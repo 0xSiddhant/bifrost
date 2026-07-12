@@ -1,0 +1,35 @@
+/*
+ * Design tokens — PLACEHOLDER values only.
+ * The real design system (fonts, initial theme, full scale) lands in PLAN-01;
+ * the theming engine (JSON themes -> these variables) lands in PLAN-04.
+ * Components must reference these variables, never raw values.
+ */
+:root {
+  /* color */
+  --color-bg: #101014;
+  --color-surface: #1a1a21;
+  --color-border: #2c2c36;
+  --color-text: #e8e8ee;
+  --color-text-muted: #8f8f9d;
+  --color-accent: #7c6cf0;
+  --color-danger: #e5484d;
+  --color-success: #46a758;
+
+  /* typography (self-hosted fonts arrive in PLAN-01) */
+  --font-body: system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-body);
+  --font-mono: ui-monospace, 'SF Mono', monospace;
+
+  /* spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
