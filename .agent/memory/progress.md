@@ -2,11 +2,11 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**Active plan: PLAN-00**
+**Active plan: PLAN-01**
 
 | Plan | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
-| PLAN-00 | Foundation (tech setup, zero feature code) | in-review | main (direct, per plan) | Implemented + all acceptance criteria verified locally; awaiting user-approved push |
+| PLAN-00 | Foundation (tech setup, zero feature code) | done | main (direct, per plan) | Pushed 2026-07-12; develop created |
 | PLAN-01 | UI/UX foundation ⛔ approval gate | not-started | — | Blocks ALL plans below until user approves |
 | PLAN-02 | File transfer (upload + download + live watch) | not-started | — | |
 | PLAN-03 | Previews + QR tool | not-started | — | |
