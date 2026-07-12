@@ -13,10 +13,16 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/network-mDNS%20%2F%20intranet%20only-8A2BE2)
 
-<!-- TODO: replace with real demo -->
-<img src="docs/assets/demo.png" alt="Bifrost demo" width="720" />
+<!-- TODO: add demo video when the features land (PLAN-02+) -->
+<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the two portals" width="720" />
 
-*[▶ Watch demo video](docs/assets/demo.mp4)*
+<img src="docs/assets/screenshot-receive.png" alt="Receive files — live download list with per-type icons" width="720" />
+
+<p>
+  <img src="docs/assets/screenshot-send-phone.png" alt="Send files on a phone" width="230" />
+  <img src="docs/assets/screenshot-receive-phone.png" alt="Receive files on a phone" width="230" />
+  <img src="docs/assets/screenshot-daybreak-phone.png" alt="Daybreak (light) theme on a phone" width="230" />
+</p>
 
 </div>
 
