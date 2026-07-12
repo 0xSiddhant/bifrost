@@ -16,7 +16,10 @@ export function lanIPv4Addresses(): string[] {
 /** Advertise the hub over Bonjour so Apple devices resolve http://<name>.local. */
 export function advertiseMdns(name: string, port: number, log: Logger): MdnsHandle {
   const bonjour = new Bonjour();
-  bonjour.publish({ name, type: 'http', port });
+  // host is what makes the responder answer A/AAAA queries for <name>.local —
+  // advertising the service alone only registers PTR/SRV/TXT, and the browser
+  // resolves the hostname, not the service.
+  bonjour.publish({ name, type: 'http', port, host: `${name}.local` });
   log.info({ name: `${name}.local`, port }, 'mdns advertisement up');
   return {
     stop: () =>
