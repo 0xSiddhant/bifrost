@@ -1,0 +1,44 @@
+{
+  "name": "bifrost",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LAN-only file transfer & sync hub — your devices, connected by the rainbow bridge",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "npm run build -w client && npm run build -w server",
+    "start": "node server/dist/app.js",
+    "logs": "tail -f storage/logs/app.log | pino-pretty",
+    "backup": "tsx scripts/backup.ts",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.1",
+    "@commitlint/config-conventional": "^21.2.0",
+    "@types/node": "^22.19.0",
+    "concurrently": "^10.0.3",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-boundaries": "^7.0.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.9.5",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.63.0"
+  }
+}
