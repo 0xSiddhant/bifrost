@@ -93,6 +93,12 @@
   --dur-2: 200ms;
   --ease: cubic-bezier(0.2, 0, 0.2, 1);
 
+  /* QR palette — modules must stay dark-on-light for scanners, but the
+     dark end can carry the theme (canvas reads these at draw time) */
+  --qr-module-a: #0f766e;
+  --qr-module-b: #6d28d9;
+  --qr-bg: #eef1fa;
+
   color-scheme: dark;
 }
 
@@ -127,6 +133,10 @@
   --glow-teal: 0 0 26px rgba(15, 157, 143, 0.22);
   --glow-violet: 0 0 26px rgba(109, 95, 208, 0.22);
   --glow-soft: 0 0 46px rgba(109, 95, 208, 0.1);
+
+  --qr-module-a: #0c5f54;
+  --qr-module-b: #4c3aa8;
+  --qr-bg: #ffffff;
 
   --tone-teal: #0f9d8f;
   --tone-teal-soft: rgba(15, 157, 143, 0.1);

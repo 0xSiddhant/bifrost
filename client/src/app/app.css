@@ -396,11 +396,20 @@
   gap: var(--space-3);
 }
 
-.qr-canvas {
+/* Bridge-gradient frame around the code — the QR is a portal, treat it like one. */
+.qr-frame {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--bridge);
+  box-shadow: var(--glow-soft);
   max-width: 100%;
-  border-radius: var(--radius-md);
-  /* White quiet zone stays visible on the dark theme. */
-  box-shadow: 0 0 0 1px var(--border);
+}
+
+.qr-canvas {
+  display: block;
+  max-width: 100%;
+  border-radius: calc(var(--radius-lg) - 3px);
 }
 
 .qr-box {
