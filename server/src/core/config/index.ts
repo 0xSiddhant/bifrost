@@ -17,6 +17,7 @@ const envSchema = z.object({
   MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(2048),
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(20),
   UPLOAD_EXT_BLOCKLIST: z.string().default('.exe,.bat,.cmd,.msi'),
+  UPLOAD_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
@@ -42,6 +43,7 @@ export interface AppConfig {
   maxUploadSizeMb: number;
   maxFilesPerUpload: number;
   uploadExtBlocklist: readonly string[];
+  uploadRateLimitPerMin: number;
   storage: StoragePaths;
   heimdall: {
     pin: string;
@@ -96,6 +98,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     uploadExtBlocklist: raw.UPLOAD_EXT_BLOCKLIST.split(',')
       .map((ext) => ext.trim().toLowerCase())
       .filter(Boolean),
+    uploadRateLimitPerMin: raw.UPLOAD_RATE_LIMIT_PER_MIN,
     storage: resolveStoragePaths(raw.STORAGE_ROOT),
     heimdall: {
       pin: raw.HEIMDALL_PIN,
