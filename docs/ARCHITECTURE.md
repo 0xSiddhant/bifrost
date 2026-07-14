@@ -25,6 +25,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `qr-tool` | QR generator utility + server-URL QR | both |
 | `presence` | Connected-device dashboard, named devices | local only |
 | `audit-log` | Upload history & activity log (event-bus subscriber) | local only |
+| `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 
 ## Core services (shared kernel — no feature imports)
 

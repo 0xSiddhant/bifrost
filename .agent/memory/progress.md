@@ -13,7 +13,9 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-04 | Theming engine | not-started | — | |
 | PLAN-05 | Heimdall admin panel | not-started | — | |
 | PLAN-06 | Clipboard sync, presence, audit log | not-started | — | |
-| PLAN-07 | Ops (PM2, backup, Docker, observability) | not-started | — | |
+| PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
+| PLAN-08 | JSON Differ | not-started | — | Plan file to be authored (owner); shares PLAN-07 components |
+| PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
