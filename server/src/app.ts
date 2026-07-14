@@ -20,6 +20,7 @@ import { advertiseMdns, lanIPv4Addresses, type MdnsHandle } from './core/mdns/in
 import { fromRepoRoot } from './core/paths.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
+import { fileTransferModule } from './modules/file-transfer/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -27,7 +28,7 @@ import { healthModule } from './modules/health/module.js';
  * append here as modules come into existence.
  */
 const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
-  local: [healthModule],
+  local: [healthModule, fileTransferModule],
   cloud: [healthModule],
 };
 
