@@ -8,7 +8,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 |---|---|---|---|---|
 | PLAN-00 | Foundation (tech setup, zero feature code) | done | main (direct, per plan) | Pushed 2026-07-12; develop created |
 | PLAN-01 | UI/UX foundation ⛔ approval gate | done | PR #2 → develop (merged 2026-07-13) | **UI approved by owner 2026-07-13**; gate cleared — PLAN-02 unlocked |
-| PLAN-02 | File transfer (upload + download + live watch) | in-review | feat/plan-02-file-transfer (local) | Implemented + verified end-to-end 2026-07-14; awaiting owner testing, then push + PR |
+| PLAN-02 | File transfer (upload + download + live watch) | in-review | PR #3 → develop | Implemented + verified 2026-07-14; owner tested locally; CI green — awaiting review/merge |
 | PLAN-03 | Previews + QR tool | not-started | — | |
 | PLAN-04 | Theming engine | not-started | — | |
 | PLAN-05 | Heimdall admin panel | not-started | — | |
