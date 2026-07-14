@@ -389,6 +389,29 @@
 }
 
 /* ── qr tool ────────────────────────────────────────────────── */
+.qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Bridge-gradient frame around the code — the QR is a portal, treat it like one. */
+.qr-frame {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  background: var(--bridge);
+  box-shadow: var(--glow-soft);
+  max-width: 100%;
+}
+
+.qr-canvas {
+  display: block;
+  max-width: 100%;
+  border-radius: calc(var(--radius-lg) - 3px);
+}
+
 .qr-box {
   display: grid;
   place-items: center;

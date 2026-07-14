@@ -24,3 +24,21 @@ export interface Capabilities {
 export function fetchCapabilities(): Promise<Capabilities> {
   return apiGet<Capabilities>('/api/capabilities');
 }
+
+/**
+ * Downloads are a shared resource: file-transfer lists them, previews views
+ * them — features can't import each other, so the contract lives here.
+ */
+export interface DownloadEntry {
+  id: string;
+  name: string;
+  size: number;
+  mtime: number;
+  ext: string;
+}
+
+export const listDownloads = (): Promise<DownloadEntry[]> =>
+  apiGet<DownloadEntry[]>('/api/downloads');
+
+export const downloadUrl = (id: string, options: { inline?: boolean } = {}): string =>
+  `/api/downloads/${id}/content${options.inline ? '?inline=1' : ''}`;

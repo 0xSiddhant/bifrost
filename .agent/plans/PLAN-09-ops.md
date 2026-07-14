@@ -1,4 +1,6 @@
-# PLAN-07 — Ops (run-for-real, backup, Docker, optional observability)
+# PLAN-09 — Ops (run-for-real, backup, Docker, optional observability)
+
+> Renumbered from PLAN-07 when Runestone (07) and JSON Differ (08) were inserted.
 
 ## Goal
 
@@ -6,7 +8,7 @@ Bifrost runs as a household appliance: starts on boot, restarts on crash, backs 
 
 ## Scope
 
-**In:** PM2 setup (+ launchd docs), backup/restore, Dockerfile + compose (Linux-target), optional Grafana+Loki+Alloy compose stack, restart-resilience test suite, cloud-profile readiness notes.
+**In:** PM2 setup (+ launchd docs), backup/restore, hardening of the PLAN-00 Dockerfile/compose for the Linux target, optional Grafana+Loki+Alloy compose stack, restart-resilience test suite, cloud-profile readiness notes.
 **Out:** actually deploying the cloud profile (future work; see PLAN-99), Postgres implementation.
 
 ## Decisions & reasoning
@@ -21,7 +23,7 @@ Bifrost runs as a household appliance: starts on boot, restarts on crash, backs 
 - [ ] `ecosystem.config.cjs` (PM2): prod env, max-memory restart, SIGINT kill timeout aligned with graceful-shutdown budget; docs: `pm2 start/startup/save`, log locations
 - [ ] `docs/launchd.md` with a ready plist
 - [ ] `scripts/backup.ts` (VACUUM INTO + zip + rotation) and `scripts/restore.ts`; both refuse to run against a live server unless `--force`
-- [ ] `Dockerfile` (multi-stage, node:20-slim, non-root user) + `docker-compose.yml` (host network, `./storage` volume) + `docs/docker-linux.md` honestly stating macOS limitations
+- [ ] Harden the PLAN-00 `Dockerfile` + `docker-compose.yml` against the now-complete app (healthcheck, tini/init, storage permissions, image size pass) + `docs/docker-linux.md` honestly stating macOS limitations; first real runtime verification on a Linux box/VM (mDNS + chokidar under host network)
 - [ ] `docker-compose.observability.yml` + Alloy config + Loki config + `grafana/dashboards/bifrost.json` provisioned; `docs/observability.md` (start/stop, it's optional)
 - [ ] Restart-resilience suite (scripted): 50× rapid stop/start; SIGKILL (not just SIGINT) mid-upload, mid-clipboard-write, mid-migration → assert clean recovery, WAL integrity (`PRAGMA integrity_check`), tmp swept
 - [ ] `docs/cloud-profile.md`: what flips for internet deployment — module manifest, Postgres repo swap points, real auth requirement, HTTPS, rate limits — the checklist future-you follows

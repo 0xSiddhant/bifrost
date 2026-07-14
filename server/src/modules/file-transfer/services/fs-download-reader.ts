@@ -11,14 +11,29 @@ import type { DownloadContent, DownloadReader } from '../ports.js';
 export class FsDownloadReader implements DownloadReader {
   constructor(private readonly downloadsDir: string) {}
 
-  async open(name: string): Promise<DownloadContent> {
+  async stat(name: string): Promise<{ size: number }> {
+    const resolved = await this.confine(name);
+    const stat = await fsp.stat(resolved);
+    if (!stat.isFile()) throw new Error('not a regular file');
+    return { size: stat.size };
+  }
+
+  async open(name: string, slice?: { start: number; end: number }): Promise<DownloadContent> {
+    const resolved = await this.confine(name);
+    const stat = await fsp.stat(resolved);
+    if (!stat.isFile()) throw new Error('not a regular file');
+    return {
+      stream: fs.createReadStream(resolved, slice ? { start: slice.start, end: slice.end } : {}),
+      size: stat.size,
+    };
+  }
+
+  private async confine(name: string): Promise<string> {
     const root = await fsp.realpath(this.downloadsDir);
     const resolved = await fsp.realpath(path.join(this.downloadsDir, name));
     if (resolved !== root && !resolved.startsWith(root + path.sep)) {
       throw new Error('path escapes downloads/');
     }
-    const stat = await fsp.stat(resolved);
-    if (!stat.isFile()) throw new Error('not a regular file');
-    return { stream: fs.createReadStream(resolved), size: stat.size };
+    return resolved;
   }
 }

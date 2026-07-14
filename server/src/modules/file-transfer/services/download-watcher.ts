@@ -1,16 +1,11 @@
-import { createHash } from 'node:crypto';
 import type { Stats } from 'node:fs';
 import path from 'node:path';
 import { watch, type FSWatcher } from 'chokidar';
 import type { DownloadEntry } from '../../../core/bus/events.js';
 import type { EventBus } from '../../../core/bus/index.js';
+import { downloadIdFor as idFor } from '../../../core/download-id.js';
 import type { Logger } from '../../../core/logger/index.js';
 import type { DownloadRegistry } from '../ports.js';
-
-/** Deterministic, opaque, stable across restarts — same file, same id. */
-function idFor(name: string): string {
-  return createHash('sha256').update(name).digest('base64url').slice(0, 16);
-}
 
 /**
  * Watches downloads/ with chokidar and owns the listing registry. The initial

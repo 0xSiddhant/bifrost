@@ -12,16 +12,35 @@ export class GetDownloadStreamUseCase {
     private readonly reader: DownloadReader,
   ) {}
 
-  async execute(id: string): Promise<DownloadContent & { name: string }> {
+  /** Name + current size, so the route can parse a Range header before streaming. */
+  async resolve(id: string): Promise<{ name: string; size: number }> {
     const name = this.registry.resolveName(id);
-    if (!name) throw new AppError('file not found', 404, 'NOT_FOUND');
+    if (!name) throw notFound();
     try {
-      const content = await this.reader.open(name);
+      const { size } = await this.reader.stat(name);
+      return { name, size };
+    } catch {
+      throw notFound();
+    }
+  }
+
+  async open(
+    id: string,
+    slice?: { start: number; end: number },
+  ): Promise<DownloadContent & { name: string }> {
+    const name = this.registry.resolveName(id);
+    if (!name) throw notFound();
+    try {
+      const content = await this.reader.open(name, slice);
       return { ...content, name };
     } catch {
       // Deleted between listing and request, or the path check failed —
       // indistinguishable to the client on purpose.
-      throw new AppError('file not found', 404, 'NOT_FOUND');
+      throw notFound();
     }
   }
+}
+
+function notFound(): AppError {
+  return new AppError('file not found', 404, 'NOT_FOUND');
 }

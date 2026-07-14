@@ -21,6 +21,8 @@ import { fromRepoRoot } from './core/paths.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
+import { previewsModule } from './modules/previews/module.js';
+import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -28,8 +30,8 @@ import { fileTransferModule } from './modules/file-transfer/module.js';
  * append here as modules come into existence.
  */
 const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
-  local: [healthModule, fileTransferModule],
-  cloud: [healthModule],
+  local: [healthModule, fileTransferModule, previewsModule, qrToolModule],
+  cloud: [healthModule, qrToolModule],
 };
 
 export interface RunningApp {
@@ -143,6 +145,12 @@ async function main(): Promise<void> {
   }
   for (const address of lanIPv4Addresses()) {
     fastify.log.info(`lan address: http://${address}:${config.port}`);
+  }
+  const [primaryUrl] = serverUrls(config);
+  if (primaryUrl) {
+    // Straight to stdout, not the logger: a multi-line ASCII QR inside a JSON
+    // log line would be unreadable. Android fallback per tech-stack.md.
+    process.stdout.write(`\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`);
   }
 
   let signalled = false;

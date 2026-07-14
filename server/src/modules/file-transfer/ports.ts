@@ -42,7 +42,12 @@ export interface DownloadContent {
 
 /** Downloads-side file access; implementation enforces the realpath prefix check. */
 export interface DownloadReader {
-  open(name: string): Promise<DownloadContent>;
+  stat(name: string): Promise<{ size: number }>;
+  /**
+   * `slice` (inclusive byte bounds) opens a partial stream for HTTP ranges;
+   * `size` in the result is always the FULL file size either way.
+   */
+  open(name: string, slice?: { start: number; end: number }): Promise<DownloadContent>;
 }
 
 export class FileTooLargeError extends Error {

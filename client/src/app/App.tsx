@@ -22,6 +22,9 @@ const UploadPage = lazy(() =>
 const DownloadsPage = lazy(() =>
   import('../features/file-transfer/DownloadsPage').then((m) => ({ default: m.DownloadsPage })),
 );
+const PreviewModal = lazy(() =>
+  import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
+);
 const ClipboardPage = lazy(() =>
   import('../features/clipboard/ClipboardPage').then((m) => ({ default: m.ClipboardPage })),
 );
@@ -91,7 +94,10 @@ export function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/upload" element={<UploadPage />} />
-            <Route path="/downloads" element={<DownloadsPage />} />
+            <Route path="/downloads" element={<DownloadsPage />}>
+              {/* Modal route: deep-linkable, back button closes the preview. */}
+              <Route path=":id/preview" element={<PreviewModal />} />
+            </Route>
             <Route path="/clipboard" element={<ClipboardPage />} />
             <Route path="/qr" element={<QrToolPage />} />
             <Route path="/heimdall" element={<HeimdallPage />} />
