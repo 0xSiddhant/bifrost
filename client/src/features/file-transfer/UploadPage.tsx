@@ -1,22 +1,159 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { FileRow } from '../../core/ui/FileRow';
 import { ProgressBar } from '../../core/ui/ProgressBar';
 import { Toast } from '../../core/ui/Toast';
 import { CheckIcon, UploadIcon } from '../../core/ui/icons';
+import { formatBytes } from '../../core/format';
+import {
+  fetchUploadConfig,
+  uploadFile,
+  UploadCancelledError,
+  type UploadConfig,
+  type UploadTask,
+} from './api';
 
-/** Static design shell — mocked queue, no real uploads (PLAN-02 wires it). */
+type ItemStatus = 'queued' | 'uploading' | 'done' | 'error' | 'cancelled';
 
-type QueueState = 'uploading' | 'error';
+interface QueueItem {
+  key: number;
+  file: File;
+  status: ItemStatus;
+  progress: number;
+  error?: string;
+}
 
-const MOCK_DONE = { name: 'vacation-photos_2026.zip', size: '184.2 MB', time: 'just now' };
-const MOCK_ACTIVE = { name: 'IMG_4021.HEIC', size: '3.1 MB', time: 'just now' };
-const MOCK_SLOW = { name: 'talk-recording.mov', size: '1.2 GB', time: 'just now' };
+const MAX_CONCURRENT_UPLOADS = 3;
+
+const STATUS_LABEL: Record<ItemStatus, string> = {
+  queued: 'waiting…',
+  uploading: 'crossing the bridge…',
+  done: 'landed in the vault',
+  error: 'failed',
+  cancelled: 'cancelled',
+};
 
 export function UploadPage() {
-  // Design-review helper only: lets the reviewer see both states. Removed in PLAN-02.
-  const [state, setState] = useState<QueueState>('uploading');
+  const [items, setItems] = useState<QueueItem[]>([]);
+  const [config, setConfig] = useState<UploadConfig | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const tasksRef = useRef(new Map<number, UploadTask>());
+  const startedRef = useRef(new Set<number>());
+  const nextKeyRef = useRef(1);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    fetchUploadConfig()
+      .then((cfg) => {
+        if (!disposed) setConfig(cfg);
+      })
+      .catch(() => {
+        // Server-side enforcement still applies; the UI just loses pre-checks.
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
+
+  const patch = (key: number, partial: Partial<QueueItem>) => {
+    setItems((prev) => prev.map((item) => (item.key === key ? { ...item, ...partial } : item)));
+  };
+
+  const begin = (item: QueueItem) => {
+    patch(item.key, { status: 'uploading', progress: 0, error: undefined });
+    const task = uploadFile(item.file, (percent) => patch(item.key, { progress: percent }));
+    tasksRef.current.set(item.key, task);
+    task.promise
+      .then(() => patch(item.key, { status: 'done', progress: 100 }))
+      .catch((error: Error) => {
+        if (error instanceof UploadCancelledError) {
+          patch(item.key, { status: 'cancelled' });
+        } else {
+          patch(item.key, { status: 'error', error: error.message });
+        }
+      })
+      .finally(() => tasksRef.current.delete(item.key));
+  };
+
+  // Upload pump: whenever the queue changes, fill free slots with waiting files.
+  useEffect(() => {
+    const uploading = items.filter((item) => item.status === 'uploading').length;
+    const waiting = items.filter(
+      (item) => item.status === 'queued' && !startedRef.current.has(item.key),
+    );
+    for (const item of waiting.slice(0, Math.max(0, MAX_CONCURRENT_UPLOADS - uploading))) {
+      startedRef.current.add(item.key);
+      begin(item);
+    }
+  });
+
+  const addFiles = (files: FileList | File[]) => {
+    const maxBytes = config ? config.maxUploadSizeMb * 1024 * 1024 : null;
+    const additions: QueueItem[] = [...files].map((file) => {
+      const key = nextKeyRef.current++;
+      const ext = `.${file.name.toLowerCase().split('.').pop() ?? ''}`;
+      if (maxBytes !== null && file.size > maxBytes) {
+        return {
+          key,
+          file,
+          status: 'error',
+          progress: 0,
+          error: `larger than the ${formatBytes(maxBytes)} limit — not sent`,
+        };
+      }
+      if (config?.blockedExtensions.includes(ext)) {
+        return { key, file, status: 'error', progress: 0, error: 'this file type is blocked' };
+      }
+      return { key, file, status: 'queued', progress: 0 };
+    });
+    if (additions.length > 0) setItems((prev) => [...prev, ...additions]);
+  };
+
+  const cancel = (item: QueueItem) => {
+    const task = tasksRef.current.get(item.key);
+    if (task) {
+      task.cancel(); // status flips via the promise rejection
+    } else {
+      patch(item.key, { status: 'cancelled' });
+    }
+  };
+
+  const retry = (item: QueueItem) => {
+    startedRef.current.delete(item.key);
+    patch(item.key, { status: 'queued', progress: 0, error: undefined });
+  };
+
+  const clearSettled = () => {
+    setItems((prev) =>
+      prev.filter((item) => item.status === 'queued' || item.status === 'uploading'),
+    );
+  };
+
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
+    setDragActive(false);
+    addFiles(event.dataTransfer.files);
+  };
+
+  const onPick = (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) addFiles(event.target.files);
+    event.target.value = '';
+  };
+
+  const onDropzoneKey = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      inputRef.current?.click();
+    }
+  };
+
+  const firstError = items.find((item) => item.status === 'error');
+  const hasSettled = items.some(
+    (item) => item.status === 'done' || item.status === 'error' || item.status === 'cancelled',
+  );
 
   return (
     <>
@@ -26,71 +163,124 @@ export function UploadPage() {
           <h2>Send files</h2>
           <p>Files land in a write-only vault on the host — nothing here can be read back.</p>
         </div>
-        <div className="state-switch" aria-label="Design review states">
-          <Button variant="ghost" size="sm" onClick={() => setState('uploading')}>
-            state: uploading
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setState('error')}>
-            state: error
-          </Button>
-        </div>
       </div>
 
       <div className="stack">
-        <div className="dropzone" role="button" tabIndex={0}>
+        <div
+          className={dragActive ? 'dropzone dropzone--active' : 'dropzone'}
+          role="button"
+          tabIndex={0}
+          aria-label="Choose files to upload"
+          onClick={() => inputRef.current?.click()}
+          onKeyDown={onDropzoneKey}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={onDrop}
+        >
           <UploadIcon size={32} />
           <strong>Drop files here or tap to browse</strong>
-          <span className="caption">Up to 20 files · 2 GB each · straight over your Wi-Fi</span>
+          <span className="caption">
+            {config
+              ? `Up to ${config.maxFilesPerUpload} files · ${formatBytes(config.maxUploadSizeMb * 1024 * 1024)} each · straight over your Wi-Fi`
+              : 'Straight over your Wi-Fi — no cloud in between'}
+          </span>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            hidden
+            onChange={onPick}
+            aria-hidden="true"
+            tabIndex={-1}
+          />
         </div>
 
-        {state === 'error' && (
+        {firstError && (
           <Toast kind="danger">
-            talk-recording.mov failed — connection interrupted. The vault kept nothing partial.
+            {firstError.file.name} failed — {firstError.error ?? 'unknown error'}
           </Toast>
         )}
 
-        <Card>
-          <FileRow
-            name={MOCK_DONE.name}
-            size={MOCK_DONE.size}
-            time={MOCK_DONE.time}
-            aside={
-              <span className="badge badge--ok">
-                <CheckIcon size={12} /> done
-              </span>
-            }
-          />
-          <FileRow
-            name={MOCK_ACTIVE.name}
-            size={MOCK_ACTIVE.size}
-            time={MOCK_ACTIVE.time}
-            aside={<span className="badge">62%</span>}
-          >
-            <ProgressBar value={62} label="IMG_4021.HEIC upload progress" />
-          </FileRow>
-          <FileRow
-            name={MOCK_SLOW.name}
-            size={MOCK_SLOW.size}
-            time={MOCK_SLOW.time}
-            aside={
-              state === 'error' ? (
-                <Button variant="ghost" size="sm">
-                  Retry
-                </Button>
-              ) : (
-                <span className="badge">28%</span>
-              )
-            }
-          >
-            <ProgressBar value={state === 'error' ? 41 : 28} error={state === 'error'} />
-          </FileRow>
-        </Card>
+        {items.length > 0 && (
+          <Card>
+            {items.map((item) => (
+              <FileRow
+                key={item.key}
+                name={item.file.name}
+                size={formatBytes(item.file.size)}
+                time={STATUS_LABEL[item.status]}
+                aside={<ItemAside item={item} onCancel={cancel} onRetry={retry} />}
+              >
+                {(item.status === 'uploading' || item.status === 'error') && (
+                  <ProgressBar
+                    value={item.progress}
+                    error={item.status === 'error'}
+                    label={`${item.file.name} upload progress`}
+                  />
+                )}
+              </FileRow>
+            ))}
+          </Card>
+        )}
 
         <div className="row">
-          <Button variant="ghost">Add more files</Button>
-          <Button variant="ghost">Clear finished</Button>
+          <Button variant="ghost" onClick={() => inputRef.current?.click()}>
+            Add more files
+          </Button>
+          {hasSettled && (
+            <Button variant="ghost" onClick={clearSettled}>
+              Clear finished
+            </Button>
+          )}
         </div>
       </div>
     </>
   );
+}
+
+function ItemAside({
+  item,
+  onCancel,
+  onRetry,
+}: {
+  item: QueueItem;
+  onCancel: (item: QueueItem) => void;
+  onRetry: (item: QueueItem) => void;
+}) {
+  switch (item.status) {
+    case 'done':
+      return (
+        <span className="badge badge--ok">
+          <CheckIcon size={12} /> done
+        </span>
+      );
+    case 'uploading':
+      return (
+        <span className="row">
+          <span className="badge">{Math.floor(item.progress)}%</span>
+          <Button variant="ghost" size="sm" onClick={() => onCancel(item)}>
+            Cancel
+          </Button>
+        </span>
+      );
+    case 'queued':
+      return (
+        <Button variant="ghost" size="sm" onClick={() => onCancel(item)}>
+          Cancel
+        </Button>
+      );
+    case 'error':
+    case 'cancelled':
+      return (
+        <span className="row">
+          {item.status === 'error' && <span className="badge badge--danger">failed</span>}
+          <Button variant="ghost" size="sm" onClick={() => onRetry(item)}>
+            Retry
+          </Button>
+        </span>
+      );
+  }
 }

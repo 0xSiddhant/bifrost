@@ -448,6 +448,11 @@
   background: var(--accent-soft);
 }
 
+.badge--danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .check-row {
   display: flex;
   align-items: center;
