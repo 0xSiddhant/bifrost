@@ -33,7 +33,7 @@ describe('boot → health → capabilities', () => {
   it('GET /api/capabilities lists the loaded modules', async () => {
     const response = await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ profile: 'local', modules: ['health'] });
+    expect(response.json()).toEqual({ profile: 'local', modules: ['health', 'file-transfer'] });
   });
 
   it('unknown API routes return a clean JSON 404 (no paths leaked)', async () => {
