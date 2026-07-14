@@ -86,7 +86,7 @@ export function QrCard({ text, size = 240, label, downloadName }: QrCardProps) {
     if (!canvas || !downloadName) return;
     const link = document.createElement('a');
     link.href = canvas.toDataURL('image/png');
-    link.download = downloadName;
+    link.download = withContentSlug(downloadName, text);
     link.click();
   };
 
@@ -108,6 +108,25 @@ export function QrCard({ text, size = 240, label, downloadName }: QrCardProps) {
       )}
     </div>
   );
+}
+
+/**
+ * "bifrost-qr.png" + "https://example.com/x" → "bifrost-qr-example-com-x.png":
+ * a saved code should say what it encodes without being opened.
+ */
+function withContentSlug(baseName: string, content: string): string {
+  const slug = content
+    .toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '') // scheme adds noise, not identity
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/, '');
+  if (!slug) return baseName;
+  const dot = baseName.lastIndexOf('.');
+  const stem = dot > 0 ? baseName.slice(0, dot) : baseName;
+  const ext = dot > 0 ? baseName.slice(dot) : '';
+  return `${stem}-${slug}${ext}`;
 }
 
 const QUIET_ZONE_MODULES = 2;
