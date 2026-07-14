@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { Link, Outlet } from 'react-router-dom';
+import { downloadUrl, type DownloadEntry } from '../../core/api';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
-import { FileRow } from '../../core/ui/FileRow';
+import { FileRow, kindOf } from '../../core/ui/FileRow';
 import { Input, Select } from '../../core/ui/Field';
-import { DownloadIcon, FolderIcon } from '../../core/ui/icons';
+import { DownloadIcon, EyeIcon, FolderIcon } from '../../core/ui/icons';
 import { formatBytes, formatTimeAgo } from '../../core/format';
-import { downloadUrl, type DownloadEntry } from './api';
 import { useDownloads } from './useDownloads';
 
 type SortKey = 'newest' | 'name' | 'size';
@@ -15,6 +16,9 @@ const SORTERS: Record<SortKey, (a: DownloadEntry, b: DownloadEntry) => number> =
   name: (a, b) => a.name.localeCompare(b.name),
   size: (a, b) => b.size - a.size,
 };
+
+/** Client-side hint only — the preview modal asks /meta for the truth. */
+const mayPreview = (name: string): boolean => !['archive', 'other'].includes(kindOf(name));
 
 export function DownloadsPage() {
   const { entries, sseStatus } = useDownloads();
@@ -90,19 +94,35 @@ export function DownloadsPage() {
               size={formatBytes(entry.size)}
               time={formatTimeAgo(entry.mtime)}
               aside={
-                <a
-                  className="btn btn--ghost btn--icon"
-                  href={downloadUrl(entry.id)}
-                  download={entry.name}
-                  aria-label={`Download ${entry.name}`}
-                >
-                  <DownloadIcon size={18} />
-                </a>
+                <span className="row">
+                  {mayPreview(entry.name) && (
+                    <Link
+                      className="btn btn--ghost btn--icon"
+                      to={`${entry.id}/preview`}
+                      aria-label={`Preview ${entry.name}`}
+                    >
+                      <EyeIcon size={18} />
+                    </Link>
+                  )}
+                  <a
+                    className="btn btn--ghost btn--icon"
+                    href={downloadUrl(entry.id)}
+                    download={entry.name}
+                    aria-label={`Download ${entry.name}`}
+                  >
+                    <DownloadIcon size={18} />
+                  </a>
+                </span>
               }
             />
           ))}
         </Card>
       )}
+
+      {/* Preview modal route (/downloads/:id/preview) renders here. */}
+      <Suspense fallback={null}>
+        <Outlet context={{ entries: visible }} />
+      </Suspense>
     </>
   );
 }

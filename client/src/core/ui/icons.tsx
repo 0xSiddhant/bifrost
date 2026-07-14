@@ -150,3 +150,22 @@ export const AudioFileIcon = (p: IconProps) => (
     <circle cx="17" cy="16" r="2" />
   </svg>
 );
+
+export const EyeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+export const ChevronLeftIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m14 6-6 6 6 6" />
+  </svg>
+);
+
+export const ChevronRightIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m10 6 6 6-6 6" />
+  </svg>
+);

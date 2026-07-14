@@ -395,6 +395,143 @@
   gap: var(--space-3);
 }
 
+/* ── Preview modal (previews feature) ───────────────────────── */
+.modal--preview {
+  max-width: min(56rem, 94vw);
+  max-height: 92dvh;
+}
+
+.preview-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.preview-body {
+  flex: 1;
+  min-height: 12rem;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+}
+
+.preview-media {
+  max-width: 100%;
+  max-height: 70dvh;
+  border-radius: var(--radius-md);
+}
+
+.preview-audio {
+  width: 100%;
+}
+
+.preview-pdf {
+  width: 100%;
+  height: 70dvh;
+  border: none;
+  border-radius: var(--radius-md);
+}
+
+.preview-markdown,
+.preview-text {
+  justify-self: stretch;
+  max-height: 70dvh;
+  overflow: auto;
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.preview-markdown :is(h1, h2, h3, h4) {
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.preview-markdown :is(p, ul, ol, blockquote) {
+  margin-bottom: var(--space-3);
+}
+
+.preview-markdown :is(ul, ol) {
+  padding-left: var(--space-6);
+}
+
+.preview-markdown blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-3);
+  color: var(--text-muted);
+}
+
+.preview-markdown code,
+.preview-text code {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.preview-markdown pre,
+.preview-text {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+
+.preview-markdown img {
+  max-width: 100%;
+}
+
+.preview-markdown table {
+  border-collapse: collapse;
+}
+
+.preview-markdown :is(td, th) {
+  border: 1px solid var(--border);
+  padding: var(--space-1) var(--space-2);
+}
+
+.preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* highlight.js token colors from design tokens — theme-aware for free. */
+.preview-text .hljs-comment,
+.preview-text .hljs-quote,
+.preview-text .hljs-meta {
+  color: var(--text-muted);
+}
+
+.preview-text .hljs-keyword,
+.preview-text .hljs-selector-tag,
+.preview-text .hljs-built_in,
+.preview-text .hljs-tag {
+  color: var(--accent);
+}
+
+.preview-text .hljs-string,
+.preview-text .hljs-regexp,
+.preview-text .hljs-addition {
+  color: var(--ok);
+}
+
+.preview-text .hljs-number,
+.preview-text .hljs-literal,
+.preview-text .hljs-symbol,
+.preview-text .hljs-attribute,
+.preview-text .hljs-attr {
+  color: var(--tone-violet);
+}
+
+.preview-text .hljs-title,
+.preview-text .hljs-name,
+.preview-text .hljs-section {
+  color: var(--warn);
+}
+
+.preview-text .hljs-deletion {
+  color: var(--danger);
+}
+
 /* ── Field (Input / Select) ─────────────────────────────────── */
 .field {
   display: flex;

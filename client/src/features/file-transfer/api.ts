@@ -1,13 +1,5 @@
 import { apiGet } from '../../core/api';
 
-export interface DownloadEntry {
-  id: string;
-  name: string;
-  size: number;
-  mtime: number;
-  ext: string;
-}
-
 export interface UploadConfig {
   maxUploadSizeMb: number;
   maxFilesPerUpload: number;
@@ -19,13 +11,8 @@ export interface UploadOutcome {
   rejected: { name: string; reason: string }[];
 }
 
-export const listDownloads = (): Promise<DownloadEntry[]> =>
-  apiGet<DownloadEntry[]>('/api/downloads');
-
 export const fetchUploadConfig = (): Promise<UploadConfig> =>
   apiGet<UploadConfig>('/api/files/config');
-
-export const downloadUrl = (id: string): string => `/api/downloads/${id}/content`;
 
 export class UploadCancelledError extends Error {
   override name = 'UploadCancelledError';

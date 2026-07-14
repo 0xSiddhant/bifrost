@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { bifrostEvents, type SseStatus } from '../../core/sse';
-import { listDownloads, type DownloadEntry } from './api';
+import { listDownloads, type DownloadEntry } from '../../core/api';
 
 export interface DownloadsState {
   /** null while the first fetch is in flight. */
