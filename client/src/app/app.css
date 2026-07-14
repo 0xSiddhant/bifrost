@@ -389,6 +389,20 @@
 }
 
 /* ── qr tool ────────────────────────────────────────────────── */
+.qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.qr-canvas {
+  max-width: 100%;
+  border-radius: var(--radius-md);
+  /* White quiet zone stays visible on the dark theme. */
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 .qr-box {
   display: grid;
   place-items: center;
