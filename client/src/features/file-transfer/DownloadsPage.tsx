@@ -1,25 +1,33 @@
-import { useState } from 'react';
-import { Button } from '../../core/ui/Button';
+import { useMemo, useState } from 'react';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { FileRow } from '../../core/ui/FileRow';
 import { Input, Select } from '../../core/ui/Field';
 import { DownloadIcon, FolderIcon } from '../../core/ui/icons';
+import { formatBytes, formatTimeAgo } from '../../core/format';
+import { downloadUrl, type DownloadEntry } from './api';
+import { useDownloads } from './useDownloads';
 
-/** Static design shell — the live SSE-fed list arrives in PLAN-02. */
+type SortKey = 'newest' | 'name' | 'size';
 
-const MOCK_FILES = [
-  { name: 'family-album-june.zip', size: '412.7 MB', time: '2m ago' },
-  { name: 'flight-tickets.pdf', size: '184 KB', time: '18m ago' },
-  { name: 'demo-cut-v3.mp4', size: '1.4 GB', time: '1h ago' },
-  { name: 'IMG_3990.HEIC', size: '2.8 MB', time: '3h ago' },
-  { name: 'podcast-episode-12.mp3', size: '58.1 MB', time: 'yesterday' },
-  { name: 'tax-notes-2026.md', size: '12 KB', time: 'yesterday' },
-];
+const SORTERS: Record<SortKey, (a: DownloadEntry, b: DownloadEntry) => number> = {
+  newest: (a, b) => b.mtime - a.mtime,
+  name: (a, b) => a.name.localeCompare(b.name),
+  size: (a, b) => b.size - a.size,
+};
 
 export function DownloadsPage() {
-  // Design-review helper only: shows the empty state. Removed in PLAN-02.
-  const [empty, setEmpty] = useState(false);
+  const { entries, sseStatus } = useDownloads();
+  const [query, setQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('newest');
+
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const filtered = (entries ?? []).filter(
+      (entry) => needle === '' || entry.name.toLowerCase().includes(needle),
+    );
+    return filtered.sort(SORTERS[sortKey]);
+  }, [entries, query, sortKey]);
 
   return (
     <>
@@ -31,46 +39,65 @@ export function DownloadsPage() {
             Drop something into the downloads folder on the host — it appears here instantly.
           </p>
         </div>
-        <div className="state-switch" aria-label="Design review states">
-          <Button variant="ghost" size="sm" onClick={() => setEmpty(false)}>
-            state: files
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setEmpty(true)}>
-            state: empty
-          </Button>
-        </div>
       </div>
 
       <div className="toolbar">
-        <Input label="Search" type="search" placeholder="Filter by name…" />
-        <Select label="Sort">
-          <option>Newest first</option>
-          <option>Name</option>
-          <option>Size</option>
+        <Input
+          label="Search"
+          type="search"
+          placeholder="Filter by name…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <Select
+          label="Sort"
+          value={sortKey}
+          onChange={(event) => setSortKey(event.target.value as SortKey)}
+        >
+          <option value="newest">Newest first</option>
+          <option value="name">Name</option>
+          <option value="size">Size</option>
         </Select>
-        <span className="badge badge--ok">● live</span>
+        {sseStatus === 'open' ? (
+          <span className="badge badge--ok">● live</span>
+        ) : (
+          <span className="badge">○ reconnecting…</span>
+        )}
       </div>
 
-      {empty ? (
+      {entries === null ? (
+        <Card>
+          <EmptyState icon={<FolderIcon size={28} />} title="Summoning the listing…" />
+        </Card>
+      ) : visible.length === 0 ? (
         <Card>
           <EmptyState
             icon={<FolderIcon size={28} />}
-            title="The bridge is quiet"
-            hint="Files dropped into storage/downloads on the host will appear here, on every device, the moment they land."
+            title={query ? 'Nothing matches your search' : 'The bridge is quiet'}
+            hint={
+              query
+                ? undefined
+                : 'Files dropped into storage/downloads on the host will appear here, on every device, the moment they land.'
+            }
           />
         </Card>
       ) : (
         <Card>
-          {MOCK_FILES.map((file) => (
+          {visible.map((entry) => (
             <FileRow
-              key={file.name}
-              name={file.name}
-              size={file.size}
-              time={file.time}
+              key={entry.id}
+              name={entry.name}
+              size={formatBytes(entry.size)}
+              time={formatTimeAgo(entry.mtime)}
               aside={
-                <Button variant="ghost" size="icon" aria-label={`Download ${file.name}`}>
+                <a
+                  className="btn btn--ghost btn--icon"
+                  href={downloadUrl(entry.id)}
+                  download={entry.name}
+                  aria-label={`Download ${entry.name}`}
+                >
                   <DownloadIcon size={18} />
-                </Button>
+                </a>
               }
             />
           ))}

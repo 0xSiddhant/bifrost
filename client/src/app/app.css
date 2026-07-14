@@ -380,7 +380,8 @@
     background var(--dur-2) var(--ease);
 }
 
-.dropzone:hover {
+.dropzone:hover,
+.dropzone--active {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
