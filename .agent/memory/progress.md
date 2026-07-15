@@ -10,7 +10,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-01 | UI/UX foundation ⛔ approval gate | done | PR #2 → develop (merged 2026-07-13) | **UI approved by owner 2026-07-13**; gate cleared — PLAN-02 unlocked |
 | PLAN-02 | File transfer (upload + download + live watch) | done | PR #3 → develop (merged 2026-07-14) | Owner tested locally; CI green — PLAN-03 unlocked |
 | PLAN-03 | Previews + QR tool | in-review | feat/plan-03-previews-qr (local) | Implemented + verified 2026-07-14; awaiting owner testing, then push + PR |
-| PLAN-04 | Theming engine | in-review | feat/plan-04-theming (local) | Implemented + verified 2026-07-15; awaiting owner testing, then push + PR |
+| PLAN-04 | Theming engine | in-review | PR #5 → develop | Implemented + verified 2026-07-15; owner tested; awaiting review/merge |
 | PLAN-05 | Heimdall admin panel | not-started | — | |
 | PLAN-06 | Clipboard sync, presence, audit log | not-started | — | |
 | PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
