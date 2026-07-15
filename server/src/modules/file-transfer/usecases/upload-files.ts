@@ -27,7 +27,10 @@ export interface UploadFilesDeps {
 export class UploadFilesUseCase {
   constructor(private readonly deps: UploadFilesDeps) {}
 
-  async execute(files: AsyncIterable<IncomingFile>): Promise<UploadResult> {
+  async execute(
+    files: AsyncIterable<IncomingFile>,
+    context: { uploaderHint?: string } = {},
+  ): Promise<UploadResult> {
     const { repo, bus, log, maxBytes, blockedExtensions } = this.deps;
     const now = this.deps.now ?? Date.now;
     const result: UploadResult = { accepted: [], rejected: [] };
@@ -53,6 +56,7 @@ export class UploadFilesUseCase {
           storedName,
           size: written.bytes,
           uploadedAt: now(),
+          uploaderHint: context.uploaderHint,
         });
         log.info({ file: storedName, bytes: written.bytes }, 'upload accepted');
       } catch (error) {
