@@ -28,11 +28,23 @@ export interface FileUploadedEvent {
   uploadedAt: number;
 }
 
+/** One validated theme as the listing/SSE payload shows it. */
+export interface ThemeSummary {
+  id: string;
+  name: string;
+  mode: 'dark' | 'light';
+  preview: { bg: string; accent: string };
+  builtIn: boolean;
+  /** Contrast lint findings — warn, never block (PLAN-04). */
+  warnings: string[];
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;
+  'theme.updated': { themes: ThemeSummary[] };
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

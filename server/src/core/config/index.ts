@@ -18,6 +18,9 @@ const envSchema = z.object({
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(20),
   UPLOAD_EXT_BLOCKLIST: z.string().default('.exe,.bat,.cmd,.msi'),
   UPLOAD_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
+  THEMES_DIR: z.string().min(1).default('./themes'),
+  // Placeholder gate until Heimdall sessions (PLAN-05) guard theme writes.
+  THEME_WRITE_API: z.enum(['0', '1']).default('1'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
@@ -44,6 +47,16 @@ export interface AppConfig {
   maxFilesPerUpload: number;
   uploadExtBlocklist: readonly string[];
   uploadRateLimitPerMin: number;
+  themes: {
+    dir: string;
+    writeApi: boolean;
+    /**
+     * Explicit server default (DB settings overlay, Heimdall-set in PLAN-05).
+     * null = not configured — clients then fall through to their
+     * prefers-color-scheme match (resolution order in PLAN-04).
+     */
+    defaultId: string | null;
+  };
   storage: StoragePaths;
   heimdall: {
     pin: string;
@@ -99,6 +112,11 @@ export function loadConfig(env: Env = process.env): AppConfig {
       .map((ext) => ext.trim().toLowerCase())
       .filter(Boolean),
     uploadRateLimitPerMin: raw.UPLOAD_RATE_LIMIT_PER_MIN,
+    themes: {
+      dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
+      writeApi: raw.THEME_WRITE_API === '1',
+      defaultId: null,
+    },
     storage: resolveStoragePaths(raw.STORAGE_ROOT),
     heimdall: {
       pin: raw.HEIMDALL_PIN,
@@ -124,6 +142,9 @@ export interface SettingsRow {
 const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
   'heimdall.shortcut': (config, value) => {
     config.heimdall.shortcut = value;
+  },
+  'themes.default': (config, value) => {
+    if (/^[a-z0-9-]{2,32}$/.test(value)) config.themes.defaultId = value;
   },
   'heimdall.tapCount': (config, value) => {
     const count = Number(value);

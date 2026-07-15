@@ -12,7 +12,7 @@ Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see
 | 05 | Heimdall admin panel | PLAN-04 merged |
 | 06 | Clipboard sync · device presence · audit log | PLAN-05 merged |
 | 07 | Runestone — JSON viewer/editor (Part A) + saved library (Part B) | PLAN-06 merged. **Declared exception: two PRs** — `feat/plan-07a-runestone-editor`, then `feat/plan-07b-runestone-library` after A merges |
-| 08 | JSON Differ — *plan file to be authored* (shares PLAN-07's components) | PLAN-07 (both parts) merged |
+| 08 | Variant — JSON & text diff checker (shares PLAN-07's components) | PLAN-07 (both parts) merged |
 | 09 | Ops — PM2, backup, Docker (Linux future), optional Grafana stack *(renumbered from 07)* | PLAN-08 merged |
 | 99 | Future backlog | Reference only — pull items into new numbered plans when scheduled |
 

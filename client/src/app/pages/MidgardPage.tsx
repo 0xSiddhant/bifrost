@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { PortalCard } from '../../core/ui/Card';
 import { DownloadIcon, UploadIcon } from '../../core/ui/icons';
 
-export function HomePage() {
+export function MidgardPage() {
   return (
     <>
       <section className="hero">
@@ -36,7 +36,7 @@ export function HomePage() {
         ᛒᛁᚠᚱᛟᛋᛏ
       </div>
 
-      <p className="home-links caption">
+      <p className="midgard-links caption">
         Also on the bridge: <Link to="/clipboard">Clipboard sync</Link> ·{' '}
         <Link to="/qr">QR tool</Link>
       </p>

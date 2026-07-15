@@ -329,7 +329,7 @@
   margin-left: auto;
 }
 
-/* ── home ───────────────────────────────────────────────────── */
+/* ── midgard (landing) ──────────────────────────────────────── */
 .hero {
   text-align: center;
   padding: var(--space-8) 0 var(--space-12);
@@ -358,7 +358,7 @@
   gap: var(--space-6);
 }
 
-.home-links {
+.midgard-links {
   margin-top: var(--space-6);
   text-align: center;
 }
