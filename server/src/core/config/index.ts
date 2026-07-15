@@ -19,12 +19,17 @@ const envSchema = z.object({
   UPLOAD_EXT_BLOCKLIST: z.string().default('.exe,.bat,.cmd,.msi'),
   UPLOAD_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
   THEMES_DIR: z.string().min(1).default('./themes'),
-  // Placeholder gate until Heimdall sessions (PLAN-05) guard theme writes.
-  THEME_WRITE_API: z.enum(['0', '1']).default('1'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
   HEIMDALL_TAP_COUNT: z.coerce.number().int().min(3).max(20).default(7),
+  // Encryption key for the admin session cookie (@fastify/secure-session).
+  // Optional: when unset, a random key is generated at boot — sessions then
+  // reset on restart. Set it (≥ 32 chars) to keep sessions across restarts.
+  HEIMDALL_SESSION_SECRET: z
+    .string()
+    .min(32, 'must be at least 32 characters when set')
+    .optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   BACKUP_DIR: z.string().default(''),
 });
@@ -49,7 +54,6 @@ export interface AppConfig {
   uploadRateLimitPerMin: number;
   themes: {
     dir: string;
-    writeApi: boolean;
     /**
      * Explicit server default (DB settings overlay, Heimdall-set in PLAN-05).
      * null = not configured — clients then fall through to their
@@ -62,6 +66,8 @@ export interface AppConfig {
     pin: string;
     shortcut: string;
     tapCount: number;
+    /** null = generate a random session key at boot (sessions reset on restart). */
+    sessionSecret: string | null;
   };
   logLevel: LogLevel;
   backupDir: string | null;
@@ -114,7 +120,6 @@ export function loadConfig(env: Env = process.env): AppConfig {
     uploadRateLimitPerMin: raw.UPLOAD_RATE_LIMIT_PER_MIN,
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
-      writeApi: raw.THEME_WRITE_API === '1',
       defaultId: null,
     },
     storage: resolveStoragePaths(raw.STORAGE_ROOT),
@@ -122,6 +127,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
       pin: raw.HEIMDALL_PIN,
       shortcut: raw.HEIMDALL_SHORTCUT_DEFAULT,
       tapCount: raw.HEIMDALL_TAP_COUNT,
+      sessionSecret: raw.HEIMDALL_SESSION_SECRET ?? null,
     },
     logLevel: raw.LOG_LEVEL,
     backupDir: raw.BACKUP_DIR || null,
