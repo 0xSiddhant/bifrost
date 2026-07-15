@@ -10,7 +10,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-01 | UI/UX foundation ⛔ approval gate | done | PR #2 → develop (merged 2026-07-13) | **UI approved by owner 2026-07-13**; gate cleared — PLAN-02 unlocked |
 | PLAN-02 | File transfer (upload + download + live watch) | done | PR #3 → develop (merged 2026-07-14) | Owner tested locally; CI green — PLAN-03 unlocked |
 | PLAN-03 | Previews + QR tool | in-review | feat/plan-03-previews-qr (local) | Implemented + verified 2026-07-14; awaiting owner testing, then push + PR |
-| PLAN-04 | Theming engine | not-started | — | |
+| PLAN-04 | Theming engine | in-review | feat/plan-04-theming (local) | Implemented + verified 2026-07-15; awaiting owner testing, then push + PR |
 | PLAN-05 | Heimdall admin panel | not-started | — | |
 | PLAN-06 | Clipboard sync, presence, audit log | not-started | — | |
 | PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
@@ -19,6 +19,8 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
+
+- 2026-07-15 — PLAN-04 implemented: `themes` module both profiles (draft-2020-12 schema + ajv all-errors validation, fs store + chokidar watcher with silent boot scan, derived-defaults resolver so a 14-color theme themes everything, contrast lint warn-only, routes GET/POST/DELETE with `THEME_WRITE_API` flag until PLAN-05 auth); built-ins rewritten as `themes/aurora.json`/`daybreak.json`; `--syn-*` tokens added; client engine (fetch → inline `:root` vars → localStorage cache, FOUC inline script in index.html, SSE `theme.updated` live refresh, pure `resolveThemeChoice` resolution) + ThemeSwitcher dropdown replacing ThemeToggle; client workspace gained vitest. 117 server + 6 client tests green. Live-verified: watcher pickup 483 ms, invalid file skipped, 422 ajv paths, 403 built-in delete, SSE frames. docs/THEME-SPEC.md written. Awaiting owner browser pass; not pushed.
 
 - 2026-07-14 (later) — PLAN-03 implemented: core range parser (single-range, 206/416) + inline mime map + shared download-id; file-transfer content route gained Range/`?inline=1`; `previews` module (file-type sniffing, kind resolver, `GET /api/downloads/:id/meta`, local profile); `qr-tool` module (`GET /api/qr/server-url`, boot-log ASCII QR, both profiles). Client: preview modal route `/downloads/:id/preview` (image/video/audio/pdf/markdown/text viewers, esc/arrow nav), downloads preview affordance, shared `<QrCard>` + live QR page. 94 tests green. Verified live: iOS-style `bytes=0-1` probe → 206, mid-file seek, suffix, 416; lying `.txt`-with-png-bytes → kind image; zip → download-only; deep link serves SPA. Manual device pass (video scrub iOS/Android, pinch zoom, PDF) still owed. Awaiting owner testing; not pushed.
 
