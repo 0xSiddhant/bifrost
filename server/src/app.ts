@@ -23,6 +23,7 @@ import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
 import { previewsModule } from './modules/previews/module.js';
 import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
+import { themesModule } from './modules/themes/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -30,8 +31,8 @@ import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.j
  * append here as modules come into existence.
  */
 const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
-  local: [healthModule, fileTransferModule, previewsModule, qrToolModule],
-  cloud: [healthModule, qrToolModule],
+  local: [healthModule, fileTransferModule, previewsModule, qrToolModule, themesModule],
+  cloud: [healthModule, qrToolModule, themesModule],
 };
 
 export interface RunningApp {
