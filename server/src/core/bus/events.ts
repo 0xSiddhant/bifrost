@@ -26,6 +26,17 @@ export interface FileUploadedEvent {
   size: number;
   /** Epoch milliseconds. */
   uploadedAt: number;
+  /** Best-effort uploader identity (request IP) for the Heimdall metadata view; absent when unknown. */
+  uploaderHint?: string;
+}
+
+/**
+ * Runtime settings changed in Heimdall (PLAN-05). Broadcast so open clients
+ * rebind the entry gesture without a reload.
+ */
+export interface SettingsUpdatedEvent {
+  shortcut: string;
+  tapCount: number;
 }
 
 /** One validated theme as the listing/SSE payload shows it. */
@@ -45,6 +56,7 @@ export interface BifrostEventMap {
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;
   'theme.updated': { themes: ThemeSummary[] };
+  'settings.updated': SettingsUpdatedEvent;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

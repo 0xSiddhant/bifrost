@@ -35,7 +35,7 @@ describe('boot → health → capabilities', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       profile: 'local',
-      modules: ['health', 'file-transfer', 'previews', 'qr-tool', 'themes'],
+      modules: ['health', 'file-transfer', 'previews', 'qr-tool', 'themes', 'heimdall'],
     });
   });
 

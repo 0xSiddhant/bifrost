@@ -36,7 +36,9 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
         throw new AppError('request body too large', 413, 'PAYLOAD_TOO_LARGE');
       }
 
-      const result = await deps.uploadFiles.execute(incomingFiles(request)).catch((error) => {
+      const result = await deps.uploadFiles
+        .execute(incomingFiles(request), { uploaderHint: request.ip })
+        .catch((error) => {
         // Busboy aborts the whole request past the files cap — surface it as a
         // clean 413 instead of the generic opaque 500.
         if ((error as { code?: string }).code === 'FST_FILES_LIMIT') {

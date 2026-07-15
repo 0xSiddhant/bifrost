@@ -4,6 +4,7 @@ import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
+import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import {
   ClipboardIcon,
   DownloadIcon,
@@ -50,6 +51,7 @@ const NAV = [
 
 export function App() {
   const { capabilities } = useCapabilities();
+  const { registerTap } = useHeimdallGesture();
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
 
   useEffect(() => {
@@ -68,7 +70,9 @@ export function App() {
       </div>
       <div className="bridge-strip" aria-hidden="true" />
       <header className="shell-header">
-        <NavLink to="/" className="wordmark">
+        {/* Home link, and the mobile Heimdall tap target (the footer mark is
+            hidden on phones). 7 rapid taps open the gate; single taps go home. */}
+        <NavLink to="/" className="wordmark" onClick={registerTap}>
           Bifrost
         </NavLink>
         <nav className="nav nav--top" aria-label="Main">
@@ -116,7 +120,15 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
-        <span className="mono caption">bifrost.local</span>
+        {/* The server-identity mark doubles as the hidden touch entry to
+            Heimdall — N taps within 3s. Not a link, not labelled. */}
+        <span
+          className="mono caption footer-mark"
+          onClick={registerTap}
+          aria-hidden="true"
+        >
+          bifrost.local
+        </span>
         <span className="caption">
           profile: {capabilities?.profile ?? '—'} · v0.1.0 ·{' '}
           <span className={`sse-dot sse-${sseStatus}`} /> {sseStatus}

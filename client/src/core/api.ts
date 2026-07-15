@@ -16,6 +16,27 @@ export async function apiGet<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * POST/PATCH/DELETE with an optional JSON body. Same-origin cookies ride along
+ * by default (fetch credentials: 'same-origin'), which is how the Heimdall
+ * session cookie authenticates writes. Returns null for empty (204) responses.
+ */
+export async function apiSend<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers:
+      body === undefined
+        ? { accept: 'application/json' }
+        : { accept: 'application/json', 'content-type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, `${method} ${path} failed with ${response.status}`);
+  }
+  const text = await response.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
 export interface Capabilities {
   profile: 'local' | 'cloud';
   modules: string[];
