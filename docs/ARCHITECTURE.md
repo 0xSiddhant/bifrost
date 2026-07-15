@@ -26,6 +26,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `presence` | Connected-device dashboard, named devices | local only |
 | `audit-log` | Upload history & activity log (event-bus subscriber) | local only |
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
+| `variant` | JSON & text diff checker (PLAN-08) | both |
 
 ## Core services (shared kernel — no feature imports)
 
