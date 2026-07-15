@@ -12,7 +12,7 @@ import {
   UploadIcon,
   WifiOffIcon,
 } from '../core/ui/icons';
-import { HomePage } from './pages/HomePage';
+import { MidgardPage } from './pages/MidgardPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 // Route-level code splitting: cloud builds never ship local-only pages.
@@ -41,7 +41,7 @@ const HeimdallPage = lazy(() =>
  * Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
 const NAV = [
-  { to: '/', label: 'Home', icon: <FolderIcon size={18} /> },
+  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} /> },
   { to: '/upload', label: 'Send', icon: <UploadIcon size={18} /> },
   { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} /> },
   { to: '/clipboard', label: 'Clipboard', icon: <ClipboardIcon size={18} /> },
@@ -92,7 +92,7 @@ export function App() {
       <main className="shell-main">
         <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<MidgardPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/downloads" element={<DownloadsPage />}>
               {/* Modal route: deep-linkable, back button closes the preview. */}
