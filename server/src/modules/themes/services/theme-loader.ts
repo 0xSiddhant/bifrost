@@ -13,7 +13,7 @@ import {
 } from '../ports.js';
 import type { ThemeValidator } from './theme-validator.js';
 
-export const BUILT_IN_THEME_IDS = new Set(['aurora', 'daybreak']);
+export const BUILT_IN_THEME_IDS = new Set(['aurora', 'daybreak', 'ghibli-dusk']);
 
 interface LoadedTheme {
   theme: ResolvedTheme;
