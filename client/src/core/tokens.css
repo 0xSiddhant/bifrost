@@ -99,6 +99,14 @@
   --qr-module-b: #6d28d9;
   --qr-bg: #eef1fa;
 
+  /* syntax colors — JSON/code highlighting (Runestone PLAN-07, Differ PLAN-08) */
+  --syn-key: #2dd4bf;
+  --syn-string: #4ade80;
+  --syn-number: #a78bfa;
+  --syn-bool: #fbbf24;
+  --syn-null: #8b94a7;
+  --syn-punct: #8b94a7;
+
   color-scheme: dark;
 }
 
@@ -137,6 +145,13 @@
   --qr-module-a: #0c5f54;
   --qr-module-b: #4c3aa8;
   --qr-bg: #ffffff;
+
+  --syn-key: #0f9d8f;
+  --syn-string: #1a9e50;
+  --syn-number: #6d5fd0;
+  --syn-bool: #b97d10;
+  --syn-null: #6e7385;
+  --syn-punct: #6e7385;
 
   --tone-teal: #0f9d8f;
   --tone-teal-soft: rgba(15, 157, 143, 0.1);

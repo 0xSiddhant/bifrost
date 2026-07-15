@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
-import { ThemeToggle } from '../core/ui/ThemeToggle';
+import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import {
   ClipboardIcon,
@@ -79,7 +79,7 @@ export function App() {
             </NavLink>
           ))}
         </nav>
-        <ThemeToggle />
+        <ThemeSwitcher />
       </header>
 
       {sseStatus === 'closed' && (

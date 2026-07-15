@@ -395,6 +395,70 @@
   gap: var(--space-3);
 }
 
+/* ── Theme switcher (shell) ─────────────────────────────────── */
+.theme-switcher {
+  position: relative;
+}
+
+.theme-menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  min-width: 13rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  z-index: 60;
+}
+
+.theme-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.theme-menu__item:hover {
+  background: var(--surface-2);
+}
+
+.theme-menu__item.is-active {
+  background: var(--accent-soft);
+}
+
+.theme-menu__name {
+  flex: 1;
+}
+
+.theme-menu__dot {
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: var(--radius-full);
+  border: 2px solid;
+}
+
+.theme-menu__dot > span {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: var(--radius-full);
+}
+
 /* ── Preview modal (previews feature) ───────────────────────── */
 .modal--preview {
   max-width: min(56rem, 94vw);
