@@ -53,3 +53,13 @@ export interface ThemeRegistry {
   get(id: string): ResolvedTheme | null;
   fileNameOf(id: string): string | null;
 }
+
+/**
+ * Which themes an admin has hidden from the switcher (PLAN-05). Persisted in
+ * DB settings so it survives restarts; disabled themes stay on disk and can be
+ * re-enabled. A theme not in the disabled set is enabled.
+ */
+export interface ThemeVisibilityStore {
+  disabledIds(): Set<string>;
+  setDisabled(id: string, disabled: boolean): void;
+}
