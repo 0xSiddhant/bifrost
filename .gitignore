@@ -16,3 +16,6 @@ storage/*/*
 
 # OS noise
 .DS_Store
+
+# Claude Code — skills are committed, local settings are not
+.claude/settings.local.json
