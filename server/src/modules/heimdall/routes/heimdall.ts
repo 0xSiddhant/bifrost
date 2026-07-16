@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { closeAdminSession, openAdminSession, type AuthService } from '../../../core/auth/index.js';
+import type { EventBus } from '../../../core/bus/index.js';
 import type { Logger } from '../../../core/logger/index.js';
 import type { LoginThrottle } from '../login-throttle.js';
 import type { GetSettingsUseCase, UpdateSettingsUseCase } from '../usecases/manage-settings.js';
@@ -9,6 +10,7 @@ import type { ListUploadsUseCase } from '../usecases/list-uploads.js';
 export interface HeimdallRoutesDeps {
   auth: AuthService;
   throttle: LoginThrottle;
+  bus: EventBus;
   log: Logger;
   getSettings: GetSettingsUseCase;
   updateSettings: UpdateSettingsUseCase;
@@ -62,6 +64,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
       const decision = deps.throttle.check(ip);
       if (!decision.allowed) {
         deps.log.warn({ ip }, 'heimdall login blocked: rate limited');
+        deps.bus.emit('heimdall.login', { outcome: 'locked', ip });
         return reply
           .header('retry-after', Math.ceil(decision.retryAfterMs / 1000))
           .code(429)
@@ -72,12 +75,14 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
       if (!deps.auth.verifyPin(request.body.pin)) {
         deps.throttle.fail(ip);
         deps.log.warn({ ip }, 'heimdall login failed: bad pin');
+        deps.bus.emit('heimdall.login', { outcome: 'failure', ip });
         return reply.code(401).send({ error: 'BAD_PIN', message: 'incorrect pin' });
       }
 
       deps.throttle.succeed(ip);
       openAdminSession(request, deps.auth);
       deps.log.info({ ip }, 'heimdall login ok');
+      deps.bus.emit('heimdall.login', { outcome: 'success', ip });
       return reply.code(200).send({ ok: true });
     },
   );

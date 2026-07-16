@@ -46,6 +46,7 @@ export const heimdallModule: FeatureModule = {
     registerHeimdallRoutes(app, {
       auth,
       throttle: new LoginThrottle(),
+      bus,
       log,
       getSettings,
       updateSettings: new UpdateSettingsUseCase(settingsRepo, getSettings, bus),
