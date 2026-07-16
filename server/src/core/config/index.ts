@@ -18,6 +18,9 @@ const envSchema = z.object({
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(20),
   UPLOAD_EXT_BLOCKLIST: z.string().default('.exe,.bat,.cmd,.msi'),
   UPLOAD_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
+  CLIPBOARD_MAX_ENTRIES: z.coerce.number().int().positive().default(100),
+  CLIPBOARD_MAX_TEXT_KB: z.coerce.number().int().positive().default(64),
+  AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -52,6 +55,11 @@ export interface AppConfig {
   maxFilesPerUpload: number;
   uploadExtBlocklist: readonly string[];
   uploadRateLimitPerMin: number;
+  clipboard: {
+    maxEntries: number;
+    maxTextBytes: number;
+  };
+  auditRetentionDays: number;
   themes: {
     dir: string;
     /**
@@ -118,6 +126,11 @@ export function loadConfig(env: Env = process.env): AppConfig {
       .map((ext) => ext.trim().toLowerCase())
       .filter(Boolean),
     uploadRateLimitPerMin: raw.UPLOAD_RATE_LIMIT_PER_MIN,
+    clipboard: {
+      maxEntries: raw.CLIPBOARD_MAX_ENTRIES,
+      maxTextBytes: raw.CLIPBOARD_MAX_TEXT_KB * 1024,
+    },
+    auditRetentionDays: raw.AUDIT_RETENTION_DAYS,
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,

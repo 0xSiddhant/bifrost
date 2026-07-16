@@ -50,6 +50,35 @@ export interface ThemeSummary {
   warnings: string[];
 }
 
+/** A shared-clipboard entry — the list/SSE payload shape (PLAN-06). */
+export interface ClipboardEntry {
+  id: string;
+  text: string;
+  kind: 'text' | 'code';
+  lang: string | null;
+  /** Stable id of the posting device, resolved to a name client-side via presence. */
+  deviceId: string | null;
+  createdAt: number;
+}
+
+/** Delta broadcast on any clipboard change — clients apply it without a refetch. */
+export type ClipboardChange =
+  | { action: 'add'; entry: ClipboardEntry }
+  | { action: 'delete'; id: string };
+
+/** A device as the presence dashboard shows it (PLAN-06). */
+export interface PresenceDevice {
+  deviceId: string;
+  /** Friendly claimed name, or null. */
+  name: string | null;
+  /** Auto-assigned character alias ("Thor"); the default display name. */
+  charName: string | null;
+  /** UA-derived label, e.g. "iPhone · Safari" — shown alongside the alias in Heimdall only. */
+  label: string;
+  online: boolean;
+  lastSeen: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -57,6 +86,10 @@ export interface BifrostEventMap {
   'download.removed': DownloadEntry;
   'theme.updated': { themes: ThemeSummary[] };
   'settings.updated': SettingsUpdatedEvent;
+  'clipboard.updated': ClipboardChange;
+  'presence.changed': { devices: PresenceDevice[] };
+  /** Emitted by Heimdall for the audit log; consumed only by audit-log. */
+  'heimdall.login': { outcome: 'success' | 'failure' | 'locked'; ip: string };
 }
 
 export type BifrostEventName = keyof BifrostEventMap;
