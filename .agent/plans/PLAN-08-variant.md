@@ -6,7 +6,7 @@ A two-pane comparison tool at `/variant`. **JSON mode (default):** structural, s
 
 ## Gate
 
-Starts after PLAN-07 (both parts) is merged. Hard reuse dependencies: `<JsonEditor>`, `core/json` utils (esp. `sortKeysDeep`, `formatJson`, `jsonStats`), tree view component, Runestone library APIs (pane pickers + slug deep-links), `--syn-*` and `--diff-*` tokens from PLAN-04.
+Starts after PLAN-07 (both parts) is merged. Hard reuse dependencies: `<JsonEditor>`, `core/json` utils (esp. `sortKeysDeep`, `formatJson`, `jsonStats`), tree view component, Runestone library APIs (pane pickers + slug deep-links), `--syn-*` tokens from PLAN-04. **`--diff-*` tokens ship in THIS plan, not PLAN-04** — PLAN-04 merged with a closed schema key set (`additionalProperties: false`) that never included a diff group (open point logged 2026-07-15, resolved 2026-07-16: extend here).
 
 ## Scope
 
@@ -26,9 +26,12 @@ Starts after PLAN-07 (both parts) is merged. Hard reuse dependencies: `<JsonEdit
 - **Tree view in rail = plain PLAN-07 tree** (read-only orientation aid). *Diff-annotated tree* (tinted nodes, badge counts on collapsed branches) = stretch task; the results drawer already delivers most of its value.
 - **Invalid JSON in JSON mode → banner + auto-fallback to Text mode** ("Left side isn't valid JSON — switched to Text"), one-tap return once fixed. Never dead-end.
 - **Library integration & URLs:** each pane gets a runestone picker; `/variant?left=<slug>&right=<slug>` preloads both sides (either param optional) — bookmarkable, shareable comparisons. 404 slug → pane-level friendly error, page still usable.
-- **Theme tokens:** `--diff-add`, `--diff-remove`, `--diff-change` (+ subtle bg variants) — added to PLAN-04's checklist alongside `--syn-*`; Aurora leans on the green/violet aurora ends.
+- **Theme tokens:** `--diff-add`, `--diff-remove`, `--diff-change` (+ subtle bg variants). Delivered **in this plan** by extending the merged PLAN-04 machinery, mirroring exactly how the `syntax` group works: add an optional `diff` group to the theme JSON schema, server-side derived defaults from `--ok`/`--danger`/`--accent` so every existing/minimal theme keeps validating and gets sensible colors, tokens.css entries with explicit values for the built-ins (Aurora leans on the green/violet aurora ends; author Daybreak + Ghibli Dusk values too), THEME-SPEC.md updated. No existing theme file breaks.
 
 ## Task checklist
+
+**Theme tokens (first — UI work binds to them)**
+- [ ] Optional `diff` group in the theme JSON schema + server-side derived defaults (from `--ok`/`--danger`/`--accent`) in the resolver; `--diff-*` entries in tokens.css; explicit values for Aurora, Daybreak, Ghibli Dusk; THEME-SPEC.md section
 
 **Engine (`client/src/core/json/`)**
 - [ ] `diff.ts` walker: records, all three array strategies, tolerance, ignore-path glob matching, type-change detection; property tests (diff(a,a)=∅; apply-records equivalence on generated docs)
@@ -60,4 +63,4 @@ Starts after PLAN-07 (both parts) is merged. Hard reuse dependencies: `<JsonEdit
 
 - [ ] Unit/property: walker (all ops, strategies, tolerance, globs), normalizers, glob matcher corpus
 - [ ] Component: stale-compare behavior, fallback banner, drawer jump targeting
-- [ ] Manual: theme switch mid-compare (tokens only), large-doc perf pass, device pass
+- [ ] Manual: theme switch mid-compare (tokens only — verify all three built-ins incl. Ghibli Dusk, plus a minimal theme relying on derived diff defaults), large-doc perf pass, device pass

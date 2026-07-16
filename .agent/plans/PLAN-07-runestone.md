@@ -26,19 +26,21 @@ A themed JSON tool in two parts. **Part A — the editor:** validate, color-code
 - **Syntax colors are theme tokens:** `--syn-key`, `--syn-string`, `--syn-number`, `--syn-bool`, `--syn-null`, `--syn-punct` added to `tokens.css` with Aurora + Daybreak values. **PLAN-04 amendment (already applied):** theme JSON schema gains an optional `syntax` group; themes omitting it get defaults derived from `--accent`/`--text` — no existing theme breaks.
 - **`sortKeysDeep` ships as a shared pure util in `client/src/core/json/`** (alongside `formatJson`, `minifyJson`, `unescapeEmbedded`, `jsonStats`, `pathAt`) — explicitly because **PLAN-08's diff checker needs sort-keys too** (sort both sides before diffing to kill ordering noise). Pure functions, unit-tested once, imported twice.
 - **Relic-name generator = shared core service** (`core/relics`, server + mirrored client util): curated bank across Norse / Potter / MCU with categories *person, object/relic, spell, weapon* (Loki, Mjölnir, Gungnir, Hofund, Brísingamen, Pensieve, Deluminator, Portkey, Expelliarmus, Tesseract, Aether, Stormbreaker…), pattern `<flavor-adjective> <Name>` ("Gleaming Gungnir"), collision-safe via short suffix. Used for page titles now, default file/document names in Part B, and available to any future module.
+  - *Naming disambiguation:* `core/relics` (name bank) is unrelated to `client/src/assets/relics/` (the background line-art collections) — do not merge or confuse them.
+  - *Overlap with PLAN-06:* `presence/character-names.ts` already holds a Norse/Potter/MCU **person** pool for device aliases. Deliberate coexistence: presence keeps its own pool untouched (merged, tested code; its uniqueness semantics are per-device, not per-title). `core/relics` is a superset bank with its own pattern; a runestone titled "Gleaming Loki" coexisting with a device named "Loki" is fine. Folding presence onto `core/relics` is a possible later refactor, not part of this plan.
 - **Tree view is read-only; editing happens in code mode.** Collapsible nodes, type badges, array/object item counts; tapping a key copies its JSON path (`data.items[3].price`) with a copied-toast. Phones default to tree view for viewing comfort.
 - **Draft survival via localStorage** (allowed as non-critical convenience per coding rules): buffer auto-cached (debounced), "Restore draft?" toast on return, dismiss clears. Matters because real saving is Part B.
-- **Doc-size cap:** `RUNESTONE_MAX_DOC_KB=2048` in `.env` — beyond ~2 MB, browser highlighting janks; also the storage guard for Part B.
+- **Doc-size cap:** `RUNESTONE_MAX_DOC_KB=2048` in `.env` — beyond ~2 MB, browser highlighting janks; also the storage guard for Part B. Wire through `.env.example` + zod config like every other limit; the client reads it from a config/capabilities response, never hardcodes it.
 - **Slug format (Part B): `/runestone/<kebab-name>-<6char-id>`** — the id anchors the URL, the name part is cosmetic, so **renames never break shared links** (old-name URLs with a matching id 301-redirect to the current slug).
 - **Rename rules (owner requirement):** name is editable **only on the editor page** — inline on the title, before first save and after. The library never renames; it only opens/deletes.
-- **Author (Part B):** presence deviceId → friendly device name (PLAN-06); fallback to UA label for unnamed devices. No accounts.
+- **Author (Part B):** runestone stores only `author_device_id` (from the `X-Bifrost-Device` header). Display resolution happens **client-side** via the PLAN-06 `core/devices` registry, following its established convention `name ?? charName ?? label` — i.e. the character alias is the default display, not the UA label. Runestone never reads presence's `devices` table (Rule 2 — same reasoning as the audit-log/upload_audit decision). No accounts.
 - **Creative 404 (Part B):** themed "This runestone was never carved / has crumbled" page offering two actions: *Carve it now* (opens editor pre-titled with the slug's name part) and *Back to the library*.
 
 ## API contracts (Part B — all under `/api/runestone`)
 
 | Method & path | Purpose | Notes |
 |---|---|---|
-| `GET /api/runestone` | Library listing | `[{ id, name, slug, author, createdAt, modifiedAt, sizeBytes }]`; query params: `q` (name/author search), `author`, `sort` (name\|created\|modified\|size), `order`, pagination |
+| `GET /api/runestone` | Library listing | `[{ id, name, slug, authorDeviceId, createdAt, modifiedAt, sizeBytes }]`; query params: `q` (name search only — server has no author names), `author` (**deviceId**, exact), `sort` (name\|created\|modified\|size), `order`, pagination. The client resolves `authorDeviceId` → display name via `core/devices` and maps a picked author name → deviceId before filtering |
 | `POST /api/runestone` | Save new | `{ name?, content }` — name defaults to relic generator; 413 over cap; 422 invalid JSON |
 | `GET /api/runestone/:slug` | Fetch one | 404 → client shows creative 404; stale-name slug with valid id → 301 to current slug |
 | `PUT /api/runestone/:id` | Update content and/or name | Rename regenerates slug (old id-links keep working); bumps modifiedAt |
@@ -67,7 +69,7 @@ A themed JSON tool in two parts. **Part A — the editor:** validate, color-code
 - [ ] Drizzle schema + migration; repository interface + SQLite impl
 - [ ] Usecases: save/update/rename+reslug/delete/list-with-filters; slug service (kebab + id, redirect resolution)
 - [ ] Routes per contract; events on bus; audit-log picks them up automatically
-- [ ] Editor page gains Save/Saved state (dirty tracking), author attach from presence
+- [ ] Editor page gains Save/Saved state (dirty tracking), author attach from `X-Bifrost-Device` header (display resolved client-side via `core/devices`)
 - [ ] Library page: table/cards responsive, search + author filter + sort, open/delete, live SSE refresh
 - [ ] Creative 404 with *Carve it now* + *Back to library*
 - [ ] Draft-cache handoff: saving clears the localStorage draft
@@ -76,13 +78,13 @@ A themed JSON tool in two parts. **Part A — the editor:** validate, color-code
 
 **Part A**
 1. Pasting broken JSON shows *every* error with positions; fixing them flips to "Valid ✓" without reload; editing stays smooth on a 1.5 MB doc on iPhone.
-2. Keys/strings/numbers/bools/null are visibly distinct in both Aurora and Daybreak; switching theme recolors the open editor instantly (tokens only).
+2. Keys/strings/numbers/bools/null are visibly distinct in all built-in themes (Aurora, Daybreak, **Ghibli Dusk** — its syntax colors are derived, so verify legibility, don't assume); switching theme recolors the open editor instantly (tokens only).
 3. Every toolbar action round-trips correctly (`sortKeysDeep` is idempotent and stable — property-tested); tree path-copy yields a path that resolves in code.
 4. Refresh mid-edit on a phone → restore-draft toast recovers the exact buffer.
 5. Title regenerates as a plausible relic name on each fresh load; export filename matches title.
 
 **Part B**
-6. Save → appears in library with correct author/size/dates; open-by-slug works from another device; rename on editor updates slug while the old id-link still resolves.
+6. Save → appears in library with correct author (character alias per PLAN-06 display rules)/size/dates; open-by-slug works from another device; rename on editor updates slug while the old id-link still resolves.
 7. Filters/search/sort behave with 50+ seeded docs; delete removes with confirm and live-updates other open libraries.
 8. Unknown slug → creative 404; *Carve it now* opens the editor titled from the slug.
 9. Kill test: SIGINT during save burst → restart → no torn rows, drafts intact.

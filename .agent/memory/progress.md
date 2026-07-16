@@ -2,20 +2,21 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**Active plan: PLAN-06**
+**Active plan: PLAN-07 (Part A next up — gate cleared by PR #7 merge)**
 
 | Plan | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
 | PLAN-00 | Foundation (tech setup, zero feature code) | done | main (direct, per plan) | Pushed 2026-07-12; develop created |
 | PLAN-01 | UI/UX foundation ⛔ approval gate | done | PR #2 → develop (merged 2026-07-13) | **UI approved by owner 2026-07-13**; gate cleared — PLAN-02 unlocked |
 | PLAN-02 | File transfer (upload + download + live watch) | done | PR #3 → develop (merged 2026-07-14) | Owner tested locally; CI green — PLAN-03 unlocked |
-| PLAN-03 | Previews + QR tool | in-review | feat/plan-03-previews-qr (local) | Implemented + verified 2026-07-14; awaiting owner testing, then push + PR |
+| PLAN-03 | Previews + QR tool | done | PR #4 → develop (merged) | Row was stale (never flipped from in-review); merge confirmed in git history 2026-07-16 |
 | PLAN-04 | Theming engine | done | PR #5 → develop (merged 2026-07-15) | Gate cleared — PLAN-05 unlocked |
 | PLAN-05 | Heimdall admin panel | done | PR #6 → develop (merged 2026-07-16) | Gate cleared — PLAN-06 unlocked |
-| PLAN-06 | Clipboard sync, presence, audit log | in-review | PR #7 → develop | Implemented + verified 2026-07-16; 9 commits pushed; awaiting owner review/merge |
+| PLAN-06 | Clipboard sync, presence, audit log | done | PR #7 → develop (merged 2026-07-16) | Gate cleared — PLAN-07 unlocked |
 | PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
 | PLAN-08 | Variant (JSON & text diff checker) | not-started | — | Plan authored 2026-07-15; shares PLAN-07 components |
 | PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
+| PLAN-10 | Heimdall Modal (overlay conversion + new sections) | not-started | — | Plan authored 2026-07-16; supersedes "PIN on every arrival" (logged when implemented) |
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
