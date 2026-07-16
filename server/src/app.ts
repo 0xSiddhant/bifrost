@@ -25,6 +25,9 @@ import { previewsModule } from './modules/previews/module.js';
 import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
 import { themesModule } from './modules/themes/module.js';
 import { heimdallModule } from './modules/heimdall/module.js';
+import { clipboardModule } from './modules/clipboard/module.js';
+import { presenceModule } from './modules/presence/module.js';
+import { auditLogModule } from './modules/audit-log/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -32,7 +35,17 @@ import { heimdallModule } from './modules/heimdall/module.js';
  * append here as modules come into existence.
  */
 const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
-  local: [healthModule, fileTransferModule, previewsModule, qrToolModule, themesModule, heimdallModule],
+  local: [
+    healthModule,
+    fileTransferModule,
+    previewsModule,
+    qrToolModule,
+    themesModule,
+    heimdallModule,
+    clipboardModule,
+    presenceModule,
+    auditLogModule,
+  ],
   cloud: [healthModule, qrToolModule, themesModule, heimdallModule],
 };
 
