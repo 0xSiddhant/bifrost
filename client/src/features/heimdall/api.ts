@@ -76,3 +76,37 @@ export const fetchManagedThemes = (): Promise<{ themes: ManagedTheme[] }> =>
 
 export const setThemeEnabled = (id: string, enabled: boolean): Promise<ManagedTheme> =>
   apiSend<ManagedTheme>('PATCH', `/api/themes/${id}`, { enabled });
+
+export interface AuditRecord {
+  id: number;
+  ts: number;
+  event: string;
+  deviceId: string | null;
+  ip: string | null;
+  summary: string | null;
+}
+
+export interface AuditPage {
+  total: number;
+  items: AuditRecord[];
+  events: string[];
+}
+
+export interface PresenceDevice {
+  deviceId: string;
+  name: string | null;
+  charName: string | null;
+  label: string;
+  online: boolean;
+  lastSeen: number;
+}
+
+export const fetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
+  apiGet<{ devices: PresenceDevice[] }>('/api/presence');
+
+export const fetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
+  const query = new URLSearchParams();
+  if (params.event) query.set('event', params.event);
+  query.set('limit', String(params.limit ?? 100));
+  return apiGet<AuditPage>(`/api/heimdall/audit?${query.toString()}`);
+};

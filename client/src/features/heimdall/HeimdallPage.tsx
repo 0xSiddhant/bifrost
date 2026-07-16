@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, apiGet } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
+import { deviceLabel, deviceName } from '../../core/devices';
+import { bifrostEvents } from '../../core/sse';
 import { heimdallGate } from '../../core/heimdallGate';
 import { eventToShortcut, prettyShortcut } from '../../core/shortcut';
 import { Button } from '../../core/ui/Button';
@@ -13,7 +15,9 @@ import { FolderIcon, ShieldIcon } from '../../core/ui/icons';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
 import {
+  fetchAudit,
   fetchManagedThemes,
+  fetchPresence,
   fetchSettings,
   fetchStats,
   fetchUploads,
@@ -22,9 +26,11 @@ import {
   revokeSessions,
   setThemeEnabled,
   updateSettings,
+  type AuditPage,
   type FolderUsage,
   type HeimdallSettings,
   type ManagedTheme,
+  type PresenceDevice,
   type Stats,
   type UploadMeta,
 } from './api';
@@ -109,6 +115,117 @@ function ThemesManager() {
         <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
           {error}
         </p>
+      )}
+    </div>
+  );
+}
+
+/** Heimdall shows the character alias AND the original UA label together. */
+function auditActor(row: { deviceId: string | null; ip: string | null }): string {
+  const name = deviceName(row.deviceId);
+  if (name) {
+    const label = deviceLabel(row.deviceId);
+    return label ? `${name} · ${label}` : name;
+  }
+  return row.ip ?? '—';
+}
+
+/** Live device roster for the admin — alias + original UA label + status. */
+function ConnectedDevices() {
+  const [devices, setDevices] = useState<PresenceDevice[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPresence()
+      .then((res) => {
+        if (!cancelled) setDevices(res.devices);
+      })
+      .catch(() => {});
+    const off = bifrostEvents.on('presence.changed', (payload) => {
+      if (payload && typeof payload === 'object' && 'devices' in payload) {
+        setDevices((payload as { devices: PresenceDevice[] }).devices);
+      }
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+
+  if (devices.length === 0) return <p className="caption">No devices seen yet.</p>;
+  return (
+    <div className="stack">
+      {devices.map((device) => (
+        <div className="device-row" key={device.deviceId}>
+          <span
+            className={`device-dot ${device.online ? 'is-online' : 'is-offline'}`}
+            aria-hidden="true"
+          />
+          <div className="device-row__body">
+            <div className="device-row__name">
+              {device.name ?? device.charName ?? device.label}
+            </div>
+            <div className="device-row__meta">
+              <span>{device.label}</span>
+              <span>
+                {device.online ? 'online' : `last seen ${formatTimeAgo(device.lastSeen)}`}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The activity log (audit-log module), filterable by event type. */
+function ActivityHistory() {
+  const [page, setPage] = useState<AuditPage | null>(null);
+  const [filter, setFilter] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAudit({ event: filter || undefined })
+      .then((result) => {
+        if (!cancelled) setPage(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [filter]);
+
+  return (
+    <div className="stack">
+      <Select
+        label="Filter by event"
+        value={filter}
+        onChange={(event) => setFilter(event.target.value)}
+      >
+        <option value="">All events</option>
+        {(page?.events ?? []).map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </Select>
+      {!page ? (
+        <p className="caption">Loading…</p>
+      ) : page.items.length === 0 ? (
+        <p className="caption">No activity recorded yet.</p>
+      ) : (
+        page.items.map((row) => (
+          <div className="file-row" key={row.id}>
+            <div className="file-row__body">
+              <div className="file-row__name mono">{row.event}</div>
+              <div className="file-row__meta">
+                {row.summary && <span>{row.summary}</span>}
+                <span>{auditActor(row)}</span>
+                <span>{formatTimeAgo(row.ts)}</span>
+              </div>
+            </div>
+          </div>
+        ))
       )}
     </div>
   );
@@ -481,6 +598,16 @@ function Dashboard({ onLock }: { onLock: () => void }) {
           ) : (
             <p className="caption">Loading settings…</p>
           )}
+        </Card>
+
+        <h3>Connected devices</h3>
+        <Card>
+          <ConnectedDevices />
+        </Card>
+
+        <h3>Activity history</h3>
+        <Card>
+          <ActivityHistory />
         </Card>
 
         <h3>Themes</h3>

@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**Active plan: PLAN-05**
+**Active plan: PLAN-06**
 
 | Plan | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
@@ -11,14 +11,18 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-02 | File transfer (upload + download + live watch) | done | PR #3 → develop (merged 2026-07-14) | Owner tested locally; CI green — PLAN-03 unlocked |
 | PLAN-03 | Previews + QR tool | in-review | feat/plan-03-previews-qr (local) | Implemented + verified 2026-07-14; awaiting owner testing, then push + PR |
 | PLAN-04 | Theming engine | done | PR #5 → develop (merged 2026-07-15) | Gate cleared — PLAN-05 unlocked |
-| PLAN-05 | Heimdall admin panel | in-review | PR #6 → develop | Implemented + verified 2026-07-15; 6 commits pushed; awaiting owner review/merge |
-| PLAN-06 | Clipboard sync, presence, audit log | not-started | — | |
+| PLAN-05 | Heimdall admin panel | done | PR #6 → develop (merged 2026-07-16) | Gate cleared — PLAN-06 unlocked |
+| PLAN-06 | Clipboard sync, presence, audit log | in-review | PR #7 → develop | Implemented + verified 2026-07-16; 9 commits pushed; awaiting owner review/merge |
 | PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
 | PLAN-08 | Variant (JSON & text diff checker) | not-started | — | Plan authored 2026-07-15; shares PLAN-07 components |
 | PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
+
+- 2026-07-16 — PLAN-06 device character aliases (owner feedback): each device gets a unique random alias (Harry Potter + Norse + MCU pool in `presence/character-names.ts`) on first connect — `devices.char_name` col (migration `0003_device_character`), assigned in `SyncPresenceUseCase`, filled via `coalesce` (set once, preserved). Alias is the display name everywhere (clipboard, Devices page); Heimdall also shows the original UA label — new "Connected devices" card + audit actor column render `alias · label`; the public Devices page shows only the alias. Client: `core/devices` now resolves `{display,label}` (`deviceName`/`deviceLabel`). 183 server + 14 client tests green (char-pool uniqueness/exhaustion, alias assignment/preservation). Live-verified: two devices → "Jormungandr"/"Tyr", Devices page shows aliases only, `/api/presence` carries `charName`. **Note**: the earlier "No devices yet" the owner saw was this feature mid-edit — `char_name` was added to the schema before its migration, which 500'd `/api/presence` under `npm run dev`; resolved once the migration landed. Uncommitted.
+
+- 2026-07-16 — PLAN-06 implemented: three local-profile modules. **clipboard** — `clipboard_entries` table, add/list/delete usecases, size cap (413) + oldest-out + optional TTL (`expiresAt`, 60s prune timer), `clipboard.updated` delta (add/delete) → SSE; client page (composer with code toggle + highlight.js, live entry list, copy via async Clipboard API w/ execCommand fallback, delete). **presence** — core `SseHub` extended to expose per-connection metadata (`deviceId` from `?deviceId` query, UA, ip) + `onConnectionChange`; `devices` table, `ua-parser-js` labels ("iPhone · Safari"), `presence.changed` on connect/disconnect/rename; client Devices page (online dots, rename "this device"). **audit-log** — pure bus subscriber → `audit_events`, self-contained guarded `GET /api/heimdall/audit` (History) + retention prune (boot + daily); Heimdall gained a filterable Activity history card. Core additions: `deviceId` client bootstrap + `X-Bifrost-Device` header, `core/devices.ts` name registry, `heimdall.login` bus event, config `CLIPBOARD_MAX_ENTRIES`/`CLIPBOARD_MAX_TEXT_KB`/`AUDIT_RETENTION_DAYS`, migration `0002_sync_presence_audit`. 178 server + 14 client tests green (ua labels, clipboard caps/CRUD/restart, audit subscriber/prune/guard, presence merge/rename, deviceId stability). Live-verified on the built server: 2 SSE devices show in presence with UA labels, clipboard post fans out over SSE to the other device, rename persists, disconnect → offline; audit records login+clipboard; Rule 2 confirmed (audit-log/clipboard/presence imported only by app.ts). Screenshotted both new pages. **Deviation**: kept PLAN-05's `upload_audit` + uploads card instead of repointing it at `audit_events` (would couple heimdall to audit-log's table) — the History card is the richer log. Uncommitted.
 
 - 2026-07-15 — Ghibli relic collection (owner feedback): added `client/src/assets/relics/ghibli.tsx` — a 4th "Ghibli world" collection (16 original line-art relics + 森/風/火 kanji), registered in `relics/index.ts`. Auto-surfaces in SkyRelics and Heimdall's Sky relics card via `ALL_COLLECTIONS`. Screenshot-verified all 19 read as recognizable line art. Client typecheck/lint/build clean. Landed on PR #6.
 

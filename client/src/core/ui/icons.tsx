@@ -47,6 +47,14 @@ export const QrIcon = (p: IconProps) => (
   </svg>
 );
 
+export const MonitorIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="14" height="10" rx="1.5" />
+    <path d="M7 18h6M10 14v4" />
+    <rect x="17" y="9" width="4" height="9" rx="1" />
+  </svg>
+);
+
 export const ShieldIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3z" />

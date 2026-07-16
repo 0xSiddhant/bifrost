@@ -1,3 +1,5 @@
+import { getDeviceId } from './deviceId';
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -22,12 +24,15 @@ export async function apiGet<T>(path: string): Promise<T> {
  * session cookie authenticates writes. Returns null for empty (204) responses.
  */
 export async function apiSend<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {
+    accept: 'application/json',
+    // Attributes writes to this device (clipboard, PLAN-06). Not auth.
+    'x-bifrost-device': getDeviceId(),
+  };
+  if (body !== undefined) headers['content-type'] = 'application/json';
   const response = await fetch(path, {
     method,
-    headers:
-      body === undefined
-        ? { accept: 'application/json' }
-        : { accept: 'application/json', 'content-type': 'application/json' },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {

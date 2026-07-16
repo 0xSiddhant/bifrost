@@ -8,7 +8,7 @@ import { QrCard } from '../../core/ui/QrCard';
 const QR_SIZES = { small: 160, medium: 240, large: 320 } as const;
 type QrSize = keyof typeof QR_SIZES;
 
-export function QrToolPage() {
+export function SigilPage() {
   const [serverUrls, setServerUrls] = useState<string[]>([]);
   const [joinUrl, setJoinUrl] = useState('');
   const [text, setText] = useState('');
@@ -36,8 +36,8 @@ export function QrToolPage() {
     <>
       <div className="page-head">
         <div>
-          <span className="eyebrow">runes · marks that carry meaning</span>
-          <h2>QR tool</h2>
+          <span className="eyebrow">sigils · marks that carry meaning</span>
+          <h2>Sigil</h2>
           <p>Get any device onto the bridge, or turn any text into a scannable code.</p>
         </div>
       </div>
