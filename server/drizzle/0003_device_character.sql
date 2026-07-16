@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `char_name` text;

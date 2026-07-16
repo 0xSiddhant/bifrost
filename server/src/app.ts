@@ -11,15 +11,23 @@ import {
 } from './core/config/index.js';
 import { loadDotenv } from './core/config/dotenv.js';
 import { createLogger, moduleLogger, type Logger } from './core/logger/index.js';
-import { checkpointAndClose, openDb, readSettings, runMigrations } from './core/db/index.js';
+import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
 import { buildHttp } from './core/http/index.js';
-import { registerAuth } from './core/auth/index.js';
+import { AuthService, registerAuth } from './core/auth/index.js';
 import { advertiseMdns, lanIPv4Addresses, type MdnsHandle } from './core/mdns/index.js';
 import { fromRepoRoot } from './core/paths.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
+import { fileTransferModule } from './modules/file-transfer/module.js';
+import { previewsModule } from './modules/previews/module.js';
+import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
+import { themesModule } from './modules/themes/module.js';
+import { heimdallModule } from './modules/heimdall/module.js';
+import { clipboardModule } from './modules/clipboard/module.js';
+import { presenceModule } from './modules/presence/module.js';
+import { auditLogModule } from './modules/audit-log/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -27,9 +35,21 @@ import { healthModule } from './modules/health/module.js';
  * append here as modules come into existence.
  */
 const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
-  local: [healthModule],
-  cloud: [healthModule],
+  local: [
+    healthModule,
+    fileTransferModule,
+    previewsModule,
+    qrToolModule,
+    themesModule,
+    heimdallModule,
+    clipboardModule,
+    presenceModule,
+    auditLogModule,
+  ],
+  cloud: [healthModule, qrToolModule, themesModule, heimdallModule],
 };
+
+const SESSION_EPOCH_KEY = 'heimdall.sessionEpoch';
 
 export interface RunningApp {
   fastify: FastifyInstance;
@@ -59,19 +79,30 @@ export async function createApp(
 
   const db = openDb(baseConfig.storage.dbFile);
   runMigrations(db);
-  const config = applySettingsOverlay(baseConfig, readSettings(db));
+  const settingsRows = readSettings(db);
+  const config = applySettingsOverlay(baseConfig, settingsRows);
+
+  // Session epoch persists across restarts so a "revoke all" stays in effect.
+  const epochRow = settingsRows.find((row) => row.key === SESSION_EPOCH_KEY);
+  const initialEpoch = epochRow ? Number(epochRow.value) : 0;
+  const auth = new AuthService(config.heimdall.pin, initialEpoch, (epoch) =>
+    writeSetting(db, SESSION_EPOCH_KEY, String(epoch)),
+  );
+  if (config.heimdall.sessionSecret === null) {
+    logger.warn('HEIMDALL_SESSION_SECRET unset — admin sessions reset on restart');
+  }
 
   const bus = new EventBus();
   const sse = new SseHub();
 
   const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist') });
-  await registerAuth(fastify);
+  await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 
   const modules = MANIFEST[config.profile];
   for (const mod of modules) {
     await fastify.register(async (scope) => {
-      await mod.register(scope, { config, log: moduleLogger(logger, mod.name), db, bus, sse });
+      await mod.register(scope, { config, log: moduleLogger(logger, mod.name), db, bus, sse, auth });
     });
     logger.info({ module: mod.name }, 'module loaded');
   }
@@ -142,6 +173,12 @@ async function main(): Promise<void> {
   }
   for (const address of lanIPv4Addresses()) {
     fastify.log.info(`lan address: http://${address}:${config.port}`);
+  }
+  const [primaryUrl] = serverUrls(config);
+  if (primaryUrl) {
+    // Straight to stdout, not the logger: a multi-line ASCII QR inside a JSON
+    // log line would be unreadable. Android fallback per tech-stack.md.
+    process.stdout.write(`\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`);
   }
 
   let signalled = false;

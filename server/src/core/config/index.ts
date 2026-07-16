@@ -17,10 +17,22 @@ const envSchema = z.object({
   MAX_UPLOAD_SIZE_MB: z.coerce.number().int().positive().default(2048),
   MAX_FILES_PER_UPLOAD: z.coerce.number().int().positive().default(20),
   UPLOAD_EXT_BLOCKLIST: z.string().default('.exe,.bat,.cmd,.msi'),
+  UPLOAD_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
+  CLIPBOARD_MAX_ENTRIES: z.coerce.number().int().positive().default(100),
+  CLIPBOARD_MAX_TEXT_KB: z.coerce.number().int().positive().default(64),
+  AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
   HEIMDALL_TAP_COUNT: z.coerce.number().int().min(3).max(20).default(7),
+  // Encryption key for the admin session cookie (@fastify/secure-session).
+  // Optional: when unset, a random key is generated at boot — sessions then
+  // reset on restart. Set it (≥ 32 chars) to keep sessions across restarts.
+  HEIMDALL_SESSION_SECRET: z
+    .string()
+    .min(32, 'must be at least 32 characters when set')
+    .optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   BACKUP_DIR: z.string().default(''),
 });
@@ -42,11 +54,28 @@ export interface AppConfig {
   maxUploadSizeMb: number;
   maxFilesPerUpload: number;
   uploadExtBlocklist: readonly string[];
+  uploadRateLimitPerMin: number;
+  clipboard: {
+    maxEntries: number;
+    maxTextBytes: number;
+  };
+  auditRetentionDays: number;
+  themes: {
+    dir: string;
+    /**
+     * Explicit server default (DB settings overlay, Heimdall-set in PLAN-05).
+     * null = not configured — clients then fall through to their
+     * prefers-color-scheme match (resolution order in PLAN-04).
+     */
+    defaultId: string | null;
+  };
   storage: StoragePaths;
   heimdall: {
     pin: string;
     shortcut: string;
     tapCount: number;
+    /** null = generate a random session key at boot (sessions reset on restart). */
+    sessionSecret: string | null;
   };
   logLevel: LogLevel;
   backupDir: string | null;
@@ -96,11 +125,22 @@ export function loadConfig(env: Env = process.env): AppConfig {
     uploadExtBlocklist: raw.UPLOAD_EXT_BLOCKLIST.split(',')
       .map((ext) => ext.trim().toLowerCase())
       .filter(Boolean),
+    uploadRateLimitPerMin: raw.UPLOAD_RATE_LIMIT_PER_MIN,
+    clipboard: {
+      maxEntries: raw.CLIPBOARD_MAX_ENTRIES,
+      maxTextBytes: raw.CLIPBOARD_MAX_TEXT_KB * 1024,
+    },
+    auditRetentionDays: raw.AUDIT_RETENTION_DAYS,
+    themes: {
+      dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
+      defaultId: null,
+    },
     storage: resolveStoragePaths(raw.STORAGE_ROOT),
     heimdall: {
       pin: raw.HEIMDALL_PIN,
       shortcut: raw.HEIMDALL_SHORTCUT_DEFAULT,
       tapCount: raw.HEIMDALL_TAP_COUNT,
+      sessionSecret: raw.HEIMDALL_SESSION_SECRET ?? null,
     },
     logLevel: raw.LOG_LEVEL,
     backupDir: raw.BACKUP_DIR || null,
@@ -121,6 +161,9 @@ export interface SettingsRow {
 const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
   'heimdall.shortcut': (config, value) => {
     config.heimdall.shortcut = value;
+  },
+  'themes.default': (config, value) => {
+    if (/^[a-z0-9-]{2,32}$/.test(value)) config.themes.defaultId = value;
   },
   'heimdall.tapCount': (config, value) => {
     const count = Number(value);

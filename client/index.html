@@ -2,9 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#101014" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0e14" />
     <title>Bifrost</title>
+    <script>
+      // FOUC guard: replay the last applied theme's tokens before first paint.
+      // The theme engine reconciles against the server after hydration.
+      try {
+        var cached = JSON.parse(localStorage.getItem('bifrost.theme.cache') || 'null');
+        if (cached && cached.tokens) {
+          var root = document.documentElement;
+          for (var key in cached.tokens) root.style.setProperty(key, cached.tokens[key]);
+          if (cached.mode) root.style.colorScheme = cached.mode;
+          if (cached.id) root.setAttribute('data-theme', cached.id);
+        }
+      } catch (error) {
+        /* corrupt cache: stylesheet defaults carry the first paint */
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

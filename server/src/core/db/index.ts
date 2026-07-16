@@ -35,6 +35,18 @@ export function readSettings(handle: DbHandle): SettingsRow[] {
     .all();
 }
 
+/** Upsert one runtime setting (Heimdall edits, session epoch). Synchronous — better-sqlite3. */
+export function writeSetting(handle: DbHandle, key: string, value: string): void {
+  handle.db
+    .insert(schema.settings)
+    .values({ key, value })
+    .onConflictDoUpdate({
+      target: schema.settings.key,
+      set: { value, updatedAt: new Date().toISOString() },
+    })
+    .run();
+}
+
 /** Shutdown path: fold the WAL back into the main file, then close. */
 export function checkpointAndClose(handle: DbHandle): void {
   handle.sqlite.pragma('wal_checkpoint(TRUNCATE)');

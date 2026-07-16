@@ -4,6 +4,7 @@ import type { DbHandle } from './db/index.js';
 import type { EventBus } from './bus/index.js';
 import type { SseHub } from './sse/index.js';
 import type { Logger } from './logger/index.js';
+import type { AuthService } from './auth/index.js';
 
 /** Everything a feature module may depend on. Modules receive this — they never import each other. */
 export interface ModuleDeps {
@@ -12,6 +13,8 @@ export interface ModuleDeps {
   db: DbHandle;
   bus: EventBus;
   sse: SseHub;
+  /** PIN-session service; only Heimdall uses it (login/logout/revoke). */
+  auth: AuthService;
 }
 
 /**

@@ -7,16 +7,22 @@
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![Fastify](https://img.shields.io/badge/Fastify-5-000000?logo=fastify&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![SQLite](https://img.shields.io/badge/SQLite-WAL-003B57?logo=sqlite&logoColor=white)
 ![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/network-mDNS%20%2F%20intranet%20only-8A2BE2)
 
-<!-- TODO: replace with real demo -->
-<img src="docs/assets/demo.png" alt="Bifrost demo" width="720" />
+<!-- TODO: add demo video when the features land (PLAN-02+) -->
+<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the two portals" width="720" />
 
-*[▶ Watch demo video](docs/assets/demo.mp4)*
+<img src="docs/assets/screenshot-receive.png" alt="Receive files — live download list with per-type icons" width="720" />
+
+<p>
+  <img src="docs/assets/screenshot-send-phone.png" alt="Send files on a phone" width="230" />
+  <img src="docs/assets/screenshot-receive-phone.png" alt="Receive files on a phone" width="230" />
+  <img src="docs/assets/screenshot-daybreak-phone.png" alt="Daybreak (light) theme on a phone" width="230" />
+</p>
 
 </div>
 
@@ -31,11 +37,11 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 📤 Multi-file upload (streamed, 2 GB configurable limit) into a write-only folder
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
-- 📋 Clipboard/text sync across devices
-- 🔳 QR generator utility (+ scan-to-join QR for the server URL)
-- 🎨 Dynamic themes, addable via JSON
+- 📋 Muninn — clipboard/text sync across devices
+- 🔳 Sigil — QR generator utility (+ scan-to-join QR for the server URL)
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk built in), addable via JSON
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
-- 📜 Upload history & audit log, device presence dashboard
+- 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
 ## Quick start
@@ -52,11 +58,7 @@ cp .env.example .env
 # 3. create runtime folders (storage/{uploads,downloads,tmp,data,logs})
 npm run setup
 
-# 4. set up branches (repo already initialized)
-git checkout -b develop
-git push -u origin develop
-
-# 5. run in dev (server + client, hot reload)
+# 4. run in dev (server + client, hot reload)
 npm run dev
 ```
 

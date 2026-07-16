@@ -1,35 +1,171 @@
 /*
- * Design tokens — PLACEHOLDER values only.
- * The real design system (fonts, initial theme, full scale) lands in PLAN-01;
- * the theming engine (JSON themes -> these variables) lands in PLAN-04.
- * Components must reference these variables, never raw values.
+ * Design tokens — the single source of every visual value.
+ * Components consume tokens only; a hex value outside this file is a bug.
+ *
+ * :root               = "Aurora"   (dark-first default)
+ * [data-theme="daybreak"] = "Daybreak" (light alternate)
+ *
+ * The shape of this file is the contract the theme engine (PLAN-04)
+ * parametrizes: a theme JSON is exactly a set of these custom properties.
  */
 :root {
-  /* color */
-  --color-bg: #101014;
-  --color-surface: #1a1a21;
-  --color-border: #2c2c36;
-  --color-text: #e8e8ee;
-  --color-text-muted: #8f8f9d;
-  --color-accent: #7c6cf0;
-  --color-danger: #e5484d;
-  --color-success: #46a758;
+  /* ── color roles ─────────────────────────────────────────── */
+  --bg: #0b0e14;
+  --surface: #131824;
+  --surface-2: #1b2233;
+  --text: #e9edf5;
+  --text-muted: #8b94a7;
+  --border: #242e44;
+  --accent: #2dd4bf; /* aurora teal — primary interactive */
+  --accent-2: #8b7cf6; /* aurora violet — secondary/gradient partner */
+  --ok: #4ade80;
+  --danger: #f87171;
+  --warn: #fbbf24;
 
-  /* typography (self-hosted fonts arrive in PLAN-01) */
-  --font-body: system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-body);
-  --font-mono: ui-monospace, 'SF Mono', monospace;
+  /* derived, still themable */
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --danger-soft: rgba(248, 113, 113, 0.12);
+  --scrim: rgba(4, 6, 10, 0.72);
 
-  /* spacing scale */
+  /* the rainbow bridge — shell strip, wordmark, progress, primary actions */
+  --bridge: linear-gradient(90deg, #2dd4bf 0%, #8b7cf6 50%, #4ade80 100%);
+  --accent-grad: linear-gradient(135deg, #2dd4bf 0%, #5eead4 100%);
+
+  /* atmosphere — the night sky behind everything (Aurora) */
+  --sky:
+    radial-gradient(55% 42% at 12% -5%, rgba(45, 212, 191, 0.16), transparent 65%),
+    radial-gradient(50% 38% at 88% 2%, rgba(139, 124, 246, 0.18), transparent 65%),
+    radial-gradient(65% 50% at 50% 112%, rgba(74, 222, 128, 0.1), transparent 60%);
+  --stars: rgba(233, 237, 245, 0.55);
+  --stars-alpha: 1;
+
+  /* glows — per-tone halos for icons, portals, focus moments */
+  --glow-teal: 0 0 26px rgba(45, 212, 191, 0.35);
+  --glow-violet: 0 0 26px rgba(139, 124, 246, 0.38);
+  --glow-soft: 0 0 46px rgba(139, 124, 246, 0.16);
+
+  /* portal tones */
+  --tone-teal: #2dd4bf;
+  --tone-teal-soft: rgba(45, 212, 191, 0.13);
+  --tone-violet: #a78bfa;
+  --tone-violet-soft: rgba(167, 139, 250, 0.14);
+
+  /* translucent chrome */
+  --header-veil: rgba(19, 24, 36, 0.78);
+  --card-sheen: linear-gradient(180deg, rgba(233, 237, 245, 0.05) 0%, transparent 42%);
+
+  /* background relics — barely-there line art in the sky */
+  --relic-alpha: 0.07;
+  --relic-muted: #8b94a7;
+
+  /* ── typography ──────────────────────────────────────────── */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.85rem;
+  --text-md: 0.95rem;
+  --text-lg: 1.15rem;
+  --text-xl: 1.45rem;
+  --text-2xl: clamp(1.8rem, 4vw, 2.4rem);
+
+  /* ── spacing scale ───────────────────────────────────────── */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
   --space-4: 1rem;
+  --space-5: 1.25rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
+  --space-12: 3rem;
 
-  /* shape */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  /* ── shape & depth ───────────────────────────────────────── */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 999px;
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 8px 28px rgba(0, 0, 0, 0.45);
+
+  /* ── motion ──────────────────────────────────────────────── */
+  --dur-1: 150ms;
+  --dur-2: 200ms;
+  --ease: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* QR palette — modules must stay dark-on-light for scanners, but the
+     dark end can carry the theme (canvas reads these at draw time) */
+  --qr-module-a: #0f766e;
+  --qr-module-b: #6d28d9;
+  --qr-bg: #eef1fa;
+
+  /* syntax colors — JSON/code highlighting (Runestone PLAN-07, Differ PLAN-08) */
+  --syn-key: #2dd4bf;
+  --syn-string: #4ade80;
+  --syn-number: #a78bfa;
+  --syn-bool: #fbbf24;
+  --syn-null: #8b94a7;
+  --syn-punct: #8b94a7;
+
+  color-scheme: dark;
+}
+
+[data-theme='daybreak'] {
+  --bg: #faf7f1;
+  --surface: #ffffff;
+  --surface-2: #f2ede3;
+  --text: #22283a;
+  --text-muted: #6e7385;
+  --border: #e5dfd0;
+  --accent: #0f9d8f;
+  --accent-2: #6d5fd0;
+  --ok: #1a9e50;
+  --danger: #d64545;
+  --warn: #b97d10;
+
+  --accent-soft: rgba(15, 157, 143, 0.1);
+  --danger-soft: rgba(214, 69, 69, 0.1);
+  --scrim: rgba(38, 34, 26, 0.45);
+
+  --bridge: linear-gradient(90deg, #0f9d8f 0%, #6d5fd0 50%, #1a9e50 100%);
+  --accent-grad: linear-gradient(135deg, #0f9d8f 0%, #14b8a6 100%);
+
+  /* atmosphere — dawn over the bridge (Daybreak) */
+  --sky:
+    radial-gradient(55% 42% at 12% -5%, rgba(15, 157, 143, 0.12), transparent 65%),
+    radial-gradient(50% 38% at 88% 2%, rgba(109, 95, 208, 0.12), transparent 65%),
+    radial-gradient(65% 50% at 50% 112%, rgba(233, 179, 91, 0.14), transparent 60%);
+  --stars: transparent;
+  --stars-alpha: 0;
+
+  --glow-teal: 0 0 26px rgba(15, 157, 143, 0.22);
+  --glow-violet: 0 0 26px rgba(109, 95, 208, 0.22);
+  --glow-soft: 0 0 46px rgba(109, 95, 208, 0.1);
+
+  --qr-module-a: #0c5f54;
+  --qr-module-b: #4c3aa8;
+  --qr-bg: #ffffff;
+
+  --syn-key: #0f9d8f;
+  --syn-string: #1a9e50;
+  --syn-number: #6d5fd0;
+  --syn-bool: #b97d10;
+  --syn-null: #6e7385;
+  --syn-punct: #6e7385;
+
+  --tone-teal: #0f9d8f;
+  --tone-teal-soft: rgba(15, 157, 143, 0.1);
+  --tone-violet: #6d5fd0;
+  --tone-violet-soft: rgba(109, 95, 208, 0.1);
+
+  --header-veil: rgba(255, 255, 255, 0.82);
+  --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, transparent 42%);
+
+  --relic-alpha: 0.09;
+  --relic-muted: #6e7385;
+
+  --shadow-1: 0 1px 3px rgba(60, 50, 30, 0.12);
+  --shadow-2: 0 8px 28px rgba(60, 50, 30, 0.16);
+
+  color-scheme: light;
 }

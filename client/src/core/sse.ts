@@ -1,3 +1,5 @@
+import { getDeviceId } from './deviceId';
+
 export type SseStatus = 'connecting' | 'open' | 'closed';
 
 type StatusListener = (status: SseStatus) => void;
@@ -18,10 +20,17 @@ export class BifrostEvents {
   private readonly statusListeners = new Set<StatusListener>();
   private readonly eventListeners = new Map<string, Set<EventListener>>();
 
+  /** Current status snapshot — late subscribers (route changes) start from truth. */
+  get status(): SseStatus {
+    if (!this.source) return 'closed';
+    return this.source.readyState === EventSource.OPEN ? 'open' : 'connecting';
+  }
+
   connect(): void {
     if (this.source) return;
     this.setStatus('connecting');
-    this.source = new EventSource('/api/events');
+    // deviceId lets the presence module (PLAN-06) identify this connection.
+    this.source = new EventSource(`/api/events?deviceId=${encodeURIComponent(getDeviceId())}`);
     this.source.onopen = () => {
       this.retryAttempt = 0;
       this.setStatus('open');

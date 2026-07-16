@@ -27,7 +27,13 @@ export interface HttpOptions {
 export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> {
   // Cast once: fastify's instance generics carry the pino logger type, which
   // doesn't structurally assign back to the default FastifyInstance alias.
-  const app = Fastify({ loggerInstance: options.logger }) as unknown as FastifyInstance;
+  // forceCloseConnections implements "drain/abort in-flight uploads" from the
+  // shutdown sequence: close() would otherwise wait forever on a client that
+  // is mid-stream through a 2 GB upload.
+  const app = Fastify({
+    loggerInstance: options.logger,
+    forceCloseConnections: true,
+  }) as unknown as FastifyInstance;
 
   app.setErrorHandler((error: unknown, request, reply) => {
     if (error instanceof AppError) {
@@ -35,6 +41,17 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     }
     if (error instanceof Error && 'validation' in error && error.validation) {
       return reply.code(400).send({ error: 'BAD_REQUEST', message: error.message });
+    }
+    // Well-formed 4xx from fastify plugins (rate limit, multipart caps, …):
+    // client errors carry no internals, so their message may pass through.
+    if (error instanceof Error) {
+      const { statusCode, code } = error as Error & { statusCode?: unknown; code?: unknown };
+      if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+        return reply.code(statusCode).send({
+          error: typeof code === 'string' ? code : 'REQUEST_ERROR',
+          message: error.message,
+        });
+      }
     }
     request.log.error({ err: error }, 'unhandled error');
     return reply.code(500).send({ error: 'INTERNAL', message: 'internal server error' });
