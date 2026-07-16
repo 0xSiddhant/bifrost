@@ -615,6 +615,14 @@
   font-size: var(--text-sm);
 }
 
+/* Links detected inside shared text: underlined so they read as tappable
+   even mid-paragraph (base `a` is underline-on-hover only). */
+.clip-entry__link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+}
+
 .clip-entry__code {
   margin: 0;
   max-height: 16rem;
