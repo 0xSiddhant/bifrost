@@ -1,6 +1,6 @@
 {
   "name": "bifrost",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "LAN-only file transfer & sync hub — your devices, connected by the rainbow bridge",
   "license": "MIT",
