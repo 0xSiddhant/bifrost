@@ -90,7 +90,11 @@ On load, `--text` is checked against `--bg` and `--surface`. Ratios below **4.5:
 ## Adding / removing
 
 - **Filesystem:** save `<id>.json` into `themes/` — the watcher validates and broadcasts it live. Delete the file to remove it.
-- **API:** `POST /api/themes` (422 lists every schema violation with its exact path) and `DELETE /api/themes/:id`. Built-ins (`aurora`, `daybreak`) refuse deletion/overwrite. Both endpoints sit behind `THEME_WRITE_API` until Heimdall auth lands in PLAN-05.
+- **API:** `POST /api/themes` (422 lists every schema violation with its exact path) and `DELETE /api/themes/:id`. Built-ins (`aurora`, `daybreak`, `ghibli-dusk`) refuse deletion/overwrite. Both endpoints require a Heimdall admin session (`requireAdmin`).
+
+## Enable / disable (Heimdall)
+
+An admin can hide a theme from the public switcher without deleting it. Disabled ids live in DB settings (`themes.disabled`) and are filtered from both `GET /api/themes` and the live `theme.updated` broadcast, so clients fall back automatically if their active theme is disabled. Heimdall uses `GET /api/themes/manage` (all themes + `enabled` flag) and `PATCH /api/themes/:id {enabled}`; disabling the last enabled theme is refused (409 `LAST_THEME`).
 
 ## Troubleshooting
 

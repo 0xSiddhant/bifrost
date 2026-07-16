@@ -28,9 +28,13 @@ bifrost/
 ├── client/
 │   └── src/
 │       ├── app/               # shell, router, capabilities-driven nav
-│       ├── core/              # api client, sse client, theme engine, design tokens
+│       ├── assets/            # self-hosted fonts + relic line-art collections (norse, wizarding, olympus, ghibli)
+│       ├── core/              # api client, sse client, theme engine, device registry, design tokens
 │       └── features/          # mirrors server modules; route-level code splitting
-├── themes/                    # built-in + user-added theme JSON files
+│                              #   lore-named where the page is lore-named: muninn→clipboard,
+│                              #   wardens→presence, sigil→qr-tool (server ids unchanged)
+├── scripts/                   # setup.ts (folders/env/migrations), backup.ts
+├── themes/                    # built-in (aurora, daybreak, ghibli-dusk) + user-added theme JSON files
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts
     ├── uploads/   downloads/   tmp/   data/ (app.db)   logs/
 ```
