@@ -6,7 +6,7 @@ One Node/Fastify process serves the static frontend, REST API, and SSE stream on
 
 1. **Vertical slices.** Code is organized feature-first: `src/modules/<feature>/` contains that feature's routes, usecases, services, and DB schema. Shared infrastructure lives in `src/core/` only.
 2. **Modules never import each other. Only `core`.** Cross-feature communication goes through the core **event bus** (e.g. `bus.emit('file.uploaded', meta)`). Enforced by `eslint-plugin-boundaries` — a violating import is a build failure, not a style nit.
-3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (qr-tool, notes, toolbox), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles.
+3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall — see the manifest in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles.
 
 ## Layers inside every module
 
@@ -19,22 +19,22 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 |---|---|---|
 | `file-transfer` | Upload (write-only) + download (read-only) + live folder watch | local only |
 | `previews` | In-browser image/PDF/video/markdown preview, range requests | local only |
-| `clipboard` | Cross-device text/clipboard sync | local only |
+| `clipboard` | Cross-device text/clipboard sync (Muninn page) | local only |
 | `themes` | Theme engine, JSON themes, dynamic switching | both |
 | `heimdall` | Hidden admin panel (gesture/shortcut + PIN) | both |
-| `qr-tool` | QR generator utility + server-URL QR | both |
-| `presence` | Connected-device dashboard, named devices | local only |
+| `qr-tool` | QR generator utility + server-URL QR (Sigil page) | both |
+| `presence` | Connected-device dashboard (Wardens page), character aliases + renames | local only |
 | `audit-log` | Upload history & activity log (event-bus subscriber) | local only |
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
 
 ## Core services (shared kernel — no feature imports)
 
-`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus) · `auth` (PIN sessions for Heimdall) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping).
+`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus; carries per-connection metadata — deviceId/UA/IP — and an `onConnectionChange` subscription that presence consumes) · `auth` (`@fastify/secure-session` PIN sessions + revocable session epoch; decorates `app.requireAdmin`, which guards both Heimdall routes and theme write routes) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping).
 
 ## Key data flows
 
-- **Upload:** client `POST /api/files` (multipart) → busboy streams to `storage/tmp/` → usecase validates (size limit from config, filename sanitization, extension blocklist) → atomic `rename()` into `storage/uploads/` → `bus.emit('file.uploaded')` → audit-log records. **No read route for `uploads/` exists anywhere.** Files written mode 0644, stored as `<timestamp>-<sanitized-name>`.
+- **Upload:** client `POST /api/files` (multipart) → busboy streams to `storage/tmp/` → usecase validates (size limit from config, filename sanitization, extension blocklist) → atomic `rename()` into `storage/uploads/` → `bus.emit('file.uploaded')` → recorded twice, independently: heimdall's `upload_audit` (uploads metadata card) and audit-log's `audit_events` (cross-module history) — deliberately uncoupled tables. **No read route for `uploads/` exists anywhere.** Files written mode 0644, stored as `<timestamp>-<sanitized-name>`.
 - **Live download:** file dropped into `storage/downloads/` via Finder → chokidar (FSEvents, `awaitWriteFinish`) → `bus.emit('download.added')` → sse-hub broadcasts → every open client updates. Downloads served via controlled endpoint with path-traversal protection, never a raw directory listing.
 
 ## Restart safety (server is stopped/started constantly)

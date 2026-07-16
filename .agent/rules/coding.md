@@ -35,4 +35,4 @@
 
 - Design tokens/themes only via CSS custom properties — never hardcode colors in components.
 - Responsive-first: layouts verified at 375px, 768px, 1280px.
-- No `localStorage` for critical state; server is the source of truth (theme choice may cache locally).
+- No `localStorage` for critical state; server is the source of truth. Allowed non-critical class (per decision log): theme-choice cache, `deviceId`, relic-collection prefs, draft buffers.

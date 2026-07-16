@@ -12,7 +12,9 @@
 | Live updates | Server-Sent Events (one hub) | One-directional notifications; browser auto-reconnect; ~20 lines vs WS lifecycle management |
 | mDNS | bonjour-service | Advertise `bifrost.local`; Android fallback = LAN-IP QR code printed at boot + shown in Heimdall |
 | Config | dotenv + zod validation at boot | Fail fast on bad env; `.env` = defaults + secrets, DB `settings` table = runtime-mutable values (admin shortcut, etc.) |
-| Logging | pino → JSON file (`storage/logs/`) + pino-roll rotation; pino-pretty in dev | Structured lines per module/request; Grafana+Loki compose stack is an optional add-on (PLAN-07), not load-bearing |
+| Logging | pino → JSON file (`storage/logs/`) + pino-roll rotation; pino-pretty in dev | Structured lines per module/request; Grafana+Loki compose stack is an optional add-on (PLAN-09), not load-bearing |
+| Admin sessions | @fastify/secure-session (stateless secretbox cookie) + revocable session epoch in DB settings | No server-side session store to babysit; epoch bump = revoke-all that survives restart (see decisions 2026-07-15) |
+| Device labels | ua-parser-js (server-side) | Presence turns UAs into "iPhone · Safari" labels; character aliases layered on top (PLAN-06) |
 | Theme validation | ajv against a published JSON Schema | Users add themes as JSON; schema is the contract (THEME-SPEC.md) |
 | Lint/format | ESLint + eslint-plugin-boundaries + Prettier | Boundaries plugin mechanically enforces module isolation |
 | Commits | commitlint + husky, Conventional Commits | Owner's established discipline; scopes = module names |
