@@ -12,7 +12,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-03 | Previews + QR tool | in-review | feat/plan-03-previews-qr (local) | Implemented + verified 2026-07-14; awaiting owner testing, then push + PR |
 | PLAN-04 | Theming engine | done | PR #5 → develop (merged 2026-07-15) | Gate cleared — PLAN-05 unlocked |
 | PLAN-05 | Heimdall admin panel | done | PR #6 → develop (merged 2026-07-16) | Gate cleared — PLAN-06 unlocked |
-| PLAN-06 | Clipboard sync, presence, audit log | in-review | feat/plan-06-sync-presence (local) | Implemented + verified 2026-07-16; awaiting owner testing, then commit + PR |
+| PLAN-06 | Clipboard sync, presence, audit log | in-review | PR #7 → develop | Implemented + verified 2026-07-16; 9 commits pushed; awaiting owner review/merge |
 | PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
 | PLAN-08 | Variant (JSON & text diff checker) | not-started | — | Plan authored 2026-07-15; shares PLAN-07 components |
 | PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
