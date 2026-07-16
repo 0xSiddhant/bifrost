@@ -37,8 +37,8 @@ export function MidgardPage() {
       </div>
 
       <p className="midgard-links caption">
-        Also on the bridge: <Link to="/clipboard">Clipboard sync</Link> ·{' '}
-        <Link to="/qr">QR tool</Link>
+        Also on the bridge: <Link to="/muninn">Muninn</Link> · <Link to="/wardens">Wardens</Link> ·{' '}
+        <Link to="/sigil">Sigil</Link>
       </p>
     </>
   );

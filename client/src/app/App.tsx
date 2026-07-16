@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
+import { startDeviceRegistry } from '../core/devices';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
@@ -9,6 +10,7 @@ import {
   ClipboardIcon,
   DownloadIcon,
   FolderIcon,
+  MonitorIcon,
   QrIcon,
   UploadIcon,
   WifiOffIcon,
@@ -26,14 +28,17 @@ const DownloadsPage = lazy(() =>
 const PreviewModal = lazy(() =>
   import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
 );
-const ClipboardPage = lazy(() =>
-  import('../features/clipboard/ClipboardPage').then((m) => ({ default: m.ClipboardPage })),
+const MuninnPage = lazy(() =>
+  import('../features/muninn/MuninnPage').then((m) => ({ default: m.MuninnPage })),
 );
-const QrToolPage = lazy(() =>
-  import('../features/qr-tool/QrToolPage').then((m) => ({ default: m.QrToolPage })),
+const SigilPage = lazy(() =>
+  import('../features/sigil/SigilPage').then((m) => ({ default: m.SigilPage })),
 );
 const HeimdallPage = lazy(() =>
   import('../features/heimdall/HeimdallPage').then((m) => ({ default: m.HeimdallPage })),
+);
+const WardensPage = lazy(() =>
+  import('../features/wardens/WardensPage').then((m) => ({ default: m.WardensPage })),
 );
 
 /**
@@ -45,8 +50,9 @@ const NAV = [
   { to: '/', label: 'Midgard', icon: <FolderIcon size={18} /> },
   { to: '/upload', label: 'Send', icon: <UploadIcon size={18} /> },
   { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} /> },
-  { to: '/clipboard', label: 'Clipboard', icon: <ClipboardIcon size={18} /> },
-  { to: '/qr', label: 'QR', icon: <QrIcon size={18} /> },
+  { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} /> },
+  { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} /> },
+  { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} /> },
 ];
 
 export function App() {
@@ -57,6 +63,7 @@ export function App() {
   useEffect(() => {
     const unsubscribe = bifrostEvents.onStatus(setSseStatus);
     bifrostEvents.connect();
+    startDeviceRegistry();
     return () => {
       unsubscribe();
       bifrostEvents.close();
@@ -102,8 +109,9 @@ export function App() {
               {/* Modal route: deep-linkable, back button closes the preview. */}
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
-            <Route path="/clipboard" element={<ClipboardPage />} />
-            <Route path="/qr" element={<QrToolPage />} />
+            <Route path="/muninn" element={<MuninnPage />} />
+            <Route path="/wardens" element={<WardensPage />} />
+            <Route path="/sigil" element={<SigilPage />} />
             <Route path="/heimdall" element={<HeimdallPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
