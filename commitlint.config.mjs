@@ -24,6 +24,8 @@ export default {
         'ci',
         'docs',
         'chore',
+        // release commits (manual now, PLAN-09 automation later)
+        'release',
       ],
     ],
     'subject-case': [2, 'always', 'lower-case'],
