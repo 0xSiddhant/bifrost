@@ -39,7 +39,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Muninn — clipboard/text sync across devices
 - 🔳 Sigil — QR generator utility (+ scan-to-join QR for the server URL)
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk built in), addable via JSON
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
