@@ -740,6 +740,272 @@
   }
 }
 
+/* ── Runestone (PLAN-07) ─────────────────────────────────────── */
+/* The title is an input so it stays inline-editable — styled as the heading. */
+.rune-title {
+  width: 100%;
+  max-width: 30ch;
+  background: transparent;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  padding: 0;
+}
+
+.rune-title:hover {
+  border-bottom-color: var(--border);
+}
+
+.rune-title:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.rune-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.rune-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.rune-toolbar__group--end {
+  margin-left: auto;
+}
+
+.rune-viewtoggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.rune-viewtoggle__btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
+}
+
+.rune-viewtoggle__btn.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.rune-body {
+  margin-top: var(--space-3);
+}
+
+.json-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* ≥16px on touch screens or iOS zooms the page on focus */
+@media (max-width: 768px) {
+  .json-editor .cm-content,
+  .json-editor .cm-gutters {
+    font-size: 16px;
+  }
+}
+
+.rune-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.rune-status__state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 600;
+}
+
+.rune-status__state--ok {
+  color: var(--ok);
+}
+
+.rune-status__state--bad {
+  color: var(--danger);
+}
+
+.rune-status__path {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.rune-status__path:hover {
+  color: var(--accent);
+}
+
+.rune-stats {
+  margin-left: auto;
+}
+
+.rune-issues {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--border);
+  max-height: 11rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.rune-issues button {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.rune-issues button:hover {
+  color: var(--danger);
+}
+
+.rune-issues button .mono {
+  color: var(--danger);
+  margin-right: var(--space-2);
+}
+
+.rune-restore {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* tree view — read-only explorer; editing happens in code mode */
+.rune-tree {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.rune-tree__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px 0 2px calc(var(--tree-depth, 0) * var(--space-4));
+  min-width: 0;
+}
+
+.rune-tree__spacer {
+  width: 14px;
+  flex: none;
+}
+
+.rune-tree__toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0;
+  width: 14px;
+  flex: none;
+  cursor: pointer;
+  align-self: center;
+  display: inline-flex;
+  transition: transform var(--dur-1) var(--ease);
+}
+
+.rune-tree__toggle--open {
+  transform: rotate(90deg);
+}
+
+.rune-tree__key {
+  background: transparent;
+  border: none;
+  color: var(--syn-key);
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+
+.rune-tree__key:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.rune-tree__value {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.rune-tree__value--string {
+  color: var(--syn-string);
+}
+
+.rune-tree__value--number {
+  color: var(--syn-number);
+}
+
+.rune-tree__value--boolean {
+  color: var(--syn-bool);
+}
+
+.rune-tree__value--null {
+  color: var(--syn-null);
+}
+
+.rune-tree__badge {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+}
+
+.rune-tree__count {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.rune-tree-empty {
+  padding: var(--space-6) var(--space-3);
+  text-align: center;
+}
+
 /* ── responsive ─────────────────────────────────────────────── */
 @media (max-width: 768px) {
   .portals,
@@ -782,7 +1048,19 @@
     flex-direction: column;
     gap: var(--space-1);
     font-size: var(--text-xs);
-    padding: var(--space-1) var(--space-2);
+    padding: var(--space-1) var(--space-1);
+    /* seven entries share the row (Runestone joined in PLAN-07) — every
+       item must shrink instead of pushing the last ones off-screen */
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .nav--bottom .nav__item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .shell-footer {

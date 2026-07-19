@@ -177,3 +177,10 @@ export const ChevronRightIcon = (p: IconProps) => (
     <path d="m10 6 6 6-6 6" />
   </svg>
 );
+
+export const BracesIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M8 4H7a2 2 0 0 0-2 2v3.5c0 1-.6 2.5-2 2.5 1.4 0 2 1.5 2 2.5V18a2 2 0 0 0 2 2h1" />
+    <path d="M16 4h1a2 2 0 0 1 2 2v3.5c0 1 .6 2.5 2 2.5-1.4 0-2 1.5-2 2.5V18a2 2 0 0 1-2 2h-1" />
+  </svg>
+);
