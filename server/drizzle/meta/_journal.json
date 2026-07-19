@@ -29,6 +29,13 @@
       "when": 1784179974681,
       "tag": "0003_device_character",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784474401018,
+      "tag": "0004_runestones",
+      "breakpoints": true
     }
   ]
 }
