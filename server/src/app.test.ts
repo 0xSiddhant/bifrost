@@ -45,6 +45,7 @@ describe('boot → health → capabilities', () => {
         'clipboard',
         'presence',
         'audit-log',
+        'runestone',
       ],
     });
   });
