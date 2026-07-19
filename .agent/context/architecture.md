@@ -36,6 +36,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 
 - **Upload:** client `POST /api/files` (multipart) → busboy streams to `storage/tmp/` → usecase validates (size limit from config, filename sanitization, extension blocklist) → atomic `rename()` into `storage/uploads/` → `bus.emit('file.uploaded')` → recorded twice, independently: heimdall's `upload_audit` (uploads metadata card) and audit-log's `audit_events` (cross-module history) — deliberately uncoupled tables. **No read route for `uploads/` exists anywhere.** Files written mode 0644, stored as `<timestamp>-<sanitized-name>`.
 - **Live download:** file dropped into `storage/downloads/` via Finder → chokidar (FSEvents, `awaitWriteFinish`) → `bus.emit('download.added')` → sse-hub broadcasts → every open client updates. Downloads served via controlled endpoint with path-traversal protection, never a raw directory listing.
+- **Runestone save:** editor `POST/PUT /api/runestone` → usecase validates (JSON parse, `RUNESTONE_MAX_DOC_KB` cap) → `runestones` table (id = 6-char handle anchoring the `<kebab-name>-<id>` slug; renames regenerate the slug, stale slugs 301) → `bus.emit('runestone.saved'|'runestone.deleted')` → SSE live-updates open libraries; audit-log records both. Author stored as `author_device_id` only — names resolve client-side.
 
 ## Restart safety (server is stopped/started constantly)
 
