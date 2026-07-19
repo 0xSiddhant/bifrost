@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
 import {
@@ -12,12 +13,19 @@ import {
   type JsonIssue,
 } from '../../core/json';
 import { relicTitle } from '../../core/relicNames';
+import { ApiError } from '../../core/api';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
-import { fetchRunestoneConfig, type RunestoneConfig } from './api';
+import {
+  fetchRunestone,
+  fetchRunestoneConfig,
+  saveRunestone,
+  updateRunestone,
+  type RunestoneConfig,
+} from './api';
 import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from './TreeView';
 
@@ -52,9 +60,25 @@ function exportFilename(title: string): string {
   return `${safe || 'runestone'}.json`;
 }
 
+/** "gleaming-gungnir-abc123" → "Gleaming Gungnir" (drops an id-shaped tail). */
+function titleFromSlug(slug: string): string {
+  const parts = slug.split('-').filter(Boolean);
+  if (parts.length > 1 && /^[a-z0-9]{6}$/.test(parts[parts.length - 1] ?? '')) parts.pop();
+  return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
+type Phase = 'new' | 'loading' | 'saved' | 'notfound';
+
 export function RunestonePage() {
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+
+  const [phase, setPhase] = useState<Phase>(slug ? 'loading' : 'new');
+  const [docId, setDocId] = useState<string | null>(null);
   const [title, setTitle] = useState(() => relicTitle());
   const [text, setText] = useState('');
+  const [snapshot, setSnapshot] = useState<{ title: string; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
   const [view, setView] = useState<'code' | 'tree'>(() =>
     window.innerWidth < 768 ? 'tree' : 'code',
   );
@@ -72,25 +96,66 @@ export function RunestonePage() {
         if (!cancelled) setConfig(cfg);
       })
       .catch(() => {
-        // cap check degrades gracefully; the server still enforces it in Part B
+        // cap check degrades gracefully; the server still enforces it on save
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Offer to restore a cached draft once, on arrival with an empty buffer.
+  // Load (or fail to find) the document a slug URL names.
   useEffect(() => {
+    if (!slug) {
+      setPhase('new');
+      setDocId(null);
+      setSnapshot(null);
+      return;
+    }
+    let cancelled = false;
+    setPhase('loading');
+    fetchRunestone(slug)
+      .then((doc) => {
+        if (cancelled) return;
+        if (!doc) {
+          setPhase('notfound');
+          return;
+        }
+        setDocId(doc.id);
+        setTitle(doc.name);
+        setText(doc.content);
+        setSnapshot({ title: doc.name, text: doc.content });
+        setPhase('saved');
+        // The API 301s stale slugs; fix the address bar to the canonical one.
+        if (doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPhase('new');
+          setNotice({ kind: 'danger', message: 'Could not load that runestone.' });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // navigate identity churns; slug is the real dependency
+  }, [slug]);
+
+  const isScratch = phase === 'new' && docId === null;
+
+  // Offer to restore a cached draft once, on arriving at the scratch editor.
+  useEffect(() => {
+    if (!isScratch) return;
     const draft = loadDraft();
     if (draft && draft.text.trim() !== '') setRestorable(draft);
-  }, []);
+  }, [isScratch]);
 
-  // Auto-cache the buffer (debounced) so a refresh mid-edit loses nothing.
+  // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
+  // nothing. Saved documents live on the server instead.
   useEffect(() => {
-    if (text.trim() === '') return;
+    if (!isScratch || text.trim() === '') return;
     const id = window.setTimeout(() => saveDraft({ title, text, savedAt: Date.now() }), 500);
     return () => window.clearTimeout(id);
-  }, [title, text]);
+  }, [isScratch, title, text]);
 
   useEffect(() => {
     if (!notice) return;
@@ -124,8 +189,43 @@ export function RunestonePage() {
     return pathAt(debouncedText, Math.min(debouncedCursor, debouncedText.length));
   }, [view, empty, debouncedText, debouncedCursor]);
 
+  const dirty = snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
+  const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
+
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
+
+  const save = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      if (docId === null) {
+        const doc = await saveRunestone({ name: title, content: text });
+        setDocId(doc.id);
+        setTitle(doc.name);
+        setSnapshot({ title: doc.name, text: doc.content });
+        setPhase('saved');
+        clearDraft();
+        setRestorable(null);
+        navigate(`/runestone/${doc.slug}`, { replace: true });
+        ok('Runestone carved');
+      } else {
+        const doc = await updateRunestone(docId, { name: title, content: text });
+        setTitle(doc.name);
+        setSnapshot({ title: doc.name, text: doc.content });
+        if (slug && doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
+        ok('Saved');
+      }
+    } catch (error) {
+      fail(
+        error instanceof ApiError && error.status === 413
+          ? 'The server refused it — over the size limit.'
+          : 'Save failed — is the bridge up?',
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const applyFormat = () => setText((current) => formatJson(current));
   const applyMinify = () => setText((current) => minifyJson(current));
@@ -243,7 +343,47 @@ export function RunestonePage() {
     setRestorable(null);
   };
 
+  const carveFromSlug = () => {
+    setPhase('new');
+    setDocId(null);
+    setSnapshot(null);
+    setText('');
+    setTitle(slug ? titleFromSlug(slug) || relicTitle() : relicTitle());
+    navigate('/runestone', { replace: true });
+  };
+
   const canTransform = valid && !overCap;
+
+  if (phase === 'loading') {
+    return <div className="page-loading caption">Reading the stone…</div>;
+  }
+
+  if (phase === 'notfound') {
+    return (
+      <>
+        <div className="page-head">
+          <div>
+            <span className="eyebrow eyebrow--violet">the runes · carved to be read later</span>
+            <h2>This runestone was never carved</h2>
+            <p>…or it has crumbled to dust. The library keeps no memory of “{slug}”.</p>
+          </div>
+        </div>
+        <Card>
+          <div className="rune-404">
+            <p className="rune-404__glyph" aria-hidden="true">
+              ᚱᚢᚾᛖ᛫ᛚᛟᛊᛏ
+            </p>
+            <div className="row">
+              <Button onClick={carveFromSlug}>Carve it now</Button>
+              <Button variant="ghost" onClick={() => void navigate('/runestone/library')}>
+                Back to the library
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </>
+    );
+  }
 
   return (
     <>
@@ -260,6 +400,14 @@ export function RunestonePage() {
             />
           </h2>
           <p>Validate, explore, and shape JSON. The title names your export.</p>
+        </div>
+        <div className="rune-head-actions">
+          <Button onClick={() => void save()} disabled={!canSave}>
+            {saving ? 'Carving…' : docId === null ? 'Save to library' : dirty ? 'Save' : 'Saved'}
+          </Button>
+          <Button variant="ghost" onClick={() => void navigate('/runestone/library')}>
+            Library
+          </Button>
         </div>
       </div>
 
@@ -411,6 +559,9 @@ export function RunestonePage() {
               <span className="rune-status__state rune-status__state--bad">
                 <AlertIcon size={14} /> {issues.length} {issues.length === 1 ? 'error' : 'errors'}
               </span>
+            )}
+            {docId !== null && (
+              <span className="caption">{dirty ? 'Unsaved changes' : 'In the library'}</span>
             )}
             {cursorPath && (
               <button
