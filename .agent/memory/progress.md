@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**Active plan: PLAN-07 (Part A next up — gate cleared by PR #7 merge)**
+**Active plan: PLAN-07 (Part A implemented, awaiting owner testing; Part B not started)**
 
 | Plan | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
@@ -13,13 +13,15 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-04 | Theming engine | done | PR #5 → develop (merged 2026-07-15) | Gate cleared — PLAN-05 unlocked |
 | PLAN-05 | Heimdall admin panel | done | PR #6 → develop (merged 2026-07-16) | Gate cleared — PLAN-06 unlocked |
 | PLAN-06 | Clipboard sync, presence, audit log | done | PR #7 → develop (merged 2026-07-16) | Gate cleared — PLAN-07 unlocked |
-| PLAN-07 | Runestone (JSON editor Part A + library Part B) | not-started | — | Two PRs (07a, 07b) per plan's declared exception |
+| PLAN-07 | Runestone (JSON editor Part A + library Part B) | in-progress | feat/plan-07a-runestone-editor | Part A built + live-verified 2026-07-17; uncommitted pending owner test. Part B gated on 07a merge |
 | PLAN-08 | Variant (JSON & text diff checker) | not-started | — | Plan authored 2026-07-15; shares PLAN-07 components |
 | PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
 | PLAN-10 | Heimdall Modal (overlay conversion + new sections) | not-started | — | Plan authored 2026-07-16; supersedes "PIN on every arrival" (logged when implemented) |
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
+
+- 2026-07-17 — PLAN-07 **Part A implemented** on `feat/plan-07a-runestone-editor`. **Server**: `runestone` module (both profiles, `GET /api/runestone/config` → `{maxDocKb}`), `RUNESTONE_MAX_DOC_KB` env (default 2048) in zod config + `.env.example`, `core/relics` name service (`relicTitle`/`uniqueRelicTitle`, 4-category Norse/Potter/MCU bank, retry + base36-suffix collision fallback). **Client**: `core/json` pure utils on jsonc-parser (validateJson all-errors strict, formatJson/minifyJson token-preserving via edits/scanner, sortKeysDeep property-tested over 200 seeded random docs, unescapeEmbedded, jsonStats, pathAt/formatJsonPath); `core/relicNames` mirror; **`core/ui/JsonEditor`** (CM6 + lang-json + lint/fold/history, highlight bound to `--syn-*` vars, imperative fold/goto handle) — placed in core because PLAN-08 mounts two (features can't import features); `features/runestone` page (toolbar, read-only TreeView with path-copy, inline-editable relic title feeding export filename, import via picker+drop, size-cap banner, debounced localStorage draft + restore toast, error list with line:col click-to-jump, cursor-path in status bar, code⇄tree toggle with tree default <768px); nav now **filters from /api/capabilities** (module field per entry) with Runestone entry + new BracesIcon; `copyText` moved muninn→`core/copy` (shared). Bottom nav CSS fixed to flex-fit 7 entries at 390px. New deps: @codemirror/* + jsonc-parser (client). 192 server + 57 client tests green; lint/typecheck/build clean; restart smoke + integrity_check ok. **Live-verified** on the built server (CDP): 6-error doc lists every error with positions → fix flips to "Valid JSON" without reload; minify/format/sort round-trip (name-order preserved by format, sort idempotent); unescape unwraps embedded JSON; tree path-copy puts `nested.deep.value` on the real clipboard; reload → restore toast recovers the exact buffer; syn tokens distinct in Aurora/Daybreak/Ghibli-Dusk screenshots; mobile 390×844 defaults to tree and nav fits (overflow 0px). Known limitation (logged): sort-keys/tree go through JSON.parse, so numbers past 2^53 normalize there (format/minify preserve raw tokens). Manual owed to owner: iPhone/Android touch editing on a 1.5 MB doc, real export download, drag-drop from Finder. Uncommitted (test-before-commit).
 
 - 2026-07-17 — Claude Code project skills committed (owner-authored, reviewed): `.claude/skills/` now holds verify, release, context-sync, new-module, live-verify, db-migration; CLAUDE.md lists them. Review corrections to new-module: `FeatureModule` contract is `{ name, register }` (no migrations/capabilities fields — `/api/capabilities` derives from `MANIFEST` in app.ts), tables live centrally in `core/db/schema.ts` (not per-module), and client feature folders may use page codenames (clipboard→muninn, qr-tool→sigil, presence→wardens). New skills encode the recurring live-verification ritual (built server + headless Chromium + screenshot matrix) and the schema+migration-as-one-unit rule (from the `char_name` incident). Known open item: the release skill invokes changelogen, which is not a devDependency (ran via npx for v1.0.0). `.gitignore` excludes `.claude/settings.local.json`. Committed directly to develop per owner instruction; not pushed.
 

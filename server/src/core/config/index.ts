@@ -21,6 +21,7 @@ const envSchema = z.object({
   CLIPBOARD_MAX_ENTRIES: z.coerce.number().int().positive().default(100),
   CLIPBOARD_MAX_TEXT_KB: z.coerce.number().int().positive().default(64),
   AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -60,6 +61,9 @@ export interface AppConfig {
     maxTextBytes: number;
   };
   auditRetentionDays: number;
+  runestone: {
+    maxDocKb: number;
+  };
   themes: {
     dir: string;
     /**
@@ -131,6 +135,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
       maxTextBytes: raw.CLIPBOARD_MAX_TEXT_KB * 1024,
     },
     auditRetentionDays: raw.AUDIT_RETENTION_DAYS,
+    runestone: {
+      maxDocKb: raw.RUNESTONE_MAX_DOC_KB,
+    },
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,
