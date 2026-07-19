@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
@@ -44,8 +44,8 @@ const WardensPage = lazy(() =>
 const RunestonePage = lazy(() =>
   import('../features/runestone/RunestonePage').then((m) => ({ default: m.RunestonePage })),
 );
-const RunestoneLibraryPage = lazy(() =>
-  import('../features/runestone/LibraryPage').then((m) => ({ default: m.LibraryPage })),
+const MimirPage = lazy(() =>
+  import('../features/runestone/MimirPage').then((m) => ({ default: m.MimirPage })),
 );
 
 /**
@@ -124,8 +124,10 @@ export function App() {
             </Route>
             <Route path="/muninn" element={<MuninnPage />} />
             <Route path="/runestone" element={<RunestonePage />} />
-            {/* literal segment beats the :slug param — declared first for clarity */}
-            <Route path="/runestone/library" element={<RunestoneLibraryPage />} />
+            {/* literal segments beat the :slug param — declared first for clarity */}
+            <Route path="/runestone/mimir" element={<MimirPage />} />
+            {/* pre-rename URL (PLAN-07b shipped as "library") */}
+            <Route path="/runestone/library" element={<Navigate to="/runestone/mimir" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />

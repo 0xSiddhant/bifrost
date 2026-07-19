@@ -74,6 +74,37 @@ describe('runestone module', () => {
     expect(gone.statusCode).toBe(404);
   });
 
+  it('serves raw document JSON at the public /runestone/api/:slug endpoint', async () => {
+    const content = '{\n  "keep": "formatting",\n  "big": 9007199254740993\n}';
+    const save = await inject({
+      method: 'POST',
+      url: '/api/runestone',
+      payload: { name: 'Public Data', content },
+    });
+    const created = save.json();
+
+    const data = await inject({ method: 'GET', url: `/runestone/api/${created.slug}` });
+    expect(data.statusCode).toBe(200);
+    expect(data.headers['content-type']).toContain('application/json');
+    expect(data.headers['access-control-allow-origin']).toBe('*');
+    // raw stored text — formatting and >2^53 precision untouched
+    expect(data.body).toBe(content);
+
+    const rename = await inject({
+      method: 'PUT',
+      url: `/api/runestone/${created.id}`,
+      payload: { name: 'Public Data v2' },
+    });
+    const stale = await inject({ method: 'GET', url: `/runestone/api/${created.slug}` });
+    expect(stale.statusCode).toBe(301);
+    expect(stale.headers.location).toBe(`/runestone/api/${rename.json().slug}`);
+
+    const missing = await inject({ method: 'GET', url: '/runestone/api/never-was-zz9zz9' });
+    expect(missing.statusCode).toBe(404);
+
+    await inject({ method: 'DELETE', url: `/api/runestone/${created.id}` });
+  });
+
   it('defaults the name to a relic title when omitted', async () => {
     const save = await inject({
       method: 'POST',
