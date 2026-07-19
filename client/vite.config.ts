@@ -18,6 +18,8 @@ export default defineConfig({
     allowedHosts: [mdnsHost],
     proxy: {
       '/api': { target: `http://localhost:${serverPort}` },
+      // public runestone data endpoint lives outside /api (PLAN-07 addendum)
+      '/runestone/api': { target: `http://localhost:${serverPort}` },
     },
   },
 });

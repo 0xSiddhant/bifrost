@@ -60,6 +60,24 @@ export const devices = sqliteTable('devices', {
 });
 
 /**
+ * Saved JSON documents ("runestones", PLAN-07 Part B). Owned by the
+ * `runestone` module. `id` is a short random handle that anchors share URLs;
+ * `slug` is `<kebab-name>-<id>` and regenerates on rename (stale slugs with a
+ * valid id still resolve). `author_device_id` is the PLAN-06 device id —
+ * display names resolve client-side, never from presence's tables.
+ */
+export const runestones = sqliteTable('runestones', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  content: text('content').notNull(),
+  authorDeviceId: text('author_device_id'),
+  sizeBytes: integer('size_bytes').notNull(),
+  createdAt: integer('created_at').notNull(),
+  modifiedAt: integer('modified_at').notNull(),
+});
+
+/**
  * Activity log (PLAN-06). A pure bus subscriber (`audit-log` module) appends
  * one row per cross-module event; `actor` is a deviceId and/or ip. Pruned by
  * retention. Nothing else imports the module — delete it and Bifrost still runs.

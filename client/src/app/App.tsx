@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
@@ -7,6 +7,7 @@ import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import {
+  BracesIcon,
   ClipboardIcon,
   DownloadIcon,
   FolderIcon,
@@ -40,25 +41,37 @@ const HeimdallPage = lazy(() =>
 const WardensPage = lazy(() =>
   import('../features/wardens/WardensPage').then((m) => ({ default: m.WardensPage })),
 );
+const RunestonePage = lazy(() =>
+  import('../features/runestone/RunestonePage').then((m) => ({ default: m.RunestonePage })),
+);
+const MimirPage = lazy(() =>
+  import('../features/runestone/MimirPage').then((m) => ({ default: m.MimirPage })),
+);
 
 /**
- * Static nav for the design review. PLAN-02+ derives this from
- * /api/capabilities so each profile only shows its loaded modules.
+ * Nav renders from /api/capabilities: an entry appears only when its module is
+ * loaded in the active deploy profile (until capabilities arrive, all entries
+ * show to avoid a layout pop on the common local profile).
  * Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
 const NAV = [
-  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} /> },
-  { to: '/upload', label: 'Send', icon: <UploadIcon size={18} /> },
-  { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} /> },
-  { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} /> },
-  { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} /> },
-  { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} /> },
+  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, module: null },
+  { to: '/upload', label: 'Send', icon: <UploadIcon size={18} />, module: 'file-transfer' },
+  { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} />, module: 'file-transfer' },
+  { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
+  { to: '/runestone', label: 'Runestone', icon: <BracesIcon size={18} />, module: 'runestone' },
+  { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} />, module: 'presence' },
+  { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} />, module: 'qr-tool' },
 ];
 
 export function App() {
   const { capabilities } = useCapabilities();
   const { registerTap } = useHeimdallGesture();
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
+  const nav = NAV.filter(
+    (item) =>
+      item.module === null || !capabilities || capabilities.modules.includes(item.module),
+  );
 
   useEffect(() => {
     const unsubscribe = bifrostEvents.onStatus(setSseStatus);
@@ -83,7 +96,7 @@ export function App() {
           Bifrost
         </NavLink>
         <nav className="nav nav--top" aria-label="Main">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
               {item.icon}
               <span>{item.label}</span>
@@ -110,6 +123,12 @@ export function App() {
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
             <Route path="/muninn" element={<MuninnPage />} />
+            <Route path="/runestone" element={<RunestonePage />} />
+            {/* literal segments beat the :slug param — declared first for clarity */}
+            <Route path="/runestone/mimir" element={<MimirPage />} />
+            {/* pre-rename URL (PLAN-07b shipped as "library") */}
+            <Route path="/runestone/library" element={<Navigate to="/runestone/mimir" replace />} />
+            <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
             <Route path="/heimdall" element={<HeimdallPage />} />
@@ -119,7 +138,7 @@ export function App() {
       </main>
 
       <nav className="nav nav--bottom" aria-label="Main">
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
             {item.icon}
             <span>{item.label}</span>

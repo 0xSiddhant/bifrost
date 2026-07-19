@@ -7,8 +7,8 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { CheckIcon, ClipboardIcon, CloseIcon } from '../../core/ui/icons';
+import { copyText } from '../../core/copy';
 import { addClipboard, deleteClipboard, type ClipboardEntry } from './api';
-import { copyText } from './copy';
 import { linkify, opensInNewTab } from './linkify';
 import { useClipboard } from './useClipboard';
 
