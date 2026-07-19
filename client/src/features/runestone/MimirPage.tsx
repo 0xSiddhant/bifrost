@@ -20,7 +20,8 @@ function authorDisplay(deviceId: string | null): string {
   return deviceName(deviceId) ?? 'departed device';
 }
 
-export function LibraryPage() {
+/** Mímir keeps the well of remembered knowledge — the saved-runestone library. */
+export function MimirPage() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<RunestoneSummary[] | null>(null);
   const [q, setQ] = useState('');
@@ -52,7 +53,7 @@ export function LibraryPage() {
               }
             }
           })
-          .catch(() => setError('Could not reach the library.'));
+          .catch(() => setError('Could not reach the well.'));
       }, 200);
     };
   }, []);
@@ -93,9 +94,9 @@ export function LibraryPage() {
     <>
       <div className="page-head">
         <div>
-          <span className="eyebrow eyebrow--violet">the library · every stone remembered</span>
-          <h2>Runestone library</h2>
-          <p>Every carved document, from every device on the bridge.</p>
+          <span className="eyebrow eyebrow--violet">mímir&apos;s well · every stone remembered</span>
+          <h2>Mímir</h2>
+          <p>The well keeps every carved stone, from every device on the bridge.</p>
         </div>
         <div className="rune-head-actions">
           <Button onClick={() => void navigate('/runestone')}>Carve a new one</Button>
@@ -155,7 +156,7 @@ export function LibraryPage() {
           )}
 
           {rows === null ? (
-            <p className="rune-tree-empty caption">Opening the library…</p>
+            <p className="rune-tree-empty caption">Drawing from the well…</p>
           ) : rows.length === 0 ? (
             <EmptyState
               icon={<BracesIcon size={28} />}
@@ -183,6 +184,16 @@ export function LibraryPage() {
                       )}
                     </div>
                   </div>
+                  {/* the same document as a raw-JSON data URL (PLAN-07 addendum) */}
+                  <a
+                    className="btn btn--ghost btn--sm rune-lib-row__api mono"
+                    href={`/runestone/api/${row.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${row.name} as JSON API`}
+                  >
+                    API
+                  </a>
                   <Button
                     variant="ghost"
                     size="icon"
