@@ -29,6 +29,14 @@ describe('relic bank', () => {
     const expected: RelicCategory[] = ['person', 'relic', 'spell', 'weapon'];
     for (const category of expected) expect(categories.has(category)).toBe(true);
   });
+
+  it('spans all four universes', () => {
+    const names = RELIC_BANK.map((entry) => entry.name);
+    expect(names).toContain('Gungnir'); // norse
+    expect(names).toContain('Pensieve'); // potter
+    expect(names).toContain('Tesseract'); // mcu
+    expect(names).toContain('Aegis'); // greek
+  });
 });
 
 describe('relicTitle', () => {

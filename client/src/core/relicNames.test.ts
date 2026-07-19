@@ -7,6 +7,7 @@ describe('relicNames (client mirror of core/relics)', () => {
     expect(new Set(names).size).toBe(names.length);
     const categories = new Set(RELIC_BANK.map((entry) => entry.category));
     expect([...categories].sort()).toEqual(['person', 'relic', 'spell', 'weapon']);
+    expect(names).toContain('Aegis'); // greek, mirrored from core/relics
   });
 
   it('generates "<Adjective> <Name>" titles from the bank', () => {

@@ -19,7 +19,7 @@ const relic = (name: string): RelicEntry => ({ name, category: 'relic' });
 const spell = (name: string): RelicEntry => ({ name, category: 'spell' });
 const weapon = (name: string): RelicEntry => ({ name, category: 'weapon' });
 
-/** Curated bank across Norse / Potter / MCU. */
+/** Curated bank across Norse / Potter / MCU / Greek. */
 export const RELIC_BANK: readonly RelicEntry[] = [
   // people
   person('Loki'),
@@ -38,6 +38,10 @@ export const RELIC_BANK: readonly RelicEntry[] = [
   person('Groot'),
   person('Nebula'),
   person('Wanda'),
+  person('Athena'),
+  person('Circe'),
+  person('Atlas'),
+  person('Achilles'),
   // objects / relics
   relic('Brísingamen'),
   relic('Draupnir'),
@@ -54,6 +58,9 @@ export const RELIC_BANK: readonly RelicEntry[] = [
   relic('Aether'),
   relic('Vibranium'),
   relic('Gauntlet'),
+  relic('Aegis'),
+  relic('Ambrosia'),
+  relic('Golden Fleece'),
   // spells
   spell('Expelliarmus'),
   spell('Lumos'),
@@ -65,6 +72,8 @@ export const RELIC_BANK: readonly RelicEntry[] = [
   spell('Obliviate'),
   spell('Seiðr'),
   spell('Galdr'),
+  spell('Pharmakon'),
+  spell('Katabasis'),
   // weapons
   weapon('Mjölnir'),
   weapon('Gungnir'),
@@ -73,6 +82,8 @@ export const RELIC_BANK: readonly RelicEntry[] = [
   weapon('Gram'),
   weapon('Laevateinn'),
   weapon('Dáinsleif'),
+  weapon('Keraunos'),
+  weapon('Harpe'),
 ];
 
 export const RELIC_ADJECTIVES: readonly string[] = [
