@@ -18,6 +18,7 @@ export default {
         'qr-tool',
         'presence',
         'audit-log',
+        'runestone',
         // core areas
         'core',
         'client',
