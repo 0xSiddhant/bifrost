@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**Active plan: PLAN-07 (Part A merged as PR #14; Part B implemented, awaiting owner testing)**
+**Active plan: PLAN-08 next (gate cleared — PLAN-07 both parts merged)**
 
 | Plan | Title | Status | Branch / PR | Notes |
 |---|---|---|---|---|
@@ -13,13 +13,15 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-04 | Theming engine | done | PR #5 → develop (merged 2026-07-15) | Gate cleared — PLAN-05 unlocked |
 | PLAN-05 | Heimdall admin panel | done | PR #6 → develop (merged 2026-07-16) | Gate cleared — PLAN-06 unlocked |
 | PLAN-06 | Clipboard sync, presence, audit log | done | PR #7 → develop (merged 2026-07-16) | Gate cleared — PLAN-07 unlocked |
-| PLAN-07 | Runestone (JSON editor Part A + library Part B) | in-progress | 07a: PR #14 merged 2026-07-19 · 07b: feat/plan-07b-runestone-library | Part B built + live-verified 2026-07-19; uncommitted pending owner test |
+| PLAN-07 | Runestone (JSON editor Part A + library Part B) | done | PR #14 + PR #15 → develop (merged 2026-07-19) | Both parts owner-tested; CI green — PLAN-08 unlocked |
 | PLAN-08 | Variant (JSON & text diff checker) | not-started | — | Plan authored 2026-07-15; shares PLAN-07 components |
 | PLAN-09 | Ops (PM2, backup, Docker, observability) | not-started | — | Renumbered from PLAN-07 on 2026-07-14 |
 | PLAN-10 | Heimdall Modal (overlay conversion + new sections) | not-started | — | Plan authored 2026-07-16; supersedes "PIN on every arrival" (logged when implemented) |
 | PLAN-99 | Future backlog | reference-only | — | Never "implemented" wholesale |
 
 ## Session notes (append newest first)
+
+- 2026-07-19 (later) — **PLAN-07 addendum implemented** on `feat/runestone-public-api` (owner requirement, post-#15-merge): public read-only `GET /runestone/api/:slug` serving the raw stored JSON (`application/json`, CORS `*`, stale slug → 301 to canonical data URL, 404 unknown) so slug URLs work as third-party data endpoints; vite dev proxy forwards `/runestone/api`; library rows gained an "API" chip (new tab); **library renamed Mímir** (route `/runestone/mimir`, old `/runestone/library` client-redirects, `MimirPage`, copy updated) — frontend-only per the lore-rename precedent. PLAN-07 plan file gained an owner-requested addendum section; architecture.md data flows updated. Int tests cover raw-body fidelity, content-type, CORS header, 301, 404.
 
 - 2026-07-19 — PLAN-07 **Part A merged** (PR #14 → develop, owner-tested and approved; `runestone` added to commitlint scopes). **Part B implemented** on `feat/plan-07b-runestone-library`. **Server**: `runestones` table (migration `0004_runestones` — id TEXT pk = 6-char base36 handle, unique `slug`, `author_device_id`, sizes/dates), pure `slug.ts` (kebab + id, diacritic-stripped, `idFromSlug`), `RunestoneRepository` port + Drizzle impl (LIKE-escaped search, lower(name) sort, pagination), usecases save/update(rename→reslug)/get(canonical|stale)/list(clamped)/delete, routes per plan contract (`GET/POST /api/runestone`, `GET /:slug` with **301 on stale-name slug**, `PUT/DELETE /:id`, 413/422 mapped; author from `X-Bifrost-Device`; name defaults via `core/relics` uniqueRelicTitle), `runestone.saved`/`runestone.deleted` bus events → SSE; audit-recorder subscribes to both. **Client**: editor gained Save flow (dirty tracking vs saved snapshot, "Save to library"/"Save"/"Saved", URL replaceState to canonical slug, draft cleared on save; draft caching now scratch-editor-only), `/runestone/:slug` loads saved docs (stale slug auto-corrects address bar), creative 404 ("never carved / crumbled", rune glyph, **Carve it now** pre-titles from the slug + **Back to the library**), new `LibraryPage` at `/runestone/library` (debounced name search, carver filter resolved via core/devices alias-first with "departed device" fallback, sort × order, SSE live refresh on saved/deleted, delete with confirm, responsive rows). 216 server + 57 client tests green (slug corpus, usecase suite incl. id-collision retry + filter clamps, int lifecycle/filters/301/413/422/audit-pickup, **save-burst kill test** — SIGINT mid-burst → restart → every 201-acknowledged doc intact, integrity ok); lint/typecheck/build clean. **DB paths per db-migration skill**: upgrade (existing app.db + 0004 → health 200, integrity ok) and fresh bootstrap both verified. **Live-verified** (built server, CDP, two devices): device A saves → device B's library gains "Bridge Ledger · Tyr" over SSE without reload; open-by-slug from B; rename → old slug URL resolves to new slug (client fixes address bar); creative 404 + Carve-it-now ("Never Carved" title); delete → empty state live; 60 seeded docs: search/author/sort/pagination correct at the API and 60 rows render at 390px with 0px horizontal overflow (filter row CSS fixed for phones). Screenshotted throughout. Manual owed: real-device pass. Uncommitted (test-before-commit).
 
