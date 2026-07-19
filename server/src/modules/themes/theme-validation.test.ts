@@ -37,7 +37,12 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 
 describe('theme schema validation', () => {
   it('accepts the committed built-ins verbatim', () => {
-    for (const file of ['themes/aurora.json', 'themes/daybreak.json']) {
+    for (const file of [
+      'themes/aurora.json',
+      'themes/daybreak.json',
+      'themes/ghibli-dusk.json',
+      'themes/olympus.json',
+    ]) {
       const raw = fs.readFileSync(`${REPO_ROOT}/${file}`, 'utf8');
       expect(() => validator.parse(raw)).not.toThrow();
     }

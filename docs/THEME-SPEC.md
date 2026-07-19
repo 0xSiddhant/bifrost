@@ -90,7 +90,7 @@ On load, `--text` is checked against `--bg` and `--surface`. Ratios below **4.5:
 ## Adding / removing
 
 - **Filesystem:** save `<id>.json` into `themes/` — the watcher validates and broadcasts it live. Delete the file to remove it.
-- **API:** `POST /api/themes` (422 lists every schema violation with its exact path) and `DELETE /api/themes/:id`. Built-ins (`aurora`, `daybreak`, `ghibli-dusk`) refuse deletion/overwrite. Both endpoints require a Heimdall admin session (`requireAdmin`).
+- **API:** `POST /api/themes` (422 lists every schema violation with its exact path) and `DELETE /api/themes/:id`. Built-ins (`aurora`, `daybreak`, `ghibli-dusk`, `olympus`) refuse deletion/overwrite. Both endpoints require a Heimdall admin session (`requireAdmin`).
 
 ## Enable / disable (Heimdall)
 
