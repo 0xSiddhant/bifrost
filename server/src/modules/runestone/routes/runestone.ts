@@ -94,6 +94,26 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
     },
   );
 
+  // Public read-only data endpoint (owner requirement, post-Part-B): the raw
+  // document JSON at /runestone/api/:slug — outside /api/ so a saved runestone
+  // doubles as a stable data URL for third-party tools. Registered routes win
+  // over the SPA fallback, so only this exact shape escapes the client app.
+  // CORS is wide open: it serves nothing but the document the URL names.
+  app.get<{ Params: { slug: string } }>(
+    '/runestone/api/:slug',
+    { schema: { params: slugParamsSchema } },
+    async (request, reply) => {
+      const { record, canonical } = deps.get.execute(request.params.slug);
+      reply.header('access-control-allow-origin', '*');
+      if (!canonical) {
+        return reply.redirect(`/runestone/api/${encodeURIComponent(record.slug)}`, 301);
+      }
+      // Raw stored text, not a re-serialization — formatting and number
+      // precision survive exactly as carved.
+      return reply.type('application/json; charset=utf-8').send(record.content);
+    },
+  );
+
   // :slug resolves saved docs; a stale-name slug with a valid id 301s to the
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
