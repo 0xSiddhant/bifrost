@@ -60,6 +60,12 @@ export class AuditRecorder {
       this.bus.on('settings.updated', (event) =>
         push('settings.updated', null, null, `settings updated (shortcut ${event.shortcut}, ${event.tapCount} taps)`),
       ),
+      this.bus.on('runestone.saved', ({ runestone }) =>
+        push('runestone.saved', runestone.authorDeviceId, null, `carved "${runestone.name}" (${fmtBytes(runestone.sizeBytes)})`),
+      ),
+      this.bus.on('runestone.deleted', (event) =>
+        push('runestone.deleted', null, null, `runestone "${event.name}" deleted`),
+      ),
     );
   }
 
