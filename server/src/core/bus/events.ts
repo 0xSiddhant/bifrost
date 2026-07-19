@@ -79,6 +79,19 @@ export interface PresenceDevice {
   lastSeen: number;
 }
 
+/** A saved JSON document as the library lists it (PLAN-07 Part B). */
+export interface RunestoneSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -90,6 +103,9 @@ export interface BifrostEventMap {
   'presence.changed': { devices: PresenceDevice[] };
   /** Emitted by Heimdall for the audit log; consumed only by audit-log. */
   'heimdall.login': { outcome: 'success' | 'failure' | 'locked'; ip: string };
+  /** Create or update of a saved JSON document — libraries live-refresh from this. */
+  'runestone.saved': { runestone: RunestoneSummary };
+  'runestone.deleted': { id: string; name: string };
 }
 
 export type BifrostEventName = keyof BifrostEventMap;
