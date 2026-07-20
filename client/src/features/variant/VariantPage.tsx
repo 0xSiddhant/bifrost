@@ -218,9 +218,11 @@ export function VariantPage() {
   };
 
   const onPaneEdit = (side: Side) => (value: string) => {
-    setPane(side, (pane) =>
-      pane.text === value ? pane : { ...pane, text: value, slugError: null },
-    );
+    // The editors also fire onChange for programmatic doc syncs — an
+    // unchanged buffer must not mark fresh compare results stale.
+    const current = side === 'left' ? left.text : right.text;
+    if (current === value) return;
+    setPane(side, (pane) => ({ ...pane, text: value, slugError: null }));
     if (results) setStale(true);
   };
 
