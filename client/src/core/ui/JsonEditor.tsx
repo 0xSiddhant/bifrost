@@ -58,6 +58,11 @@ export interface JsonEditorProps {
   placeholder?: string;
   /** Diff decorations bound to the --diff-* theme tokens. */
   highlights?: DiffHighlight[];
+  /**
+   * Plain-text mode (Variant's text panes): no JSON parsing, linting,
+   * folding, highlighting, or bracket pairing — typing costs nothing.
+   */
+  plain?: boolean;
 }
 
 export interface JsonEditorHandle {
@@ -217,7 +222,16 @@ function jsonDiagnostics(view: EditorView): Diagnostic[] {
 }
 
 export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function JsonEditor(
-  { value, onChange, onCursor, readOnly = false, height = '60vh', placeholder, highlights },
+  {
+    value,
+    onChange,
+    onCursor,
+    readOnly = false,
+    height = '60vh',
+    placeholder,
+    highlights,
+    plain = false,
+  },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -233,32 +247,37 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
+    const jsonExtensions = plain
+      ? []
+      : [
+          foldGutter(),
+          indentOnInput(),
+          indentUnit.of('  '),
+          bracketMatching(),
+          // Typing {[" inserts the closing pair; backspacing an empty pair
+          // removes both (closeBracketsKeymap precedes defaultKeymap).
+          closeBrackets(),
+          json(),
+          syntaxHighlighting(jsonHighlight),
+          linter(jsonDiagnostics, { delay: 300 }),
+          lintGutter(),
+        ];
     const state = EditorState.create({
       doc: value,
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
         history(),
-        foldGutter(),
         drawSelection(),
-        indentOnInput(),
-        indentUnit.of('  '),
-        bracketMatching(),
-        // Typing {[" inserts the closing pair; backspacing an empty pair
-        // removes both (closeBracketsKeymap precedes defaultKeymap).
-        closeBrackets(),
         highlightActiveLine(),
         EditorView.lineWrapping,
-        json(),
-        syntaxHighlighting(jsonHighlight),
-        linter(jsonDiagnostics, { delay: 300 }),
-        lintGutter(),
+        ...jsonExtensions,
         diffHighlightField,
         keymap.of([
-          ...closeBracketsKeymap,
+          ...(plain ? [] : closeBracketsKeymap),
           ...defaultKeymap,
           ...historyKeymap,
-          ...foldKeymap,
+          ...(plain ? [] : foldKeymap),
           indentWithTab,
         ]),
         ...(placeholder ? [cmPlaceholder(placeholder)] : []),
@@ -287,7 +306,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder]);
+  }, [readOnly, height, placeholder, plain]);
 
   useEffect(() => {
     const view = viewRef.current;

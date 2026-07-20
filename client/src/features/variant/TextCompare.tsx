@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
-import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { EditorView, lineNumbers } from '@codemirror/view';
 import {
   MergeView,
   goToNextChunk,
@@ -9,35 +8,22 @@ import {
   unifiedMergeView,
 } from '@codemirror/merge';
 import { editorChrome } from '../../core/ui/JsonEditor';
+import { TEXT_DIFF_CONFIG } from './compare';
 
 /**
- * Bound the char-level Myers diff: two large, mostly-different documents
- * (think minified JSON on a single enormous line) otherwise freeze the tab
- * for minutes. Past the limit the diff falls back to a coarser but instant
- * line-level result — the right trade for a live view.
- */
-export const TEXT_DIFF_CONFIG = { scanLimit: 500, timeout: 300 } as const;
-
-/**
- * Variant's text mode (PLAN-08): @codemirror/merge gives pane alignment,
- * line diff, and char-level emphasis for free. Split view is two live
- * editable panes; unified is a single pane with inline deletions (the
- * mobile default). When normalization options are active the panes show
- * read-only normalized copies — honest about what is being compared.
+ * Variant's text-mode *result* view (PLAN-08): a read-only @codemirror/merge
+ * render of the snapshots taken when Compare was clicked. Diffing never runs
+ * per keystroke (owner's model — performance); editing happens in the plain
+ * panes, this view only displays a finished compare.
  */
 
 export interface TextCompareProps {
+  /** The compared (already normalized) snapshots. */
   left: string;
   right: string;
-  onLeftChange: (value: string) => void;
-  onRightChange: (value: string) => void;
   view: 'split' | 'unified';
   wordWrap: boolean;
-  /** Read-only normalized copies to compare instead of the live buffers. */
-  normalized: { left: string; right: string } | null;
   height?: string;
-  /** Bump after replacing a buffer externally (swap/import/clear) to rebuild. */
-  resetToken?: number;
 }
 
 export interface TextCompareHandle {
@@ -47,58 +33,28 @@ export interface TextCompareHandle {
 }
 
 export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(function TextCompare(
-  {
-    left,
-    right,
-    onLeftChange,
-    onRightChange,
-    view,
-    wordWrap,
-    normalized,
-    height = '58vh',
-    resetToken = 0,
-  },
+  { left, right, view, wordWrap, height = '56vh' },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mergeRef = useRef<MergeView | null>(null);
   const unifiedRef = useRef<EditorView | null>(null);
-  const leftRef = useRef(left);
-  const rightRef = useRef(right);
-  const onLeftRef = useRef(onLeftChange);
-  const onRightRef = useRef(onRightChange);
-  leftRef.current = left;
-  rightRef.current = right;
-  onLeftRef.current = onLeftChange;
-  onRightRef.current = onRightChange;
-
-  const normalizedLeft = normalized ? normalized.left : null;
-  const normalizedRight = normalized ? normalized.right : null;
 
   useEffect(() => {
     const parent = containerRef.current;
     if (!parent) return;
-    const readOnly = normalizedLeft !== null;
-    const docA = normalizedLeft ?? leftRef.current;
-    const docB = normalizedRight ?? rightRef.current;
-
-    const base = (onDoc: React.RefObject<(value: string) => void>) => [
+    const base = [
       lineNumbers(),
-      history(),
-      keymap.of([...defaultKeymap, ...historyKeymap]),
       ...(wordWrap ? [EditorView.lineWrapping] : []),
-      EditorState.readOnly.of(readOnly),
-      EditorView.editable.of(!readOnly),
+      EditorState.readOnly.of(true),
+      EditorView.editable.of(false),
       editorChrome(height),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged && !readOnly) onDoc.current(update.state.doc.toString());
-      }),
     ];
 
     if (view === 'split') {
       const merge = new MergeView({
-        a: { doc: docA, extensions: base(onLeftRef) },
-        b: { doc: docB, extensions: base(onRightRef) },
+        a: { doc: left, extensions: base },
+        b: { doc: right, extensions: base },
         parent,
         gutter: true,
         highlightChanges: true,
@@ -113,11 +69,11 @@ export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(funct
 
     const editor = new EditorView({
       state: EditorState.create({
-        doc: docB,
+        doc: right,
         extensions: [
-          ...base(onRightRef),
+          ...base,
           unifiedMergeView({
-            original: docA,
+            original: left,
             mergeControls: false,
             gutter: true,
             highlightChanges: true,
@@ -132,7 +88,7 @@ export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(funct
       unifiedRef.current = null;
       editor.destroy();
     };
-  }, [view, wordWrap, normalizedLeft, normalizedRight, height, resetToken]);
+  }, [left, right, view, wordWrap, height]);
 
   useImperativeHandle(ref, () => ({
     scrollToPositions(posA, posB) {
@@ -168,7 +124,6 @@ export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(funct
       if (!target) return;
       if (direction === 1) goToNextChunk(target);
       else goToPreviousChunk(target);
-      target.focus();
     },
   }));
 

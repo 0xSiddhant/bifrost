@@ -1,20 +1,13 @@
 import { formatJsonPath } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { ChevronRightIcon } from '../../core/ui/icons';
-import type { DiffStats } from './compare';
+import type { DiffStats, TextChunkRow } from './compare';
 
 /**
  * Post-compare results (PLAN-08): stats chip + grouped, navigable change
  * list. Collapsed by default on desktop; the primary results view on phones,
  * where stacked panes are unreadable but a tappable list is not.
  */
-
-export interface TextChunkRow {
-  kind: 'add' | 'remove' | 'change';
-  label: string;
-  posA: number;
-  posB: number;
-}
 
 interface ResultsDrawerProps {
   mode: 'json' | 'text';

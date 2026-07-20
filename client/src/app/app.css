@@ -1703,3 +1703,21 @@
 .variant-drawer__more {
   padding: var(--space-1) var(--space-2);
 }
+
+/* Text-mode editing phase: two plain panes, no diff work until Compare. */
+.variant-textedit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.variant-textedit .json-editor {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .variant-textedit {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}

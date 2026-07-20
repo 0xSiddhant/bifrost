@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareJson,
+  compareText,
   DEFAULT_JSON_OPTIONS,
+  DEFAULT_TEXT_OPTIONS,
   diffStats,
   toDiffOptions,
 } from './compare';
@@ -114,6 +116,28 @@ describe('recordsToHighlights', () => {
     expect(marks.left).toHaveLength(1);
     expect(marks.right).toHaveLength(1);
     expect(marks.left[0]).toMatchObject({ kind: 'change', level: 'line' });
+  });
+});
+
+describe('compareText (runs only on the Compare CTA)', () => {
+  it('classifies chunks and counts stats', () => {
+    const result = compareText('keep\ngone\nsame', 'keep\nsame\nborn', DEFAULT_TEXT_OPTIONS);
+    expect(result.stats.adds + result.stats.removes + result.stats.changes).toBeGreaterThan(0);
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(result.rows.every((row) => ['add', 'remove', 'change'].includes(row.kind))).toBe(true);
+  });
+
+  it('identical docs produce zero chunks, CRLF-only differences too (acceptance 7)', () => {
+    expect(compareText('a\nb', 'a\nb', DEFAULT_TEXT_OPTIONS).rows).toEqual([]);
+    expect(compareText('a\r\nb', 'a\nb', DEFAULT_TEXT_OPTIONS).rows).toEqual([]);
+  });
+
+  it('normalization options apply to the compared snapshots', () => {
+    const raw = compareText('  a  ', 'a', DEFAULT_TEXT_OPTIONS);
+    expect(raw.rows.length).toBeGreaterThan(0);
+    const trimmed = compareText('  a  ', 'a', { ...DEFAULT_TEXT_OPTIONS, trimLines: true });
+    expect(trimmed.rows).toEqual([]);
+    expect(trimmed.left).toBe('a');
   });
 });
 

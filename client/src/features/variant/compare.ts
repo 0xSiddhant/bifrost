@@ -1,6 +1,8 @@
+import { Text } from '@codemirror/state';
+import { Chunk } from '@codemirror/merge';
 import { validateJson } from '../../core/json';
 import { diffJson, type DiffOptions, type DiffRecord } from '../../core/json/diff';
-import type { TextNormalizeOptions } from '../../core/textNormalize';
+import { normalizeText, type TextNormalizeOptions } from '../../core/textNormalize';
 
 /**
  * Pure compare-flow logic for Variant (PLAN-08). The page component stays a
@@ -102,6 +104,77 @@ export interface DiffStats {
   adds: number;
   removes: number;
   changes: number;
+}
+
+/**
+ * Bound the char-level Myers diff: two large, mostly-different documents
+ * (think minified JSON on a single enormous line) otherwise freeze the tab
+ * for minutes. Past the limit the diff falls back to a coarser but instant
+ * line-level result.
+ */
+export const TEXT_DIFF_CONFIG = { scanLimit: 500, timeout: 300 } as const;
+
+export interface TextChunkRow {
+  kind: 'add' | 'remove' | 'change';
+  label: string;
+  posA: number;
+  posB: number;
+}
+
+export interface TextCompareResult {
+  /** Normalized snapshots the result view and chunk rows both refer to. */
+  left: string;
+  right: string;
+  rows: TextChunkRow[];
+  stats: DiffStats;
+}
+
+/**
+ * Run a text compare over normalized snapshots. Owner's model: diffing
+ * happens only on the Compare CTA — never per keystroke — so this is called
+ * from exactly one place and its output is frozen until the next compare.
+ */
+export function compareText(
+  leftText: string,
+  rightText: string,
+  options: VariantTextOptions,
+): TextCompareResult {
+  const normalize = toNormalizeOptions(options);
+  const left = normalizeText(leftText, normalize);
+  const right = normalizeText(rightText, normalize);
+  const docA = Text.of(left.split('\n'));
+  const docB = Text.of(right.split('\n'));
+  const chunks = Chunk.build(docA, docB, TEXT_DIFF_CONFIG);
+  const lines = (doc: Text, from: number, end: number) => {
+    const a = doc.lineAt(Math.min(from, doc.length)).number;
+    const b = doc.lineAt(Math.min(end, doc.length)).number;
+    return a === b ? `${a}` : `${a}–${b}`;
+  };
+  const rows: TextChunkRow[] = chunks.map((chunk) => {
+    const kind =
+      chunk.fromA === chunk.toA ? 'add' : chunk.fromB === chunk.toB ? 'remove' : 'change';
+    const spanA = lines(docA, chunk.fromA, chunk.endA);
+    const spanB = lines(docB, chunk.fromB, chunk.endB);
+    const label =
+      kind === 'add'
+        ? `line ${spanB} (right)`
+        : kind === 'remove'
+          ? `line ${spanA} (left)`
+          : `left ${spanA} ↔ right ${spanB}`;
+    return {
+      kind,
+      label,
+      posA: Math.min(chunk.fromA, docA.length),
+      posB: Math.min(chunk.fromB, docB.length),
+    };
+  });
+  const stats = { adds: 0, removes: 0, changes: 0 };
+  for (const row of rows) {
+    if (row.kind === 'add') stats.adds += 1;
+    else if (row.kind === 'remove') stats.removes += 1;
+    else stats.changes += 1;
+  }
+  return { left, right, rows, stats };
 }
 
 export function diffStats(records: readonly DiffRecord[]): DiffStats {

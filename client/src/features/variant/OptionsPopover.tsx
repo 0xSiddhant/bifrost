@@ -61,7 +61,8 @@ export function OptionsPopover({ mode, json, text, onJsonChange, onTextChange }:
           onChange={(dropBlankLines) => onTextChange({ ...text, dropBlankLines })}
         />
         <p className="caption">
-          With any of these on, the panes show read-only normalized copies.
+          Normalization applies when you press Compare — the result shows the
+          normalized copies.
         </p>
       </div>
     );

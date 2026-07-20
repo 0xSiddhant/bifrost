@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Text } from '@codemirror/state';
-import { Chunk } from '@codemirror/merge';
 import { useCapabilities } from '../../core/useCapabilities';
 import { copyText } from '../../core/copy';
 import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
-import { normalizeText, hasActiveNormalization } from '../../core/textNormalize';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
 import { Button } from '../../core/ui/Button';
 import { Toast } from '../../core/ui/Toast';
@@ -15,19 +12,20 @@ import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { CheckIcon, AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   compareJson,
+  compareText,
   DEFAULT_JSON_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   diffStats,
-  toNormalizeOptions,
   type InvalidSide,
+  type TextCompareResult,
   type VariantJsonOptions,
   type VariantTextOptions,
 } from './compare';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
 import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
-import { ResultsDrawer, type TextChunkRow } from './ResultsDrawer';
-import { TEXT_DIFF_CONFIG, TextCompare, type TextCompareHandle } from './TextCompare';
+import { ResultsDrawer } from './ResultsDrawer';
+import { TextCompare, type TextCompareHandle } from './TextCompare';
 
 /**
  * Variant (PLAN-08): two-pane JSON & text comparison. Structural JSON diff by
@@ -92,6 +90,7 @@ export function VariantPage() {
   const [jsonOptions, setJsonOptions] = useState<VariantJsonOptions>(DEFAULT_JSON_OPTIONS);
   const [textOptions, setTextOptions] = useState<VariantTextOptions>(DEFAULT_TEXT_OPTIONS);
   const [results, setResults] = useState<CompareResults | null>(null);
+  const [textResult, setTextResult] = useState<TextCompareResult | null>(null);
   const [stale, setStale] = useState(false);
   const [fallback, setFallback] = useState<InvalidSide | null>(null);
   const [view, setView] = useState<'code' | 'tree'>('code');
@@ -103,7 +102,6 @@ export function VariantPage() {
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [pickerSide, setPickerSide] = useState<Side | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
-  const [resetToken, setResetToken] = useState(0);
   const [changeCursor, setChangeCursor] = useState(-1);
   const [pendingJump, setPendingJump] = useState<{ left: number | null; right: number | null } | null>(null);
 
@@ -175,7 +173,6 @@ export function VariantPage() {
         load('right', rightParam, rightLoadedSlug),
       ]);
       if (cancelled || (!leftDoc && !rightDoc)) return;
-      setResetToken((token) => token + 1);
       // Acceptance 5: a URL naming both sides opens pre-loaded AND compared.
       const l = leftDoc?.content ?? (leftParam === leftLoadedSlug ? left.text : null);
       const r = rightDoc?.content ?? (rightParam === rightLoadedSlug ? right.text : null);
@@ -199,7 +196,12 @@ export function VariantPage() {
     );
   };
 
-  // ── compare flow ──────────────────────────────────────────────────────────
+  // ── compare flow — diffing runs ONLY here, never per keystroke ────────────
+  const runTextCompare = (l = left.text, r = right.text) => {
+    setTextResult(compareText(l, r, textOptions));
+    if (startsMobile()) setDrawerOpen(true);
+  };
+
   const runCompare = (l = left.text, r = right.text) => {
     const outcome = compareJson(l, r, jsonOptions);
     if (!outcome.ok) {
@@ -207,7 +209,8 @@ export function VariantPage() {
       setMode('text');
       setResults(null);
       setStale(false);
-      setResetToken((token) => token + 1);
+      // The Compare click still deserves a diff — as text (never a dead end).
+      runTextCompare(l, r);
       return;
     }
     setResults({ records: outcome.records, left: l, right: r });
@@ -261,49 +264,8 @@ export function VariantPage() {
     [mode, view, debouncedRight, rightIssues],
   );
 
-  // ── text mode: normalized copies + chunk rows for the drawer ──────────────
-  const textDiff = useMemo(() => {
-    if (mode !== 'text') return null;
-    const options = toNormalizeOptions(textOptions);
-    const l = normalizeText(debouncedLeft, options);
-    const r = normalizeText(debouncedRight, options);
-    const docA = Text.of(l.split('\n'));
-    const docB = Text.of(r.split('\n'));
-    const chunks = Chunk.build(docA, docB, TEXT_DIFF_CONFIG);
-    const lines = (doc: Text, from: number, end: number) => {
-      const a = doc.lineAt(Math.min(from, doc.length)).number;
-      const b = doc.lineAt(Math.min(end, doc.length)).number;
-      return a === b ? `${a}` : `${a}–${b}`;
-    };
-    const rows: TextChunkRow[] = chunks.map((chunk) => {
-      const kind =
-        chunk.fromA === chunk.toA ? 'add' : chunk.fromB === chunk.toB ? 'remove' : 'change';
-      const spanA = lines(docA, chunk.fromA, chunk.endA);
-      const spanB = lines(docB, chunk.fromB, chunk.endB);
-      const label =
-        kind === 'add'
-          ? `line ${spanB} (right)`
-          : kind === 'remove'
-            ? `line ${spanA} (left)`
-            : `left ${spanA} ↔ right ${spanB}`;
-      return { kind, label, posA: Math.min(chunk.fromA, docA.length), posB: Math.min(chunk.fromB, docB.length) };
-    });
-    let adds = 0;
-    let removes = 0;
-    let changes = 0;
-    for (const row of rows) {
-      if (row.kind === 'add') adds += 1;
-      else if (row.kind === 'remove') removes += 1;
-      else changes += 1;
-    }
-    return {
-      rows,
-      stats: { adds, removes, changes },
-      normalized: hasActiveNormalization(textOptions) ? { left: l, right: r } : null,
-    };
-  }, [mode, debouncedLeft, debouncedRight, textOptions]);
-
-  const stats = mode === 'json' ? (results ? diffStats(results.records) : null) : (textDiff?.stats ?? null);
+  const stats =
+    mode === 'json' ? (results ? diffStats(results.records) : null) : (textResult?.stats ?? null);
 
   // ── scroll-lock the two JSON panes so hunks stay aligned ──────────────────
   useEffect(() => {
@@ -328,7 +290,7 @@ export function VariantPage() {
       a.removeEventListener('scroll', fromA);
       b.removeEventListener('scroll', fromB);
     };
-  }, [mode, view, resetToken]);
+  }, [mode, view]);
 
   // Jumps requested from tree view land after the code editors remount.
   useEffect(() => {
@@ -352,7 +314,7 @@ export function VariantPage() {
 
   const stepChange = (direction: 1 | -1) => {
     if (mode === 'text') {
-      textRef.current?.nextChunk(direction);
+      if (textResult) textRef.current?.nextChunk(direction);
       return;
     }
     if (!results || results.records.length === 0) return;
@@ -368,14 +330,15 @@ export function VariantPage() {
     if (next === mode) return;
     setMode(next);
     setResults(null);
+    setTextResult(null);
     setStale(false);
     setFallback(null);
-    setResetToken((token) => token + 1);
   };
 
   const returnToJson = () => {
     setMode('json');
     setFallback(null);
+    setTextResult(null);
     runCompare();
   };
 
@@ -397,7 +360,7 @@ export function VariantPage() {
       { replace: true },
     );
     if (results) setStale(true);
-    setResetToken((token) => token + 1);
+    setTextResult(null);
   };
 
   const formatBoth = () => {
@@ -408,7 +371,6 @@ export function VariantPage() {
     setLeft((pane) => ({ ...pane, text: formatJson(pane.text) }));
     setRight((pane) => ({ ...pane, text: formatJson(pane.text) }));
     if (results) setStale(true);
-    setResetToken((token) => token + 1);
     ok('Formatted both sides');
   };
 
@@ -422,7 +384,6 @@ export function VariantPage() {
     setLeft((pane) => ({ ...pane, text: sorted(pane.text) }));
     setRight((pane) => ({ ...pane, text: sorted(pane.text) }));
     if (results) setStale(true);
-    setResetToken((token) => token + 1);
     ok('Keys sorted A→Z on both sides');
   };
 
@@ -431,10 +392,10 @@ export function VariantPage() {
     setLeft(emptyPane('Original'));
     setRight(emptyPane('Modified'));
     setResults(null);
+    setTextResult(null);
     setStale(false);
     setFallback(null);
     setSearchParams({}, { replace: true });
-    setResetToken((token) => token + 1);
   };
 
   // ── import & library ──────────────────────────────────────────────────────
@@ -453,7 +414,7 @@ export function VariantPage() {
     setPane(side, () => ({ text: content, label, source: null, slugError: null }));
     setSlugParam(side, null);
     if (results) setStale(true);
-    setResetToken((token) => token + 1);
+    setTextResult(null);
     ok(`Imported ${file.name}`);
   };
 
@@ -469,7 +430,6 @@ export function VariantPage() {
     }));
     setSlugParam(side, doc.slug);
     if (results) setStale(true);
-    setResetToken((token) => token + 1);
   };
 
   const canPickFromLibrary =
@@ -578,13 +538,19 @@ export function VariantPage() {
         </button>
       </div>
 
-      {mode === 'json' && (
-        <Button onClick={() => runCompare()} disabled={empty}>
-          Compare
-        </Button>
-      )}
+      <Button
+        onClick={() => (mode === 'json' ? runCompare() : runTextCompare())}
+        disabled={empty}
+      >
+        Compare
+      </Button>
       {mode === 'json' && stale && (
         <span className="variant-rail__stale caption">stale</span>
+      )}
+      {mode === 'text' && textResult && (
+        <Button size="sm" variant="ghost" onClick={() => setTextResult(null)}>
+          Edit
+        </Button>
       )}
 
       <Button size="sm" variant="ghost" onClick={swapPanes} disabled={empty} title="Swap sides">
@@ -653,7 +619,9 @@ export function VariantPage() {
           variant="ghost"
           aria-label="Previous change"
           onClick={() => stepChange(-1)}
-          disabled={mode === 'json' && (!results || results.records.length === 0)}
+          disabled={
+            mode === 'json' ? !results || results.records.length === 0 : textResult === null
+          }
         >
           <ChevronLeftIcon size={14} />
         </Button>
@@ -662,7 +630,9 @@ export function VariantPage() {
           variant="ghost"
           aria-label="Next change"
           onClick={() => stepChange(1)}
-          disabled={mode === 'json' && (!results || results.records.length === 0)}
+          disabled={
+            mode === 'json' ? !results || results.records.length === 0 : textResult === null
+          }
         >
           <ChevronRightIcon size={14} />
         </Button>
@@ -687,7 +657,11 @@ export function VariantPage() {
                 setJsonOptions(next);
                 if (results) setStale(true);
               }}
-              onTextChange={setTextOptions}
+              onTextChange={(next) => {
+                setTextOptions(next);
+                // Normalization changes invalidate a shown result; recompare.
+                setTextResult(null);
+              }}
             />
           </div>
         )}
@@ -724,12 +698,6 @@ export function VariantPage() {
           </Toast>
         )}
 
-        {mode === 'text' && textDiff?.normalized && (
-          <Toast kind="info">
-            Comparing normalized copies — editing is paused while normalization options are on.
-          </Toast>
-        )}
-
         {mode === 'json' ? (
           <div className="variant-grid">
             {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues)}
@@ -748,18 +716,35 @@ export function VariantPage() {
                 {left.slugError ?? right.slugError}
               </p>
             )}
-            <TextCompare
-              ref={textRef}
-              left={left.text}
-              right={right.text}
-              onLeftChange={onPaneEdit('left')}
-              onRightChange={onPaneEdit('right')}
-              view={textView}
-              wordWrap={wordWrap}
-              normalized={textDiff?.normalized ?? null}
-              height={EDITOR_HEIGHT}
-              resetToken={resetToken}
-            />
+            {textResult ? (
+              // A finished compare — read-only render of the snapshots.
+              <TextCompare
+                ref={textRef}
+                left={textResult.left}
+                right={textResult.right}
+                view={textView}
+                wordWrap={wordWrap}
+                height={EDITOR_HEIGHT}
+              />
+            ) : (
+              // Editing phase: plain panes, zero diff work per keystroke.
+              <div className="variant-textedit">
+                <JsonEditor
+                  plain
+                  value={left.text}
+                  onChange={onPaneEdit('left')}
+                  height={EDITOR_HEIGHT}
+                  placeholder="Paste or type any text…"
+                />
+                <JsonEditor
+                  plain
+                  value={right.text}
+                  onChange={onPaneEdit('right')}
+                  height={EDITOR_HEIGHT}
+                  placeholder="Paste or type any text…"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -770,7 +755,7 @@ export function VariantPage() {
           stale={stale}
           stats={stats}
           records={results?.records ?? null}
-          chunks={textDiff?.rows ?? null}
+          chunks={textResult?.rows ?? null}
           onJumpRecord={jumpToRecord}
           onJumpChunk={(row) => textRef.current?.scrollToPositions(row.posA, row.posB)}
         />
