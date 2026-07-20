@@ -19,6 +19,7 @@ export default {
         'presence',
         'audit-log',
         'runestone',
+        'variant',
         // core areas
         'core',
         'client',
