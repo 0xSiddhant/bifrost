@@ -42,6 +42,10 @@ const OP_KIND: Record<DiffRecord['op'], 'add' | 'remove' | 'change'> = {
   'type-change': 'change',
 };
 
+/** Row budget per group — a 10k-row DOM list is a freeze, not a feature. */
+const MAX_ROWS_PER_GROUP = 100;
+const MAX_CHUNK_ROWS = 200;
+
 function preview(value: unknown): string {
   const text = JSON.stringify(value);
   if (text === undefined) return '';
@@ -109,7 +113,7 @@ export function ResultsDrawer({
                 {OP_LABEL[group.op]} · {group.rows.length}
               </h4>
               <ul>
-                {group.rows.map((record, index) => (
+                {group.rows.slice(0, MAX_ROWS_PER_GROUP).map((record, index) => (
                   <li key={`${group.op}-${index}`}>
                     <button type="button" onClick={() => onJumpRecord(record)}>
                       <span className="mono variant-drawer__path">
@@ -121,6 +125,11 @@ export function ResultsDrawer({
                     </button>
                   </li>
                 ))}
+                {group.rows.length > MAX_ROWS_PER_GROUP && (
+                  <li className="caption variant-drawer__more">
+                    …and {group.rows.length - MAX_ROWS_PER_GROUP} more
+                  </li>
+                )}
               </ul>
             </div>
           ))}
@@ -130,7 +139,7 @@ export function ResultsDrawer({
       {open && total > 0 && mode === 'text' && chunks && (
         <div className="variant-drawer__body">
           <ul>
-            {chunks.map((row, index) => (
+            {chunks.slice(0, MAX_CHUNK_ROWS).map((row, index) => (
               <li key={index}>
                 <button type="button" onClick={() => onJumpChunk(row)}>
                   <span className={`variant-drawer__op variant-drawer__op--${row.kind}`}>
@@ -140,6 +149,11 @@ export function ResultsDrawer({
                 </button>
               </li>
             ))}
+            {chunks.length > MAX_CHUNK_ROWS && (
+              <li className="caption variant-drawer__more">
+                …and {chunks.length - MAX_CHUNK_ROWS} more
+              </li>
+            )}
           </ul>
         </div>
       )}

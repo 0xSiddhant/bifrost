@@ -11,6 +11,14 @@ import {
 import { editorChrome } from '../../core/ui/JsonEditor';
 
 /**
+ * Bound the char-level Myers diff: two large, mostly-different documents
+ * (think minified JSON on a single enormous line) otherwise freeze the tab
+ * for minutes. Past the limit the diff falls back to a coarser but instant
+ * line-level result — the right trade for a live view.
+ */
+export const TEXT_DIFF_CONFIG = { scanLimit: 500, timeout: 300 } as const;
+
+/**
  * Variant's text mode (PLAN-08): @codemirror/merge gives pane alignment,
  * line diff, and char-level emphasis for free. Split view is two live
  * editable panes; unified is a single pane with inline deletions (the
@@ -94,6 +102,7 @@ export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(funct
         parent,
         gutter: true,
         highlightChanges: true,
+        diffConfig: TEXT_DIFF_CONFIG,
       });
       mergeRef.current = merge;
       return () => {
@@ -112,6 +121,7 @@ export const TextCompare = forwardRef<TextCompareHandle, TextCompareProps>(funct
             mergeControls: false,
             gutter: true,
             highlightChanges: true,
+            diffConfig: TEXT_DIFF_CONFIG,
           }),
         ],
       }),

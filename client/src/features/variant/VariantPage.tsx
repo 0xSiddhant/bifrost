@@ -4,7 +4,7 @@ import { Text } from '@codemirror/state';
 import { Chunk } from '@codemirror/merge';
 import { useCapabilities } from '../../core/useCapabilities';
 import { copyText } from '../../core/copy';
-import { formatJson, validateJson } from '../../core/json';
+import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { normalizeText, hasActiveNormalization } from '../../core/textNormalize';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
@@ -27,7 +27,7 @@ import { jumpTargetFor, recordsToHighlights } from './highlights';
 import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer, type TextChunkRow } from './ResultsDrawer';
-import { TextCompare, type TextCompareHandle } from './TextCompare';
+import { TEXT_DIFF_CONFIG, TextCompare, type TextCompareHandle } from './TextCompare';
 
 /**
  * Variant (PLAN-08): two-pane JSON & text comparison. Structural JSON diff by
@@ -269,7 +269,7 @@ export function VariantPage() {
     const r = normalizeText(debouncedRight, options);
     const docA = Text.of(l.split('\n'));
     const docB = Text.of(r.split('\n'));
-    const chunks = Chunk.build(docA, docB);
+    const chunks = Chunk.build(docA, docB, TEXT_DIFF_CONFIG);
     const lines = (doc: Text, from: number, end: number) => {
       const a = doc.lineAt(Math.min(from, doc.length)).number;
       const b = doc.lineAt(Math.min(end, doc.length)).number;
@@ -412,6 +412,20 @@ export function VariantPage() {
     ok('Formatted both sides');
   };
 
+  const sortKeysBoth = () => {
+    if (!bothValid) {
+      fail('Both sides must be valid JSON to sort keys.');
+      return;
+    }
+    const sorted = (text: string) =>
+      JSON.stringify(sortKeysDeep(JSON.parse(text)), null, 2);
+    setLeft((pane) => ({ ...pane, text: sorted(pane.text) }));
+    setRight((pane) => ({ ...pane, text: sorted(pane.text) }));
+    if (results) setStale(true);
+    setResetToken((token) => token + 1);
+    ok('Keys sorted A→Z on both sides');
+  };
+
   const clearBoth = () => {
     if (!window.confirm('Clear both panes?')) return;
     setLeft(emptyPane('Original'));
@@ -479,7 +493,8 @@ export function VariantPage() {
         <Button size="sm" variant="ghost" onClick={() => importInto(side)}>
           Import
         </Button>
-        {canPickFromLibrary && (
+        {/* Runestones are JSON documents — the picker has no business in text mode. */}
+        {mode === 'json' && canPickFromLibrary && (
           <Button size="sm" variant="ghost" onClick={() => setPickerSide(side)}>
             Mímir
           </Button>
@@ -578,6 +593,11 @@ export function VariantPage() {
       {mode === 'json' && (
         <Button size="sm" variant="ghost" onClick={formatBoth} disabled={empty}>
           Format both
+        </Button>
+      )}
+      {mode === 'json' && (
+        <Button size="sm" variant="ghost" onClick={sortKeysBoth} disabled={empty}>
+          Sort keys
         </Button>
       )}
       {mode === 'json' && (
@@ -692,7 +712,7 @@ export function VariantPage() {
         </div>
       </div>
 
-      <div className="stack">
+      <div className="stack variant-stack">
         {fallback && (
           <Toast kind="info">
             <span className="variant-fallback">
