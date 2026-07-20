@@ -12,6 +12,7 @@ import {
   type DecorationSet,
 } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import {
   HighlightStyle,
   bracketMatching,
@@ -243,6 +244,9 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         indentOnInput(),
         indentUnit.of('  '),
         bracketMatching(),
+        // Typing {[" inserts the closing pair; backspacing an empty pair
+        // removes both (closeBracketsKeymap precedes defaultKeymap).
+        closeBrackets(),
         highlightActiveLine(),
         EditorView.lineWrapping,
         json(),
@@ -250,7 +254,13 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         linter(jsonDiagnostics, { delay: 300 }),
         lintGutter(),
         diffHighlightField,
-        keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+        keymap.of([
+          ...closeBracketsKeymap,
+          ...defaultKeymap,
+          ...historyKeymap,
+          ...foldKeymap,
+          indentWithTab,
+        ]),
         ...(placeholder ? [cmPlaceholder(placeholder)] : []),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
