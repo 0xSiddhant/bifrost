@@ -1,6 +1,7 @@
 import {
   applyEdits,
   createScanner,
+  findNodeAtLocation,
   format,
   getLocation,
   parseTree,
@@ -192,4 +193,45 @@ export function formatJsonPath(path: readonly (string | number)[]): string {
 /** JSON path of the value at a text offset (for cursor tracking / click-to-copy). */
 export function pathAt(text: string, offset: number): string {
   return formatJsonPath(getLocation(text, offset).path);
+}
+
+export interface TextRange {
+  offset: number;
+  length: number;
+}
+
+export interface DocRanges {
+  /**
+   * Text range of the value at a JSON path. When the value is an object
+   * property, `withKey` widens the range to include the key — the whole
+   * `"price": 9` span. Null when the path does not resolve.
+   */
+  rangeAt(path: readonly (string | number)[], withKey?: boolean): TextRange | null;
+}
+
+/**
+ * Parse a document once and resolve many paths against it (Variant maps
+ * thousands of diff records onto editor decorations — re-parsing per path
+ * would be quadratic in document size).
+ */
+export function docRanges(text: string): DocRanges {
+  const tree = parseTree(text, undefined, STRICT);
+  return {
+    rangeAt(path, withKey = false) {
+      if (!tree) return null;
+      const node = findNodeAtLocation(tree, path as (string | number)[]);
+      if (!node) return null;
+      const target = withKey && node.parent?.type === 'property' ? node.parent : node;
+      return { offset: target.offset, length: target.length };
+    },
+  };
+}
+
+/** One-shot convenience over docRanges — fine for single lookups. */
+export function rangeAtPath(
+  text: string,
+  path: readonly (string | number)[],
+  withKey = false,
+): TextRange | null {
+  return docRanges(text).rangeAt(path, withKey);
 }

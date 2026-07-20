@@ -107,6 +107,15 @@
   --syn-null: #8b94a7;
   --syn-punct: #8b94a7;
 
+  /* diff colors — additions/removals/changes across both compare panes
+     (Variant PLAN-08); soft variants are the line backgrounds */
+  --diff-add: #4ade80;
+  --diff-remove: #f87171;
+  --diff-change: #fbbf24;
+  --diff-add-soft: rgba(74, 222, 128, 0.16);
+  --diff-remove-soft: rgba(248, 113, 113, 0.16);
+  --diff-change-soft: rgba(251, 191, 36, 0.16);
+
   color-scheme: dark;
 }
 
@@ -152,6 +161,13 @@
   --syn-bool: #b97d10;
   --syn-null: #6e7385;
   --syn-punct: #6e7385;
+
+  --diff-add: #1a9e50;
+  --diff-remove: #d64545;
+  --diff-change: #b97d10;
+  --diff-add-soft: rgba(26, 158, 80, 0.12);
+  --diff-remove-soft: rgba(214, 69, 69, 0.12);
+  --diff-change-soft: rgba(185, 125, 16, 0.12);
 
   --tone-teal: #0f9d8f;
   --tone-teal-soft: rgba(15, 157, 143, 0.1);

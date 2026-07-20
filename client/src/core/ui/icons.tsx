@@ -178,6 +178,14 @@ export const ChevronRightIcon = (p: IconProps) => (
   </svg>
 );
 
+export const DiffIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 4v16" />
+    <path d="M4.5 12h4" />
+    <path d="M15.5 12h4M17.5 10v4" />
+  </svg>
+);
+
 export const BracesIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M8 4H7a2 2 0 0 0-2 2v3.5c0 1-.6 2.5-2 2.5 1.4 0 2 1.5 2 2.5V18a2 2 0 0 0 2 2h1" />

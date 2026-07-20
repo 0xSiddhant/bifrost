@@ -43,6 +43,7 @@ Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rg
 
 - **Atmosphere** — `--bridge`, `--accent-grad`, `--sky`, `--stars`, `--stars-alpha`, `--glow-teal`, `--glow-violet`, `--glow-soft`, `--tone-teal(-soft)`, `--tone-violet(-soft)`, `--header-veil`, `--card-sheen`, `--relic-alpha`, `--relic-muted`, `--shadow-1/2`. Defaults: gradients and glows built from your `--accent`/`--accent-2`/`--ok`; stars on for dark mode, off for light.
 - **Syntax** — `--syn-key/string/number/bool/null/punct` (JSON/code highlighting, Runestone PLAN-07 + Differ PLAN-08). Defaults: accent / ok / accent-2 / warn / muted / muted.
+- **Diff** — `--diff-add/remove/change` plus `--diff-add/remove/change-soft` (compare-pane highlighting, Variant PLAN-08; the `-soft` variants are the line backgrounds, so keep them low-alpha). Defaults: ok / danger / accent, softs at ~0.16 alpha (dark) or ~0.12 (light).
 - **QR** — `--qr-module-a/b`, `--qr-bg`. Modules must stay dark-on-light for scanners; defaults are per-mode deep teal→violet on near-white.
 - **Fonts** — `--font-display/body/mono`. **Self-hosted families only** (`'Space Grotesk'`, `'Inter'`, `'JetBrains Mono'` first in the stack) — the LAN may have no internet, so any other family would silently fall back anyway.
 - **Type/spacing/shape/motion** — `--text-*`, `--space-*`, `--radius-*`, `--dur-*`, `--ease`. Rarely worth overriding; omitted values fall back to the stylesheet.

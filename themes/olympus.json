@@ -41,6 +41,12 @@
     "--syn-bool": "#eab84f",
     "--syn-null": "#9aa5b1",
     "--syn-punct": "#9aa5b1",
+    "--diff-add": "#7fbf6e",
+    "--diff-remove": "#e0705a",
+    "--diff-change": "#eab84f",
+    "--diff-add-soft": "rgba(127, 191, 110, 0.16)",
+    "--diff-remove-soft": "rgba(224, 112, 90, 0.16)",
+    "--diff-change-soft": "rgba(234, 184, 79, 0.16)",
     "--qr-module-a": "#a2792c",
     "--qr-module-b": "#1f6f8b",
     "--qr-bg": "#f1ecdf"

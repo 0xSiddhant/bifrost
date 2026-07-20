@@ -25,9 +25,9 @@ import {
   saveRunestone,
   updateRunestone,
   type RunestoneConfig,
-} from './api';
+} from '../../core/runestone';
 import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
-import { TreeView } from './TreeView';
+import { TreeView } from '../../core/ui/TreeView';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
 

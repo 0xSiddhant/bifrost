@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { formatJsonPath } from '../../core/json';
-import { ChevronRightIcon } from '../../core/ui/icons';
+import { formatJsonPath } from '../json';
+import { ChevronRightIcon } from './icons';
 
 /**
  * Read-only explorer for a parsed JSON document (PLAN-07): collapsible nodes,

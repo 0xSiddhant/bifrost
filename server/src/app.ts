@@ -29,6 +29,7 @@ import { clipboardModule } from './modules/clipboard/module.js';
 import { presenceModule } from './modules/presence/module.js';
 import { auditLogModule } from './modules/audit-log/module.js';
 import { runestoneModule } from './modules/runestone/module.js';
+import { variantModule } from './modules/variant/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -47,8 +48,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     presenceModule,
     auditLogModule,
     runestoneModule,
+    variantModule,
   ],
-  cloud: [healthModule, qrToolModule, themesModule, heimdallModule, runestoneModule],
+  cloud: [healthModule, qrToolModule, themesModule, heimdallModule, runestoneModule, variantModule],
 };
 
 const SESSION_EPOCH_KEY = 'heimdall.sessionEpoch';

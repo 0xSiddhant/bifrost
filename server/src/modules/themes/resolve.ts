@@ -20,6 +20,7 @@ export function resolveTheme(theme: ThemeFile, builtIn: boolean): ResolvedTheme 
   const accent = t['--accent'] ?? '#2dd4bf';
   const accent2 = t['--accent-2'] ?? '#8b7cf6';
   const ok = t['--ok'] ?? '#4ade80';
+  const danger = t['--danger'] ?? '#f87171';
   const warn = t['--warn'] ?? '#fbbf24';
   const text = t['--text'] ?? '#e9edf5';
   const textMuted = t['--text-muted'] ?? '#8b94a7';
@@ -56,6 +57,14 @@ export function resolveTheme(theme: ThemeFile, builtIn: boolean): ResolvedTheme 
     '--syn-bool': warn,
     '--syn-null': textMuted,
     '--syn-punct': textMuted,
+    // Diff tokens (PLAN-08): additions/removals ride the status colors, the
+    // change highlight rides the theme's signature accent.
+    '--diff-add': ok,
+    '--diff-remove': danger,
+    '--diff-change': accent,
+    '--diff-add-soft': alpha(ok, dark ? 0.16 : 0.12),
+    '--diff-remove-soft': alpha(danger, dark ? 0.16 : 0.12),
+    '--diff-change-soft': alpha(accent, dark ? 0.16 : 0.12),
     // Scanners need dark-on-light regardless of theme mode.
     '--qr-module-a': dark ? '#0f766e' : '#0c5f54',
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',

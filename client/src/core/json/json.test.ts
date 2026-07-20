@@ -5,6 +5,7 @@ import {
   jsonStats,
   minifyJson,
   pathAt,
+  rangeAtPath,
   sortKeysDeep,
   unescapeEmbedded,
   validateJson,
@@ -198,5 +199,15 @@ describe('paths', () => {
   it('resolves the path at a document offset', () => {
     const doc = '{"data": {"items": [{"price": 9}]}}';
     expect(pathAt(doc, doc.indexOf('9'))).toBe('data.items[0].price');
+  });
+
+  it('maps a path back to its text range, optionally including the key', () => {
+    const doc = '{"data": {"items": [{"price": 9}]}}';
+    const value = rangeAtPath(doc, ['data', 'items', 0, 'price']);
+    expect(value).toEqual({ offset: doc.indexOf('9'), length: 1 });
+    const withKey = rangeAtPath(doc, ['data', 'items', 0, 'price'], true);
+    expect(withKey).toEqual({ offset: doc.indexOf('"price"'), length: '"price": 9'.length });
+    expect(rangeAtPath(doc, ['nope'])).toBeNull();
+    expect(rangeAtPath('{ broken', ['x'])).toBeNull();
   });
 });
