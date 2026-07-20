@@ -1688,3 +1688,18 @@
     gap: 2px;
   }
 }
+
+/* Desktop: the compare area breaks out of the 62rem shell column — two
+   editors side by side earn the real estate (owner feedback). The page
+   head stays aligned with every other page; phones keep the stack. */
+@media (min-width: 1024px) {
+  .variant-stack {
+    --variant-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--variant-w);
+    margin-inline: calc((100% - var(--variant-w)) / 2);
+  }
+}
+
+.variant-drawer__more {
+  padding: var(--space-1) var(--space-2);
+}
