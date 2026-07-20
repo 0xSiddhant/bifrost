@@ -12,7 +12,7 @@ import {
   listRunestones,
   type RunestoneSort,
   type RunestoneSummary,
-} from './api';
+} from '../../core/runestone';
 
 /** The device that carved it, by PLAN-06 display rules (alias-first). */
 function authorDisplay(deviceId: string | null): string {

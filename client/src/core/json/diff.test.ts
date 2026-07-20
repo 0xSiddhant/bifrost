@@ -305,14 +305,14 @@ describe('property tests', () => {
         parent = (parent as Record<string, unknown>)[seg as string];
       }
       const last = site[site.length - 1];
-      const container = parent as Record<string, unknown> & unknown[];
+      const container = parent as Record<string, unknown>;
       const action = rng();
       if (action < 0.4) {
         container[last as string] = randomValue(2); // change / type-change
       } else if (action < 0.7 && typeof last === 'string') {
         delete container[last]; // remove an object key
-      } else if (Array.isArray(container)) {
-        container.push(randomValue(2)); // append → add
+      } else if (Array.isArray(parent)) {
+        parent.push(randomValue(2)); // append → add
       } else {
         container[`fresh${Math.floor(rng() * 30)}`] = randomValue(2); // new key
       }
@@ -326,12 +326,12 @@ describe('property tests', () => {
   /** Apply diff records back onto the left doc (index strategy invariants). */
   const applyRecords = (left: unknown, records: DiffRecord[]): unknown => {
     const root: { value: unknown } = { value: JSON.parse(JSON.stringify(left ?? null)) };
-    const parentOf = (path: PathSegment[]): Record<string, unknown> & unknown[] => {
+    const parentOf = (path: PathSegment[]): Record<string, unknown> => {
       let cur: unknown = root.value;
       for (const seg of path.slice(0, -1)) {
         cur = (cur as Record<string, unknown>)[seg as string];
       }
-      return cur as Record<string, unknown> & unknown[];
+      return cur as Record<string, unknown>;
     };
     const setAt = (path: PathSegment[], value: unknown): void => {
       if (path.length === 0) {

@@ -1,4 +1,4 @@
-import { ApiError, apiGet, apiSend } from '../../core/api';
+import { ApiError, apiGet, apiSend } from './api';
 
 export interface RunestoneConfig {
   /** Document size cap in KB — from .env via the server, never hardcoded. */
