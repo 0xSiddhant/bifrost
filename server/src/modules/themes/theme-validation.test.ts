@@ -115,6 +115,14 @@ describe('resolveTheme derived defaults', () => {
     expect(resolved.preview).toEqual({ bg: '#0a0a12', accent: '#5eead4' });
   });
 
+  it('derives diff tokens from ok/danger/accent for a minimal theme', () => {
+    const resolved = resolveTheme(validator.check(minimalTheme()), false);
+    expect(resolved.tokens['--diff-add']).toBe('#4ade80'); // ok
+    expect(resolved.tokens['--diff-remove']).toBe('#f87171'); // danger
+    expect(resolved.tokens['--diff-change']).toBe('#5eead4'); // accent
+    expect(resolved.tokens['--diff-add-soft']).toBe('rgba(74, 222, 128, 0.16)');
+  });
+
   it('never overrides authored values', () => {
     const theme = minimalTheme();
     (theme.tokens as Record<string, string>)['--syn-key'] = '#ff0000';
