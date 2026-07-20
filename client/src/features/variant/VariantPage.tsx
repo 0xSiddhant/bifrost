@@ -17,6 +17,7 @@ import {
   DEFAULT_TEXT_OPTIONS,
   diffStats,
   type InvalidSide,
+  type TextChunkRow,
   type TextCompareResult,
   type VariantJsonOptions,
   type VariantTextOptions,
@@ -25,7 +26,7 @@ import { jumpTargetFor, recordsToHighlights } from './highlights';
 import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer } from './ResultsDrawer';
-import { TextCompare, type TextCompareHandle } from './TextCompare';
+import { hasActiveNormalization } from '../../core/textNormalize';
 
 /**
  * Variant (PLAN-08): two-pane JSON & text comparison. Structural JSON diff by
@@ -48,7 +49,6 @@ interface CompareResults {
 }
 
 const EDITOR_HEIGHT = '56vh';
-const WRAP_KEY = 'variant.wordWrap';
 
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -99,13 +99,8 @@ export function VariantPage() {
   const [textOptions, setTextOptions] = useState<VariantTextOptions>(DEFAULT_TEXT_OPTIONS);
   const [results, setResults] = useState<CompareResults | null>(null);
   const [textResult, setTextResult] = useState<TextCompareResult | null>(null);
-  const [stale, setStale] = useState(false);
   const [fallback, setFallback] = useState<InvalidSide | null>(null);
   const [view, setView] = useState<'code' | 'tree'>('code');
-  const [textView, setTextView] = useState<'split' | 'unified'>(() =>
-    startsMobile() ? 'unified' : 'split',
-  );
-  const [wordWrap, setWordWrap] = useState(() => sessionStorage.getItem(WRAP_KEY) === '1');
   const [drawerOpen, setDrawerOpen] = useState(startsMobile);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [pickerSide, setPickerSide] = useState<Side | null>(null);
@@ -115,7 +110,8 @@ export function VariantPage() {
 
   const leftEditorRef = useRef<JsonEditorHandle>(null);
   const rightEditorRef = useRef<JsonEditorHandle>(null);
-  const textRef = useRef<TextCompareHandle>(null);
+  const textLeftRef = useRef<JsonEditorHandle>(null);
+  const textRightRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importSideRef = useRef<Side>('left');
 
@@ -139,10 +135,6 @@ export function VariantPage() {
     const id = window.setTimeout(() => setNotice(null), 2400);
     return () => window.clearTimeout(id);
   }, [notice]);
-
-  useEffect(() => {
-    sessionStorage.setItem(WRAP_KEY, wordWrap ? '1' : '0');
-  }, [wordWrap]);
 
   // ── shareable compare URLs: ?left=<slug>&right=<slug> ─────────────────────
   const leftParam = searchParams.get('left');
@@ -231,7 +223,6 @@ export function VariantPage() {
       setFallback(outcome.invalid);
       setMode('text');
       setResults(null);
-      setStale(false);
       // The Compare click still deserves a diff — copy the docs into the
       // text workspace (the one deliberate cross-mode copy) and run there.
       setPanes((prev) => ({
@@ -245,19 +236,26 @@ export function VariantPage() {
       return;
     }
     setResults({ records: outcome.records, left: l, right: r });
-    setStale(false);
     setFallback(null);
     setChangeCursor(-1);
     if (startsMobile()) setDrawerOpen(true);
   };
 
+  // Owner's model: the first real edit after a compare removes the markers
+  // and the results entirely — they only return on the next Compare click.
+  const dropResults = () => {
+    if (mode === 'json') setResults(null);
+    else setTextResult(null);
+    setChangeCursor(-1);
+  };
+
   const onPaneEdit = (side: Side) => (value: string) => {
     // The editors also fire onChange for programmatic doc syncs — an
-    // unchanged buffer must not mark fresh compare results stale.
+    // unchanged buffer must not clear fresh compare results.
     const current = side === 'left' ? left.text : right.text;
     if (current === value) return;
     setPane(side, (pane) => ({ ...pane, text: value, slugError: null }));
-    if (mode === 'json' && results) setStale(true);
+    dropResults();
   };
 
   const highlights = useMemo(
@@ -298,11 +296,17 @@ export function VariantPage() {
   const stats =
     mode === 'json' ? (results ? diffStats(results.records) : null) : (textResult?.stats ?? null);
 
-  // ── scroll-lock the two JSON panes so hunks stay aligned ──────────────────
+  // Text-pane decorations are only honest when the buffers equal the compared
+  // snapshots — destructive normalization breaks that, so the drawer carries
+  // those results alone.
+  const textHighlights =
+    textResult && !hasActiveNormalization(textOptions) ? textResult.highlights : null;
+
+  // ── scroll-lock the two panes (either mode) so hunks stay aligned ─────────
   useEffect(() => {
-    if (mode !== 'json' || view !== 'code') return;
-    const a = leftEditorRef.current?.scrollerElement();
-    const b = rightEditorRef.current?.scrollerElement();
+    if (mode === 'json' && view !== 'code') return;
+    const a = (mode === 'json' ? leftEditorRef : textLeftRef).current?.scrollerElement();
+    const b = (mode === 'json' ? rightEditorRef : textRightRef).current?.scrollerElement();
     if (!a || !b) return;
     let locked = false;
     const follow = (source: HTMLElement, target: HTMLElement) => () => {
@@ -343,9 +347,19 @@ export function VariantPage() {
     if (target.right !== null) rightEditorRef.current?.revealOffset(target.right);
   };
 
+  const jumpToChunk = (row: TextChunkRow) => {
+    textLeftRef.current?.revealOffset(row.posA);
+    textRightRef.current?.revealOffset(row.posB);
+  };
+
   const stepChange = (direction: 1 | -1) => {
     if (mode === 'text') {
-      if (textResult) textRef.current?.nextChunk(direction);
+      if (!textResult || textResult.rows.length === 0) return;
+      const next =
+        (changeCursor + direction + textResult.rows.length) % textResult.rows.length;
+      setChangeCursor(next);
+      const row = textResult.rows[next];
+      if (row) jumpToChunk(row);
       return;
     }
     if (!results || results.records.length === 0) return;
@@ -389,10 +403,8 @@ export function VariantPage() {
         },
         { replace: true },
       );
-      if (results) setStale(true);
-    } else {
-      setTextResult(null);
     }
+    dropResults();
   };
 
   const formatBoth = () => {
@@ -402,7 +414,7 @@ export function VariantPage() {
     }
     setPane('left', (pane) => ({ ...pane, text: formatJson(pane.text) }), 'json');
     setPane('right', (pane) => ({ ...pane, text: formatJson(pane.text) }), 'json');
-    if (results) setStale(true);
+    setResults(null);
     ok('Formatted both sides');
   };
 
@@ -415,7 +427,7 @@ export function VariantPage() {
       JSON.stringify(sortKeysDeep(JSON.parse(text)), null, 2);
     setPane('left', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
     setPane('right', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
-    if (results) setStale(true);
+    setResults(null);
     ok('Keys sorted A→Z on both sides');
   };
 
@@ -425,13 +437,8 @@ export function VariantPage() {
       ...prev,
       [mode]: { left: emptyPane('Original'), right: emptyPane('Modified') },
     }));
-    if (mode === 'json') {
-      setResults(null);
-      setStale(false);
-      setSearchParams({}, { replace: true });
-    } else {
-      setTextResult(null);
-    }
+    if (mode === 'json') setSearchParams({}, { replace: true });
+    dropResults();
     setFallback(null);
   };
 
@@ -449,12 +456,8 @@ export function VariantPage() {
     const content = await file.text();
     const label = file.name.replace(/\.[^.]+$/, '').trim() || file.name;
     setPane(side, () => ({ text: content, label, source: null, slugError: null }));
-    if (mode === 'json') {
-      setSlugParam(side, null);
-      if (results) setStale(true);
-    } else {
-      setTextResult(null);
-    }
+    if (mode === 'json') setSlugParam(side, null);
+    dropResults();
     ok(`Imported ${file.name}`);
   };
 
@@ -473,7 +476,7 @@ export function VariantPage() {
       'json',
     );
     setSlugParam(side, doc.slug);
-    if (results) setStale(true);
+    setResults(null);
   };
 
   const canPickFromLibrary =
@@ -583,14 +586,6 @@ export function VariantPage() {
       >
         Compare
       </Button>
-      {mode === 'json' && stale && (
-        <span className="variant-rail__stale caption">stale</span>
-      )}
-      {mode === 'text' && textResult && (
-        <Button size="sm" variant="ghost" onClick={() => setTextResult(null)}>
-          Edit
-        </Button>
-      )}
 
       <Button size="sm" variant="ghost" onClick={swapPanes} disabled={empty} title="Swap sides">
         Swap ⇄
@@ -623,35 +618,6 @@ export function VariantPage() {
           </button>
         </div>
       )}
-      {mode === 'text' && (
-        <div className="variant-modetoggle" role="group" aria-label="Text layout">
-          <button
-            type="button"
-            className={`variant-modetoggle__btn${textView === 'split' ? ' is-active' : ''}`}
-            onClick={() => setTextView('split')}
-          >
-            Split
-          </button>
-          <button
-            type="button"
-            className={`variant-modetoggle__btn${textView === 'unified' ? ' is-active' : ''}`}
-            onClick={() => setTextView('unified')}
-          >
-            Unified
-          </button>
-        </div>
-      )}
-      {mode === 'text' && (
-        <Button
-          size="sm"
-          variant={wordWrap ? 'primary' : 'ghost'}
-          onClick={() => setWordWrap((wrap) => !wrap)}
-          title="Toggle word wrap"
-        >
-          Wrap
-        </Button>
-      )}
-
       <div className="variant-rail__nav">
         <Button
           size="sm"
@@ -694,11 +660,11 @@ export function VariantPage() {
               text={textOptions}
               onJsonChange={(next) => {
                 setJsonOptions(next);
-                if (results) setStale(true);
+                // Options changes invalidate a shown result; recompare.
+                setResults(null);
               }}
               onTextChange={(next) => {
                 setTextOptions(next);
-                // Normalization changes invalidate a shown result; recompare.
                 setTextResult(null);
               }}
             />
@@ -755,35 +721,28 @@ export function VariantPage() {
                 {left.slugError ?? right.slugError}
               </p>
             )}
-            {textResult ? (
-              // A finished compare — read-only render of the snapshots.
-              <TextCompare
-                ref={textRef}
-                left={textResult.left}
-                right={textResult.right}
-                view={textView}
-                wordWrap={wordWrap}
+            {/* Always-editable panes; Compare paints decorations onto them,
+                and the first real edit removes them again (owner's model). */}
+            <div className="variant-textedit">
+              <JsonEditor
+                ref={textLeftRef}
+                plain
+                value={left.text}
+                onChange={onPaneEdit('left')}
                 height={EDITOR_HEIGHT}
+                placeholder="Paste or type any text…"
+                highlights={textHighlights?.left}
               />
-            ) : (
-              // Editing phase: plain panes, zero diff work per keystroke.
-              <div className="variant-textedit">
-                <JsonEditor
-                  plain
-                  value={left.text}
-                  onChange={onPaneEdit('left')}
-                  height={EDITOR_HEIGHT}
-                  placeholder="Paste or type any text…"
-                />
-                <JsonEditor
-                  plain
-                  value={right.text}
-                  onChange={onPaneEdit('right')}
-                  height={EDITOR_HEIGHT}
-                  placeholder="Paste or type any text…"
-                />
-              </div>
-            )}
+              <JsonEditor
+                ref={textRightRef}
+                plain
+                value={right.text}
+                onChange={onPaneEdit('right')}
+                height={EDITOR_HEIGHT}
+                placeholder="Paste or type any text…"
+                highlights={textHighlights?.right}
+              />
+            </div>
           </div>
         )}
 
@@ -791,12 +750,11 @@ export function VariantPage() {
           mode={mode}
           open={drawerOpen}
           onToggle={() => setDrawerOpen((open) => !open)}
-          stale={stale}
           stats={stats}
           records={results?.records ?? null}
           chunks={textResult?.rows ?? null}
           onJumpRecord={jumpToRecord}
-          onJumpChunk={(row) => textRef.current?.scrollToPositions(row.posA, row.posB)}
+          onJumpChunk={jumpToChunk}
         />
 
         {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}

@@ -13,7 +13,6 @@ interface ResultsDrawerProps {
   mode: 'json' | 'text';
   open: boolean;
   onToggle: () => void;
-  stale: boolean;
   stats: DiffStats | null;
   records: readonly DiffRecord[] | null;
   chunks: readonly TextChunkRow[] | null;
@@ -61,7 +60,6 @@ export function ResultsDrawer({
   mode,
   open,
   onToggle,
-  stale,
   stats,
   records,
   chunks,
@@ -79,7 +77,7 @@ export function ResultsDrawer({
       : [];
 
   return (
-    <section className={`variant-drawer${stale ? ' variant-drawer--stale' : ''}`}>
+    <section className="variant-drawer">
       <button
         type="button"
         className="variant-drawer__head"
@@ -95,7 +93,6 @@ export function ResultsDrawer({
           <span className="variant-stats__remove">−{stats.removes}</span>
           <span className="variant-stats__change">~{stats.changes}</span>
         </span>
-        {stale && <span className="variant-drawer__stale caption">edited — compare again</span>}
       </button>
 
       {open && total > 0 && mode === 'json' && (

@@ -3,6 +3,7 @@ import { Chunk } from '@codemirror/merge';
 import { validateJson } from '../../core/json';
 import { diffJson, type DiffOptions, type DiffRecord } from '../../core/json/diff';
 import { normalizeText, type TextNormalizeOptions } from '../../core/textNormalize';
+import type { DiffHighlight } from '../../core/ui/JsonEditor';
 
 /**
  * Pure compare-flow logic for Variant (PLAN-08). The page component stays a
@@ -122,12 +123,21 @@ export interface TextChunkRow {
 }
 
 export interface TextCompareResult {
-  /** Normalized snapshots the result view and chunk rows both refer to. */
+  /** Normalized snapshots the chunk rows and highlights refer to. */
   left: string;
   right: string;
   rows: TextChunkRow[];
   stats: DiffStats;
+  /**
+   * Pane decorations (valid against the snapshots). When destructive
+   * normalization is on the pane buffers differ from the snapshots, so the
+   * page must not paint these — the rows/stats still apply.
+   */
+  highlights: { left: DiffHighlight[]; right: DiffHighlight[] };
 }
+
+/** Same budget rationale as the JSON side — walls of tint cost, not inform. */
+const MAX_DECORATED_CHUNKS = 500;
 
 /**
  * Run a text compare over normalized snapshots. Owner's model: diffing
@@ -174,7 +184,43 @@ export function compareText(
     else if (row.kind === 'remove') stats.removes += 1;
     else stats.changes += 1;
   }
-  return { left, right, rows, stats };
+
+  // Chunk spans → line tints; per-chunk changes → char emphasis. Deletions
+  // paint the left pane, insertions the right, changed chunks both.
+  const leftMarks: DiffHighlight[] = [];
+  const rightMarks: DiffHighlight[] = [];
+  for (const chunk of chunks.slice(0, MAX_DECORATED_CHUNKS)) {
+    const kind =
+      chunk.fromA === chunk.toA ? 'add' : chunk.fromB === chunk.toB ? 'remove' : 'change';
+    if (chunk.toA > chunk.fromA && kind !== 'add') {
+      const paneKind = kind === 'remove' ? 'remove' : 'change';
+      leftMarks.push({ from: chunk.fromA, to: chunk.endA, kind: paneKind, level: 'line' });
+    }
+    if (chunk.toB > chunk.fromB && kind !== 'remove') {
+      const paneKind = kind === 'add' ? 'add' : 'change';
+      rightMarks.push({ from: chunk.fromB, to: chunk.endB, kind: paneKind, level: 'line' });
+    }
+    for (const change of chunk.changes) {
+      if (change.toA > change.fromA && kind !== 'add') {
+        leftMarks.push({
+          from: chunk.fromA + change.fromA,
+          to: chunk.fromA + change.toA,
+          kind: kind === 'remove' ? 'remove' : 'change',
+          level: 'char',
+        });
+      }
+      if (change.toB > change.fromB && kind !== 'remove') {
+        rightMarks.push({
+          from: chunk.fromB + change.fromB,
+          to: chunk.fromB + change.toB,
+          kind: kind === 'add' ? 'add' : 'change',
+          level: 'char',
+        });
+      }
+    }
+  }
+
+  return { left, right, rows, stats, highlights: { left: leftMarks, right: rightMarks } };
 }
 
 export function diffStats(records: readonly DiffRecord[]): DiffStats {

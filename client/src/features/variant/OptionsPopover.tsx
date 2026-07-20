@@ -61,8 +61,8 @@ export function OptionsPopover({ mode, json, text, onJsonChange, onTextChange }:
           onChange={(dropBlankLines) => onTextChange({ ...text, dropBlankLines })}
         />
         <p className="caption">
-          Normalization applies when you press Compare — the result shows the
-          normalized copies.
+          Normalization applies when you press Compare. With any of these on,
+          inline markers stay hidden — the change list carries the result.
         </p>
       </div>
     );

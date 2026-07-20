@@ -1205,11 +1205,6 @@
   gap: var(--space-1);
 }
 
-.variant-rail__stale {
-  text-align: center;
-  color: var(--diff-change);
-}
-
 .variant-rail__options {
   position: relative;
 }
@@ -1354,22 +1349,6 @@
   gap: var(--space-4);
 }
 
-.variant-textcompare {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--surface);
-}
-
-.variant-textcompare .cm-mergeView,
-.variant-textcompare .cm-mergeViewEditors {
-  background: transparent;
-}
-
-.variant-textcompare .cm-merge-revert {
-  background: var(--surface-2);
-}
-
 /* ── results drawer ── */
 
 .variant-drawer {
@@ -1377,10 +1356,6 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   overflow: hidden;
-}
-
-.variant-drawer--stale {
-  opacity: 0.75;
 }
 
 .variant-drawer__head {
@@ -1409,10 +1384,6 @@
 
 .variant-drawer__title {
   font-weight: 600;
-}
-
-.variant-drawer__stale {
-  color: var(--diff-change);
 }
 
 .variant-stats {

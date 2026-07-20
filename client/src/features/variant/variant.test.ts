@@ -132,6 +132,27 @@ describe('compareText (runs only on the Compare CTA)', () => {
     expect(compareText('a\r\nb', 'a\nb', DEFAULT_TEXT_OPTIONS).rows).toEqual([]);
   });
 
+  it('emits pane decorations: removals left, additions right, changes both', () => {
+    const left = 'keep\ngone\nprice 9';
+    const right = 'keep\nprice 12\nborn';
+    const { highlights } = compareText(left, right, DEFAULT_TEXT_OPTIONS);
+    expect(highlights.left.length).toBeGreaterThan(0);
+    expect(highlights.right.length).toBeGreaterThan(0);
+    // Every left mark resolves inside the left snapshot, same for right.
+    for (const mark of highlights.left) {
+      expect(mark.to).toBeLessThanOrEqual(left.length);
+      expect(['remove', 'change']).toContain(mark.kind);
+    }
+    for (const mark of highlights.right) {
+      expect(mark.to).toBeLessThanOrEqual(right.length);
+      expect(['add', 'change']).toContain(mark.kind);
+    }
+    const charMarks = [...highlights.left, ...highlights.right].filter(
+      (mark) => mark.level === 'char',
+    );
+    expect(charMarks.length).toBeGreaterThan(0);
+  });
+
   it('normalization options apply to the compared snapshots', () => {
     const raw = compareText('  a  ', 'a', DEFAULT_TEXT_OPTIONS);
     expect(raw.rows.length).toBeGreaterThan(0);
