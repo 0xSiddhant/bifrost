@@ -85,8 +85,16 @@ export function VariantPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [mode, setMode] = useState<Mode>('json');
-  const [left, setLeft] = useState<PaneState>(() => emptyPane('Original'));
-  const [right, setRight] = useState<PaneState>(() => emptyPane('Modified'));
+  // JSON and text mode are separate workspaces — content never carries over
+  // on a mode switch (owner requirement). The invalid-JSON fallback is the
+  // one deliberate exception: that Compare explicitly re-targets the docs.
+  const [panes, setPanes] = useState<Record<Mode, { left: PaneState; right: PaneState }>>(() => ({
+    json: { left: emptyPane('Original'), right: emptyPane('Modified') },
+    text: { left: emptyPane('Original'), right: emptyPane('Modified') },
+  }));
+  const { left, right } = panes[mode];
+  const jsonLeftText = panes.json.left.text;
+  const jsonRightText = panes.json.right.text;
   const [jsonOptions, setJsonOptions] = useState<VariantJsonOptions>(DEFAULT_JSON_OPTIONS);
   const [textOptions, setTextOptions] = useState<VariantTextOptions>(DEFAULT_TEXT_OPTIONS);
   const [results, setResults] = useState<CompareResults | null>(null);
@@ -111,8 +119,11 @@ export function VariantPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importSideRef = useRef<Side>('left');
 
-  const setPane = (side: Side, update: (pane: PaneState) => PaneState) => {
-    (side === 'left' ? setLeft : setRight)(update);
+  const setPane = (side: Side, update: (pane: PaneState) => PaneState, target?: Mode) => {
+    setPanes((prev) => {
+      const which = target ?? mode;
+      return { ...prev, [which]: { ...prev[which], [side]: update(prev[which][side]) } };
+    });
   };
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
@@ -136,8 +147,8 @@ export function VariantPage() {
   // ── shareable compare URLs: ?left=<slug>&right=<slug> ─────────────────────
   const leftParam = searchParams.get('left');
   const rightParam = searchParams.get('right');
-  const leftLoadedSlug = left.source?.slug ?? null;
-  const rightLoadedSlug = right.source?.slug ?? null;
+  const leftLoadedSlug = panes.json.left.source?.slug ?? null;
+  const rightLoadedSlug = panes.json.right.source?.slug ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -147,22 +158,34 @@ export function VariantPage() {
         const doc = await fetchRunestone(slug);
         if (cancelled) return null;
         if (!doc) {
-          setPane(side, (pane) => ({
-            ...pane,
-            slugError: `No runestone answers to “${slug}” — it was never carved, or has crumbled.`,
-          }));
+          setPane(
+            side,
+            (pane) => ({
+              ...pane,
+              slugError: `No runestone answers to “${slug}” — it was never carved, or has crumbled.`,
+            }),
+            'json',
+          );
           return null;
         }
-        setPane(side, () => ({
-          text: doc.content,
-          label: doc.name,
-          source: { slug: doc.slug, name: doc.name },
-          slugError: null,
-        }));
+        setPane(
+          side,
+          () => ({
+            text: doc.content,
+            label: doc.name,
+            source: { slug: doc.slug, name: doc.name },
+            slugError: null,
+          }),
+          'json',
+        );
         return doc;
       } catch {
         if (!cancelled) {
-          setPane(side, (pane) => ({ ...pane, slugError: 'Could not load that runestone.' }));
+          setPane(
+            side,
+            (pane) => ({ ...pane, slugError: 'Could not load that runestone.' }),
+            'json',
+          );
         }
         return null;
       }
@@ -174,8 +197,8 @@ export function VariantPage() {
       ]);
       if (cancelled || (!leftDoc && !rightDoc)) return;
       // Acceptance 5: a URL naming both sides opens pre-loaded AND compared.
-      const l = leftDoc?.content ?? (leftParam === leftLoadedSlug ? left.text : null);
-      const r = rightDoc?.content ?? (rightParam === rightLoadedSlug ? right.text : null);
+      const l = leftDoc?.content ?? (leftParam === leftLoadedSlug ? jsonLeftText : null);
+      const r = rightDoc?.content ?? (rightParam === rightLoadedSlug ? jsonRightText : null);
       if (l !== null && r !== null) runCompare(l, r);
     })();
     return () => {
@@ -197,19 +220,27 @@ export function VariantPage() {
   };
 
   // ── compare flow — diffing runs ONLY here, never per keystroke ────────────
-  const runTextCompare = (l = left.text, r = right.text) => {
+  const runTextCompare = (l = panes.text.left.text, r = panes.text.right.text) => {
     setTextResult(compareText(l, r, textOptions));
     if (startsMobile()) setDrawerOpen(true);
   };
 
-  const runCompare = (l = left.text, r = right.text) => {
+  const runCompare = (l = jsonLeftText, r = jsonRightText) => {
     const outcome = compareJson(l, r, jsonOptions);
     if (!outcome.ok) {
       setFallback(outcome.invalid);
       setMode('text');
       setResults(null);
       setStale(false);
-      // The Compare click still deserves a diff — as text (never a dead end).
+      // The Compare click still deserves a diff — copy the docs into the
+      // text workspace (the one deliberate cross-mode copy) and run there.
+      setPanes((prev) => ({
+        ...prev,
+        text: {
+          left: { ...prev.text.left, text: l, label: prev.json.left.label },
+          right: { ...prev.text.right, text: r, label: prev.json.right.label },
+        },
+      }));
       runTextCompare(l, r);
       return;
     }
@@ -226,7 +257,7 @@ export function VariantPage() {
     const current = side === 'left' ? left.text : right.text;
     if (current === value) return;
     setPane(side, (pane) => ({ ...pane, text: value, slugError: null }));
-    if (results) setStale(true);
+    if (mode === 'json' && results) setStale(true);
   };
 
   const highlights = useMemo(
@@ -234,9 +265,9 @@ export function VariantPage() {
     [results],
   );
 
-  // ── per-side validity (drives Compare state + the fallback return path) ───
-  const debouncedLeft = useDebounced(left.text, 300);
-  const debouncedRight = useDebounced(right.text, 300);
+  // ── per-side validity (JSON workspace only — drives Compare + return) ─────
+  const debouncedLeft = useDebounced(jsonLeftText, 300);
+  const debouncedRight = useDebounced(jsonRightText, 300);
   const leftIssues = useMemo(
     () => (debouncedLeft.trim() === '' ? null : validateJson(debouncedLeft).length),
     [debouncedLeft],
@@ -328,39 +359,40 @@ export function VariantPage() {
   // ── rail actions ──────────────────────────────────────────────────────────
   const switchMode = (next: Mode) => {
     if (next === mode) return;
+    // Separate workspaces: each mode keeps its own buffers AND results.
     setMode(next);
-    setResults(null);
-    setTextResult(null);
-    setStale(false);
     setFallback(null);
   };
 
   const returnToJson = () => {
     setMode('json');
     setFallback(null);
-    setTextResult(null);
-    runCompare();
+    if (bothValid) runCompare();
   };
 
   const swapPanes = () => {
-    const previousLeft = left;
-    setLeft(right);
-    setRight(previousLeft);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        const l = prev.get('left');
-        const r = prev.get('right');
-        next.delete('left');
-        next.delete('right');
-        if (r) next.set('left', r);
-        if (l) next.set('right', l);
-        return next;
-      },
-      { replace: true },
-    );
-    if (results) setStale(true);
-    setTextResult(null);
+    setPanes((prev) => ({
+      ...prev,
+      [mode]: { left: prev[mode].right, right: prev[mode].left },
+    }));
+    if (mode === 'json') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const l = prev.get('left');
+          const r = prev.get('right');
+          next.delete('left');
+          next.delete('right');
+          if (r) next.set('left', r);
+          if (l) next.set('right', l);
+          return next;
+        },
+        { replace: true },
+      );
+      if (results) setStale(true);
+    } else {
+      setTextResult(null);
+    }
   };
 
   const formatBoth = () => {
@@ -368,8 +400,8 @@ export function VariantPage() {
       fail('Both sides must be valid JSON to format.');
       return;
     }
-    setLeft((pane) => ({ ...pane, text: formatJson(pane.text) }));
-    setRight((pane) => ({ ...pane, text: formatJson(pane.text) }));
+    setPane('left', (pane) => ({ ...pane, text: formatJson(pane.text) }), 'json');
+    setPane('right', (pane) => ({ ...pane, text: formatJson(pane.text) }), 'json');
     if (results) setStale(true);
     ok('Formatted both sides');
   };
@@ -381,21 +413,26 @@ export function VariantPage() {
     }
     const sorted = (text: string) =>
       JSON.stringify(sortKeysDeep(JSON.parse(text)), null, 2);
-    setLeft((pane) => ({ ...pane, text: sorted(pane.text) }));
-    setRight((pane) => ({ ...pane, text: sorted(pane.text) }));
+    setPane('left', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
+    setPane('right', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
     if (results) setStale(true);
     ok('Keys sorted A→Z on both sides');
   };
 
   const clearBoth = () => {
     if (!window.confirm('Clear both panes?')) return;
-    setLeft(emptyPane('Original'));
-    setRight(emptyPane('Modified'));
-    setResults(null);
-    setTextResult(null);
-    setStale(false);
+    setPanes((prev) => ({
+      ...prev,
+      [mode]: { left: emptyPane('Original'), right: emptyPane('Modified') },
+    }));
+    if (mode === 'json') {
+      setResults(null);
+      setStale(false);
+      setSearchParams({}, { replace: true });
+    } else {
+      setTextResult(null);
+    }
     setFallback(null);
-    setSearchParams({}, { replace: true });
   };
 
   // ── import & library ──────────────────────────────────────────────────────
@@ -412,9 +449,12 @@ export function VariantPage() {
     const content = await file.text();
     const label = file.name.replace(/\.[^.]+$/, '').trim() || file.name;
     setPane(side, () => ({ text: content, label, source: null, slugError: null }));
-    setSlugParam(side, null);
-    if (results) setStale(true);
-    setTextResult(null);
+    if (mode === 'json') {
+      setSlugParam(side, null);
+      if (results) setStale(true);
+    } else {
+      setTextResult(null);
+    }
     ok(`Imported ${file.name}`);
   };
 
@@ -422,12 +462,16 @@ export function VariantPage() {
     const side = pickerSide;
     setPickerSide(null);
     if (!side) return;
-    setPane(side, () => ({
-      text: doc.content,
-      label: doc.name,
-      source: { slug: doc.slug, name: doc.name },
-      slugError: null,
-    }));
+    setPane(
+      side,
+      () => ({
+        text: doc.content,
+        label: doc.name,
+        source: { slug: doc.slug, name: doc.name },
+        slugError: null,
+      }),
+      'json',
+    );
     setSlugParam(side, doc.slug);
     if (results) setStale(true);
   };
@@ -440,15 +484,10 @@ export function VariantPage() {
   // ── render helpers ────────────────────────────────────────────────────────
   const paneHeader = (side: Side, pane: PaneState) => (
     <div className="variant-pane__head">
-      <input
-        className="variant-pane__label"
-        value={pane.label}
-        maxLength={60}
-        aria-label={`${side} pane label`}
-        onChange={(event) =>
-          setPane(side, (current) => ({ ...current, label: event.target.value }))
-        }
-      />
+      {/* Display-only: imports and Mímir picks set it, users don't (owner). */}
+      <span className="variant-pane__label" title={pane.label}>
+        {pane.label}
+      </span>
       <div className="variant-pane__actions">
         <Button size="sm" variant="ghost" onClick={() => importInto(side)}>
           Import
@@ -691,8 +730,8 @@ export function VariantPage() {
           <Toast kind="info">
             <span className="variant-fallback">
               {fallbackMessage(fallback)}
-              <Button size="sm" onClick={returnToJson} disabled={!bothValid}>
-                {bothValid ? 'Back to JSON compare' : 'Fix the JSON to return'}
+              <Button size="sm" onClick={returnToJson}>
+                Back to JSON
               </Button>
             </span>
           </Toast>
