@@ -1,6 +1,7 @@
 import {
   applyEdits,
   createScanner,
+  findNodeAtLocation,
   format,
   getLocation,
   parseTree,
@@ -192,4 +193,28 @@ export function formatJsonPath(path: readonly (string | number)[]): string {
 /** JSON path of the value at a text offset (for cursor tracking / click-to-copy). */
 export function pathAt(text: string, offset: number): string {
   return formatJsonPath(getLocation(text, offset).path);
+}
+
+export interface TextRange {
+  offset: number;
+  length: number;
+}
+
+/**
+ * Text range of the value at a JSON path (Variant maps diff records onto
+ * editor decorations with this). When the value is an object property,
+ * `withKey` widens the range to include the key — the whole `"price": 9` span.
+ * Null when the document is unparseable or the path does not resolve.
+ */
+export function rangeAtPath(
+  text: string,
+  path: readonly (string | number)[],
+  withKey = false,
+): TextRange | null {
+  const tree = parseTree(text, undefined, STRICT);
+  if (!tree) return null;
+  const node = findNodeAtLocation(tree, path as (string | number)[]);
+  if (!node) return null;
+  const target = withKey && node.parent?.type === 'property' ? node.parent : node;
+  return { offset: target.offset, length: target.length };
 }
