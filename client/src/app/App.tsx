@@ -9,6 +9,7 @@ import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import {
   BracesIcon,
   ClipboardIcon,
+  DiffIcon,
   DownloadIcon,
   FolderIcon,
   MonitorIcon,
@@ -47,6 +48,9 @@ const RunestonePage = lazy(() =>
 const MimirPage = lazy(() =>
   import('../features/runestone/MimirPage').then((m) => ({ default: m.MimirPage })),
 );
+const VariantPage = lazy(() =>
+  import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
+);
 
 /**
  * Nav renders from /api/capabilities: an entry appears only when its module is
@@ -60,6 +64,7 @@ const NAV = [
   { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} />, module: 'file-transfer' },
   { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
   { to: '/runestone', label: 'Runestone', icon: <BracesIcon size={18} />, module: 'runestone' },
+  { to: '/variant', label: 'Variant', icon: <DiffIcon size={18} />, module: 'variant' },
   { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} />, module: 'presence' },
   { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} />, module: 'qr-tool' },
 ];
@@ -129,6 +134,7 @@ export function App() {
             {/* pre-rename URL (PLAN-07b shipped as "library") */}
             <Route path="/runestone/library" element={<Navigate to="/runestone/mimir" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
+            <Route path="/variant" element={<VariantPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
             <Route path="/heimdall" element={<HeimdallPage />} />
