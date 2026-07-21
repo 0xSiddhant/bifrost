@@ -1,0 +1,19 @@
+# Deps + build output are produced fresh inside the image.
+node_modules
+**/node_modules
+dist
+**/dist
+
+# Runtime state and secrets never belong in the build context / image layers.
+storage
+backups
+.env
+.env.*
+!.env.example
+
+# VCS, CI, editor, logs.
+.git
+.github
+.agent
+*.log
+.DS_Store

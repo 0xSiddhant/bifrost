@@ -1,0 +1,25 @@
+# Bifrost on a Linux host. See docs/docker-linux.md — this is NOT the macOS run
+# mode (host networking + FSEvents don't work in Docker Desktop's VM).
+#
+#   cp .env.example .env      # set HEIMDALL_PIN etc.
+#   docker compose up -d --build
+
+services:
+  bifrost:
+    build: .
+    image: bifrost:latest
+    container_name: bifrost
+    # Host networking so mDNS multicast advertises bifrost.local and clients on
+    # the LAN can reach it. LINUX ONLY — a no-op on Docker Desktop (mac/win).
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 4646
+    volumes:
+      # State that must survive container replacement.
+      - ./storage:/app/storage
+      - ./themes:/app/themes
+    restart: unless-stopped
+    init: true
