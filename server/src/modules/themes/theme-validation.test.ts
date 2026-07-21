@@ -37,7 +37,12 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 
 describe('theme schema validation', () => {
   it('accepts the committed built-ins verbatim', () => {
-    for (const file of ['themes/aurora.json', 'themes/daybreak.json']) {
+    for (const file of [
+      'themes/aurora.json',
+      'themes/daybreak.json',
+      'themes/ghibli-dusk.json',
+      'themes/olympus.json',
+    ]) {
       const raw = fs.readFileSync(`${REPO_ROOT}/${file}`, 'utf8');
       expect(() => validator.parse(raw)).not.toThrow();
     }
@@ -108,6 +113,14 @@ describe('resolveTheme derived defaults', () => {
     expect(resolved.tokens['--qr-bg']).toBe('#eef1fa'); // dark-mode default
     expect(resolved.tokens['--stars-alpha']).toBe('1');
     expect(resolved.preview).toEqual({ bg: '#0a0a12', accent: '#5eead4' });
+  });
+
+  it('derives diff tokens from ok/danger/accent for a minimal theme', () => {
+    const resolved = resolveTheme(validator.check(minimalTheme()), false);
+    expect(resolved.tokens['--diff-add']).toBe('#4ade80'); // ok
+    expect(resolved.tokens['--diff-remove']).toBe('#f87171'); // danger
+    expect(resolved.tokens['--diff-change']).toBe('#5eead4'); // accent
+    expect(resolved.tokens['--diff-add-soft']).toBe('rgba(74, 222, 128, 0.16)');
   });
 
   it('never overrides authored values', () => {

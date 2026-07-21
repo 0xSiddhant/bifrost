@@ -89,6 +89,13 @@ A themed JSON tool in two parts. **Part A — the editor:** validate, color-code
 8. Unknown slug → creative 404; *Carve it now* opens the editor titled from the slug.
 9. Kill test: SIGINT during save burst → restart → no torn rows, drafts intact.
 
+## Addendum — public JSON endpoint + Mímir (owner, 2026-07-19, post-Part-B merge)
+
+- **`GET /runestone/api/<slug>` returns the raw document JSON** (`application/json`, `Access-Control-Allow-Origin: *`) so any saved runestone doubles as a data URL for third-party services. Lives outside `/api/` by owner example; stale-name slugs 301 to the canonical data URL; unknown slugs 404. Read-only.
+- **Library rows gain an "API" action** opening that URL in a new tab.
+- **Library renamed to "Mímir"** (the well of remembered knowledge) — frontend-only like the Muninn/Wardens/Sigil renames: route `/runestone/mimir` (old `/runestone/library` redirects), `MimirPage`, user-facing copy. Server ids/paths unchanged.
+- Vite dev proxy forwards `/runestone/api` so the endpoint also works against the dev server.
+
 ## Test checklist
 
 - [ ] Unit: all `core/json` utils (incl. sortKeysDeep property tests), relic generator, slug service, validation adapter corpus (nested errors, trailing commas, NaN, BOM)

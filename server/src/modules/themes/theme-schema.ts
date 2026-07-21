@@ -1,7 +1,7 @@
 /**
  * The theme contract (JSON Schema draft 2020-12), mirrored prose-style in
  * docs/THEME-SPEC.md. A theme JSON is a flat map onto the tokens.css custom
- * properties: required color roles, optional atmosphere / syntax / qr /
+ * properties: required color roles, optional atmosphere / syntax / diff / qr /
  * typography / shape groups. Omitted optional tokens get derived defaults
  * (resolve.ts) so a minimal theme is ~17 lines.
  */
@@ -48,6 +48,15 @@ export const SYNTAX_TOKENS = [
   '--syn-bool',
   '--syn-null',
   '--syn-punct',
+] as const;
+
+export const DIFF_TOKENS = [
+  '--diff-add',
+  '--diff-remove',
+  '--diff-change',
+  '--diff-add-soft',
+  '--diff-remove-soft',
+  '--diff-change-soft',
 ] as const;
 
 export const QR_TOKENS = ['--qr-module-a', '--qr-module-b', '--qr-bg'] as const;
@@ -107,6 +116,7 @@ export const ALL_TOKEN_KEYS = [
   ...ATMOSPHERE_COLOR_TOKENS,
   ...ATMOSPHERE_CSS_TOKENS,
   ...SYNTAX_TOKENS,
+  ...DIFF_TOKENS,
   ...QR_TOKENS,
   ...FONT_TOKENS,
   ...TYPO_SHAPE_TOKENS,
@@ -117,6 +127,7 @@ for (const key of REQUIRED_COLOR_ROLES) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_COLOR_TOKENS) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_CSS_TOKENS) tokenProperties[key] = cssValue;
 for (const key of SYNTAX_TOKENS) tokenProperties[key] = color;
+for (const key of DIFF_TOKENS) tokenProperties[key] = color;
 for (const key of QR_TOKENS) tokenProperties[key] = color;
 for (const key of FONT_TOKENS) tokenProperties[key] = font;
 for (const key of TYPO_SHAPE_TOKENS) tokenProperties[key] = cssValue;

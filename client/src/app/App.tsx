@@ -1,21 +1,15 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
-import {
-  ClipboardIcon,
-  DownloadIcon,
-  FolderIcon,
-  MonitorIcon,
-  QrIcon,
-  UploadIcon,
-  WifiOffIcon,
-} from '../core/ui/icons';
+import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
+import { OllivandersPage } from './pages/OllivandersPage';
+import { DiagonAlleyPage } from './pages/DiagonAlleyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 // Route-level code splitting: cloud builds never ship local-only pages.
@@ -28,37 +22,93 @@ const DownloadsPage = lazy(() =>
 const PreviewModal = lazy(() =>
   import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
 );
-const MuninnPage = lazy(() =>
-  import('../features/muninn/MuninnPage').then((m) => ({ default: m.MuninnPage })),
+const HermesPage = lazy(() =>
+  import('../features/hermes/HermesPage').then((m) => ({ default: m.HermesPage })),
 );
 const SigilPage = lazy(() =>
   import('../features/sigil/SigilPage').then((m) => ({ default: m.SigilPage })),
 );
-const HeimdallPage = lazy(() =>
-  import('../features/heimdall/HeimdallPage').then((m) => ({ default: m.HeimdallPage })),
+const HeimdallModal = lazy(() =>
+  import('../features/heimdall/HeimdallModal').then((m) => ({ default: m.HeimdallModal })),
 );
 const WardensPage = lazy(() =>
   import('../features/wardens/WardensPage').then((m) => ({ default: m.WardensPage })),
 );
+const RunestonePage = lazy(() =>
+  import('../features/runestone/RunestonePage').then((m) => ({ default: m.RunestonePage })),
+);
+const PensievePage = lazy(() =>
+  import('../features/runestone/PensievePage').then((m) => ({ default: m.PensievePage })),
+);
+const VariantPage = lazy(() =>
+  import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
+);
 
 /**
- * Static nav for the design review. PLAN-02+ derives this from
- * /api/capabilities so each profile only shows its loaded modules.
- * Heimdall is deliberately absent — it opens via gesture/shortcut only.
+ * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
+ * Each tab is a hub page whose tools live as cards there and keep their own
+ * routes: Midgard (Send/Receive/Hermes/Join Bifrost), Ollivanders (Runestone/
+ * Variant/Edda), Diagon Alley (the QR tool + the coming-soon toolbox). A tab
+ * appears only when at least one of its modules is loaded in the active deploy
+ * profile. Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
-const NAV = [
-  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} /> },
-  { to: '/upload', label: 'Send', icon: <UploadIcon size={18} /> },
-  { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} /> },
-  { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} /> },
-  { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} /> },
-  { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} /> },
+interface NavCategory {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  /** Sub-page path prefixes that also light this tab as active. */
+  match?: string[];
+  /** Tab shows when any of these modules is available (null = always). */
+  modules: (string | null)[];
+}
+
+const NAV: NavCategory[] = [
+  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, modules: [null] },
+  {
+    to: '/ollivanders',
+    label: 'Ollivanders',
+    icon: <WandIcon size={18} />,
+    match: ['/runestone', '/variant', '/edda'],
+    modules: ['runestone', 'variant'],
+  },
+  {
+    to: '/diagon-alley',
+    label: 'Diagon Alley',
+    icon: <SparklesIcon size={18} />,
+    match: ['/sigil'],
+    modules: ['qr-tool'],
+  },
 ];
 
 export function App() {
   const { capabilities } = useCapabilities();
-  const { registerTap } = useHeimdallGesture();
+  const [heimdallOpen, setHeimdallOpen] = useState(false);
+  const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
+  const { pathname } = useLocation();
+  const nav = NAV.filter((category) =>
+    category.modules.some(
+      (module) => module === null || !capabilities || capabilities.modules.includes(module),
+    ),
+  );
+  // A category tab is active on its own page and on any of its tools' pages.
+  const isActive = (category: NavCategory) => {
+    if (category.to === '/') return pathname === '/';
+    const paths = [category.to, ...(category.match ?? [])];
+    return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  };
+  const navItems = () =>
+    nav.map((category) => (
+      <Link
+        key={category.to}
+        to={category.to}
+        className={isActive(category) ? 'nav__item active' : 'nav__item'}
+        aria-current={isActive(category) ? 'page' : undefined}
+      >
+        {category.icon}
+        <span>{category.label}</span>
+      </Link>
+    ));
 
   useEffect(() => {
     const unsubscribe = bifrostEvents.onStatus(setSseStatus);
@@ -79,16 +129,13 @@ export function App() {
       <header className="shell-header">
         {/* Home link, and the mobile Heimdall tap target (the footer mark is
             hidden on phones). 7 rapid taps open the gate; single taps go home. */}
+        {/* Home link, and (≥768px) the Heimdall tap entry: N rapid taps open the
+            modal; single taps go home. Below the threshold registerTap no-ops. */}
         <NavLink to="/" className="wordmark" onClick={registerTap}>
           Bifrost
         </NavLink>
         <nav className="nav nav--top" aria-label="Main">
-          {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
-              {item.icon}
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {navItems()}
         </nav>
         <ThemeSwitcher />
       </header>
@@ -104,37 +151,46 @@ export function App() {
         <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
           <Routes>
             <Route path="/" element={<MidgardPage />} />
+            {/* Category hubs — the tools they list keep their own routes below. */}
+            <Route path="/ollivanders" element={<OllivandersPage />} />
+            <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/downloads" element={<DownloadsPage />}>
               {/* Modal route: deep-linkable, back button closes the preview. */}
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
-            <Route path="/muninn" element={<MuninnPage />} />
+            <Route path="/hermes" element={<HermesPage />} />
+            {/* pre-rename URL (shipped as "muninn") */}
+            <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
+            <Route path="/runestone" element={<RunestonePage />} />
+            {/* literal segments beat the :slug param — declared first for clarity */}
+            <Route path="/runestone/pensieve" element={<PensievePage />} />
+            {/* pre-rename URLs (shipped as "library", then "mimir") */}
+            <Route path="/runestone/library" element={<Navigate to="/runestone/pensieve" replace />} />
+            <Route path="/runestone/mimir" element={<Navigate to="/runestone/pensieve" replace />} />
+            <Route path="/runestone/:slug" element={<RunestonePage />} />
+            <Route path="/variant" element={<VariantPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
-            <Route path="/heimdall" element={<HeimdallPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
 
+      {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
+          Opened by the gesture/shortcut only (≥768px). */}
+      {heimdallOpen && (
+        <Suspense fallback={null}>
+          <HeimdallModal onClose={() => setHeimdallOpen(false)} />
+        </Suspense>
+      )}
+
       <nav className="nav nav--bottom" aria-label="Main">
-        {NAV.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
-            {item.icon}
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {navItems()}
       </nav>
 
       <footer className="shell-footer">
-        {/* The server-identity mark doubles as the hidden touch entry to
-            Heimdall — N taps within 3s. Not a link, not labelled. */}
-        <span
-          className="mono caption footer-mark"
-          onClick={registerTap}
-          aria-hidden="true"
-        >
+        <span className="mono caption footer-mark" aria-hidden="true">
           bifrost.local
         </span>
         <span className="caption">

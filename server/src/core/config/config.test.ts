@@ -16,6 +16,12 @@ describe('loadConfig', () => {
     expect(config.heimdall.tapCount).toBe(7);
     expect(config.logLevel).toBe('info');
     expect(config.backupDir).toBeNull();
+    expect(config.runestone.maxDocKb).toBe(2048);
+  });
+
+  it('reads RUNESTONE_MAX_DOC_KB', () => {
+    const config = loadConfig({ ...VALID_ENV, RUNESTONE_MAX_DOC_KB: '512' });
+    expect(config.runestone.maxDocKb).toBe(512);
   });
 
   it('fails fast when HEIMDALL_PIN is missing, naming the key', () => {
@@ -79,5 +85,11 @@ describe('applySettingsOverlay', () => {
       { key: 'heimdall.tapCount', value: 'ninety-nine' },
     ]);
     expect(overlaid.heimdall.tapCount).toBe(7);
+  });
+
+  it('applies a persisted log level (Heimdall runtime switch survives restart)', () => {
+    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'debug' }]).logLevel).toBe('debug');
+    // a bad value is ignored, leaving the .env default
+    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'loud' }]).logLevel).toBe(base.logLevel);
   });
 });

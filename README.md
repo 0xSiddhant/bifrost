@@ -14,7 +14,7 @@
 ![Platform](https://img.shields.io/badge/network-mDNS%20%2F%20intranet%20only-8A2BE2)
 
 <!-- TODO: add demo video when the features land (PLAN-02+) -->
-<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the two portals" width="720" />
+<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the three transfer portals" width="720" />
 
 <img src="docs/assets/screenshot-receive.png" alt="Receive files — live download list with per-type icons" width="720" />
 
@@ -37,12 +37,16 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 📤 Multi-file upload (streamed, 2 GB configurable limit) into a write-only folder
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
-- 📋 Muninn — clipboard/text sync across devices
-- 🔳 Sigil — QR generator utility (+ scan-to-join QR for the server URL)
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk built in), addable via JSON
+- 📋 Hermes — clipboard/text sync across devices
+- 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
+- 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
+- ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
+
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda soon), and **Diagon Alley** (Sigil + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 
@@ -64,6 +68,31 @@ npm run dev
 
 Then open `http://bifrost.local:<PORT>` from any device on the same Wi-Fi — or scan the QR printed in the terminal.
 
+## Run it as a service (macOS)
+
+For an always-on hub that survives crashes and reboots, run it natively (this is
+the production mode — mDNS/`bifrost.local` works, unlike Docker on macOS). One
+command builds and starts it:
+
+```bash
+sh scripts/start-pm2.sh        # via PM2 (rich logs/monitoring; installs pm2)
+# — or —
+sh scripts/start-launchd.sh    # via launchd (zero extra deps, native)
+```
+
+Pick one, not both. Details + how to choose: [`docs/pm2.md`](docs/pm2.md) ·
+[`docs/launchd.md`](docs/launchd.md).
+
+**Optional Grafana view of the logs** (Docker containers; works alongside the
+native run — Alloy tails `storage/logs/`). In a second terminal:
+
+```bash
+sh scripts/observability.sh    # http://localhost:3000  (admin / bifrost)
+```
+
+See [`docs/observability.md`](docs/observability.md). Back up all state
+(`storage/` + `themes/`) any time with `npm run backup`.
+
 ## Scripts
 
 | Command | What it does |
@@ -73,12 +102,26 @@ Then open `http://bifrost.local:<PORT>` from any device on the same Wi-Fi — or
 | `npm run build` | Production build (client + server) |
 | `npm start` | Run production build |
 | `npm run logs` | Pretty-tail the JSON log file |
-| `npm run backup` | Zip `storage/` to a backup location |
+| `npm run backup` | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
+| `npm run restore -- <archive.zip>` | Restore an archive (refuses a live server unless `--force`) |
+| `npm run test:resilience` | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand) |
 | `npm test` / `npm run lint` / `npm run typecheck` | Quality gates (also run in CI) |
+
+Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
+`scripts/start-launchd.sh`, `scripts/observability.sh`.
 
 ## Project docs
 
 Architecture, rules, plans and progress live in [`.agent/`](.agent/). Start with [`.agent/plans/README.md`](.agent/plans/README.md).
+
+Operating & deploying:
+
+- [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
+- [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy stack
+- [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
+- [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
+- [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
+- [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
 
 ## License
 

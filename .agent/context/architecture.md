@@ -6,7 +6,7 @@ One Node/Fastify process serves the static frontend, REST API, and SSE stream on
 
 1. **Vertical slices.** Code is organized feature-first: `src/modules/<feature>/` contains that feature's routes, usecases, services, and DB schema. Shared infrastructure lives in `src/core/` only.
 2. **Modules never import each other. Only `core`.** Cross-feature communication goes through the core **event bus** (e.g. `bus.emit('file.uploaded', meta)`). Enforced by `eslint-plugin-boundaries` — a violating import is a build failure, not a style nit.
-3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall — see the manifest in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles.
+3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall, runestone, variant — see `MANIFEST` in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles. The nav groups pages into **three category hub tabs** (Midgard = transfer, Ollivanders = dev tools, Diagon Alley = utilities); each tool keeps its own route and is surfaced as a card on its hub, and a category tab shows only when one of its modules is in the capabilities list.
 
 ## Layers inside every module
 
@@ -19,7 +19,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 |---|---|---|
 | `file-transfer` | Upload (write-only) + download (read-only) + live folder watch | local only |
 | `previews` | In-browser image/PDF/video/markdown preview, range requests | local only |
-| `clipboard` | Cross-device text/clipboard sync (Muninn page) | local only |
+| `clipboard` | Cross-device text/clipboard sync (Hermes page) | local only |
 | `themes` | Theme engine, JSON themes, dynamic switching | both |
 | `heimdall` | Hidden admin panel (gesture/shortcut + PIN) | both |
 | `qr-tool` | QR generator utility + server-URL QR (Sigil page) | both |
@@ -28,14 +28,18 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
 
+`variant` is **capability-only**: its `register()` is a deliberate no-op — all comparison runs client-side; the module exists purely so `/api/capabilities` advertises the page (and the Pensieve picker's runestone-capability check). Runestone shares the JSON stack (`core/json`, `core/ui/JsonEditor`, `core/ui/TreeView`) that Variant mounts twice — those live in client `core/` because features may never import features.
+
 ## Core services (shared kernel — no feature imports)
 
-`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus; carries per-connection metadata — deviceId/UA/IP — and an `onConnectionChange` subscription that presence consumes) · `auth` (`@fastify/secure-session` PIN sessions + revocable session epoch; decorates `app.requireAdmin`, which guards both Heimdall routes and theme write routes) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping).
+`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus; carries per-connection metadata — deviceId/UA/IP — and an `onConnectionChange` subscription that presence consumes) · `auth` (`@fastify/secure-session` PIN sessions + revocable session epoch; decorates `app.requireAdmin`, which guards both Heimdall routes and theme write routes) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping) · `backup` (`VACUUM INTO` a consistent DB snapshot + zip of `storage/` + `themes/`, online-safe; importable so PLAN-10's in-app button reuses it).
 
 ## Key data flows
 
 - **Upload:** client `POST /api/files` (multipart) → busboy streams to `storage/tmp/` → usecase validates (size limit from config, filename sanitization, extension blocklist) → atomic `rename()` into `storage/uploads/` → `bus.emit('file.uploaded')` → recorded twice, independently: heimdall's `upload_audit` (uploads metadata card) and audit-log's `audit_events` (cross-module history) — deliberately uncoupled tables. **No read route for `uploads/` exists anywhere.** Files written mode 0644, stored as `<timestamp>-<sanitized-name>`.
 - **Live download:** file dropped into `storage/downloads/` via Finder → chokidar (FSEvents, `awaitWriteFinish`) → `bus.emit('download.added')` → sse-hub broadcasts → every open client updates. Downloads served via controlled endpoint with path-traversal protection, never a raw directory listing.
+- **Runestone save:** editor `POST/PUT /api/runestone` → usecase validates (JSON parse, `RUNESTONE_MAX_DOC_KB` cap) → `runestones` table (id = 6-char handle anchoring the `<kebab-name>-<id>` slug; renames regenerate the slug, stale slugs 301) → `bus.emit('runestone.saved'|'runestone.deleted')` → SSE live-updates open libraries (the **Pensieve** page); audit-log records both. Author stored as `author_device_id` only — names resolve client-side.
+- **Runestone public data endpoint:** `GET /runestone/api/:slug` (outside `/api/`, wins over the SPA fallback) serves the **raw stored document text** as `application/json` with `Access-Control-Allow-Origin: *`, so a saved runestone doubles as a stable data URL for third-party tools. Stale slugs 301 to the canonical data URL; read-only — every write still goes through `/api/runestone`.
 
 ## Restart safety (server is stopped/started constantly)
 
@@ -44,7 +48,16 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 - Aborted uploads leave junk only in `storage/tmp/` — swept on boot.
 - Boot reconciliation: chokidar initial scan rebuilds the download listing; audit tables reconciled against the folder.
 - Drizzle migrations are idempotent and tracked in-DB.
+- Proven by `npm run test:resilience` (50 restarts + SIGKILL mid-write / mid-migration + tmp-sweep, all `integrity_check`ed).
 
 ## Storage layout
 
-`storage/{uploads,downloads,tmp,data,logs}` inside the repo, gitignored (`.gitkeep` committed). Paths configurable via `.env`. `storage/data/app.db` is the SQLite file.
+`storage/{uploads,downloads,tmp,data,logs}` inside the repo, gitignored (`.gitkeep` committed). Paths configurable via `.env`. `storage/data/app.db` is the SQLite file. `themes/` (user themes) is state outside `storage/`, so backups cover both.
+
+## Operations & running (PLAN-09)
+
+- **Production entry is `server/src/bootstrap.ts`**, not `app.ts`. `app.ts` self-starts only when it is the *direct* entry (`import.meta.url === argv[1]`); PM2's fork mode wraps the script so that guard never fires. `bootstrap.ts` calls `main()` unconditionally; `npm start`, PM2, launchd, and Docker all point at it. (`app.ts` keeps the guard so tests / the resilience suite can spawn it directly.)
+- **Run modes:** macOS runs **native** (PM2 or launchd — mDNS + FSEvents need it) via `ecosystem.config.cjs` / a launchd plist, with one-command `scripts/start-*.sh`. **Docker targets a future Linux host** (`--network host`); it is deliberately not the macOS run mode.
+- **Backup/restore:** `npm run backup` / `restore` wrap `core/backup` (online-safe snapshot, rotation, `--include-env` opt-in; restore refuses a live server).
+- **Observability (optional, detachable):** `docker-compose.observability.yml` runs Grafana + Loki + Alloy; Alloy tails `storage/logs/*.log`, so it works with any run mode and backfills after downtime.
+- **Releases are automated:** `.github/workflows/release.yml` on push to `main` computes the semver bump from conventional commits, tags, publishes a GitHub Release + tarball, and back-merges to `develop` (needs a `RELEASE_TOKEN` PAT).

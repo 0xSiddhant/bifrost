@@ -47,6 +47,23 @@ export const QrIcon = (p: IconProps) => (
   </svg>
 );
 
+// A wand with a sparkle at its tip — Ollivanders (the dev tools).
+export const WandIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 19 16 8" />
+    <path d="M18 3v4M16 5h4" />
+    <path d="M7.5 6 8.5 7" />
+  </svg>
+);
+
+// Twin four-point stars — Diagon Alley (the utility toolbox).
+export const SparklesIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M11 3l1.6 3.9 3.9 1.6-3.9 1.6L11 14l-1.6-3.9L5.5 8.5l3.9-1.6z" />
+    <path d="M18 13l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" />
+  </svg>
+);
+
 export const MonitorIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <rect x="3" y="4" width="14" height="10" rx="1.5" />
@@ -175,5 +192,20 @@ export const ChevronLeftIcon = (p: IconProps) => (
 export const ChevronRightIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="m10 6 6 6-6 6" />
+  </svg>
+);
+
+export const DiffIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 4v16" />
+    <path d="M4.5 12h4" />
+    <path d="M15.5 12h4M17.5 10v4" />
+  </svg>
+);
+
+export const BracesIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M8 4H7a2 2 0 0 0-2 2v3.5c0 1-.6 2.5-2 2.5 1.4 0 2 1.5 2 2.5V18a2 2 0 0 0 2 2h1" />
+    <path d="M16 4h1a2 2 0 0 1 2 2v3.5c0 1 .6 2.5 2 2.5-1.4 0-2 1.5-2 2.5V18a2 2 0 0 1-2 2h-1" />
   </svg>
 );

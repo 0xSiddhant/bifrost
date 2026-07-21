@@ -16,5 +16,7 @@ export interface DeviceRepository {
   upsertSeen(deviceId: string, label: string, charName: string, now: number): void;
   /** Set/clear the friendly name; returns whether the device exists. */
   rename(deviceId: string, name: string | null): boolean;
+  /** Delete the given device rows; returns how many were removed. */
+  remove(deviceIds: string[]): number;
   all(): KnownDevice[];
 }

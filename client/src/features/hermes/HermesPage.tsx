@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ApiError } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
@@ -7,12 +7,36 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { CheckIcon, ClipboardIcon, CloseIcon } from '../../core/ui/icons';
+import { copyText } from '../../core/copy';
 import { addClipboard, deleteClipboard, type ClipboardEntry } from './api';
-import { copyText } from './copy';
+import { linkify, opensInNewTab } from './linkify';
 import { useClipboard } from './useClipboard';
 
 function byteSize(text: string): string {
   return formatBytes(new TextEncoder().encode(text).length);
+}
+
+function LinkifiedText({ text }: { text: string }) {
+  const tokens = useMemo(() => linkify(text), [text]);
+  return (
+    <>
+      {tokens.map((token, index) =>
+        token.type === 'link' ? (
+          <a
+            key={index}
+            className="clip-entry__link"
+            href={token.href}
+            target={opensInNewTab(token.href) ? '_blank' : undefined}
+            rel="noopener noreferrer"
+          >
+            {token.text}
+          </a>
+        ) : (
+          token.text
+        ),
+      )}
+    </>
+  );
 }
 
 function CodeBlock({ text, lang }: { text: string; lang: string | null }) {
@@ -27,7 +51,7 @@ function CodeBlock({ text, lang }: { text: string; lang: string | null }) {
   );
 }
 
-export function MuninnPage() {
+export function HermesPage() {
   const { entries, ready } = useClipboard();
   const [text, setText] = useState('');
   const [isCode, setIsCode] = useState(false);
@@ -72,8 +96,8 @@ export function MuninnPage() {
     <>
       <div className="page-head">
         <div>
-          <span className="eyebrow">huginn &amp; muninn · the ravens carry words</span>
-          <h2>Muninn</h2>
+          <span className="eyebrow">hermes · the messenger carries words</span>
+          <h2>Hermes</h2>
           <p>Paste once, read everywhere. Text syncs to every connected device.</p>
         </div>
       </div>
@@ -140,7 +164,9 @@ export function MuninnPage() {
                   {entry.kind === 'code' ? (
                     <CodeBlock text={entry.text} lang={entry.lang} />
                   ) : (
-                    <div className="clip-entry__text">{entry.text}</div>
+                    <div className="clip-entry__text">
+                      <LinkifiedText text={entry.text} />
+                    </div>
                   )}
                   <div className="clip-entry__foot">
                     <div className="clip-entry__meta">

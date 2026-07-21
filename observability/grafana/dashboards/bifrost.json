@@ -1,0 +1,135 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "liveNow": false,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["bifrost"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Bifrost",
+  "uid": "bifrost-overview",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Requests / min",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum(count_over_time({job=\"bifrost\"} |= \"request completed\" [1m]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Errors + warnings / min",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum(count_over_time({job=\"bifrost\", level=~\"40|50|60\"} [1m]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Uploads received",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum(count_over_time({job=\"bifrost\"} |= \"file.uploaded\" [$__range]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Watcher events (downloads seen)",
+      "type": "stat",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum(count_over_time({job=\"bifrost\"} |= \"download.added\" [$__range]))",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Errors by module",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum by (module) (count_over_time({job=\"bifrost\", level=~\"50|60\"} [$__auto]))",
+          "legendFormat": "{{module}}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Request throughput",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum(count_over_time({job=\"bifrost\"} |= \"request completed\" [$__auto]))",
+          "legendFormat": "requests",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Recent warnings & errors",
+      "type": "logs",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "{job=\"bifrost\", level=~\"40|50|60\"}",
+          "queryType": "range"
+        }
+      ]
+    }
+  ]
+}

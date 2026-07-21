@@ -4,6 +4,7 @@ import { DbDeviceRepository } from './services/db-device-repository.js';
 import {
   BuildPresenceUseCase,
   ClaimNameUseCase,
+  PruneStaleDevicesUseCase,
   SyncPresenceUseCase,
 } from './usecases/presence.js';
 
@@ -34,6 +35,7 @@ export const presenceModule: FeatureModule = {
     registerPresenceRoutes(app, {
       buildPresence: build,
       claimName: new ClaimNameUseCase(repo, build, bus),
+      pruneStale: new PruneStaleDevicesUseCase(repo, () => sse.liveConnections(), build, bus),
     });
 
     app.addHook('onClose', () => {

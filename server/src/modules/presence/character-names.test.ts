@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTER_NAMES, pickCharacterName } from './character-names.js';
 
 describe('character names', () => {
-  it('is a deduplicated pool spanning the three universes', () => {
-    expect(CHARACTER_NAMES.length).toBeGreaterThan(40);
+  it('is a deduplicated pool spanning the four universes', () => {
+    expect(CHARACTER_NAMES.length).toBeGreaterThan(60);
     expect(new Set(CHARACTER_NAMES).size).toBe(CHARACTER_NAMES.length);
     expect(CHARACTER_NAMES).toContain('Thor'); // norse
     expect(CHARACTER_NAMES).toContain('Hermione'); // potter
     expect(CHARACTER_NAMES).toContain('Iron Man'); // mcu
+    expect(CHARACTER_NAMES).toContain('Zeus'); // greek
   });
 
   it('never returns a name already in use', () => {

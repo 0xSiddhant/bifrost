@@ -103,6 +103,78 @@ const Wing = (p: RelicProps) => (
   </svg>
 );
 
+/** Athena's little owl */
+const Owl = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M8.5 5.5 7.5 3.5M15.5 5.5l1-2" />
+    <path d="M7 10c0-3.3 2.2-5.5 5-5.5s5 2.2 5 5.5v4.5c0 2.6-2 4.5-5 4.5s-5-1.9-5-4.5V10z" />
+    <circle cx="9.8" cy="10" r="1.6" />
+    <circle cx="14.2" cy="10" r="1.6" />
+    <circle cx="9.8" cy="10" r=".3" />
+    <circle cx="14.2" cy="10" r=".3" />
+    <path d="m12 12.2-.8 1.2h1.6l-.8-1.2z" />
+    <path d="M9.3 16c.9.7 1.7.7 2.7.7s1.8 0 2.7-.7" />
+    <path d="M10 19v1.8M14 19v1.8" />
+  </svg>
+);
+
+/** Artemis' bow, arrow nocked */
+const ArtemisBow = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M8 3c6 4.5 6 13.5 0 18" />
+    <path d="M8 3v18" />
+    <path d="M8 12h11" />
+    <path d="m16 9.5 3 2.5-3 2.5" />
+    <path d="m9.5 12-2-1.5M9.5 12l-2 1.5" />
+  </svg>
+);
+
+/** Dionysus' grapes */
+const GrapeCluster = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M12 7.5V4" />
+    <path d="M12 4c1.8-.2 3-1 3.6-2.4C13.7 1.4 12.5 2.3 12 4z" />
+    <circle cx="8.4" cy="9.5" r="1.8" />
+    <circle cx="12" cy="9.5" r="1.8" />
+    <circle cx="15.6" cy="9.5" r="1.8" />
+    <circle cx="10.2" cy="13" r="1.8" />
+    <circle cx="13.8" cy="13" r="1.8" />
+    <circle cx="12" cy="16.5" r="1.8" />
+  </svg>
+);
+
+/** Olive branch */
+const OliveBranch = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M5 19C9.5 15.5 14.5 9.5 19 4" />
+    <path d="M9.5 15.5c-2 .4-3.6-.2-4.6-1.8 1.9-.9 3.6-.5 4.6 1.8zM13 11.5c-.4-2 .2-3.6 1.8-4.6.9 1.9.5 3.6-1.8 4.6zM16 8c2-.4 3.6.2 4.6 1.8-1.9.9-3.6.5-4.6-1.8z" />
+    <circle cx="10.5" cy="10.5" r="1.1" />
+    <circle cx="14.5" cy="15" r="1.1" />
+  </svg>
+);
+
+/** A trireme under sail */
+const Trireme = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M4 14h16" />
+    <path d="M4 14c.6 2.4 3.6 4 8 4s7.4-1.6 8-4" />
+    <path d="M20 14c1.2-.9 1.8-2.1 1.6-3.6" />
+    <path d="M12 14V4" />
+    <path d="M8 4.5h8v4c-2.6 1.4-5.4 1.4-8 0v-4z" />
+    <path d="m7.5 15.5-1.3 3M12 16v3M16.5 15.5l1.3 3" />
+  </svg>
+);
+
+/** Theatre mask */
+const TheatreMask = (p: RelicProps) => (
+  <svg {...base(p)}>
+    <path d="M6 4h12v6.5c0 4.6-2.5 8.5-6 8.5s-6-3.9-6-8.5V4z" />
+    <path d="M6 6.5H4M18 6.5h2" />
+    <path d="M8.5 9.5c.8-.8 2-.8 2.8 0M12.7 9.5c.8-.8 2-.8 2.8 0" />
+    <path d="M8.8 13.5c1.9 2 4.5 2 6.4 0" />
+  </svg>
+);
+
 export const GREEK_RELICS = [
   Trident,
   Lyre,
@@ -115,6 +187,12 @@ export const GREEK_RELICS = [
   Labyrinth,
   TwinBolts,
   Wing,
+  Owl,
+  ArtemisBow,
+  GrapeCluster,
+  OliveBranch,
+  Trireme,
+  TheatreMask,
   glyphRelic('Ω'), // omega
   glyphRelic('Δ'), // delta
   glyphRelic('Ψ'), // psi

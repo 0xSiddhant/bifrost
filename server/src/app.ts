@@ -11,6 +11,7 @@ import {
 } from './core/config/index.js';
 import { loadDotenv } from './core/config/dotenv.js';
 import { createLogger, moduleLogger, type Logger } from './core/logger/index.js';
+import { LogTap } from './core/logtap.js';
 import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
@@ -28,6 +29,8 @@ import { heimdallModule } from './modules/heimdall/module.js';
 import { clipboardModule } from './modules/clipboard/module.js';
 import { presenceModule } from './modules/presence/module.js';
 import { auditLogModule } from './modules/audit-log/module.js';
+import { runestoneModule } from './modules/runestone/module.js';
+import { variantModule } from './modules/variant/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -45,8 +48,10 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     clipboardModule,
     presenceModule,
     auditLogModule,
+    runestoneModule,
+    variantModule,
   ],
-  cloud: [healthModule, qrToolModule, themesModule, heimdallModule],
+  cloud: [healthModule, qrToolModule, themesModule, heimdallModule, runestoneModule, variantModule],
 };
 
 const SESSION_EPOCH_KEY = 'heimdall.sessionEpoch';
@@ -66,13 +71,17 @@ export async function createApp(
   baseConfig: AppConfig,
   options: CreateAppOptions = {},
 ): Promise<RunningApp> {
+  const logTap = new LogTap();
   const logger =
     options.logger ??
-    createLogger({
-      level: baseConfig.logLevel,
-      logsDir: baseConfig.storage.logs,
-      pretty: process.env.NODE_ENV !== 'production',
-    });
+    createLogger(
+      {
+        level: baseConfig.logLevel,
+        logsDir: baseConfig.storage.logs,
+        pretty: process.env.NODE_ENV !== 'production',
+      },
+      logTap,
+    );
 
   ensureStorageDirs(baseConfig);
   sweepTmp(baseConfig.storage.tmp, logger);
@@ -81,6 +90,10 @@ export async function createApp(
   runMigrations(db);
   const settingsRows = readSettings(db);
   const config = applySettingsOverlay(baseConfig, settingsRows);
+  // Apply a persisted log level (Heimdall's runtime switch) before any module
+  // child loggers are created, so they inherit it. Skip when a logger was
+  // injected (tests own its level — e.g. a silent one).
+  if (!options.logger) logger.level = config.logLevel;
 
   // Session epoch persists across restarts so a "revoke all" stays in effect.
   const epochRow = settingsRows.find((row) => row.key === SESSION_EPOCH_KEY);
@@ -99,10 +112,20 @@ export async function createApp(
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 
+  // Live log-level switch (Heimdall Logs): set on the root and every module
+  // child (pino children don't inherit a level change after creation).
+  const moduleLoggers: Logger[] = [];
+  const setLogLevel = (level: AppConfig['logLevel']): void => {
+    logger.level = level;
+    for (const child of moduleLoggers) child.level = level;
+  };
+
   const modules = MANIFEST[config.profile];
   for (const mod of modules) {
+    const log = moduleLogger(logger, mod.name);
+    moduleLoggers.push(log);
     await fastify.register(async (scope) => {
-      await mod.register(scope, { config, log: moduleLogger(logger, mod.name), db, bus, sse, auth });
+      await mod.register(scope, { config, log, db, bus, sse, auth, logTap, setLogLevel });
     });
     logger.info({ module: mod.name }, 'module loaded');
   }
@@ -147,7 +170,7 @@ function sweepTmp(tmpDir: string, log: Logger): void {
   if (entries.length > 0) log.info({ swept: entries.length }, 'tmp swept on boot');
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   loadDotenv();
 
   let baseConfig: AppConfig;
@@ -196,6 +219,10 @@ async function main(): Promise<void> {
   process.once('SIGTERM', onSignal);
 }
 
+// Self-start only when this file IS the direct entry (e.g. `node dist/app.js`,
+// or tsx in tests). Process managers that wrap/import the entry — notably PM2's
+// fork mode — must use the dedicated bootstrap entry (server/src/bootstrap.ts),
+// which calls main() unconditionally.
 const isDirectRun =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {

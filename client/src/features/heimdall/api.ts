@@ -104,9 +104,61 @@ export interface PresenceDevice {
 export const fetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
   apiGet<{ devices: PresenceDevice[] }>('/api/presence');
 
+/** Drop devices offline for > 7 days, then return the fresh roster. */
+export const prunePresence = (): Promise<{ removed: number; devices: PresenceDevice[] }> =>
+  apiSend<{ removed: number; devices: PresenceDevice[] }>('POST', '/api/presence/prune');
+
 export const fetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
   const query = new URLSearchParams();
   if (params.event) query.set('event', params.event);
   query.set('limit', String(params.limit ?? 100));
   return apiGet<AuditPage>(`/api/heimdall/audit?${query.toString()}`);
 };
+
+export interface AboutInfo {
+  version: string;
+  commit: string;
+  buildDate: string;
+  uptimeSeconds: number;
+  node: string;
+  host: string;
+  profile: 'local' | 'cloud';
+}
+
+export const fetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>('/api/heimdall/about');
+
+export const fetchChangelog = (): Promise<{ content: string }> =>
+  apiGet<{ content: string }>('/api/heimdall/changelog');
+
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
+export const LOG_LEVELS: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
+
+export interface LogEntry {
+  time: number;
+  level: number;
+  levelLabel: string;
+  module: string | null;
+  msg: string;
+  extra?: Record<string, unknown>;
+}
+
+export interface LogsResponse {
+  level: LogLevel;
+  entries: LogEntry[];
+  modules: string[];
+}
+
+export const fetchLogs = (params: { lines?: number; level?: LogLevel; module?: string } = {}): Promise<LogsResponse> => {
+  const query = new URLSearchParams();
+  if (params.lines) query.set('lines', String(params.lines));
+  if (params.level) query.set('level', params.level);
+  if (params.module) query.set('module', params.module);
+  const qs = query.toString();
+  return apiGet<LogsResponse>(`/api/heimdall/logs${qs ? `?${qs}` : ''}`);
+};
+
+export const setLogLevel = (level: LogLevel): Promise<{ level: LogLevel }> =>
+  apiSend<{ level: LogLevel }>('PATCH', '/api/heimdall/logs/level', { level });
+
+/** URL for the admin-gated live log tail (EventSource). */
+export const LOGS_STREAM_URL = '/api/heimdall/logs/stream';

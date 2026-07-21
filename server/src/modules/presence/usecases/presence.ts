@@ -66,6 +66,43 @@ export class SyncPresenceUseCase {
   }
 }
 
+/** Devices unseen for longer than this are pruned on demand (PLAN-10). */
+export const STALE_DEVICE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * On-demand cleanup (triggered when a Wardens surface is opened): drop devices
+ * that have been offline and unseen for more than 7 days. Currently-connected
+ * devices are never pruned regardless of a stale lastSeen. Only the roster row
+ * is deleted — the device's audit/clipboard/runestone activity is untouched
+ * (those keep the raw deviceId and resolve to a "departed device" label).
+ */
+export class PruneStaleDevicesUseCase {
+  constructor(
+    private readonly repo: DeviceRepository,
+    private readonly connections: () => ConnectionInfo[],
+    private readonly build: BuildPresenceUseCase,
+    private readonly bus: EventBus,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  execute(): { removed: number; devices: PresenceDevice[] } {
+    const cutoff = this.now() - STALE_DEVICE_MS;
+    const online = new Set<string>();
+    for (const connection of this.connections()) {
+      if (connection.deviceId) online.add(connection.deviceId);
+    }
+    const stale = this.repo
+      .all()
+      .filter((device) => device.lastSeen < cutoff && !online.has(device.deviceId))
+      .map((device) => device.deviceId);
+
+    const removed = this.repo.remove(stale);
+    const devices = this.build.execute();
+    if (removed > 0) this.bus.emit('presence.changed', { devices });
+    return { removed, devices };
+  }
+}
+
 export class ClaimNameUseCase {
   constructor(
     private readonly repo: DeviceRepository,

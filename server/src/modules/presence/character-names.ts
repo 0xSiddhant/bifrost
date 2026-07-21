@@ -23,8 +23,17 @@ const MCU = [
   'Shuri', 'Wong', 'Valkyrie', 'Okoye', 'Mantis', 'Yondu',
 ];
 
-/** Deduplicated pool across the three universes. */
-export const CHARACTER_NAMES: readonly string[] = [...new Set([...POTTER, ...NORSE, ...MCU])];
+const GREEK = [
+  'Zeus', 'Hera', 'Poseidon', 'Athena', 'Apollo', 'Artemis', 'Ares', 'Aphrodite',
+  'Hermes', 'Hephaestus', 'Demeter', 'Dionysus', 'Hades', 'Persephone', 'Hestia',
+  'Heracles', 'Achilles', 'Odysseus', 'Perseus', 'Atlas', 'Prometheus', 'Helios',
+  'Pegasus', 'Chiron',
+];
+
+/** Deduplicated pool across the four universes. */
+export const CHARACTER_NAMES: readonly string[] = [
+  ...new Set([...POTTER, ...NORSE, ...MCU, ...GREEK]),
+];
 
 /**
  * Pick a name not already taken by another device. Falls back to a numbered

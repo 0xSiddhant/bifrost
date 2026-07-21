@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
 import { PortalCard } from '../../core/ui/Card';
-import { DownloadIcon, UploadIcon } from '../../core/ui/icons';
+import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
+import { ClipboardIcon, DownloadIcon, UploadIcon } from '../../core/ui/icons';
 
 export function MidgardPage() {
   return (
@@ -13,7 +13,7 @@ export function MidgardPage() {
         <p>Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.</p>
       </section>
 
-      <div className="portals">
+      <div className="portals portals--triple">
         <PortalCard
           to="/upload"
           tone="teal"
@@ -30,16 +30,21 @@ export function MidgardPage() {
           description="Everything shared from the host appears here, live — on every device at once."
           go="asgard → midgard"
         />
+        <PortalCard
+          to="/hermes"
+          tone="amber"
+          icon={<ClipboardIcon size={26} />}
+          title="Hermes"
+          description="A shared clipboard for the bridge — paste text on one device, read it on every other."
+          go="one board · every device"
+        />
       </div>
 
       <div className="rune-divider" aria-hidden="true">
         ᛒᛁᚠᚱᛟᛋᛏ
       </div>
 
-      <p className="midgard-links caption">
-        Also on the bridge: <Link to="/muninn">Muninn</Link> · <Link to="/wardens">Wardens</Link> ·{' '}
-        <Link to="/sigil">Sigil</Link>
-      </p>
+      <JoinBifrostCard />
     </>
   );
 }

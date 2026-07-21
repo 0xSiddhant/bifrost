@@ -1,0 +1,55 @@
+# Optional Grafana + Loki + Alloy stack. DETACHABLE by design — Bifrost never
+# depends on it. Logs are files first (storage/logs/), so this can be down for
+# weeks and Alloy backfills the whole log when it next starts.
+#
+# Works whether Bifrost runs native (PM2/launchd) or in Docker — Alloy just
+# tails ./storage/logs on the host.
+#
+#   docker compose -f docker-compose.observability.yml up -d
+#   open http://localhost:3000   (admin / bifrost — change it)
+
+services:
+  loki:
+    image: grafana/loki:3.1.1
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ./observability/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    ports:
+      - '3100:3100'
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.3.1
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ./observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./storage/logs:/var/log/bifrost:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: bifrost
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3000:3000'
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  alloy-data:
+  grafana-data:

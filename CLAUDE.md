@@ -20,3 +20,4 @@ All project knowledge lives in `.agent/`. Read it before writing any code.
 - After completing any task, update `.agent/memory/progress.md`. After making any non-trivial decision not covered by a plan, append it to `.agent/memory/decisions.md` with date and reasoning.
 - Never modify plan files without being asked. Ask the user when a plan is ambiguous instead of guessing.
 - Keep all storage paths, limits, and secrets in `.env` — never hardcode.
+- Project skills live in `.claude/skills/` (verify, release, context-sync, new-module, live-verify, db-migration). Prefer invoking them over ad-hoc procedures; run `verify` before every PR.

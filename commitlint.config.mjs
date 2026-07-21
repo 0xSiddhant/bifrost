@@ -18,11 +18,14 @@ export default {
         'qr-tool',
         'presence',
         'audit-log',
+        'runestone',
+        'variant',
         // core areas
         'core',
         'client',
         'ci',
         'docs',
+        'ops',
         'chore',
         // release commits (manual now, PLAN-09 automation later)
         'release',

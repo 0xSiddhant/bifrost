@@ -1,76 +1,34 @@
-import { useEffect, useState } from 'react';
-import { apiGet } from '../../core/api';
+import { useState } from 'react';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
-import { Input, Select } from '../../core/ui/Field';
+import { Input } from '../../core/ui/Field';
 import { QrCard } from '../../core/ui/QrCard';
 
 const QR_SIZES = { small: 160, medium: 240, large: 320 } as const;
 type QrSize = keyof typeof QR_SIZES;
 
+/**
+ * Sigil = the QR generator, a stall in Diagon Alley (the utility toolbox).
+ * "Join Bifrost" moved to Midgard during the nav reorg — getting a device onto
+ * the bridge is a home action, not a utility.
+ */
 export function SigilPage() {
-  const [serverUrls, setServerUrls] = useState<string[]>([]);
-  const [joinUrl, setJoinUrl] = useState('');
   const [text, setText] = useState('');
   const [size, setSize] = useState<QrSize>('medium');
-
-  useEffect(() => {
-    let disposed = false;
-    apiGet<{ urls: string[] }>('/api/qr/server-url')
-      .then(({ urls }) => {
-        if (disposed || urls.length === 0) return;
-        setServerUrls(urls);
-        // LAN IP first — Android can't resolve .local names.
-        setJoinUrl(urls[0] ?? '');
-      })
-      .catch(() => {
-        // Card falls back to the current address bar origin.
-        if (!disposed) setJoinUrl(window.location.origin);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
 
   return (
     <>
       <div className="page-head">
         <div>
           <span className="eyebrow">sigils · marks that carry meaning</span>
-          <h2>Sigil</h2>
-          <p>Get any device onto the bridge, or turn any text into a scannable code.</p>
+          <h2>Make a QR</h2>
+          <p>Turn any text or URL into a scannable code you can download.</p>
         </div>
       </div>
 
       <div className="grid-2">
         <Card>
           <div className="stack">
-            <h3>Join Bifrost</h3>
-            <QrCard text={joinUrl} label="QR code for the server address" />
-            {serverUrls.length > 1 && (
-              <Select
-                label="Address"
-                value={joinUrl}
-                onChange={(event) => setJoinUrl(event.target.value)}
-              >
-                {serverUrls.map((url) => (
-                  <option key={url} value={url}>
-                    {url}
-                  </option>
-                ))}
-              </Select>
-            )}
-            <p className="caption">
-              Scan from any phone on this Wi-Fi. Android tip: pick the IP address — no .local
-              lookup needed.
-            </p>
-            {joinUrl && <span className="mono caption">{joinUrl}</span>}
-          </div>
-        </Card>
-
-        <Card>
-          <div className="stack">
-            <h3>Make a QR</h3>
             <Input
               label="Text or URL"
               placeholder="https://…"

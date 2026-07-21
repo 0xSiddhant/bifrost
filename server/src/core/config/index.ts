@@ -21,6 +21,7 @@ const envSchema = z.object({
   CLIPBOARD_MAX_ENTRIES: z.coerce.number().int().positive().default(100),
   CLIPBOARD_MAX_TEXT_KB: z.coerce.number().int().positive().default(64),
   AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
+  RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -35,6 +36,8 @@ const envSchema = z.object({
     .optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   BACKUP_DIR: z.string().default(''),
+  // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
+  BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
 });
 
 export interface StoragePaths {
@@ -60,6 +63,9 @@ export interface AppConfig {
     maxTextBytes: number;
   };
   auditRetentionDays: number;
+  runestone: {
+    maxDocKb: number;
+  };
   themes: {
     dir: string;
     /**
@@ -79,6 +85,8 @@ export interface AppConfig {
   };
   logLevel: LogLevel;
   backupDir: string | null;
+  /** Rotation: keep only the newest N archives (0 = keep all). */
+  backupKeep: number;
 }
 
 export class ConfigError extends Error {
@@ -131,6 +139,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
       maxTextBytes: raw.CLIPBOARD_MAX_TEXT_KB * 1024,
     },
     auditRetentionDays: raw.AUDIT_RETENTION_DAYS,
+    runestone: {
+      maxDocKb: raw.RUNESTONE_MAX_DOC_KB,
+    },
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,
@@ -144,6 +155,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     logLevel: raw.LOG_LEVEL,
     backupDir: raw.BACKUP_DIR || null,
+    backupKeep: raw.BACKUP_KEEP,
   };
   return deepFreeze(config);
 }
@@ -168,6 +180,9 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
   'heimdall.tapCount': (config, value) => {
     const count = Number(value);
     if (Number.isInteger(count) && count >= 3 && count <= 20) config.heimdall.tapCount = count;
+  },
+  'log.level': (config, value) => {
+    if ((LOG_LEVELS as readonly string[]).includes(value)) config.logLevel = value as LogLevel;
   },
 };
 
