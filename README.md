@@ -37,9 +37,11 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 📤 Multi-file upload (streamed, 2 GB configurable limit) into a write-only folder
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
-- 📋 Muninn — clipboard/text sync across devices
+- 📋 Hermes — clipboard/text sync across devices
 - 🔳 Sigil — QR generator utility (+ scan-to-join QR for the server URL)
 - 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
+- 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL
+- ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start

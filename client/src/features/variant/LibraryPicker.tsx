@@ -12,7 +12,7 @@ import { EmptyState } from '../../core/ui/EmptyState';
 import { BracesIcon, SearchIcon } from '../../core/ui/icons';
 
 /**
- * Per-pane runestone picker (PLAN-08): load a saved document from Mímir into
+ * Per-pane runestone picker (PLAN-08): load a saved document from the Pensieve into
  * a compare pane. Read-only against the runestone API — saving stays on the
  * Runestone page.
  */
@@ -41,7 +41,7 @@ export function LibraryPicker({ open, side, onPick, onClose }: LibraryPickerProp
         if (!cancelled) setDocs(list);
       })
       .catch(() => {
-        if (!cancelled) setError('Could not reach Mímir — is the bridge up?');
+        if (!cancelled) setError('Could not reach the Pensieve — is the bridge up?');
       });
     const unsubscribe = onDevicesChange(() => setDevicesTick((tick) => tick + 1));
     return () => {

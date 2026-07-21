@@ -20,8 +20,8 @@ function authorDisplay(deviceId: string | null): string {
   return deviceName(deviceId) ?? 'departed device';
 }
 
-/** Mímir keeps the well of remembered knowledge — the saved-runestone library. */
-export function MimirPage() {
+/** The Pensieve holds remembered thoughts — the saved-runestone library. */
+export function PensievePage() {
   const navigate = useNavigate();
   const [rows, setRows] = useState<RunestoneSummary[] | null>(null);
   const [q, setQ] = useState('');
@@ -53,7 +53,7 @@ export function MimirPage() {
               }
             }
           })
-          .catch(() => setError('Could not reach the well.'));
+          .catch(() => setError('Could not reach the Pensieve.'));
       }, 200);
     };
   }, []);
@@ -94,9 +94,9 @@ export function MimirPage() {
     <>
       <div className="page-head">
         <div>
-          <span className="eyebrow eyebrow--violet">mímir&apos;s well · every stone remembered</span>
-          <h2>Mímir</h2>
-          <p>The well keeps every carved stone, from every device on the bridge.</p>
+          <span className="eyebrow eyebrow--violet">the pensieve · every stone remembered</span>
+          <h2>Pensieve</h2>
+          <p>The basin keeps every carved stone, from every device on the bridge.</p>
         </div>
         <div className="rune-head-actions">
           <Button onClick={() => void navigate('/runestone')}>Carve a new one</Button>
@@ -156,7 +156,7 @@ export function MimirPage() {
           )}
 
           {rows === null ? (
-            <p className="rune-tree-empty caption">Drawing from the well…</p>
+            <p className="rune-tree-empty caption">Surfacing memories…</p>
           ) : rows.length === 0 ? (
             <EmptyState
               icon={<BracesIcon size={28} />}

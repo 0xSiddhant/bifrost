@@ -18,7 +18,7 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 
 ## Client (`client/src/features/<name>/`)
 
-7. Feature slice with route-level code splitting; nav renders from `/api/capabilities`, never hardcoded. The client folder name may be a page codename that differs from the server module name (existing mappings: `clipboard`→`muninn`, `qr-tool`→`sigil`, `presence`→`wardens`) — record the mapping in architecture.md's module registry.
+7. Feature slice with route-level code splitting; nav renders from `/api/capabilities`, never hardcoded. The client folder name may be a page codename that differs from the server module name (existing mappings: `clipboard`→`hermes`, `qr-tool`→`sigil`, `presence`→`wardens`) — record the mapping in architecture.md's module registry.
 8. Styling via tokens only — zero hardcoded colors/sizes (grep for hex before finishing).
 9. Shared logic goes in `client/src/core/`, never imported across feature folders.
 

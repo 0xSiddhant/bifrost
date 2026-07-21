@@ -1,4 +1,4 @@
-// Pure link tokenizer for Muninn text entries. Splits a shared text into
+// Pure link tokenizer for Hermes text entries. Splits a shared text into
 // text/link tokens so the page can render tappable anchors without touching
 // the stored entry. Code-snippet entries never pass through this.
 

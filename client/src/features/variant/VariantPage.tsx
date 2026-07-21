@@ -61,9 +61,9 @@ function useDebounced<T>(value: T, delayMs: number): T {
 
 const startsMobile = () => window.innerWidth < 768;
 
-function fallbackMessage(side: InvalidSide): string {
-  if (side === 'both') return 'Neither side is valid JSON — comparing as text.';
-  return `The ${side} side isn't valid JSON — switched to Text mode.`;
+function invalidMessage(side: InvalidSide): string {
+  if (side === 'both') return 'Neither side is valid JSON.';
+  return `The ${side} side isn't valid JSON.`;
 }
 
 interface PaneState {
@@ -86,8 +86,9 @@ export function VariantPage() {
 
   const [mode, setMode] = useState<Mode>('json');
   // JSON and text mode are separate workspaces — content never carries over
-  // on a mode switch (owner requirement). The invalid-JSON fallback is the
-  // one deliberate exception: that Compare explicitly re-targets the docs.
+  // between them (owner requirement): a mode switch keeps each side's own
+  // buffers, and invalid JSON stays in the JSON workspace rather than being
+  // copied into the text panes.
   const [panes, setPanes] = useState<Record<Mode, { left: PaneState; right: PaneState }>>(() => ({
     json: { left: emptyPane('Original'), right: emptyPane('Modified') },
     text: { left: emptyPane('Original'), right: emptyPane('Modified') },
@@ -99,7 +100,6 @@ export function VariantPage() {
   const [textOptions, setTextOptions] = useState<VariantTextOptions>(DEFAULT_TEXT_OPTIONS);
   const [results, setResults] = useState<CompareResults | null>(null);
   const [textResult, setTextResult] = useState<TextCompareResult | null>(null);
-  const [fallback, setFallback] = useState<InvalidSide | null>(null);
   const [view, setView] = useState<'code' | 'tree'>('code');
   const [drawerOpen, setDrawerOpen] = useState(startsMobile);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -220,23 +220,15 @@ export function VariantPage() {
   const runCompare = (l = jsonLeftText, r = jsonRightText) => {
     const outcome = compareJson(l, r, jsonOptions);
     if (!outcome.ok) {
-      setFallback(outcome.invalid);
-      setMode('text');
+      // Invalid JSON stays in the JSON workspace — we flag which side is
+      // broken (pane status also shows the error count) and never touch the
+      // separate text workspace. The old auto-switch clobbered the user's
+      // text-mode content, so it's gone (owner).
       setResults(null);
-      // The Compare click still deserves a diff — copy the docs into the
-      // text workspace (the one deliberate cross-mode copy) and run there.
-      setPanes((prev) => ({
-        ...prev,
-        text: {
-          left: { ...prev.text.left, text: l, label: prev.json.left.label },
-          right: { ...prev.text.right, text: r, label: prev.json.right.label },
-        },
-      }));
-      runTextCompare(l, r);
+      fail(invalidMessage(outcome.invalid));
       return;
     }
     setResults({ records: outcome.records, left: l, right: r });
-    setFallback(null);
     setChangeCursor(-1);
     if (startsMobile()) setDrawerOpen(true);
   };
@@ -375,13 +367,6 @@ export function VariantPage() {
     if (next === mode) return;
     // Separate workspaces: each mode keeps its own buffers AND results.
     setMode(next);
-    setFallback(null);
-  };
-
-  const returnToJson = () => {
-    setMode('json');
-    setFallback(null);
-    if (bothValid) runCompare();
   };
 
   const swapPanes = () => {
@@ -439,7 +424,6 @@ export function VariantPage() {
     }));
     if (mode === 'json') setSearchParams({}, { replace: true });
     dropResults();
-    setFallback(null);
   };
 
   // ── import & library ──────────────────────────────────────────────────────
@@ -487,7 +471,7 @@ export function VariantPage() {
   // ── render helpers ────────────────────────────────────────────────────────
   const paneHeader = (side: Side, pane: PaneState) => (
     <div className="variant-pane__head">
-      {/* Display-only: imports and Mímir picks set it, users don't (owner). */}
+      {/* Display-only: imports and Pensieve picks set it, users don't (owner). */}
       <span className="variant-pane__label" title={pane.label}>
         {pane.label}
       </span>
@@ -498,7 +482,7 @@ export function VariantPage() {
         {/* Runestones are JSON documents — the picker has no business in text mode. */}
         {mode === 'json' && canPickFromLibrary && (
           <Button size="sm" variant="ghost" onClick={() => setPickerSide(side)}>
-            Mímir
+            Pensieve
           </Button>
         )}
       </div>
@@ -540,7 +524,7 @@ export function VariantPage() {
             value={pane.text}
             onChange={onPaneEdit(side)}
             height={EDITOR_HEIGHT}
-            placeholder="Paste, type, import — or load from Mímir…"
+            placeholder="Paste, type, import — or load from the Pensieve…"
             highlights={
               highlights ? (side === 'left' ? highlights.left : highlights.right) : undefined
             }
@@ -692,17 +676,6 @@ export function VariantPage() {
       </div>
 
       <div className="stack variant-stack">
-        {fallback && (
-          <Toast kind="info">
-            <span className="variant-fallback">
-              {fallbackMessage(fallback)}
-              <Button size="sm" onClick={returnToJson}>
-                Back to JSON
-              </Button>
-            </span>
-          </Toast>
-        )}
-
         {mode === 'json' ? (
           <div className="variant-grid">
             {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues)}

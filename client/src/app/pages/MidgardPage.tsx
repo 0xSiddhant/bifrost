@@ -37,7 +37,7 @@ export function MidgardPage() {
       </div>
 
       <p className="midgard-links caption">
-        Also on the bridge: <Link to="/muninn">Muninn</Link> · <Link to="/wardens">Wardens</Link> ·{' '}
+        Also on the bridge: <Link to="/hermes">Hermes</Link> · <Link to="/wardens">Wardens</Link> ·{' '}
         <Link to="/sigil">Sigil</Link>
       </p>
     </>
