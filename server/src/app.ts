@@ -151,7 +151,7 @@ function sweepTmp(tmpDir: string, log: Logger): void {
   if (entries.length > 0) log.info({ swept: entries.length }, 'tmp swept on boot');
 }
 
-async function main(): Promise<void> {
+export async function main(): Promise<void> {
   loadDotenv();
 
   let baseConfig: AppConfig;
@@ -200,6 +200,10 @@ async function main(): Promise<void> {
   process.once('SIGTERM', onSignal);
 }
 
+// Self-start only when this file IS the direct entry (e.g. `node dist/app.js`,
+// or tsx in tests). Process managers that wrap/import the entry — notably PM2's
+// fork mode — must use the dedicated bootstrap entry (server/src/bootstrap.ts),
+// which calls main() unconditionally.
 const isDirectRun =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isDirectRun) {

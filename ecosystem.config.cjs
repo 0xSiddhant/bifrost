@@ -12,7 +12,9 @@ module.exports = {
   apps: [
     {
       name: 'bifrost',
-      script: 'server/dist/app.js',
+      // bootstrap.js (not app.js) — app.js only self-starts as the direct entry,
+      // and PM2 fork mode wraps the script, so it would exit immediately.
+      script: 'server/dist/bootstrap.js',
       cwd: __dirname,
       // Single instance: SQLite (one writer) and mDNS are not cluster-safe.
       exec_mode: 'fork',
