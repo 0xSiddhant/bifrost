@@ -1,0 +1,102 @@
+name: Release
+
+# Fires when develop is merged into main. Computes the semver bump from the
+# conventional commits since the last tag, updates package versions + the
+# CHANGELOG, tags, publishes a GitHub Release with a build tarball, and
+# back-merges the bump into develop. See docs/releasing.md.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    # Loop guard: never react to the workflow's own release commit.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    steps:
+      - name: Checkout main (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Fine-grained PAT so pushes to protected main/develop go through
+          # (solo repo — less ceremony than an auto-PR). See docs/releasing.md.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Detect a releasable change
+        id: detect
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          RANGE=""
+          [ -n "$LAST_TAG" ] && RANGE="$LAST_TAG..HEAD"
+          if git log $RANGE --format='%s%n%b' | grep -qE '^(feat|fix)(\(.+\))?!?:|^BREAKING CHANGE|!:'; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No feat/fix/breaking commits since ${LAST_TAG:-repo start} — skipping."
+          fi
+
+      - name: Bump version + regenerate CHANGELOG
+        if: steps.detect.outputs.release == 'true'
+        run: |
+          # changelogen infers the bump (feat->minor, fix->patch, !/BREAKING
+          # ->major), writes package.json + CHANGELOG.md.
+          npx --yes changelogen@latest --bump
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          # Keep the workspaces in lockstep with the root version.
+          npm version "$VERSION" --no-git-tag-version --allow-same-version \
+            --workspaces --include-workspace-root=false
+
+      - name: Commit, tag, push
+        if: steps.detect.outputs.release == 'true'
+        run: |
+          git config user.name "bifrost-release[bot]"
+          git config user.email "release@users.noreply.github.com"
+          git add package.json package-lock.json CHANGELOG.md \
+            server/package.json client/package.json
+          git commit -m "chore(release): v${VERSION}"
+          git tag "v${VERSION}"
+          git push origin main --follow-tags
+
+      - name: Build release tarball
+        if: steps.detect.outputs.release == 'true'
+        run: |
+          npm run build
+          tar -czf "bifrost-v${VERSION}.tar.gz" \
+            server/dist client/dist server/drizzle \
+            package.json package-lock.json server/package.json client/package.json \
+            ecosystem.config.cjs .env.example
+
+      - name: Publish GitHub Release
+        if: steps.detect.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          # Notes = the section changelogen just prepended to CHANGELOG.md
+          # (everything from the first "## " header to the next one).
+          awk '/^## /{c++} c==1{print} c==2{exit}' CHANGELOG.md > RELEASE_NOTES.md
+          gh release create "v${VERSION}" "bifrost-v${VERSION}.tar.gz" \
+            --title "v${VERSION}" --notes-file RELEASE_NOTES.md
+
+      - name: Back-merge main into develop
+        if: steps.detect.outputs.release == 'true'
+        run: |
+          git fetch origin develop
+          git checkout develop
+          git merge --ff-only main
+          git push origin develop
