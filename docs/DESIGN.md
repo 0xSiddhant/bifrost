@@ -17,11 +17,20 @@ declared in `core/fonts.css` with `font-display: swap` and system fallbacks.
 
 ## Themes
 
+Four themes ship built in; users add more as JSON — see
+[THEME-SPEC.md](THEME-SPEC.md) for the schema and resolver.
+
 - **Aurora** (default, dark) — near-black blue-slate, aurora accents
   (teal `--accent`, violet `--accent-2`, green `--ok`) used sparingly.
 - **Daybreak** (light) — warm paper background, same hues desaturated.
+- **Ghibli Dusk** (dark) — Studio-Ghibli twilight: twilight-blue base,
+  lantern-gold accent, dusk-teal / meadow-green, horizon-glow sky.
+- **Olympus** (dark) — midnight-Aegean blue, gilded-gold accent, Aegean-cyan,
+  laurel-green, terracotta danger, a gold summit glow in `--sky`.
 
 Switching = one attribute: `<html data-theme="daybreak">`. Nothing else moves.
+A theme need only author ~14 colors — the resolver derives the rest, including
+the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
 
 ## Token reference (`core/tokens.css`)
 
@@ -46,18 +55,24 @@ Every page sits under `.sky`: layered aurora glows (`--sky`), a slow drifting
 aurora ribbon, and a faint starfield (dark theme only, via `--stars-alpha`).
 
 **Relics** are the fun layer: 6–9 random line-art artifacts scattered through
-the sky, re-shuffled on every route change and reload. Three collections live
-in `client/src/assets/relics/`:
+the sky, re-shuffled on every route change and reload. Four collections live
+in `client/src/assets/relics/` (shared primitives in `shared.tsx`, each
+collection registered in `index.ts`):
 
 | Collection | Count | Flavor |
 |---|---|---|
 | Norse artifacts (`norse.tsx`) | 20 | Mjölnir, valknut, Yggdrasil, Fenrir, runes… |
 | Wizarding world (`potter.tsx`) | 21 | snitch, hallows, floating candle, platform 9¾… |
-| Olympus (`greek.tsx`) | 14 | trident, lyre, laurel, labyrinth, Ω Δ Ψ… |
+| Olympus (`greek.tsx`) | 20 | trident, lyre, laurel, labyrinth, owl, Ω Δ Ψ… |
+| Ghibli world (`ghibli.tsx`) | 19 | soot sprites, forest spirit, 森 風 火 kanji… |
 
 Heimdall → **Sky relics** lets the owner enable/disable collections per
-device (default: all). It's a client-side visual preference stored like the
-theme choice; server-backed settings arrive in PLAN-05.
+device (default: all). It's a client-side visual preference (localStorage via
+`core/relicPrefs.ts`), independent of the server's DB-backed settings.
+
+> Not to be confused with two same-named-but-unrelated things: `core/relicNames.ts`
+> (the runestone *title* bank, e.g. "Gleaming Gungnir", mirroring `server/src/core/relics`)
+> and `assets/relics/` here (background *line art*).
 
 Rules that keep them tasteful:
 
