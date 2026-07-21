@@ -71,7 +71,12 @@ jobs:
             server/package.json client/package.json
           git commit -m "chore(release): v${VERSION}"
           git tag "v${VERSION}"
-          git push origin main --follow-tags
+          # Push the branch and the tag as separate refs. `--follow-tags` only
+          # pushes *annotated* tags, so the lightweight release tag was silently
+          # left behind (v1.1.0 shipped, but its tag never reached the remote and
+          # the Publish step failed). Explicit tag push works for any tag type.
+          git push origin main
+          git push origin "v${VERSION}"
 
       - name: Build release tarball
         if: steps.detect.outputs.release == 'true'
