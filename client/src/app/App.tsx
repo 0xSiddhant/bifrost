@@ -30,8 +30,8 @@ const DownloadsPage = lazy(() =>
 const PreviewModal = lazy(() =>
   import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
 );
-const MuninnPage = lazy(() =>
-  import('../features/muninn/MuninnPage').then((m) => ({ default: m.MuninnPage })),
+const HermesPage = lazy(() =>
+  import('../features/hermes/HermesPage').then((m) => ({ default: m.HermesPage })),
 );
 const SigilPage = lazy(() =>
   import('../features/sigil/SigilPage').then((m) => ({ default: m.SigilPage })),
@@ -45,8 +45,8 @@ const WardensPage = lazy(() =>
 const RunestonePage = lazy(() =>
   import('../features/runestone/RunestonePage').then((m) => ({ default: m.RunestonePage })),
 );
-const MimirPage = lazy(() =>
-  import('../features/runestone/MimirPage').then((m) => ({ default: m.MimirPage })),
+const PensievePage = lazy(() =>
+  import('../features/runestone/PensievePage').then((m) => ({ default: m.PensievePage })),
 );
 const VariantPage = lazy(() =>
   import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
@@ -62,7 +62,7 @@ const NAV = [
   { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, module: null },
   { to: '/upload', label: 'Send', icon: <UploadIcon size={18} />, module: 'file-transfer' },
   { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} />, module: 'file-transfer' },
-  { to: '/muninn', label: 'Muninn', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
+  { to: '/hermes', label: 'Hermes', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
   { to: '/runestone', label: 'Runestone', icon: <BracesIcon size={18} />, module: 'runestone' },
   { to: '/variant', label: 'Variant', icon: <DiffIcon size={18} />, module: 'variant' },
   { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} />, module: 'presence' },
@@ -127,12 +127,15 @@ export function App() {
               {/* Modal route: deep-linkable, back button closes the preview. */}
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
-            <Route path="/muninn" element={<MuninnPage />} />
+            <Route path="/hermes" element={<HermesPage />} />
+            {/* pre-rename URL (shipped as "muninn") */}
+            <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
             <Route path="/runestone" element={<RunestonePage />} />
             {/* literal segments beat the :slug param — declared first for clarity */}
-            <Route path="/runestone/mimir" element={<MimirPage />} />
-            {/* pre-rename URL (PLAN-07b shipped as "library") */}
-            <Route path="/runestone/library" element={<Navigate to="/runestone/mimir" replace />} />
+            <Route path="/runestone/pensieve" element={<PensievePage />} />
+            {/* pre-rename URLs (shipped as "library", then "mimir") */}
+            <Route path="/runestone/library" element={<Navigate to="/runestone/pensieve" replace />} />
+            <Route path="/runestone/mimir" element={<Navigate to="/runestone/pensieve" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/variant" element={<VariantPage />} />
             <Route path="/wardens" element={<WardensPage />} />

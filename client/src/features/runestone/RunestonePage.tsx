@@ -365,7 +365,7 @@ export function RunestonePage() {
           <div>
             <span className="eyebrow eyebrow--violet">the runes · carved to be read later</span>
             <h2>This runestone was never carved</h2>
-            <p>…or it has crumbled to dust. Mímir keeps no memory of “{slug}”.</p>
+            <p>…or it has crumbled to dust. The Pensieve keeps no memory of “{slug}”.</p>
           </div>
         </div>
         <Card>
@@ -375,8 +375,8 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/runestone/mimir')}>
-                Back to Mímir
+              <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+                Back to the Pensieve
               </Button>
             </div>
           </div>
@@ -403,10 +403,10 @@ export function RunestonePage() {
         </div>
         <div className="rune-head-actions">
           <Button onClick={() => void save()} disabled={!canSave}>
-            {saving ? 'Carving…' : docId === null ? 'Save to Mímir' : dirty ? 'Save' : 'Saved'}
+            {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/runestone/mimir')}>
-            Mímir
+          <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+            Pensieve
           </Button>
         </div>
       </div>
@@ -561,7 +561,7 @@ export function RunestonePage() {
               </span>
             )}
             {docId !== null && (
-              <span className="caption">{dirty ? 'Unsaved changes' : 'Kept in Mímir'}</span>
+              <span className="caption">{dirty ? 'Unsaved changes' : 'Kept in the Pensieve'}</span>
             )}
             {cursorPath && (
               <button

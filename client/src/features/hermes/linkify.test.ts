@@ -67,7 +67,7 @@ describe('linkify', () => {
   });
 
   it('does not linkify filenames or version strings as domains', () => {
-    expect(links(linkify('open MuninnPage.tsx and notes.md'))).toEqual([]);
+    expect(links(linkify('open HermesPage.tsx and notes.md'))).toEqual([]);
     expect(links(linkify('bump to v1.2.3'))).toEqual([]);
   });
 

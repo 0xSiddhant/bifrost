@@ -471,7 +471,7 @@ export function VariantPage() {
   // ── render helpers ────────────────────────────────────────────────────────
   const paneHeader = (side: Side, pane: PaneState) => (
     <div className="variant-pane__head">
-      {/* Display-only: imports and Mímir picks set it, users don't (owner). */}
+      {/* Display-only: imports and Pensieve picks set it, users don't (owner). */}
       <span className="variant-pane__label" title={pane.label}>
         {pane.label}
       </span>
@@ -482,7 +482,7 @@ export function VariantPage() {
         {/* Runestones are JSON documents — the picker has no business in text mode. */}
         {mode === 'json' && canPickFromLibrary && (
           <Button size="sm" variant="ghost" onClick={() => setPickerSide(side)}>
-            Mímir
+            Pensieve
           </Button>
         )}
       </div>
@@ -524,7 +524,7 @@ export function VariantPage() {
             value={pane.text}
             onChange={onPaneEdit(side)}
             height={EDITOR_HEIGHT}
-            placeholder="Paste, type, import — or load from Mímir…"
+            placeholder="Paste, type, import — or load from the Pensieve…"
             highlights={
               highlights ? (side === 'left' ? highlights.left : highlights.right) : undefined
             }
