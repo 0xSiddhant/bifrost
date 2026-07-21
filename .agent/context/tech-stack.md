@@ -12,7 +12,7 @@
 | Live updates | Server-Sent Events (one hub) | One-directional notifications; browser auto-reconnect; ~20 lines vs WS lifecycle management |
 | mDNS | bonjour-service | Advertise `bifrost.local`; Android fallback = LAN-IP QR code printed at boot + shown in Heimdall |
 | Config | dotenv + zod validation at boot | Fail fast on bad env; `.env` = defaults + secrets, DB `settings` table = runtime-mutable values (admin shortcut, etc.) |
-| Logging | pino → JSON file (`storage/logs/`) + pino-roll rotation; pino-pretty in dev | Structured lines per module/request; Grafana+Loki compose stack is an optional add-on (PLAN-09), not load-bearing |
+| Logging | pino → JSON file (`storage/logs/`) + pino-roll rotation; pino-pretty in dev | Structured lines per module/request; the optional observability stack tails these files |
 | Admin sessions | @fastify/secure-session (stateless secretbox cookie) + revocable session epoch in DB settings | No server-side session store to babysit; epoch bump = revoke-all that survives restart (see decisions 2026-07-15) |
 | Device labels | ua-parser-js (server-side) | Presence turns UAs into "iPhone · Safari" labels; character aliases layered on top (PLAN-06) |
 | Theme validation | ajv against a published JSON Schema | Users add themes as JSON; schema is the contract (THEME-SPEC.md) |
@@ -20,7 +20,10 @@
 | Lint/format | ESLint + eslint-plugin-boundaries + Prettier | Boundaries plugin mechanically enforces module isolation |
 | Commits | commitlint + husky, Conventional Commits | Owner's established discipline; scopes = module names |
 | Tests | Vitest (+ supertest via fastify.inject) | Fast, TS-native, same tool front+back |
-| Process manager | PM2 (prod on the Mac) | Auto-restart, boot startup, log mgmt; launchd documented as alternative |
-| Docker | Provided but NOT the run mode on macOS | mDNS multicast + FSEvents + Finder-native folders all break in the macOS Docker VM; Dockerfile exists for a future Linux host (`--network host`) |
+| Process manager (macOS run mode) | PM2 or launchd | Native run keeps mDNS/FSEvents working. Both crash-restart + start-on-boot; PM2 adds live monitoring, launchd needs no install. `ecosystem.config.cjs` + one-command `scripts/start-pm2.sh` / `start-launchd.sh`; runs `server/dist/bootstrap.js` (app.ts's direct-run guard doesn't fire under PM2's fork wrapper) — see docs/pm2.md, docs/launchd.md |
+| Docker (Linux target) | Multi-stage Dockerfile + compose | NOT the macOS run mode (mDNS/FSEvents/Finder break in the Docker VM). Ships for a future Linux host (`--network host`); CI builds it every PR to keep it honest — docs/docker-linux.md |
+| Observability (optional) | Grafana + Loki + Alloy (`docker-compose.observability.yml`) | Alloy tails `storage/logs/*.log` → Loki → Grafana; files-first so it's fully detachable and backfills. Works alongside any run mode — docs/observability.md |
+| Backup/restore | better-sqlite3 `VACUUM INTO` + `zip`/`unzip` | Online-safe DB snapshot (consistent under WAL) + archive of `storage/` + `themes/`; `core/backup` reused in-process by PLAN-10's button — docs/releasing.md for state boundaries |
+| Release automation | GitHub Actions (`release.yml`) + changelogen | On push to `main`: semver from conventional commits → bump + CHANGELOG → tag → GitHub Release + tarball → `main`→`develop` back-merge; needs a `RELEASE_TOKEN` PAT — docs/releasing.md |
 
-Deferred/optional: Postgres (cloud profile), Grafana+Loki+Alloy compose stack, PWA manifest.
+Deferred/optional: Postgres (cloud profile), PWA manifest.

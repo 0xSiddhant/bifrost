@@ -32,7 +32,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 
 ## Core services (shared kernel — no feature imports)
 
-`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus; carries per-connection metadata — deviceId/UA/IP — and an `onConnectionChange` subscription that presence consumes) · `auth` (`@fastify/secure-session` PIN sessions + revocable session epoch; decorates `app.requireAdmin`, which guards both Heimdall routes and theme write routes) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping).
+`config` (zod-validated .env, overlaid with DB-stored runtime settings) · `db` (better-sqlite3 + Drizzle, WAL mode) · `logger` (pino, JSON file + rotation, child logger per module) · `event bus` (typed in-process emitter) · `sse-hub` (one SSE endpoint, all modules publish through the bus; carries per-connection metadata — deviceId/UA/IP — and an `onConnectionChange` subscription that presence consumes) · `auth` (`@fastify/secure-session` PIN sessions + revocable session epoch; decorates `app.requireAdmin`, which guards both Heimdall routes and theme write routes) · `mdns` (Bonjour advertisement, local profile only) · `http` (Fastify instance, static serving, error mapping) · `backup` (`VACUUM INTO` a consistent DB snapshot + zip of `storage/` + `themes/`, online-safe; importable so PLAN-10's in-app button reuses it).
 
 ## Key data flows
 
@@ -48,7 +48,16 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 - Aborted uploads leave junk only in `storage/tmp/` — swept on boot.
 - Boot reconciliation: chokidar initial scan rebuilds the download listing; audit tables reconciled against the folder.
 - Drizzle migrations are idempotent and tracked in-DB.
+- Proven by `npm run test:resilience` (50 restarts + SIGKILL mid-write / mid-migration + tmp-sweep, all `integrity_check`ed).
 
 ## Storage layout
 
-`storage/{uploads,downloads,tmp,data,logs}` inside the repo, gitignored (`.gitkeep` committed). Paths configurable via `.env`. `storage/data/app.db` is the SQLite file.
+`storage/{uploads,downloads,tmp,data,logs}` inside the repo, gitignored (`.gitkeep` committed). Paths configurable via `.env`. `storage/data/app.db` is the SQLite file. `themes/` (user themes) is state outside `storage/`, so backups cover both.
+
+## Operations & running (PLAN-09)
+
+- **Production entry is `server/src/bootstrap.ts`**, not `app.ts`. `app.ts` self-starts only when it is the *direct* entry (`import.meta.url === argv[1]`); PM2's fork mode wraps the script so that guard never fires. `bootstrap.ts` calls `main()` unconditionally; `npm start`, PM2, launchd, and Docker all point at it. (`app.ts` keeps the guard so tests / the resilience suite can spawn it directly.)
+- **Run modes:** macOS runs **native** (PM2 or launchd — mDNS + FSEvents need it) via `ecosystem.config.cjs` / a launchd plist, with one-command `scripts/start-*.sh`. **Docker targets a future Linux host** (`--network host`); it is deliberately not the macOS run mode.
+- **Backup/restore:** `npm run backup` / `restore` wrap `core/backup` (online-safe snapshot, rotation, `--include-env` opt-in; restore refuses a live server).
+- **Observability (optional, detachable):** `docker-compose.observability.yml` runs Grafana + Loki + Alloy; Alloy tails `storage/logs/*.log`, so it works with any run mode and backfills after downtime.
+- **Releases are automated:** `.github/workflows/release.yml` on push to `main` computes the semver bump from conventional commits, tags, publishes a GitHub Release + tarball, and back-merges to `develop` (needs a `RELEASE_TOKEN` PAT).
