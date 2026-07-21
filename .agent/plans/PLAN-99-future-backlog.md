@@ -14,6 +14,13 @@ Ideas we deliberately deferred. When one is scheduled, promote it into a new num
 
 ## Tier B — valuable, larger
 
+| Idea                                  | Notes captured during planning                                                                                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Edda: Mermaid diagrams in preview** | Fenced ```mermaid blocks rendered client-side. Heavy dependency (~1 MB) — lazy-load only when a mermaid fence exists. Listed in Edda's coming-soon footer.                                        |
+| **Edda: paste-image upload**          | Paste/drop an image into the editor → stored server-side, markdown link inserted. Needs an image-storage story (folder, cleanup, size caps) — real scope, own design pass. Listed in coming-soon. |
+| **Edda: PDF export**                  | Print-stylesheet + browser print pipeline first; dedicated renderer only if that disappoints. Listed in coming-soon.                                                                              |
+| **Unified library shell**             | One library UI listing runestones + eddas with a type filter, over the separate per-module tables/APIs (storage stays uncoupled).                                                                 |
+
 | Idea                                                  | Notes                                                                                                                              |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **Variant: JSON Patch export (RFC 6902)**             | Structural diff records map ~1:1 onto patch ops; one button turns Variant into a pipeline tool. Cheap once the walker exists.      |

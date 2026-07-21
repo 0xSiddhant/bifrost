@@ -2,20 +2,21 @@
 
 Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see below). Each plan file follows the same format: goal → scope in/out → decisions & reasoning → task checklist → touched files → API contracts → acceptance criteria → test checklist.
 
-| # | Plan | Gate to start |
-|---|---|---|
-| ✅ 00 | [Foundation](completed/PLAN-00-foundation.md) — all tech setup, zero feature code | User says "start plan 0". **Special: commits directly to `main`, each push only after user's manual approval. Creates `develop` at the end.** |
-| ✅ 01 | [UI/UX foundation](completed/PLAN-01-uiux.md) — fonts, initial theme, design system, static pages | PLAN-00 done. **⛔ HARD GATE: user must explicitly approve the UI/UX before ANY plan below begins. Iterate until approved.** |
-| ✅ 02 | [File transfer](completed/PLAN-02-file-transfer.md) — upload flow, download flow, live folder watch | PLAN-01 approved |
-| ✅ 03 | [Previews + QR tool](completed/PLAN-03-previews-qr.md) | PLAN-02 merged |
-| ✅ 04 | [Theming engine](completed/PLAN-04-theming.md) (JSON themes) | PLAN-03 merged |
-| ✅ 05 | [Heimdall admin panel](completed/PLAN-05-heimdall.md) | PLAN-04 merged |
-| ✅ 06 | [Clipboard sync · device presence · audit log](completed/PLAN-06-sync-presence.md) | PLAN-05 merged |
-| ✅ 07 | [Runestone](completed/PLAN-07-runestone.md) — JSON viewer/editor (Part A) + saved library (Part B) | PLAN-06 merged. **Declared exception: two PRs** — `feat/plan-07a-runestone-editor`, then `feat/plan-07b-runestone-library` after A merges |
-| ✅ 08 | [Variant](completed/PLAN-08-variant.md) — JSON & text diff checker (shares PLAN-07's components) | PLAN-07 (both parts) merged |
-| 09 | Ops — PM2, backup, Docker (Linux future), optional Grafana stack *(renumbered from 07)* | PLAN-08 merged |
-| 10 | Heimdall Modal — settings-style overlay, route deletion, section expansion | PLAN-09 merged |
-| 99 | Future backlog | Reference only — pull items into new numbered plans when scheduled |
+| #     | Plan                                                                                                | Gate to start                                                                                                                                 |
+| ----- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| ✅ 00 | [Foundation](completed/PLAN-00-foundation.md) — all tech setup, zero feature code                   | User says "start plan 0". **Special: commits directly to `main`, each push only after user's manual approval. Creates `develop` at the end.** |
+| ✅ 01 | [UI/UX foundation](completed/PLAN-01-uiux.md) — fonts, initial theme, design system, static pages   | PLAN-00 done. **⛔ HARD GATE: user must explicitly approve the UI/UX before ANY plan below begins. Iterate until approved.**                  |
+| ✅ 02 | [File transfer](completed/PLAN-02-file-transfer.md) — upload flow, download flow, live folder watch | PLAN-01 approved                                                                                                                              |
+| ✅ 03 | [Previews + QR tool](completed/PLAN-03-previews-qr.md)                                              | PLAN-02 merged                                                                                                                                |
+| ✅ 04 | [Theming engine](completed/PLAN-04-theming.md) (JSON themes)                                        | PLAN-03 merged                                                                                                                                |
+| ✅ 05 | [Heimdall admin panel](completed/PLAN-05-heimdall.md)                                               | PLAN-04 merged                                                                                                                                |
+| ✅ 06 | [Clipboard sync · device presence · audit log](completed/PLAN-06-sync-presence.md)                  | PLAN-05 merged                                                                                                                                |
+| ✅ 07 | [Runestone](completed/PLAN-07-runestone.md) — JSON viewer/editor (Part A) + saved library (Part B)  | PLAN-06 merged. **Declared exception: two PRs** — `feat/plan-07a-runestone-editor`, then `feat/plan-07b-runestone-library` after A merges     |
+| ✅ 08 | [Variant](completed/PLAN-08-variant.md) — JSON & text diff checker (shares PLAN-07's components)    | PLAN-07 (both parts) merged                                                                                                                   |
+| 09    | Ops — PM2, backup, Docker (Linux future), optional Grafana stack _(renumbered from 07)_             | PLAN-08 merged                                                                                                                                |
+| 10    | Heimdall Modal — settings-style overlay, route deletion, section expansion                          | PLAN-09 merged                                                                                                                                |
+| 11    | Edda — markdown editor + live preview + library, public preview & raw API                           | PLAN-10 merged                                                                                                                                |
+| 99    | Future backlog                                                                                      | Reference only — pull items into new numbered plans when scheduled                                                                            |
 
 Completed plans live in `completed/` — they remain the spec of record and must be consulted when later plans reference them.
 
