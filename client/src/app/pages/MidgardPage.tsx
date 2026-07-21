@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { PortalCard } from '../../core/ui/Card';
-import { DownloadIcon, UploadIcon } from '../../core/ui/icons';
+import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
+import { ClipboardIcon, DownloadIcon, UploadIcon } from '../../core/ui/icons';
 
 export function MidgardPage() {
   return (
@@ -36,10 +37,19 @@ export function MidgardPage() {
         ᛒᛁᚠᚱᛟᛋᛏ
       </div>
 
-      <p className="midgard-links caption">
-        Also on the bridge: <Link to="/hermes">Hermes</Link> · <Link to="/wardens">Wardens</Link> ·{' '}
-        <Link to="/sigil">Sigil</Link>
-      </p>
+      <div className="grid-2">
+        <Link to="/hermes" className="hub-card">
+          <span className="hub-card__icon">
+            <ClipboardIcon size={22} />
+          </span>
+          <span className="hub-card__title">Hermes</span>
+          <span className="hub-card__desc">
+            A shared clipboard for the bridge — paste text or snippets on one device, read them on
+            every other.
+          </span>
+        </Link>
+        <JoinBifrostCard />
+      </div>
     </>
   );
 }
