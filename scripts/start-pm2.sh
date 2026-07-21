@@ -15,7 +15,7 @@ command -v npm  >/dev/null 2>&1 || { echo "✖ npm not found"; exit 1; }
 
 # 2. dependencies
 if [ ! -d node_modules ]; then
-  echo "▶ installing dependencies…"
+  echo "▶ installing dependencies..."
   npm install
 fi
 
@@ -31,17 +31,17 @@ if [ "${#PIN}" -lt 4 ]; then
 fi
 
 # 4. storage + migrations, then build
-echo "▶ setup (folders + migrations)…"
+echo "▶ setup (folders + migrations)..."
 npm run setup
-echo "▶ build…"
+echo "▶ build..."
 npm run build
 
 # 5. pm2
 if ! command -v pm2 >/dev/null 2>&1; then
-  echo "▶ installing pm2 globally…"
+  echo "▶ installing pm2 globally..."
   npm install -g pm2 || { echo "✖ 'npm install -g pm2' failed — try: sudo npm install -g pm2"; exit 1; }
 fi
-echo "▶ starting under pm2…"
+echo "▶ starting under pm2..."
 pm2 startOrRestart ecosystem.config.cjs
 pm2 save >/dev/null 2>&1 || true
 

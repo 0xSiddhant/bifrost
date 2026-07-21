@@ -17,7 +17,7 @@ NODE_BIN="$(command -v node)"
 
 # 2. dependencies
 if [ ! -d node_modules ]; then
-  echo "▶ installing dependencies…"
+  echo "▶ installing dependencies..."
   npm install
 fi
 
@@ -33,13 +33,13 @@ if [ "${#PIN}" -lt 4 ]; then
 fi
 
 # 4. setup + build
-echo "▶ setup (folders + migrations)…"
+echo "▶ setup (folders + migrations)..."
 npm run setup
-echo "▶ build…"
+echo "▶ build..."
 npm run build
 
 # 5. write the plist (node path + repo path filled in for you)
-echo "▶ writing $PLIST…"
+echo "▶ writing $PLIST..."
 mkdir -p "$HOME/Library/LaunchAgents"
 cat > "$PLIST" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,7 +75,7 @@ cat > "$PLIST" <<PLISTEOF
 PLISTEOF
 
 # 6. (re)load the service
-echo "▶ (re)loading service…"
+echo "▶ (re)loading service..."
 launchctl unload "$PLIST" 2>/dev/null || true
 launchctl load "$PLIST"
 

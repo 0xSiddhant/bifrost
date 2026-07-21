@@ -39,7 +39,7 @@ case "$CMD" in
     echo "✔ observability stack stopped."
     ;;
   up)
-    echo "▶ starting Grafana + Loki + Alloy…"
+    echo "▶ starting Grafana + Loki + Alloy..."
     $DC -f "$COMPOSE_FILE" up -d
     echo ""
     echo "✔ observability stack is up."
