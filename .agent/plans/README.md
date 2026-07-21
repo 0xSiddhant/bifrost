@@ -11,8 +11,8 @@ Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see
 | ✅ 04 | [Theming engine](completed/PLAN-04-theming.md) (JSON themes) | PLAN-03 merged |
 | ✅ 05 | [Heimdall admin panel](completed/PLAN-05-heimdall.md) | PLAN-04 merged |
 | ✅ 06 | [Clipboard sync · device presence · audit log](completed/PLAN-06-sync-presence.md) | PLAN-05 merged |
-| 07 | Runestone — JSON viewer/editor (Part A) + saved library (Part B) | PLAN-06 merged. **Declared exception: two PRs** — `feat/plan-07a-runestone-editor`, then `feat/plan-07b-runestone-library` after A merges |
-| 08 | Variant — JSON & text diff checker (shares PLAN-07's components) | PLAN-07 (both parts) merged |
+| ✅ 07 | [Runestone](completed/PLAN-07-runestone.md) — JSON viewer/editor (Part A) + saved library (Part B) | PLAN-06 merged. **Declared exception: two PRs** — `feat/plan-07a-runestone-editor`, then `feat/plan-07b-runestone-library` after A merges |
+| ✅ 08 | [Variant](completed/PLAN-08-variant.md) — JSON & text diff checker (shares PLAN-07's components) | PLAN-07 (both parts) merged |
 | 09 | Ops — PM2, backup, Docker (Linux future), optional Grafana stack *(renumbered from 07)* | PLAN-08 merged |
 | 10 | Heimdall Modal — settings-style overlay, route deletion, section expansion | PLAN-09 merged |
 | 99 | Future backlog | Reference only — pull items into new numbered plans when scheduled |
