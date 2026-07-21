@@ -9,8 +9,8 @@ import {
 } from './compare';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
 
-describe('compareJson fallback behavior', () => {
-  it('reports which side is invalid (drives the text-mode fallback banner)', () => {
+describe('compareJson invalid-side reporting', () => {
+  it('reports which side is invalid (drives the JSON-mode warning notice)', () => {
     expect(compareJson('{ broken', '{}', DEFAULT_JSON_OPTIONS)).toEqual({
       ok: false,
       invalid: 'left',
