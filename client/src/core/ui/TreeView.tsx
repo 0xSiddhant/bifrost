@@ -5,7 +5,9 @@ import { ChevronRightIcon } from './icons';
 /**
  * Read-only explorer for a parsed JSON document (PLAN-07): collapsible nodes,
  * type badges, item counts. Tapping a key copies its JSON path — editing
- * happens in code mode only.
+ * happens in code mode only. Expand all / Collapse all fold or unfold the whole
+ * tree (incl. the outermost array/object) in one action; per-node toggles still
+ * work between bulk actions.
  */
 
 interface TreeViewProps {
@@ -14,6 +16,15 @@ interface TreeViewProps {
 }
 
 const MAX_STRING_PREVIEW = 160;
+
+/** How a node decides its initial open state at mount (bulk actions remount). */
+type OpenMode = 'auto' | 'all' | 'none';
+
+function defaultOpen(mode: OpenMode, depth: number): boolean {
+  if (mode === 'all') return true;
+  if (mode === 'none') return false;
+  return depth < 2;
+}
 
 type Kind = 'object' | 'array' | 'string' | 'number' | 'boolean' | 'null';
 
@@ -45,13 +56,16 @@ interface TreeNodeProps {
   value: unknown;
   path: (string | number)[];
   depth: number;
+  openMode: OpenMode;
   onCopyPath: (path: string) => void;
 }
 
-function TreeNode({ name, value, path, depth, onCopyPath }: TreeNodeProps) {
+function TreeNode({ name, value, path, depth, openMode, onCopyPath }: TreeNodeProps) {
   const kind = kindOf(value);
   const container = kind === 'object' || kind === 'array';
-  const [open, setOpen] = useState(depth < 2);
+  // Initialised once per mount; a bulk action bumps the tree key to remount,
+  // which re-reads openMode here (and for every descendant).
+  const [open, setOpen] = useState(() => defaultOpen(openMode, depth));
 
   const keyButton = (
     <button
@@ -105,6 +119,7 @@ function TreeNode({ name, value, path, depth, onCopyPath }: TreeNodeProps) {
             value={child}
             path={[...path, childName]}
             depth={depth + 1}
+            openMode={openMode}
             onCopyPath={onCopyPath}
           />
         ))}
@@ -113,9 +128,35 @@ function TreeNode({ name, value, path, depth, onCopyPath }: TreeNodeProps) {
 }
 
 export function TreeView({ value, onCopyPath }: TreeViewProps) {
+  const [openMode, setOpenMode] = useState<OpenMode>('auto');
+  // Bumped on every bulk action so the node subtree remounts and every node
+  // re-initialises its open state from the new mode — no per-node effects.
+  const [gen, setGen] = useState(0);
+
+  const setAll = (mode: OpenMode) => {
+    setOpenMode(mode);
+    setGen((current) => current + 1);
+  };
+
   return (
     <div className="rune-tree" role="tree">
-      <TreeNode name={null} value={value} path={[]} depth={0} onCopyPath={onCopyPath} />
+      <div className="rune-tree__controls">
+        <button type="button" className="rune-tree__ctl" onClick={() => setAll('all')}>
+          Expand all
+        </button>
+        <button type="button" className="rune-tree__ctl" onClick={() => setAll('none')}>
+          Collapse all
+        </button>
+      </div>
+      <TreeNode
+        key={gen}
+        name={null}
+        value={value}
+        path={[]}
+        depth={0}
+        openMode={openMode}
+        onCopyPath={onCopyPath}
+      />
     </div>
   );
 }
