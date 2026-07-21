@@ -16,7 +16,7 @@
 | Admin sessions | @fastify/secure-session (stateless secretbox cookie) + revocable session epoch in DB settings | No server-side session store to babysit; epoch bump = revoke-all that survives restart (see decisions 2026-07-15) |
 | Device labels | ua-parser-js (server-side) | Presence turns UAs into "iPhone · Safari" labels; character aliases layered on top (PLAN-06) |
 | Theme validation | ajv against a published JSON Schema | Users add themes as JSON; schema is the contract (THEME-SPEC.md) |
-| JSON editor & tooling (client) | CodeMirror 6 (`@codemirror/*`, incl. `merge` for diff chunking) + jsonc-parser | Runestone/Variant need a real code editor (lint, fold, highlight, auto-close); jsonc-parser gives token-preserving format/minify that keeps > 2^53 precision. Shared `core/ui/JsonEditor` mounts in both features (PLAN-07/08) |
+| JSON editor & tooling (client) | CodeMirror 6 (`@codemirror/*`, incl. `merge` for diff chunking and `search` for in-editor find) + jsonc-parser | Runestone/Variant need a real code editor (lint, fold, highlight, auto-close, find); jsonc-parser gives token-preserving format/minify that keeps > 2^53 precision. Shared `core/ui/JsonEditor` mounts in both features (PLAN-07/08); its find + Variant cross-pane reveal is shared so Edda (PLAN-11) inherits it |
 | Lint/format | ESLint + eslint-plugin-boundaries + Prettier | Boundaries plugin mechanically enforces module isolation |
 | Commits | commitlint + husky, Conventional Commits | Owner's established discipline; scopes = module names |
 | Tests | Vitest (+ supertest via fastify.inject) | Fast, TS-native, same tool front+back |

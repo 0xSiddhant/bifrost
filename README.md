@@ -14,7 +14,7 @@
 ![Platform](https://img.shields.io/badge/network-mDNS%20%2F%20intranet%20only-8A2BE2)
 
 <!-- TODO: add demo video when the features land (PLAN-02+) -->
-<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the two portals" width="720" />
+<img src="docs/assets/screenshot-home.png" alt="Bifrost home — Aurora theme, the three transfer portals" width="720" />
 
 <img src="docs/assets/screenshot-receive.png" alt="Receive files — live download list with per-type icons" width="720" />
 
@@ -38,13 +38,15 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Hermes — clipboard/text sync across devices
-- 🔳 Sigil — QR generator utility (+ scan-to-join QR for the server URL)
+- 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
 - 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
-- 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL
-- ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback
+- 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
+- ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
+
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda soon), and **Diagon Alley** (Sigil + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 

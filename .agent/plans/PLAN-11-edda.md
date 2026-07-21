@@ -71,7 +71,7 @@ Starts after PLAN-10 is merged (normal numeric order). Reuse dependencies all ex
 - [ ] Save/dirty/rename flow, library page (search/author/sort/SSE refresh/delete), creative 404 with "Write it now", scratch draft + restore
 - [ ] `/edda/preview/:slug` rendered page; mobile default-preview behavior for `/edda/:slug`
 - [ ] Export `.md` + self-contained `.html`; coming-soon footer section
-- [ ] Nav entry via capabilities
+- [ ] Nav entry via capabilities — Edda lives under the **Ollivanders** category hub (a coming-soon card is already placed there by the 2026-07-21 nav reorg; wire it to the live route + capability on ship)
 
 ## Acceptance criteria
 

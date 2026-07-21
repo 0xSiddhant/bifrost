@@ -6,7 +6,7 @@ One Node/Fastify process serves the static frontend, REST API, and SSE stream on
 
 1. **Vertical slices.** Code is organized feature-first: `src/modules/<feature>/` contains that feature's routes, usecases, services, and DB schema. Shared infrastructure lives in `src/core/` only.
 2. **Modules never import each other. Only `core`.** Cross-feature communication goes through the core **event bus** (e.g. `bus.emit('file.uploaded', meta)`). Enforced by `eslint-plugin-boundaries` — a violating import is a build failure, not a style nit.
-3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall, runestone, variant — see `MANIFEST` in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles.
+3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall, runestone, variant — see `MANIFEST` in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles. The nav groups pages into **three category hub tabs** (Midgard = transfer, Ollivanders = dev tools, Diagon Alley = utilities); each tool keeps its own route and is surfaced as a card on its hub, and a category tab shows only when one of its modules is in the capabilities list.
 
 ## Layers inside every module
 

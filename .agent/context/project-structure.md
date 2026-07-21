@@ -41,11 +41,13 @@ bifrost/
 │               └── schema.ts  # Drizzle tables owned by this module
 ├── client/
 │   └── src/
-│       ├── app/               # shell, router, capabilities-driven nav
+│       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
+│       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
 │       ├── core/              # api/sse clients, theme engine, device registry, tokens,
-│       │                      #   + shared JSON stack: json/ (parse/format/diff), ui/JsonEditor,
-│       │                      #   ui/TreeView, textNormalize, runestone client, relicNames name-bank
+│       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
+│       │                      #   JsonEditor +in-editor search, TreeView +bulk collapse), json/ (parse/format/diff),
+│       │                      #   textNormalize, runestone client, relicNames name-bank
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
