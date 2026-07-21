@@ -21,6 +21,7 @@
     "logs": "tail -f storage/logs/app.log | pino-pretty",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
+    "test:resilience": "tsx scripts/resilience.ts",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
