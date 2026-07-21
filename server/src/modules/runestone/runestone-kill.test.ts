@@ -63,19 +63,34 @@ describe('runestone save-burst kill test', () => {
     child = first.child;
     await waitForHealth(15_000);
 
-    // Fire a burst of saves and SIGINT partway through.
     const acknowledged: Array<{ id: string; slug: string; name: string }> = [];
+    const save = (index: number): Promise<Response> =>
+      fetch(`${BASE}/api/runestone`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-bifrost-device': 'kill-device' },
+        body: JSON.stringify({
+          name: `Burst Doc ${index}`,
+          content: JSON.stringify({ index, pad: 'x'.repeat(2000) }),
+        }),
+      });
+
+    // Phase 1 — commit a handful of saves that MUST be acknowledged before any
+    // kill. This anchors the crash-survival assertion deterministically: the
+    // mid-burst SIGINT below races every in-flight request, and on a slow or
+    // contended CI runner it can beat all of them (0 acks → flaky failure).
+    for (let index = 0; index < 8; index += 1) {
+      const response = await save(index);
+      expect(response.status).toBe(201);
+      acknowledged.push((await response.json()) as { id: string; slug: string; name: string });
+    }
+
+    // Phase 2 — fire a burst and SIGINT partway. Whatever the server still
+    // acknowledges (201) must also survive the crash; whatever it does not must
+    // be absent afterwards, never half-written.
     const results = await Promise.allSettled(
-      Array.from({ length: 40 }, async (_unused, index) => {
-        if (index === 12) first.child.kill('SIGINT');
-        const response = await fetch(`${BASE}/api/runestone`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-bifrost-device': 'kill-device' },
-          body: JSON.stringify({
-            name: `Burst Doc ${index}`,
-            content: JSON.stringify({ index, pad: 'x'.repeat(2000) }),
-          }),
-        });
+      Array.from({ length: 40 }, async (_unused, offset) => {
+        if (offset === 12) first.child.kill('SIGINT');
+        const response = await save(8 + offset);
         if (response.status === 201) {
           acknowledged.push((await response.json()) as { id: string; slug: string; name: string });
         }
