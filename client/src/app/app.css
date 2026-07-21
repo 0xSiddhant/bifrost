@@ -363,6 +363,91 @@
   text-align: center;
 }
 
+/* ── category hub pages (Ollivanders / Diagon Alley + Midgard extras) ── */
+.hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+.hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    border-color var(--dur-1) var(--ease),
+    background var(--dur-1) var(--ease),
+    transform var(--dur-1) var(--ease);
+}
+
+a.hub-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.hub-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.hub-card__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.hub-card__desc {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.hub-card__badge {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 1px var(--space-2);
+  white-space: nowrap;
+}
+
+.hub-card--soon {
+  opacity: 0.62;
+  cursor: default;
+}
+
+.hub-card--soon .hub-card__icon {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.hub-soon-note {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
 /* ── upload dropzone ────────────────────────────────────────── */
 .dropzone {
   display: flex;
@@ -1559,19 +1644,25 @@
     gap: var(--space-1);
     font-size: var(--text-xs);
     padding: var(--space-1) var(--space-1);
-    /* eight entries share the row (Runestone joined in PLAN-07, Variant in
-       PLAN-08) — every item must shrink instead of pushing the last ones
-       off-screen */
+    /* three category tabs share the row — each flexes so a long label never
+       pushes the others off-screen */
     flex: 1;
     min-width: 0;
     align-items: center;
   }
 
+  /* Labels wrap to two lines (long ones like "Diagon Alley"), then ellipsis. */
   .nav--bottom .nav__item span {
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.15;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .shell-footer {

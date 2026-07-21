@@ -1,22 +1,15 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { Navigate, NavLink, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
-import {
-  BracesIcon,
-  ClipboardIcon,
-  DiffIcon,
-  DownloadIcon,
-  FolderIcon,
-  QrIcon,
-  UploadIcon,
-  WifiOffIcon,
-} from '../core/ui/icons';
+import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
+import { OllivandersPage } from './pages/OllivandersPage';
+import { DiagonAlleyPage } from './pages/DiagonAlleyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 // Route-level code splitting: cloud builds never ship local-only pages.
@@ -52,21 +45,39 @@ const VariantPage = lazy(() =>
 );
 
 /**
- * Nav renders from /api/capabilities: an entry appears only when its module is
- * loaded in the active deploy profile (until capabilities arrive, all entries
- * show to avoid a layout pop on the common local profile).
- * Heimdall is deliberately absent — it opens via gesture/shortcut only.
+ * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
+ * Each tab is a hub page whose tools live as cards there and keep their own
+ * routes: Midgard (Send/Receive/Hermes/Join Bifrost), Ollivanders (Runestone/
+ * Variant/Edda), Diagon Alley (the QR tool + the coming-soon toolbox). A tab
+ * appears only when at least one of its modules is loaded in the active deploy
+ * profile. Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
-const NAV = [
-  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, module: null },
-  { to: '/upload', label: 'Send', icon: <UploadIcon size={18} />, module: 'file-transfer' },
-  { to: '/downloads', label: 'Receive', icon: <DownloadIcon size={18} />, module: 'file-transfer' },
-  { to: '/hermes', label: 'Hermes', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
-  { to: '/runestone', label: 'Runestone', icon: <BracesIcon size={18} />, module: 'runestone' },
-  { to: '/variant', label: 'Variant', icon: <DiffIcon size={18} />, module: 'variant' },
-  // Wardens is not a top-nav page — the device roster lives in Heimdall's
-  // Wardens section. The /wardens route stays reachable for existing links.
-  { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} />, module: 'qr-tool' },
+interface NavCategory {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  /** Sub-page path prefixes that also light this tab as active. */
+  match?: string[];
+  /** Tab shows when any of these modules is available (null = always). */
+  modules: (string | null)[];
+}
+
+const NAV: NavCategory[] = [
+  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, modules: [null] },
+  {
+    to: '/ollivanders',
+    label: 'Ollivanders',
+    icon: <WandIcon size={18} />,
+    match: ['/runestone', '/variant', '/edda'],
+    modules: ['runestone', 'variant'],
+  },
+  {
+    to: '/diagon-alley',
+    label: 'Diagon Alley',
+    icon: <SparklesIcon size={18} />,
+    match: ['/sigil'],
+    modules: ['qr-tool'],
+  },
 ];
 
 export function App() {
@@ -74,10 +85,30 @@ export function App() {
   const [heimdallOpen, setHeimdallOpen] = useState(false);
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
-  const nav = NAV.filter(
-    (item) =>
-      item.module === null || !capabilities || capabilities.modules.includes(item.module),
+  const { pathname } = useLocation();
+  const nav = NAV.filter((category) =>
+    category.modules.some(
+      (module) => module === null || !capabilities || capabilities.modules.includes(module),
+    ),
   );
+  // A category tab is active on its own page and on any of its tools' pages.
+  const isActive = (category: NavCategory) => {
+    if (category.to === '/') return pathname === '/';
+    const paths = [category.to, ...(category.match ?? [])];
+    return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  };
+  const navItems = () =>
+    nav.map((category) => (
+      <Link
+        key={category.to}
+        to={category.to}
+        className={isActive(category) ? 'nav__item active' : 'nav__item'}
+        aria-current={isActive(category) ? 'page' : undefined}
+      >
+        {category.icon}
+        <span>{category.label}</span>
+      </Link>
+    ));
 
   useEffect(() => {
     const unsubscribe = bifrostEvents.onStatus(setSseStatus);
@@ -104,12 +135,7 @@ export function App() {
           Bifrost
         </NavLink>
         <nav className="nav nav--top" aria-label="Main">
-          {nav.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
-              {item.icon}
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {navItems()}
         </nav>
         <ThemeSwitcher />
       </header>
@@ -125,6 +151,9 @@ export function App() {
         <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
           <Routes>
             <Route path="/" element={<MidgardPage />} />
+            {/* Category hubs — the tools they list keep their own routes below. */}
+            <Route path="/ollivanders" element={<OllivandersPage />} />
+            <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/downloads" element={<DownloadsPage />}>
               {/* Modal route: deep-linkable, back button closes the preview. */}
@@ -157,12 +186,7 @@ export function App() {
       )}
 
       <nav className="nav nav--bottom" aria-label="Main">
-        {nav.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav__item">
-            {item.icon}
-            <span>{item.label}</span>
-          </NavLink>
-        ))}
+        {navItems()}
       </nav>
 
       <footer className="shell-footer">
