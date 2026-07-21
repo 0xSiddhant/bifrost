@@ -113,6 +113,33 @@
     var(--surface);
 }
 
+.portal-card--amber {
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--tone-amber-soft), transparent 55%),
+    var(--card-sheen),
+    var(--surface);
+}
+
+.portal-card--amber:hover {
+  border-color: var(--tone-amber);
+  box-shadow:
+    var(--shadow-2),
+    var(--glow-amber);
+}
+
+.portal-card--amber .portal-card__icon {
+  background: var(--tone-amber-soft);
+  color: var(--tone-amber);
+}
+
+.portal-card--amber:hover .portal-card__icon {
+  box-shadow: var(--glow-amber);
+}
+
+.portal-card--amber .portal-card__go {
+  color: var(--tone-amber);
+}
+
 .portal-card::after {
   content: '';
   position: absolute;

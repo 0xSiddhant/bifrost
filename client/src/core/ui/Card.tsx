@@ -11,11 +11,11 @@ interface PortalCardProps {
   title: string;
   description: string;
   /** Each portal is lit by its own aurora tone. */
-  tone: 'teal' | 'violet';
+  tone: 'teal' | 'violet' | 'amber';
   go?: string;
 }
 
-/** The two big doors on Home: Upload / Download. */
+/** The transfer doors on Home: Send / Receive / Hermes. */
 export function PortalCard({ to, icon, title, description, tone, go }: PortalCardProps) {
   return (
     <Link to={to} className={`portal-card portal-card--${tone}`}>

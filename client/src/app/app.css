@@ -358,6 +358,64 @@
   gap: var(--space-6);
 }
 
+/* Three transfer doors (Send / Receive / Hermes) — equal-height by nature. */
+.portals--triple {
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-4);
+}
+
+/* Wide onboarding band: the QR sits beside its details instead of stacking a
+   tall card next to a short one. Accent-lit so it reads as a highlight. */
+.join-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-8);
+  align-items: center;
+  padding: var(--space-6) var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(90% 130% at 100% 0%, var(--tone-teal-soft), transparent 60%),
+    var(--card-sheen),
+    var(--surface);
+}
+
+.join-card__qr {
+  display: grid;
+  place-items: center;
+}
+
+.join-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.join-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  margin: 0;
+}
+
+.join-card__url {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .join-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    padding: var(--space-6);
+  }
+
+  .join-card__body {
+    align-items: center;
+  }
+}
+
 .midgard-links {
   margin-top: var(--space-6);
   text-align: center;
@@ -371,25 +429,72 @@
 }
 
 .hub-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background:
+    var(--card-sheen),
+    var(--surface);
   color: var(--text);
+  overflow: hidden;
   transition:
-    border-color var(--dur-1) var(--ease),
-    background var(--dur-1) var(--ease),
-    transform var(--dur-1) var(--ease);
+    border-color var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease);
+}
+
+/* Each card is lit by its own tone — the same gradient language as the Home
+   portals, carried across every category hub. */
+.hub-card--teal {
+  background:
+    radial-gradient(120% 90% at 0% 0%, var(--tone-teal-soft), transparent 55%),
+    var(--card-sheen),
+    var(--surface);
+}
+
+.hub-card--violet {
+  background:
+    radial-gradient(120% 90% at 100% 0%, var(--tone-violet-soft), transparent 55%),
+    var(--card-sheen),
+    var(--surface);
+}
+
+.hub-card--amber {
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--tone-amber-soft), transparent 55%),
+    var(--card-sheen),
+    var(--surface);
 }
 
 a.hub-card:hover {
-  border-color: var(--accent);
-  background: var(--surface-2);
   text-decoration: none;
-  transform: translateY(-2px);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-2);
+}
+
+a.hub-card--teal:hover {
+  border-color: var(--tone-teal);
+  box-shadow:
+    var(--shadow-2),
+    var(--glow-teal);
+}
+
+a.hub-card--violet:hover {
+  border-color: var(--tone-violet);
+  box-shadow:
+    var(--shadow-2),
+    var(--glow-violet);
+}
+
+a.hub-card--amber:hover {
+  border-color: var(--tone-amber);
+  box-shadow:
+    var(--shadow-2),
+    var(--glow-amber);
 }
 
 .hub-card__icon {
@@ -401,6 +506,21 @@ a.hub-card:hover {
   border-radius: var(--radius-md);
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.hub-card--teal .hub-card__icon {
+  background: var(--tone-teal-soft);
+  color: var(--tone-teal);
+}
+
+.hub-card--violet .hub-card__icon {
+  background: var(--tone-violet-soft);
+  color: var(--tone-violet);
+}
+
+.hub-card--amber .hub-card__icon {
+  background: var(--tone-amber-soft);
+  color: var(--tone-amber);
 }
 
 .hub-card__title {
@@ -429,13 +549,8 @@ a.hub-card:hover {
 }
 
 .hub-card--soon {
-  opacity: 0.62;
+  opacity: 0.55;
   cursor: default;
-}
-
-.hub-card--soon .hub-card__icon {
-  background: var(--surface-2);
-  color: var(--text-muted);
 }
 
 .hub-soon-note {

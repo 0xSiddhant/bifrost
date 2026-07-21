@@ -23,7 +23,7 @@ export function OllivandersPage() {
 
       <div className="hub-grid">
         {has('runestone') && (
-          <Link to="/runestone" className="hub-card">
+          <Link to="/runestone" className="hub-card hub-card--teal">
             <span className="hub-card__icon">
               <BracesIcon size={22} />
             </span>
@@ -35,7 +35,7 @@ export function OllivandersPage() {
         )}
 
         {has('variant') && (
-          <Link to="/variant" className="hub-card">
+          <Link to="/variant" className="hub-card hub-card--violet">
             <span className="hub-card__icon">
               <DiffIcon size={22} />
             </span>
@@ -47,7 +47,7 @@ export function OllivandersPage() {
           </Link>
         )}
 
-        <div className="hub-card hub-card--soon" aria-disabled="true">
+        <div className="hub-card hub-card--amber hub-card--soon" aria-disabled="true">
           <span className="hub-card__icon">
             <DocFileIcon size={22} />
           </span>

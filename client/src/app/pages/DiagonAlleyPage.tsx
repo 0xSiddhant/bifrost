@@ -11,14 +11,17 @@ const SOON = [
   {
     title: 'Base64',
     desc: 'Encode and decode Base64 text, entirely in the browser.',
+    tone: 'violet',
   },
   {
     title: 'UUID',
     desc: 'Generate v4 UUIDs on demand, one or many at a time.',
+    tone: 'amber',
   },
   {
     title: 'Timestamp',
     desc: 'Convert between Unix time and human-readable dates, both ways.',
+    tone: 'teal',
   },
 ];
 
@@ -38,7 +41,7 @@ export function DiagonAlleyPage() {
 
       <div className="hub-grid">
         {hasQr && (
-          <Link to="/sigil" className="hub-card">
+          <Link to="/sigil" className="hub-card hub-card--teal">
             <span className="hub-card__icon">
               <QrIcon size={22} />
             </span>
@@ -50,7 +53,11 @@ export function DiagonAlleyPage() {
         )}
 
         {SOON.map((tool) => (
-          <div key={tool.title} className="hub-card hub-card--soon" aria-disabled="true">
+          <div
+            key={tool.title}
+            className={`hub-card hub-card--${tool.tone} hub-card--soon`}
+            aria-disabled="true"
+          >
             <span className="hub-card__icon">
               <SparklesIcon size={22} />
             </span>
