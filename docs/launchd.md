@@ -4,6 +4,10 @@
 gives the same result as [PM2](pm2.md): start on login/boot, restart on crash.
 Pick one, not both.
 
+**One command:** `sh scripts/start-launchd.sh` does everything below — builds,
+writes the plist with your real node + repo paths filled in, and loads it. The
+manual steps here are what it automates.
+
 ## The plist
 
 Save as `~/Library/LaunchAgents/local.bifrost.plist`, replacing the two
@@ -24,7 +28,7 @@ Save as `~/Library/LaunchAgents/local.bifrost.plist`, replacing the two
   <key>ProgramArguments</key>
   <array>
     <string>__NODE__</string>
-    <string>__REPO__/server/dist/app.js</string>
+    <string>__REPO__/server/dist/bootstrap.js</string>
   </array>
 
   <!-- Run from the repo so .env, storage/, and themes/ resolve. -->

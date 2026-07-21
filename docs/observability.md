@@ -11,8 +11,17 @@ safe to leave off and spin up only when you want to look.
 
 ## Start / stop
 
+One command (wraps the compose calls below):
+
 ```bash
-# from the repo root
+sh scripts/observability.sh          # start + print the Grafana URL
+sh scripts/observability.sh logs     # follow the stack's logs
+sh scripts/observability.sh down     # stop  (add -v to wipe stored logs)
+```
+
+Or drive compose directly:
+
+```bash
 docker compose -f docker-compose.observability.yml up -d
 open http://localhost:3000        # admin / bifrost  — change the password
 

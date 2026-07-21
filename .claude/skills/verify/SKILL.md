@@ -11,6 +11,6 @@ Run these in order; stop at the first failure and report it with the failing out
 2. `npm run typecheck` — both workspaces.
 3. `npm test` — server + client suites.
 4. `npm run build` — client + server production build.
-5. **Restart smoke** (only if the change touches server/storage/DB): start the built server, hit `/api/health`, SIGINT it, start again, hit `/api/health` again, then run `PRAGMA integrity_check` against `storage/data/app.db` — expect `ok`.
+5. **Restart smoke** (only if the change touches server/storage/DB): start the built server, hit `/api/health`, SIGINT it, start again, hit `/api/health` again, then run `PRAGMA integrity_check` against `storage/data/app.db` — expect `ok`. For a deeper pass on storage-critical changes, run `npm run test:resilience` (50 restarts + SIGKILL mid-write/mid-migration + tmp-sweep, all integrity-checked); it is on-demand, not part of `npm test`.
 
 Report format: one line per step (✅/❌), then details only for failures. If a plan file defines extra acceptance criteria for the work in progress, list which ones are covered by tests vs. still manual.

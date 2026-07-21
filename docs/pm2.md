@@ -7,6 +7,10 @@ see [`docker-linux.md`](docker-linux.md) for why.
 > Prefer zero dependencies? Use [`launchd`](launchd.md) instead — same outcome,
 > nothing to `npm install -g`.
 
+**One command:** `sh scripts/start-pm2.sh` does everything below (deps, `.env`
+check, setup, build, start under PM2). The steps here are what it runs — do them
+by hand when you want more control.
+
 ## One-time setup
 
 ```bash
