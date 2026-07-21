@@ -65,13 +65,18 @@ jobs:
       - name: Commit, tag, push
         if: steps.detect.outputs.release == 'true'
         run: |
-          git config user.name "bifrost-release[bot]"
-          git config user.email "release@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json package-lock.json CHANGELOG.md \
             server/package.json client/package.json
           git commit -m "chore(release): v${VERSION}"
           git tag "v${VERSION}"
-          git push origin main --follow-tags
+          # Push the branch and the tag as separate refs. `--follow-tags` only
+          # pushes *annotated* tags, so the lightweight release tag was silently
+          # left behind (v1.1.0 shipped, but its tag never reached the remote and
+          # the Publish step failed). Explicit tag push works for any tag type.
+          git push origin main
+          git push origin "v${VERSION}"
 
       - name: Build release tarball
         if: steps.detect.outputs.release == 'true'
