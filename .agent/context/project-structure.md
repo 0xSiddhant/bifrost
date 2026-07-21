@@ -5,20 +5,32 @@ bifrost/
 ├── CLAUDE.md                  # entry point for AI agents → points to .agent/
 ├── README.md
 ├── .agent/                    # plans, context, rules, memory (this folder)
-├── .github/workflows/ci.yml   # lint + typecheck + test + build on PRs
+├── .github/workflows/         # ci.yml (lint/typecheck/test/build + docker build + backup smoke)
+│                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
 ├── package.json               # npm workspaces: server, client
+├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
+├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
+├── docker-compose.yml         # run on a Linux host (host networking)
+├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
+├── observability/             # loki/ alloy/ grafana/ configs + starter dashboard JSON
 ├── docs/
 │   ├── ARCHITECTURE.md        # pointer → .agent/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
 │   ├── THEME-SPEC.md          # rules + JSON schema for user-made themes
+│   ├── pm2.md · launchd.md    # run as a service on macOS
+│   ├── docker-linux.md        # Docker on a Linux host
+│   ├── observability.md       # the optional Grafana stack
+│   ├── cloud-profile.md       # internet-deployment checklist
+│   ├── releasing.md           # automated release flow
 │   └── assets/                # screenshots for README
 ├── server/
 │   ├── drizzle/               # generated migrations
 │   └── src/
 │       ├── app.ts             # composition root: reads DEPLOY_PROFILE manifest, registers modules
+│       ├── bootstrap.ts       # production entry (always starts; PM2/launchd/Docker/npm start use it)
 │       ├── core/              # shared kernel — NEVER imports from modules/
-│       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/
+│       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
 │           └── <feature>/     # file-transfer, previews, clipboard, themes, heimdall,
@@ -38,7 +50,8 @@ bifrost/
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
 │                              #   runestone + variant added in PLAN-07/08
-├── scripts/                   # setup.ts (folders/env/migrations), backup.ts
+├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
+│                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts
     ├── uploads/   downloads/   tmp/   data/ (app.db)   logs/

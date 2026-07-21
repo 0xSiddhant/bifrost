@@ -1,0 +1,44 @@
+// Tail Bifrost's pino JSON logs and ship them to Loki.
+//
+// Files-first by design: Alloy records read positions in its storage path, so a
+// stack that was down for weeks backfills the log files on the next start —
+// Bifrost itself never knows or cares whether this is running.
+
+local.file_match "bifrost" {
+	path_targets = [{
+		__path__ = "/var/log/bifrost/*.log",
+		job      = "bifrost",
+	}]
+}
+
+loki.source.file "bifrost" {
+	targets    = local.file_match.bifrost.targets
+	forward_to = [loki.process.bifrost.receiver]
+}
+
+loki.process "bifrost" {
+	// Parse the pino JSON line and promote level + module to labels so the
+	// dashboard can group errors by module. (pino `level` is numeric:
+	// 30=info, 40=warn, 50=error, 60=fatal.)
+	stage.json {
+		expressions = {
+			level  = "level",
+			module = "module",
+		}
+	}
+
+	stage.labels {
+		values = {
+			level  = "",
+			module = "",
+		}
+	}
+
+	forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

@@ -36,6 +36,8 @@ const envSchema = z.object({
     .optional(),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
   BACKUP_DIR: z.string().default(''),
+  // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
+  BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
 });
 
 export interface StoragePaths {
@@ -83,6 +85,8 @@ export interface AppConfig {
   };
   logLevel: LogLevel;
   backupDir: string | null;
+  /** Rotation: keep only the newest N archives (0 = keep all). */
+  backupKeep: number;
 }
 
 export class ConfigError extends Error {
@@ -151,6 +155,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     logLevel: raw.LOG_LEVEL,
     backupDir: raw.BACKUP_DIR || null,
+    backupKeep: raw.BACKUP_KEEP,
   };
   return deepFreeze(config);
 }

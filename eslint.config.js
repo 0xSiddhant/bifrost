@@ -105,5 +105,13 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    // CommonJS config files (PM2's ecosystem.config.cjs) — Node globals.
+    files: ['**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { module: 'writable', require: 'readonly', __dirname: 'readonly', process: 'readonly' },
+    },
+  },
   prettier,
 );

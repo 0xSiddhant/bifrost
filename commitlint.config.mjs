@@ -25,6 +25,7 @@ export default {
         'client',
         'ci',
         'docs',
+        'ops',
         'chore',
         // release commits (manual now, PLAN-09 automation later)
         'release',
