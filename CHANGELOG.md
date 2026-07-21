@@ -1,6 +1,112 @@
 # Changelog
 
 
+## v1.1.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.0.0...v1.1.0)
+
+### 🚀 Enhancements
+
+- **clipboard:** Make links in muninn text entries tappable ([af51e0b](https://github.com/0xSiddhant/bifrost/commit/af51e0b))
+- **themes:** Add olympus greek mythology built-in theme ([e01dce6](https://github.com/0xSiddhant/bifrost/commit/e01dce6))
+- **presence:** Add greek character pool for device aliases ([83d98b2](https://github.com/0xSiddhant/bifrost/commit/83d98b2))
+- **core:** Add runestone doc-size cap to config ([0d8085b](https://github.com/0xSiddhant/bifrost/commit/0d8085b))
+- **core:** Add relic-name generator service ([bfe0dc6](https://github.com/0xSiddhant/bifrost/commit/bfe0dc6))
+- **runestone:** Register module exposing the doc cap ([f383f4e](https://github.com/0xSiddhant/bifrost/commit/f383f4e))
+- **client:** Add core json utils and relic-name mirror ([2a3c888](https://github.com/0xSiddhant/bifrost/commit/2a3c888))
+- **client:** Add shared codemirror json editor component ([2fe01b1](https://github.com/0xSiddhant/bifrost/commit/2fe01b1))
+- **runestone:** Editor page with tree view and draft survival ([dd9dd54](https://github.com/0xSiddhant/bifrost/commit/dd9dd54))
+- **client:** Expand olympus relic collection to parity ([a99d5ce](https://github.com/0xSiddhant/bifrost/commit/a99d5ce))
+- **core:** Add runestone saved and deleted bus events ([d1afc33](https://github.com/0xSiddhant/bifrost/commit/d1afc33))
+- **runestone:** Add runestones table and migration ([791444c](https://github.com/0xSiddhant/bifrost/commit/791444c))
+- **runestone:** Slug service, repository, and usecases ([f036006](https://github.com/0xSiddhant/bifrost/commit/f036006))
+- **runestone:** Crud routes, sse fanout, and kill test ([2a35023](https://github.com/0xSiddhant/bifrost/commit/2a35023))
+- **audit-log:** Record runestone saves and deletes ([dc45639](https://github.com/0xSiddhant/bifrost/commit/dc45639))
+- **runestone:** Editor save flow, slug urls, creative 404 ([89df1c3](https://github.com/0xSiddhant/bifrost/commit/89df1c3))
+- **runestone:** Library page with live refresh ([04b8b80](https://github.com/0xSiddhant/bifrost/commit/04b8b80))
+- **runestone:** Public json data endpoint at /runestone/api/:slug ([19ab58f](https://github.com/0xSiddhant/bifrost/commit/19ab58f))
+- **runestone:** Rename library to mimir, add api chip per row ([58b0fe9](https://github.com/0xSiddhant/bifrost/commit/58b0fe9))
+- **core:** Add greek entries to the relic-name bank ([db8621c](https://github.com/0xSiddhant/bifrost/commit/db8621c))
+- **themes:** Add diff token group with derived defaults ([9481bd2](https://github.com/0xSiddhant/bifrost/commit/9481bd2))
+- **client:** Add structural json diff engine and text normalizers ([baee863](https://github.com/0xSiddhant/bifrost/commit/baee863))
+- **variant:** Register capability-only module in both profiles ([8fcc8a0](https://github.com/0xSiddhant/bifrost/commit/8fcc8a0))
+- **client:** Extend json editor with diff decorations and pane hooks ([126d006](https://github.com/0xSiddhant/bifrost/commit/126d006))
+- **variant:** Two-pane compare page with rail, drawer, and pickers ([e7be50d](https://github.com/0xSiddhant/bifrost/commit/e7be50d))
+- **client:** Auto-close brackets and quotes in the json editor ([13678c2](https://github.com/0xSiddhant/bifrost/commit/13678c2))
+- **variant:** Let the compare area use the desktop width ([984af4e](https://github.com/0xSiddhant/bifrost/commit/984af4e))
+- **variant:** Diff only on the compare cta in text mode too ([020e84e](https://github.com/0xSiddhant/bifrost/commit/020e84e))
+- **variant:** Separate mode workspaces and display-only labels ([90b3583](https://github.com/0xSiddhant/bifrost/commit/90b3583))
+- **variant:** Editable panes in both modes, results drop on edit ([7ed68b0](https://github.com/0xSiddhant/bifrost/commit/7ed68b0))
+- **core:** Online-safe backup + restore with rotation ([76bfe5a](https://github.com/0xSiddhant/bifrost/commit/76bfe5a))
+- **ops:** Pm2 process definition + pm2/launchd run docs ([84686da](https://github.com/0xSiddhant/bifrost/commit/84686da))
+- **ops:** Dockerfile + compose for the linux target ([feaaf71](https://github.com/0xSiddhant/bifrost/commit/feaaf71))
+- **ops:** Optional grafana + loki + alloy observability stack ([d9b49ac](https://github.com/0xSiddhant/bifrost/commit/d9b49ac))
+- **ops:** One-command run scripts (pm2, launchd, observability) ([f739eb7](https://github.com/0xSiddhant/bifrost/commit/f739eb7))
+- **presence:** Prune devices idle over 7 days on demand ([1034fea](https://github.com/0xSiddhant/bifrost/commit/1034fea))
+- **heimdall:** Convert admin panel to a modal overlay ([83238ce](https://github.com/0xSiddhant/bifrost/commit/83238ce))
+- **core:** Log tap, build stamp, and runtime log-level plumbing ([922ebb6](https://github.com/0xSiddhant/bifrost/commit/922ebb6))
+- **heimdall:** Add about and logs sections ([063132f](https://github.com/0xSiddhant/bifrost/commit/063132f))
+- In-editor find, tree collapse-all, and runestone width revamp ([#21](https://github.com/0xSiddhant/bifrost/pull/21))
+- **client:** Category nav with ollivanders and diagon alley hubs ([468517c](https://github.com/0xSiddhant/bifrost/commit/468517c))
+- **client:** Move join bifrost to midgard, slim sigil to a qr maker ([93c8472](https://github.com/0xSiddhant/bifrost/commit/93c8472))
+- **client:** Card tone-gradient system and midgard redesign ([e688c90](https://github.com/0xSiddhant/bifrost/commit/e688c90))
+
+### 🩹 Fixes
+
+- **variant:** Keep fresh compare results from being marked stale ([c293e05](https://github.com/0xSiddhant/bifrost/commit/c293e05))
+- **variant:** Bound compare cost on large documents ([51547df](https://github.com/0xSiddhant/bifrost/commit/51547df))
+- **variant:** Keep invalid-json compare in json mode (+ docs sync & lore renames) ([#18](https://github.com/0xSiddhant/bifrost/pull/18))
+- **core:** Dedicated bootstrap entry so pm2 fork mode boots the server ([01293ee](https://github.com/0xSiddhant/bifrost/commit/01293ee))
+- **ops:** Ascii ellipsis in run scripts (set -u unbound variable) ([9167e42](https://github.com/0xSiddhant/bifrost/commit/9167e42))
+
+### 💅 Refactors
+
+- **client:** Move copy helper into core for shared use ([88e780d](https://github.com/0xSiddhant/bifrost/commit/88e780d))
+- **client:** Move tree view and runestone api client into core ([b60cf08](https://github.com/0xSiddhant/bifrost/commit/b60cf08))
+
+### 📖 Documentation
+
+- **ops:** Cloud-profile deployment checklist ([8ae62ae](https://github.com/0xSiddhant/bifrost/commit/8ae62ae))
+- **ops:** Run/observability steps + release-skill automation update ([28d692f](https://github.com/0xSiddhant/bifrost/commit/28d692f))
+- **ops:** Sync context + rules with plan-09 tooling ([dde3295](https://github.com/0xSiddhant/bifrost/commit/dde3295))
+- **docs:** Archive plan-09, set plan-10 in-review, log decisions ([466d156](https://github.com/0xSiddhant/bifrost/commit/466d156))
+- **docs:** Log plan-10 tranche 2 (about + logs) ([beb9b00](https://github.com/0xSiddhant/bifrost/commit/beb9b00))
+- Log the nav category reorg ([5c8ff91](https://github.com/0xSiddhant/bifrost/commit/5c8ff91))
+- Sync context and design docs for category nav and tones ([1b03ded](https://github.com/0xSiddhant/bifrost/commit/1b03ded))
+- Refresh readme screenshots for the new design ([#23](https://github.com/0xSiddhant/bifrost/pull/23))
+
+### 🏡 Chore
+
+- **docs:** Archive completed plans 00-06 ([99f3c1e](https://github.com/0xSiddhant/bifrost/commit/99f3c1e))
+- **docs:** Add claude code project skills ([8d1ceb0](https://github.com/0xSiddhant/bifrost/commit/8d1ceb0))
+- **docs:** Record olympus world in agent memory ([705b76b](https://github.com/0xSiddhant/bifrost/commit/705b76b))
+- **ci:** Add runestone to commitlint scopes ([e343ba4](https://github.com/0xSiddhant/bifrost/commit/e343ba4))
+- **docs:** Record plan-07 part a progress and decisions ([bffee11](https://github.com/0xSiddhant/bifrost/commit/bffee11))
+- **docs:** Record plan-07 part b progress and decisions ([5cdd223](https://github.com/0xSiddhant/bifrost/commit/5cdd223))
+- **docs:** Record runestone public api and mimir rename ([ccecd57](https://github.com/0xSiddhant/bifrost/commit/ccecd57))
+- **ci:** Add variant to commitlint scopes ([47cc9a0](https://github.com/0xSiddhant/bifrost/commit/47cc9a0))
+- **docs:** Record plan-08 progress and decisions ([6c26ee7](https://github.com/0xSiddhant/bifrost/commit/6c26ee7))
+- **docs:** Record plan-08 feedback round ([cae8928](https://github.com/0xSiddhant/bifrost/commit/cae8928))
+- **docs:** Record explicit-compare requirement ([858de5d](https://github.com/0xSiddhant/bifrost/commit/858de5d))
+- **docs:** Record workspace-separation feedback ([17e24dc](https://github.com/0xSiddhant/bifrost/commit/17e24dc))
+- **docs:** Record editable-panes feedback round ([a5e6774](https://github.com/0xSiddhant/bifrost/commit/a5e6774))
+- **docs:** Record plan-09 tranche 1 progress + decision ([efeaf6f](https://github.com/0xSiddhant/bifrost/commit/efeaf6f))
+- **docs:** Mark plan-09 implemented (all 8 items) ([bc6d4c4](https://github.com/0xSiddhant/bifrost/commit/bc6d4c4))
+
+### ✅ Tests
+
+- **core:** Scripted restart-resilience suite ([15f4809](https://github.com/0xSiddhant/bifrost/commit/15f4809))
+
+### 🤖 CI
+
+- **ops:** Release automation + docker build job + backup smoke ([d40d377](https://github.com/0xSiddhant/bifrost/commit/d40d377))
+
+### ❤️ Contributors
+
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Claude <noreply@anthropic.com>
+
 ## v1.0.0 (2026-07-16)
 
 First release: plans 00–06 — foundation, UI/UX system, file transfer, previews + QR, JSON theming, Heimdall admin panel, and clipboard sync / device presence / audit log.
