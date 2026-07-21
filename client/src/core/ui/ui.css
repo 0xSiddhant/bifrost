@@ -668,6 +668,15 @@
   accent-color: var(--accent);
 }
 
+/* Name takes the slack so the trailing badges line up in fixed columns
+   (equal min-width + centered) instead of floating by name length. */
+.check-row > span:not(.badge) {
+  flex: 1;
+  min-width: 0;
+}
+
 .check-row .badge {
-  margin-left: auto;
+  flex: none;
+  min-width: 3.75rem;
+  justify-content: center;
 }

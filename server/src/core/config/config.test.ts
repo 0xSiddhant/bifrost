@@ -86,4 +86,10 @@ describe('applySettingsOverlay', () => {
     ]);
     expect(overlaid.heimdall.tapCount).toBe(7);
   });
+
+  it('applies a persisted log level (Heimdall runtime switch survives restart)', () => {
+    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'debug' }]).logLevel).toBe('debug');
+    // a bad value is ignored, leaving the .env default
+    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'loud' }]).logLevel).toBe(base.logLevel);
+  });
 });

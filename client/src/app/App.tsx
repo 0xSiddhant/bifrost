@@ -12,7 +12,6 @@ import {
   DiffIcon,
   DownloadIcon,
   FolderIcon,
-  MonitorIcon,
   QrIcon,
   UploadIcon,
   WifiOffIcon,
@@ -36,8 +35,8 @@ const HermesPage = lazy(() =>
 const SigilPage = lazy(() =>
   import('../features/sigil/SigilPage').then((m) => ({ default: m.SigilPage })),
 );
-const HeimdallPage = lazy(() =>
-  import('../features/heimdall/HeimdallPage').then((m) => ({ default: m.HeimdallPage })),
+const HeimdallModal = lazy(() =>
+  import('../features/heimdall/HeimdallModal').then((m) => ({ default: m.HeimdallModal })),
 );
 const WardensPage = lazy(() =>
   import('../features/wardens/WardensPage').then((m) => ({ default: m.WardensPage })),
@@ -65,13 +64,15 @@ const NAV = [
   { to: '/hermes', label: 'Hermes', icon: <ClipboardIcon size={18} />, module: 'clipboard' },
   { to: '/runestone', label: 'Runestone', icon: <BracesIcon size={18} />, module: 'runestone' },
   { to: '/variant', label: 'Variant', icon: <DiffIcon size={18} />, module: 'variant' },
-  { to: '/wardens', label: 'Wardens', icon: <MonitorIcon size={18} />, module: 'presence' },
+  // Wardens is not a top-nav page — the device roster lives in Heimdall's
+  // Wardens section. The /wardens route stays reachable for existing links.
   { to: '/sigil', label: 'Sigil', icon: <QrIcon size={18} />, module: 'qr-tool' },
 ];
 
 export function App() {
   const { capabilities } = useCapabilities();
-  const { registerTap } = useHeimdallGesture();
+  const [heimdallOpen, setHeimdallOpen] = useState(false);
+  const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
   const nav = NAV.filter(
     (item) =>
@@ -97,6 +98,8 @@ export function App() {
       <header className="shell-header">
         {/* Home link, and the mobile Heimdall tap target (the footer mark is
             hidden on phones). 7 rapid taps open the gate; single taps go home. */}
+        {/* Home link, and (≥768px) the Heimdall tap entry: N rapid taps open the
+            modal; single taps go home. Below the threshold registerTap no-ops. */}
         <NavLink to="/" className="wordmark" onClick={registerTap}>
           Bifrost
         </NavLink>
@@ -140,11 +143,18 @@ export function App() {
             <Route path="/variant" element={<VariantPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
-            <Route path="/heimdall" element={<HeimdallPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
+
+      {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
+          Opened by the gesture/shortcut only (≥768px). */}
+      {heimdallOpen && (
+        <Suspense fallback={null}>
+          <HeimdallModal onClose={() => setHeimdallOpen(false)} />
+        </Suspense>
+      )}
 
       <nav className="nav nav--bottom" aria-label="Main">
         {nav.map((item) => (
@@ -156,13 +166,7 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
-        {/* The server-identity mark doubles as the hidden touch entry to
-            Heimdall — N taps within 3s. Not a link, not labelled. */}
-        <span
-          className="mono caption footer-mark"
-          onClick={registerTap}
-          aria-hidden="true"
-        >
+        <span className="mono caption footer-mark" aria-hidden="true">
           bifrost.local
         </span>
         <span className="caption">

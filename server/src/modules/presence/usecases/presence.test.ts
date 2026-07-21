@@ -4,7 +4,13 @@ import { AppError } from '../../../core/http/index.js';
 import type { PresenceDevice } from '../../../core/bus/events.js';
 import type { ConnectionInfo } from '../../../core/sse/index.js';
 import type { DeviceRepository, KnownDevice } from '../ports.js';
-import { BuildPresenceUseCase, ClaimNameUseCase, SyncPresenceUseCase } from './presence.js';
+import {
+  BuildPresenceUseCase,
+  ClaimNameUseCase,
+  PruneStaleDevicesUseCase,
+  STALE_DEVICE_MS,
+  SyncPresenceUseCase,
+} from './presence.js';
 
 const IPHONE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
@@ -34,6 +40,11 @@ class FakeDeviceRepo implements DeviceRepository {
     if (!device) return false;
     device.name = name;
     return true;
+  }
+  remove(deviceIds: string[]): number {
+    let removed = 0;
+    for (const id of deviceIds) if (this.store.delete(id)) removed += 1;
+    return removed;
   }
   all(): KnownDevice[] {
     return [...this.store.values()];
@@ -118,5 +129,33 @@ describe('presence', () => {
     const after = claim.execute('iphone-1', "  Sid's iPhone  ");
     expect(after[0]?.name).toBe("Sid's iPhone");
     expect(() => claim.execute('ghost', 'x')).toThrow(AppError);
+  });
+
+  it('prunes only devices offline for more than 7 days, keeping the online ones', () => {
+    const now = 100 * STALE_DEVICE_MS;
+    const { repo, buildPresence, bus, events } = build();
+    let connections: ConnectionInfo[] = [];
+    // stale + offline → pruned; recently seen → kept; stale but still online → kept.
+    repo.upsertSeen('stale', 'iPhone · Safari', 'Thor', now - STALE_DEVICE_MS - 1);
+    repo.upsertSeen('recent', 'iPhone · Safari', 'Loki', now - 1000);
+    repo.upsertSeen('stale-online', 'iPhone · Safari', 'Odin', now - STALE_DEVICE_MS - 1);
+    connections = [{ deviceId: 'stale-online', ua: IPHONE_UA, ip: '9.9.9.9', since: now }];
+
+    const prune = new PruneStaleDevicesUseCase(repo, () => connections, buildPresence, bus, () => now);
+    const result = prune.execute();
+
+    expect(result.removed).toBe(1);
+    const ids = repo.all().map((d) => d.deviceId).sort();
+    expect(ids).toEqual(['recent', 'stale-online']);
+    expect(events).toHaveLength(1); // broadcast fired because something changed
+  });
+
+  it('broadcasts nothing when there is nothing stale to prune', () => {
+    const now = 100 * STALE_DEVICE_MS;
+    const { repo, buildPresence, bus, events } = build();
+    repo.upsertSeen('recent', 'iPhone · Safari', 'Loki', now - 1000);
+    const prune = new PruneStaleDevicesUseCase(repo, () => [], buildPresence, bus, () => now);
+    expect(prune.execute().removed).toBe(0);
+    expect(events).toHaveLength(0);
   });
 });

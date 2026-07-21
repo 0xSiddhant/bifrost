@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import type { DbHandle } from '../../../core/db/index.js';
 import { devices } from '../../../core/db/schema.js';
 import type { DeviceRepository, KnownDevice } from '../ports.js';
@@ -25,6 +25,13 @@ export class DbDeviceRepository implements DeviceRepository {
 
   rename(deviceId: string, name: string | null): boolean {
     return this.db.update(devices).set({ name }).where(eq(devices.deviceId, deviceId)).run().changes > 0;
+  }
+
+  remove(deviceIds: string[]): number {
+    if (deviceIds.length === 0) return 0;
+    // No table foreign-keys `devices` — audit/clipboard/runestone keep the raw
+    // deviceId string, so this only drops the roster row (activity survives).
+    return this.db.delete(devices).where(inArray(devices.deviceId, deviceIds)).run().changes;
   }
 
   all(): KnownDevice[] {
