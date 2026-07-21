@@ -10,12 +10,14 @@ Starts after PLAN-10 is merged (normal numeric order). Reuse dependencies all ex
 
 ## Scope
 
-**In:** `edda` module (both profiles) — editor+preview page, perf-budgeted live preview, mobile single-pane toggle (preview unmounted while editing), save/rename/delete + separate library page, slug URLs + public preview page + download API, formatting toolbar + keyboard shortcuts, outline panel, approximate scroll sync, stats bar, `.md`/`.html` export, creative 404, localStorage scratch draft, coming-soon footer section.
+**In:** `edda` module (both profiles) — editor+preview page, perf-budgeted live preview, mobile single-pane toggle (preview unmounted while editing), save/rename/delete + separate library page, slug URLs + public preview page + download API, formatting toolbar + keyboard shortcuts, outline panel, approximate scroll sync, stats bar, `.md`/`.html` export, creative 404, localStorage scratch draft, coming-soon footer section, **in-editor find** on the shared CM6 editor (benefits every editor panel — see Decisions).
 **Out (PLAN-99):** Mermaid diagrams, paste-image upload, PDF export, unified cross-tool library shell. These are named in the page's coming-soon section but not built.
 
 ## Decisions & reasoning
 
 - **Editor = the shared CM6 editor with a markdown mode.** Extend `core/ui/JsonEditor` (or extract a `CodeEditor` base + thin wrappers — implementer's call, but ONE shared editor core) with `@codemirror/lang-markdown`: heading/emphasis/link/code syntax tinted via the existing `--syn-*` tokens. History, imperative handles, and the `highlights`/`plain` machinery hardened in PLAN-07/08 carry over untouched.
+- **In-editor find — shared-editor feature, already shipped (2026-07-21, owner request).** The shared CM6 editor gained a `@codemirror/search` find panel (⌘/Ctrl-F + an `openSearch()` handle behind "Find" buttons), theme-token-styled, working in `plain` and JSON modes — so Runestone and both Variant panes have it now, built ahead of this plan on branch `feat/editor-find-tree-collapse`. **Edda inherits it for free** through the same shared editor; the markdown editor must simply be verified to open find and step through matches. The browser's own Ctrl/⌘-F cannot locate text inside a large scrolled buffer, so the editor owns find. Pure UI concern — no server surface.
+- **Variant cross-pane reveal — already shipped (2026-07-21, owner special condition).** In Variant, in **both** JSON and text mode, a find match in one pane reveals the same string in the *other* pane when present (`onSearchMatch` on the editor → `crossPaneOffset` + `revealOffset`, scroll-lock suspended for the reveal, no diff re-run). Recorded here because it rides on the shared find hook; Edda is single-pane and needs no equivalent.
 - **Preview = the PLAN-03 renderer, upgraded to editor grade:** marked with GFM (tables, task lists, strikethrough), highlight.js on fenced code, heading anchor ids (feeds the outline + deep links), DOMPurify always — sanitization is non-negotiable even on a trusted LAN. One pure `renderMarkdown(md) → safeHtml` in `core/markdown/` shared by the live preview, the public preview page, and the HTML export (three surfaces, one renderer, zero drift).
 - **Perf model (the owner's core requirement — Variant's budget philosophy applied):**
   - Live preview re-renders on a ~200 ms idle debounce, applied inside `requestAnimationFrame`; typing never triggers synchronous render work.
@@ -54,6 +56,7 @@ Starts after PLAN-10 is merged (normal numeric order). Reuse dependencies all ex
 
 **Core**
 - [ ] Markdown mode in the shared editor (lang-markdown + `--syn-*` mapping); extraction to a base only if it stays behavior-identical for JSON/plain consumers
+- [x] In-editor find widget on the shared CM6 editor (`@codemirror/search`) — **shipped ahead of this plan** (branch `feat/editor-find-tree-collapse`); Edda inherits it. Remaining for Edda: confirm find opens and steps through matches in the markdown editor (add a "Find" affordance to the Edda toolbar for parity)
 - [ ] `core/markdown/`: `renderMarkdown` (marked GFM + highlight.js + heading ids + DOMPurify), `outline(md)`, `commands.ts` (toolbar transactions), `stats(md)` — all pure, all unit-tested
 - [ ] Env keys `EDDA_MAX_DOC_KB`, `EDDA_LIVE_PREVIEW_MAX_KB` in zod config + `.env.example`
 
@@ -80,10 +83,12 @@ Starts after PLAN-10 is merged (normal numeric order). Reuse dependencies all ex
 6. Toolbar buttons and ⌘-shortcuts produce correct markdown around selections (wrap + unwrap round-trip); outline clicks jump both panes; exports open standalone.
 7. Kill test: SIGINT during a save burst → restart → every acknowledged doc intact, integrity ok.
 8. Coming-soon section lists exactly the three parked features.
+9. In-editor find: in a large document (Runestone, a Variant pane, and Edda), ⌘/Ctrl-F opens a find widget that locates and steps through matches the browser's own find cannot reach; match count, wrap, and case toggle work; Runestone and Variant still pass their existing suites. In Variant, a search string that matches in one pane scrolls the other pane to the same string when present, in **both** JSON and text modes, without re-running the diff.
 
 ## Test checklist
 
 - [ ] Unit: renderMarkdown sanitization corpus (script/style/event-handler injection), outline extraction, command wrap/unwrap round-trips, stats, slug reserved-segment guard
 - [ ] Integration: CRUD + 301 + 413 + raw API headers (content-type, CORS, attachment) + audit pickup via inject; save-burst kill test
 - [ ] Component: debounce/manual-mode threshold behavior, mobile unmount assertion (preview absent from DOM while editing)
+- [ ] Component/manual: find widget locates matches in a large fixture across Runestone, Variant (JSON + text panes), and Edda; match count/wrap/case; Variant cross-pane scroll-to-match on a shared string in both modes (and no scroll when the string is absent on the other side)
 - [ ] Manual (live-verify skill): 2 MB fixture typing pass on system + phone viewport, real-device pass owed as usual
