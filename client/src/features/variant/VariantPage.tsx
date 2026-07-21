@@ -23,6 +23,7 @@ import {
   type VariantTextOptions,
 } from './compare';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
+import { crossPaneOffset } from './search';
 import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer } from './ResultsDrawer';
@@ -114,6 +115,32 @@ export function VariantPage() {
   const textRightRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importSideRef = useRef<Side>('left');
+  // Held true while a cross-pane search reveal scrolls the opposite pane, so
+  // the scroll-lock below doesn't drag both panes back to one position.
+  const scrollLockSuspended = useRef(false);
+
+  const editorRefFor = (side: Side): React.RefObject<JsonEditorHandle | null> =>
+    mode === 'json'
+      ? side === 'left'
+        ? leftEditorRef
+        : rightEditorRef
+      : side === 'left'
+        ? textLeftRef
+        : textRightRef;
+
+  // Owner's special condition: a find match on one side reveals the same string
+  // on the other side when present, in both JSON and text modes. Pure scroll —
+  // it never re-runs the diff.
+  const revealAcross = (fromSide: Side, matchText: string) => {
+    const otherSide: Side = fromSide === 'left' ? 'right' : 'left';
+    const offset = crossPaneOffset(panes[mode][otherSide].text, matchText);
+    if (offset === null) return;
+    scrollLockSuspended.current = true;
+    editorRefFor(otherSide).current?.revealOffset(offset);
+    window.setTimeout(() => {
+      scrollLockSuspended.current = false;
+    }, 150);
+  };
 
   const setPane = (side: Side, update: (pane: PaneState) => PaneState, target?: Mode) => {
     setPanes((prev) => {
@@ -302,7 +329,7 @@ export function VariantPage() {
     if (!a || !b) return;
     let locked = false;
     const follow = (source: HTMLElement, target: HTMLElement) => () => {
-      if (locked) return;
+      if (locked || scrollLockSuspended.current) return;
       locked = true;
       target.scrollTop = source.scrollTop;
       requestAnimationFrame(() => {
@@ -476,6 +503,16 @@ export function VariantPage() {
         {pane.label}
       </span>
       <div className="variant-pane__actions">
+        {/* Find is only present where an editor is mounted (not JSON tree view). */}
+        {(mode === 'text' || view === 'code') && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => editorRefFor(side).current?.openSearch()}
+          >
+            Find
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={() => importInto(side)}>
           Import
         </Button>
@@ -523,6 +560,7 @@ export function VariantPage() {
             ref={editorRef}
             value={pane.text}
             onChange={onPaneEdit(side)}
+            onSearchMatch={(text) => revealAcross(side, text)}
             height={EDITOR_HEIGHT}
             placeholder="Paste, type, import — or load from the Pensieve…"
             highlights={
@@ -702,6 +740,7 @@ export function VariantPage() {
                 plain
                 value={left.text}
                 onChange={onPaneEdit('left')}
+                onSearchMatch={(text) => revealAcross('left', text)}
                 height={EDITOR_HEIGHT}
                 placeholder="Paste or type any text…"
                 highlights={textHighlights?.left}
@@ -711,6 +750,7 @@ export function VariantPage() {
                 plain
                 value={right.text}
                 onChange={onPaneEdit('right')}
+                onSearchMatch={(text) => revealAcross('right', text)}
                 height={EDITOR_HEIGHT}
                 placeholder="Paste or type any text…"
                 highlights={textHighlights?.right}

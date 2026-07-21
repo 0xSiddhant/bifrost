@@ -26,6 +26,13 @@ import {
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
+import {
+  getSearchQuery,
+  openSearchPanel,
+  search,
+  searchKeymap,
+  searchPanelOpen,
+} from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { validateJson } from '../json';
 
@@ -63,11 +70,18 @@ export interface JsonEditorProps {
    * folding, highlighting, or bracket pairing — typing costs nothing.
    */
   plain?: boolean;
+  /**
+   * Fires when the in-editor find widget lands on a match (the matched text).
+   * Variant uses it to reveal the same string in the opposite pane.
+   */
+  onSearchMatch?: (matchText: string) => void;
 }
 
 export interface JsonEditorHandle {
   foldAll(): void;
   unfoldAll(): void;
+  /** Open the in-editor find panel (a discoverable button; ⌘/Ctrl-F also works). */
+  openSearch(): void;
   /** Move the cursor to a doc offset, scroll it into view, and focus. */
   gotoOffset(offset: number): void;
   /** Scroll a doc offset into view without stealing focus (pane sync jumps). */
@@ -207,6 +221,68 @@ export const editorChrome = (height: string) =>
       borderRadius: 'var(--radius-sm)',
     },
     '.cm-panels': { background: 'var(--surface-2)', color: 'var(--text)' },
+    // In-editor find widget — theme tokens so a theme switch recolors it live.
+    // CM's inputs carry class .cm-textfield (no type=text attr), so target that.
+    '.cm-panel.cm-search': {
+      display: 'flex',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: '6px 8px',
+      padding: '8px 10px',
+      fontFamily: 'var(--font-mono)',
+    },
+    '.cm-panel.cm-search .cm-textfield': {
+      background: 'var(--surface)',
+      color: 'var(--text)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-sm)',
+      padding: '4px 8px',
+      fontFamily: 'var(--font-mono)',
+      fontSize: 'var(--text-sm)',
+    },
+    '.cm-panel.cm-search .cm-textfield:focus': {
+      outline: 'none',
+      borderColor: 'var(--accent)',
+      boxShadow: '0 0 0 2px var(--accent-soft)',
+    },
+    '.cm-panel.cm-search .cm-textfield::placeholder': { color: 'var(--text-muted)' },
+    '.cm-panel.cm-search .cm-button': {
+      background: 'var(--surface)',
+      backgroundImage: 'none',
+      color: 'var(--text)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-sm)',
+      padding: '3px 10px',
+      fontSize: 'var(--text-sm)',
+      cursor: 'pointer',
+    },
+    '.cm-panel.cm-search .cm-button:hover': {
+      background: 'var(--surface-2)',
+      borderColor: 'var(--accent)',
+    },
+    '.cm-panel.cm-search label': {
+      color: 'var(--text-muted)',
+      fontSize: 'var(--text-sm)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+    },
+    '.cm-panel.cm-search input[type=checkbox]': { accentColor: 'var(--accent)' },
+    '.cm-panel.cm-search [name=close]': {
+      color: 'var(--text-muted)',
+      background: 'transparent',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '18px',
+      lineHeight: '1',
+    },
+    '.cm-panel.cm-search [name=close]:hover': { color: 'var(--text)' },
+    '.cm-searchMatch': {
+      backgroundColor: 'var(--accent-soft)',
+      outline: '1px solid var(--accent)',
+      borderRadius: '2px',
+    },
+    '.cm-searchMatch-selected': { backgroundColor: 'var(--accent)', color: 'var(--bg)' },
   });
 
 /** All strict-JSON errors as CM diagnostics; an empty doc is "empty", not broken. */
@@ -231,6 +307,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     placeholder,
     highlights,
     plain = false,
+    onSearchMatch,
   },
   ref,
 ) {
@@ -239,9 +316,11 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
   // Callbacks live in refs so the view survives parent re-renders untouched.
   const onChangeRef = useRef(onChange);
   const onCursorRef = useRef(onCursor);
+  const onSearchMatchRef = useRef(onSearchMatch);
   const highlightsRef = useRef(highlights);
   onChangeRef.current = onChange;
   onCursorRef.current = onCursor;
+  onSearchMatchRef.current = onSearchMatch;
 
   useEffect(() => {
     const parent = containerRef.current;
@@ -273,7 +352,12 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         EditorView.lineWrapping,
         ...jsonExtensions,
         diffHighlightField,
+        // In-editor find for every consumer (Runestone / Variant / Edda). The
+        // browser's own find can't reach text in a large scrolled buffer; this
+        // can. Works in plain + JSON modes alike.
+        search({ top: true }),
         keymap.of([
+          ...searchKeymap,
           ...(plain ? [] : closeBracketsKeymap),
           ...defaultKeymap,
           ...historyKeymap,
@@ -291,6 +375,24 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
           const head = update.state.selection.main.head;
           if (update.docChanged || head !== update.startState.selection.main.head) {
             onCursorRef.current?.(head);
+          }
+          // A find navigation moves the selection onto the match. When the
+          // panel is open and the selection equals the query, report the
+          // matched text (Variant reveals it in the opposite pane).
+          if (onSearchMatchRef.current && (update.selectionSet || update.docChanged)) {
+            const sel = update.state.selection.main;
+            if (!sel.empty && searchPanelOpen(update.state)) {
+              const query = getSearchQuery(update.state);
+              if (query.valid) {
+                const selected = update.state.sliceDoc(sel.from, sel.to);
+                const isMatch = query.regexp
+                  ? true
+                  : query.caseSensitive
+                    ? selected === query.search
+                    : selected.toLowerCase() === query.search.toLowerCase();
+                if (isMatch) onSearchMatchRef.current(selected);
+              }
+            }
           }
         }),
       ],
@@ -330,6 +432,12 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     unfoldAll() {
       const view = viewRef.current;
       if (view) unfoldAll(view);
+    },
+    openSearch() {
+      const view = viewRef.current;
+      if (!view) return;
+      openSearchPanel(view);
+      view.focus();
     },
     gotoOffset(offset: number) {
       const view = viewRef.current;
