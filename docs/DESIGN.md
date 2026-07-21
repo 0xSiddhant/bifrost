@@ -38,6 +38,9 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
   `--text-muted` · `--border` · `--accent` · `--accent-2` · `--ok` ·
   `--danger` · `--warn` · softs (`--accent-soft`, `--danger-soft`) ·
   `--scrim` · `--bridge` (the rainbow gradient)
+- **Card tones** (the per-card gradient language): `--tone-teal` · `--tone-violet` ·
+  `--tone-amber` + `-soft` variants, and matching `--glow-teal/violet/amber`.
+  Derived from the theme's accents when omitted.
 - **Type**: `--font-display/body/mono`, sizes `--text-xs…--text-2xl`
 - **Space**: `--space-1…12` (0.25rem base scale)
 - **Shape/depth**: `--radius-sm/md/lg/full`, `--shadow-1/2`
@@ -98,9 +101,35 @@ sanctioned slow-motion zone — owner-approved 2026-07-13.
   disables all of it (already handled globally in `base.css`).
 - **Don't** put Heimdall in any nav — it opens by gesture/shortcut only.
 
+## Cards & tones
+
+Two card families share one visual language — each card is **lit by its own
+tone**: a soft radial gradient in a corner (`--tone-*-soft`), a tone-matched
+icon chip, and a tone border + glow on hover.
+
+- **Portal cards** (`PortalCard`, tones `teal` / `violet` / `amber`) — the big
+  doors. Home shows three: Send (teal) · Receive (violet) · Hermes (amber).
+- **Hub cards** (`.hub-card--{tone}`) — the tool cards on the category hub
+  pages; tones cycle teal → violet → amber. A `--soon` modifier dims a
+  not-yet-built tool (e.g. Edda, the toolbox utilities).
+
+Reach for `--accent-soft` for generic hover/selected fills; use the tone system
+when a card wants its own identity in a grid of siblings.
+
 ## Layout language
 
-Card-based, generous whitespace, `max-width: 62rem` container. Desktop nav in
-the header; ≤640px it becomes bottom tabs (thumb-reach) with safe-area insets.
-Home is two portal cards: Send / Receive — the two things every visitor came
-to do.
+Card-based, generous whitespace, `max-width: 62rem` container **by default** —
+but the two-pane / editor tools (Variant PLAN-08, Runestone) **break out** to
+`min(105rem, 100vw − gutters)` at ≥1024px and fill the viewport height, because
+a document editor earns the width.
+
+**Navigation is three category hub tabs** — **Midgard** (transfer: Send /
+Receive / Hermes + the Join-Bifrost QR), **Ollivanders** (dev tools: Runestone /
+Variant / Edda), **Diagon Alley** (utilities: the QR maker + coming-soon
+tools). Each tool keeps its own route and appears as a card on its hub; a tab
+lights active on any of its tools' sub-pages. Desktop nav sits in the header;
+≤640px it becomes bottom tabs (thumb-reach, safe-area insets) whose labels wrap
+to two lines then ellipsis. Heimdall is never a tab — gesture/shortcut only.
+
+Home leads with the three transfer portals, then a wide horizontal **Join
+Bifrost** band (QR beside its address details) for onboarding a new device.
