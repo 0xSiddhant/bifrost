@@ -181,6 +181,9 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
     const count = Number(value);
     if (Number.isInteger(count) && count >= 3 && count <= 20) config.heimdall.tapCount = count;
   },
+  'log.level': (config, value) => {
+    if ((LOG_LEVELS as readonly string[]).includes(value)) config.logLevel = value as LogLevel;
+  },
 };
 
 export function applySettingsOverlay(base: AppConfig, rows: SettingsRow[]): AppConfig {
