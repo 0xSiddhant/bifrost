@@ -387,7 +387,7 @@ export function RunestonePage() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head rune-head">
         <div>
           <span className="eyebrow eyebrow--violet">the runes · carved to be read later</span>
           <h2>
@@ -411,7 +411,7 @@ export function RunestonePage() {
         </div>
       </div>
 
-      <div className="stack">
+      <div className="stack rune-workspace">
         {restorable && (
           <Toast kind="info">
             <span className="rune-restore">
@@ -450,6 +450,14 @@ export function RunestonePage() {
               </Button>
             </div>
             <div className="rune-toolbar__group">
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={view !== 'code'}
+                onClick={() => editorRef.current?.openSearch()}
+              >
+                Find
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
@@ -532,6 +540,7 @@ export function RunestonePage() {
                 value={text}
                 onChange={setText}
                 onCursor={setCursor}
+                height="var(--rune-editor-h, 60vh)"
                 placeholder={EDITOR_PLACEHOLDER}
               />
             ) : empty ? (
