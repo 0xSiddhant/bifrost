@@ -1,5 +1,7 @@
 import type { FeatureModule } from '../../core/module.js';
+import { writeSetting } from '../../core/db/index.js';
 import { registerHeimdallRoutes } from './routes/heimdall.js';
+import { registerObservabilityRoutes } from './routes/observability.js';
 import { LoginThrottle } from './login-throttle.js';
 import { DbSettingsRepository } from './services/db-settings-repository.js';
 import { DbUploadAuditRepository } from './services/db-upload-audit-repository.js';
@@ -17,7 +19,7 @@ import { ListUploadsUseCase } from './usecases/list-uploads.js';
 export const heimdallModule: FeatureModule = {
   name: 'heimdall',
   async register(app, deps) {
-    const { config, log, db, bus, sse, auth } = deps;
+    const { config, log, db, bus, sse, auth, logTap, setLogLevel } = deps;
 
     const settingsRepo = new DbSettingsRepository(db);
     const auditRepo = new DbUploadAuditRepository(db);
@@ -59,6 +61,15 @@ export const heimdallModule: FeatureModule = {
         return online.size;
       }),
       listUploads: new ListUploadsUseCase(auditRepo),
+    });
+
+    registerObservabilityRoutes(app, {
+      config,
+      log,
+      logTap,
+      setLogLevel,
+      persistLevel: (level) => writeSetting(db, 'log.level', level),
+      auth,
     });
 
     app.addHook('onClose', () => {

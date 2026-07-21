@@ -19,19 +19,28 @@ import {
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
 import {
+  fetchAbout,
   fetchAudit,
+  fetchChangelog,
+  fetchLogs,
   fetchManagedThemes,
   fetchPresence,
   fetchSettings,
   fetchStats,
   fetchUploads,
+  LOG_LEVELS,
+  LOGS_STREAM_URL,
   prunePresence,
   revokeSessions,
+  setLogLevel,
   setThemeEnabled,
   updateSettings,
+  type AboutInfo,
   type AuditPage,
   type FolderUsage,
   type HeimdallSettings,
+  type LogEntry,
+  type LogLevel,
   type ManagedTheme,
   type PresenceDevice,
   type Stats,
@@ -688,6 +697,214 @@ function NetworkSection() {
   );
 }
 
+// ── Logs ────────────────────────────────────────────────────────
+
+const LEVEL_VALUE: Record<LogLevel, number> = {
+  trace: 10,
+  debug: 20,
+  info: 30,
+  warn: 40,
+  error: 50,
+  fatal: 60,
+};
+
+function logRowClass(label: string): string {
+  if (label === 'error' || label === 'fatal') return 'log-row--error';
+  if (label === 'warn') return 'log-row--warn';
+  return '';
+}
+
+function LogsSection() {
+  const [viewLevel, setViewLevel] = useState<LogLevel | ''>('');
+  const [moduleFilter, setModuleFilter] = useState('');
+  const [runtimeLevel, setRuntimeLevel] = useState<LogLevel>('info');
+  const [modules, setModules] = useState<string[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [following, setFollowing] = useState(false);
+
+  // Load / refetch the tail on filter change.
+  useEffect(() => {
+    let cancelled = false;
+    fetchLogs({ level: viewLevel || undefined, module: moduleFilter || undefined, lines: 300 })
+      .then((res) => {
+        if (cancelled) return;
+        setEntries([...res.entries].reverse()); // newest first
+        setModules(res.modules);
+        setRuntimeLevel(res.level);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [viewLevel, moduleFilter]);
+
+  // Live tail via the admin-gated SSE stream while following.
+  useEffect(() => {
+    if (!following) return;
+    const source = new EventSource(LOGS_STREAM_URL);
+    const min = viewLevel ? LEVEL_VALUE[viewLevel] : 0;
+    const onLine = (event: MessageEvent) => {
+      try {
+        const entry = JSON.parse(event.data) as LogEntry;
+        if (entry.level < min) return;
+        if (moduleFilter && entry.module !== moduleFilter) return;
+        setEntries((prev) => [entry, ...prev].slice(0, 500));
+      } catch {
+        // ignore malformed frame
+      }
+    };
+    source.addEventListener('log.line', onLine as EventListener);
+    return () => source.close();
+  }, [following, viewLevel, moduleFilter]);
+
+  const changeRuntimeLevel = (next: LogLevel) => {
+    setRuntimeLevel(next);
+    void setLogLevel(next).catch(() => {});
+  };
+
+  return (
+    <div className="stack">
+      <div className="log-controls" id={ctlId('log-controls')}>
+        <Select label="Show" value={viewLevel} onChange={(e) => setViewLevel(e.target.value as LogLevel | '')}>
+          <option value="">All levels</option>
+          {LOG_LEVELS.map((lvl) => (
+            <option key={lvl} value={lvl}>
+              {lvl} and up
+            </option>
+          ))}
+        </Select>
+        <Select label="Module" value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}>
+          <option value="">All modules</option>
+          {modules.map((mod) => (
+            <option key={mod} value={mod}>
+              {mod}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Runtime level"
+          value={runtimeLevel}
+          onChange={(e) => changeRuntimeLevel(e.target.value as LogLevel)}
+        >
+          {LOG_LEVELS.map((lvl) => (
+            <option key={lvl} value={lvl}>
+              {lvl}
+            </option>
+          ))}
+        </Select>
+        <Button
+          variant={following ? 'danger' : 'ghost'}
+          size="sm"
+          onClick={() => setFollowing((on) => !on)}
+        >
+          {following ? 'Following…' : 'Follow'}
+        </Button>
+      </div>
+      <p className="caption">
+        Runtime level applies live to all logging and survives restart. Following streams new lines
+        (newest first) over an admin-only channel.
+      </p>
+      <Card>
+        <div className="log-view">
+          {entries.length === 0 ? (
+            <p className="caption">No log lines in the current window.</p>
+          ) : (
+            entries.map((entry, index) => (
+              <div className={`log-row ${logRowClass(entry.levelLabel)}`} key={`${entry.time}-${index}`}>
+                <span className="log-row__time mono">
+                  {new Date(entry.time).toLocaleTimeString()}
+                </span>
+                <span className={`badge log-row__level log-lvl--${entry.levelLabel}`}>
+                  {entry.levelLabel}
+                </span>
+                {entry.module && <span className="log-row__module mono">{entry.module}</span>}
+                <span className="log-row__msg">{entry.msg}</span>
+              </div>
+            ))
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── About ───────────────────────────────────────────────────────
+
+function AboutSection() {
+  const [about, setAbout] = useState<AboutInfo | null>(null);
+  const [changelog, setChangelog] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAbout()
+      .then((res) => {
+        if (!cancelled) setAbout(res);
+      })
+      .catch(() => {});
+    fetchChangelog()
+      .then((res) => {
+        if (!cancelled) setChangelog(res.content);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows: [string, string][] = about
+    ? [
+        ['Version', about.version],
+        ['Commit', about.commit],
+        ['Built', new Date(about.buildDate).toLocaleString()],
+        ['Uptime', formatUptime(about.uptimeSeconds)],
+        ['Node', about.node],
+        ['Host', about.host],
+        ['Profile', about.profile],
+      ]
+    : [];
+
+  return (
+    <div className="stack">
+      <Card>
+        <div className="stack" id={ctlId('about-info')}>
+          <p className="caption">
+            Heimdall is Bifrost's gatekeeper — the hidden admin panel watching over the bridge:
+            activity, devices, storage, and the runtime dials.
+          </p>
+          <dl className="about-grid">
+            {rows.map(([key, value]) => (
+              <div className="about-row" key={key}>
+                <dt className="caption">{key}</dt>
+                <dd className="mono">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="about-links">
+            <a href="https://github.com/0xSiddhant/bifrost" target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+            <a href="https://0xSiddhant.com" target="_blank" rel="noreferrer">
+              0xSiddhant.com
+            </a>
+          </div>
+        </div>
+      </Card>
+      <h3>Changelog</h3>
+      <Card>
+        {changelog === null ? (
+          <p className="caption">Loading…</p>
+        ) : changelog.trim() === '' ? (
+          <p className="caption">No changelog yet — generated from conventional commits on release.</p>
+        ) : (
+          <pre className="changelog" id={ctlId('changelog')}>
+            {changelog}
+          </pre>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // ── Registry ────────────────────────────────────────────────────
 
 export const SECTIONS: HeimdallSection[] = [
@@ -718,6 +935,17 @@ export const SECTIONS: HeimdallSection[] = [
     Component: WardensSection,
     manifest: [
       { controlId: 'devices-list', label: 'Connected devices', keywords: ['presence', 'wardens', 'devices'] },
+    ],
+  },
+  {
+    id: 'logs',
+    label: 'Logs',
+    group: 'Watchtower',
+    icon: <MonitorIcon size={16} />,
+    blurb: 'Live server log tail with filters and a runtime level switch.',
+    Component: LogsSection,
+    manifest: [
+      { controlId: 'log-controls', label: 'Log level & follow', keywords: ['debug', 'trace', 'follow', 'level', 'tail'] },
     ],
   },
   {
@@ -778,5 +1006,17 @@ export const SECTIONS: HeimdallSection[] = [
     blurb: 'Join QR and the addresses this server answers on.',
     Component: NetworkSection,
     manifest: [{ controlId: 'join-qr', label: 'Join QR', keywords: ['qr', 'lan', 'address', 'connect'] }],
+  },
+  {
+    id: 'about',
+    label: 'About',
+    group: 'Bridge',
+    icon: <ShieldIcon size={16} />,
+    blurb: 'Version, build, runtime facts, and the changelog.',
+    Component: AboutSection,
+    manifest: [
+      { controlId: 'about-info', label: 'Version & build', keywords: ['version', 'commit', 'uptime', 'node'] },
+      { controlId: 'changelog', label: 'Changelog', keywords: ['history', 'releases', 'changes'] },
+    ],
   },
 ];

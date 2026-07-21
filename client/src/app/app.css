@@ -709,6 +709,122 @@
   -webkit-user-select: none;
 }
 
+/* Heimdall — Logs section */
+.log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.log-controls .field {
+  min-width: 8rem;
+}
+
+.log-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 26rem;
+  overflow-y: auto;
+  font-size: var(--text-sm);
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: auto auto auto 1fr;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.log-row--warn {
+  background: color-mix(in srgb, var(--warn) 8%, transparent);
+}
+
+.log-row--error {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.log-row__time {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.log-row__module {
+  color: var(--accent-2);
+  font-size: var(--text-xs);
+}
+
+.log-row__msg {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.log-row__level {
+  min-width: 3.25rem;
+}
+
+.log-lvl--warn {
+  color: var(--warn);
+}
+
+.log-lvl--error,
+.log-lvl--fatal {
+  color: var(--danger);
+}
+
+.log-lvl--debug,
+.log-lvl--trace {
+  color: var(--text-muted);
+}
+
+/* Heimdall — About section */
+.about-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.about-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.about-row dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.about-links {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.about-links a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.about-links a:hover {
+  text-decoration: underline;
+}
+
+.changelog {
+  margin: 0;
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
 /* Heimdall — key-cap shortcut field */
 .shortcut-field {
   display: flex;
