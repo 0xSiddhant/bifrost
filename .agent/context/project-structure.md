@@ -35,7 +35,7 @@ bifrost/
 │       │                      #   + shared JSON stack: json/ (parse/format/diff), ui/JsonEditor,
 │       │                      #   ui/TreeView, textNormalize, runestone client, relicNames name-bank
 │       └── features/          # mirrors server modules; route-level code splitting
-│                              #   lore-named where the page is lore-named: muninn→clipboard,
+│                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
 │                              #   runestone + variant added in PLAN-07/08
 ├── scripts/                   # setup.ts (folders/env/migrations), backup.ts

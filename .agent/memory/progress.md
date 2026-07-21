@@ -23,7 +23,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 
 One line per session; **full detail — test evidence, live-verify runs, deviations — lives in [`history.md`](history.md)**.
 
-- 2026-07-21 — Variant invalid-JSON fix: a failed JSON Compare now stays in JSON mode and warns instead of switching to Text and clobbering the text workspace. Live-verified. Branch `fix/variant-invalid-json-preserves-text` (this branch also carries a context/docs sync + this memory restructure).
+- 2026-07-21 — Variant invalid-JSON fix: a failed JSON Compare now stays in JSON mode and warns instead of switching to Text and clobbering the text workspace. Live-verified. Also on this branch: context/docs sync, this memory restructure, and two lore renames — **Muninn → Hermes** (`/hermes`, `features/hermes/HermesPage`) and **Mímir → Pensieve** (`/runestone/pensieve`, `PensievePage`); old routes 301-redirect; server module ids (`clipboard`, `runestone`) unchanged. Branch `fix/variant-invalid-json-preserves-text`.
 - 2026-07-20 — **PLAN-08 (Variant)** implemented + 4 owner-feedback rounds → merged (PR #17): structural JSON diff + text fallback, editable panes in both modes, JSON/text as separate workspaces, diff-only-on-Compare, and perf caps for large docs. `--diff-*` theme tokens added.
 - 2026-07-19 — **PLAN-07 (Runestone)** Part A + B merged (PR #14/#15) + addendum: public data endpoint `GET /runestone/api/:slug`, library renamed **Mímir**. Greek names added to the runestone name-bank.
 - 2026-07-18 — Olympus world: `themes/olympus.json` built-in, `greek.tsx` relics 14→20, GREEK character pool.

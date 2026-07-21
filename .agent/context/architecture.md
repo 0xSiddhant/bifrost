@@ -19,7 +19,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 |---|---|---|
 | `file-transfer` | Upload (write-only) + download (read-only) + live folder watch | local only |
 | `previews` | In-browser image/PDF/video/markdown preview, range requests | local only |
-| `clipboard` | Cross-device text/clipboard sync (Muninn page) | local only |
+| `clipboard` | Cross-device text/clipboard sync (Hermes page) | local only |
 | `themes` | Theme engine, JSON themes, dynamic switching | both |
 | `heimdall` | Hidden admin panel (gesture/shortcut + PIN) | both |
 | `qr-tool` | QR generator utility + server-URL QR (Sigil page) | both |
@@ -28,7 +28,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
 
-`variant` is **capability-only**: its `register()` is a deliberate no-op — all comparison runs client-side; the module exists purely so `/api/capabilities` advertises the page (and the Mímir picker's runestone-capability check). Runestone shares the JSON stack (`core/json`, `core/ui/JsonEditor`, `core/ui/TreeView`) that Variant mounts twice — those live in client `core/` because features may never import features.
+`variant` is **capability-only**: its `register()` is a deliberate no-op — all comparison runs client-side; the module exists purely so `/api/capabilities` advertises the page (and the Pensieve picker's runestone-capability check). Runestone shares the JSON stack (`core/json`, `core/ui/JsonEditor`, `core/ui/TreeView`) that Variant mounts twice — those live in client `core/` because features may never import features.
 
 ## Core services (shared kernel — no feature imports)
 
@@ -38,7 +38,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 
 - **Upload:** client `POST /api/files` (multipart) → busboy streams to `storage/tmp/` → usecase validates (size limit from config, filename sanitization, extension blocklist) → atomic `rename()` into `storage/uploads/` → `bus.emit('file.uploaded')` → recorded twice, independently: heimdall's `upload_audit` (uploads metadata card) and audit-log's `audit_events` (cross-module history) — deliberately uncoupled tables. **No read route for `uploads/` exists anywhere.** Files written mode 0644, stored as `<timestamp>-<sanitized-name>`.
 - **Live download:** file dropped into `storage/downloads/` via Finder → chokidar (FSEvents, `awaitWriteFinish`) → `bus.emit('download.added')` → sse-hub broadcasts → every open client updates. Downloads served via controlled endpoint with path-traversal protection, never a raw directory listing.
-- **Runestone save:** editor `POST/PUT /api/runestone` → usecase validates (JSON parse, `RUNESTONE_MAX_DOC_KB` cap) → `runestones` table (id = 6-char handle anchoring the `<kebab-name>-<id>` slug; renames regenerate the slug, stale slugs 301) → `bus.emit('runestone.saved'|'runestone.deleted')` → SSE live-updates open libraries (the **Mímir** page); audit-log records both. Author stored as `author_device_id` only — names resolve client-side.
+- **Runestone save:** editor `POST/PUT /api/runestone` → usecase validates (JSON parse, `RUNESTONE_MAX_DOC_KB` cap) → `runestones` table (id = 6-char handle anchoring the `<kebab-name>-<id>` slug; renames regenerate the slug, stale slugs 301) → `bus.emit('runestone.saved'|'runestone.deleted')` → SSE live-updates open libraries (the **Pensieve** page); audit-log records both. Author stored as `author_device_id` only — names resolve client-side.
 - **Runestone public data endpoint:** `GET /runestone/api/:slug` (outside `/api/`, wins over the SPA fallback) serves the **raw stored document text** as `application/json` with `Access-Control-Allow-Origin: *`, so a saved runestone doubles as a stable data URL for third-party tools. Stale slugs 301 to the canonical data URL; read-only — every write still goes through `/api/runestone`.
 
 ## Restart safety (server is stopped/started constantly)
