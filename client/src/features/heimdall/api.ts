@@ -104,6 +104,10 @@ export interface PresenceDevice {
 export const fetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
   apiGet<{ devices: PresenceDevice[] }>('/api/presence');
 
+/** Drop devices offline for > 7 days, then return the fresh roster. */
+export const prunePresence = (): Promise<{ removed: number; devices: PresenceDevice[] }> =>
+  apiSend<{ removed: number; devices: PresenceDevice[] }>('POST', '/api/presence/prune');
+
 export const fetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
   const query = new URLSearchParams();
   if (params.event) query.set('event', params.event);

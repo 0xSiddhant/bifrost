@@ -50,7 +50,14 @@ export const heimdallModule: FeatureModule = {
       log,
       getSettings,
       updateSettings: new UpdateSettingsUseCase(settingsRepo, getSettings, bus),
-      getStats: new GetStatsUseCase(statsReader, auditRepo, () => sse.clientCount),
+      // "Devices connected" counts distinct online deviceIds, not raw SSE
+      // connections — multiple tabs on one device must not inflate it, so this
+      // matches the online count in the Wardens roster.
+      getStats: new GetStatsUseCase(statsReader, auditRepo, () => {
+        const online = new Set<string>();
+        for (const conn of sse.liveConnections()) if (conn.deviceId) online.add(conn.deviceId);
+        return online.size;
+      }),
       listUploads: new ListUploadsUseCase(auditRepo),
     });
 

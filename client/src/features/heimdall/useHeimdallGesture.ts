@@ -1,32 +1,35 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { bifrostEvents } from '../../core/sse';
 import { matchesShortcut } from '../../core/shortcut';
-import { heimdallGate } from '../../core/heimdallGate';
 import { fetchAccess, type AccessConfig } from './api';
 
 const DEFAULT: AccessConfig = { shortcut: 'shift+meta+comma', tapCount: 7 };
 const TAP_WINDOW_MS = 3000;
 
+/** Entry is tablet/desktop only — gated on viewport width, not UA sniffing. */
+export const HEIMDALL_MIN_WIDTH = 768;
+const isWideViewport = (): boolean =>
+  typeof window !== 'undefined' && window.innerWidth >= HEIMDALL_MIN_WIDTH;
+
 /**
- * Wires the two entry gestures. The keyboard listener is global; `registerTap`
- * is attached to the server-identity marks — the footer `bifrost.local` on
- * desktop and the header wordmark on mobile (where the footer is hidden and
- * there's no keyboard). Both open Heimdall by revealing the gate and navigating
- * there. The current shortcut/tap-count come from /api/heimdall/access and
- * re-sync live on `settings.updated`.
+ * Wires the two entry gestures — header-wordmark taps and the configurable
+ * keyboard shortcut — both of which open the Heimdall modal via `onOpen`.
+ *
+ * Both are gated on a ≥768px viewport (PLAN-10): below the threshold the
+ * keyboard listener is never attached and `registerTap` is a no-op, so a phone
+ * has no entry at all (the wordmark just navigates home). Listeners tear down
+ * and re-attach when the viewport crosses the threshold on resize. The current
+ * shortcut/tap-count come from /api/heimdall/access and re-sync on
+ * `settings.updated`.
  */
-export function useHeimdallGesture(): {
+export function useHeimdallGesture(onOpen: () => void): {
   registerTap: (event?: { preventDefault: () => void }) => void;
 } {
-  const navigate = useNavigate();
+  const openRef = useRef(onOpen);
+  openRef.current = onOpen;
   const configRef = useRef<AccessConfig>(DEFAULT);
+  const wideRef = useRef<boolean>(isWideViewport());
   const tapRef = useRef<{ count: number; timer: number | null }>({ count: 0, timer: null });
-
-  const open = useCallback(() => {
-    heimdallGate.reveal();
-    navigate('/heimdall');
-  }, [navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,12 +42,7 @@ export function useHeimdallGesture(): {
       });
 
     const offSettings = bifrostEvents.on('settings.updated', (payload) => {
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'shortcut' in payload &&
-        'tapCount' in payload
-      ) {
+      if (payload && typeof payload === 'object' && 'shortcut' in payload && 'tapCount' in payload) {
         const next = payload as AccessConfig;
         configRef.current = { shortcut: next.shortcut, tapCount: next.tapCount };
       }
@@ -53,39 +51,48 @@ export function useHeimdallGesture(): {
     const onKey = (event: KeyboardEvent) => {
       if (matchesShortcut(event, configRef.current.shortcut)) {
         event.preventDefault();
-        open();
+        openRef.current();
       }
     };
-    window.addEventListener('keydown', onKey);
+
+    // Attach the keyboard listener only above the threshold; re-evaluate on
+    // resize so crossing the line attaches/detaches it live.
+    const syncKeyListener = () => {
+      const wide = isWideViewport();
+      wideRef.current = wide;
+      window.removeEventListener('keydown', onKey);
+      if (wide) window.addEventListener('keydown', onKey);
+    };
+    syncKeyListener();
+    window.addEventListener('resize', syncKeyListener);
 
     return () => {
       cancelled = true;
       offSettings();
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', syncKeyListener);
     };
-  }, [open]);
+  }, []);
 
-  const registerTap = useCallback(
-    (event?: { preventDefault: () => void }) => {
-      const tap = tapRef.current;
-      tap.count += 1;
-      if (tap.timer !== null) window.clearTimeout(tap.timer);
-      tap.timer = window.setTimeout(() => {
-        tap.count = 0;
-        tap.timer = null;
-      }, TAP_WINDOW_MS);
-      if (tap.count >= configRef.current.tapCount) {
-        tap.count = 0;
-        window.clearTimeout(tap.timer);
-        tap.timer = null;
-        // When the target is the wordmark link, stop its home navigation on the
-        // tap that actually opens Heimdall (react-router Link honors this).
-        event?.preventDefault();
-        open();
-      }
-    },
-    [open],
-  );
+  const registerTap = useCallback((event?: { preventDefault: () => void }) => {
+    // Below the threshold the wordmark is just a home link — no entry exists.
+    if (!wideRef.current) return;
+    const tap = tapRef.current;
+    tap.count += 1;
+    if (tap.timer !== null) window.clearTimeout(tap.timer);
+    tap.timer = window.setTimeout(() => {
+      tap.count = 0;
+      tap.timer = null;
+    }, TAP_WINDOW_MS);
+    if (tap.count >= configRef.current.tapCount) {
+      tap.count = 0;
+      window.clearTimeout(tap.timer);
+      tap.timer = null;
+      // On the trigger tap, stop the wordmark's home navigation (Link honors it).
+      event?.preventDefault();
+      openRef.current();
+    }
+  }, []);
 
   return { registerTap };
 }

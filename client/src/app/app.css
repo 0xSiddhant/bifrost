@@ -423,28 +423,266 @@
   color: var(--text-muted);
 }
 
-/* ── heimdall ───────────────────────────────────────────────── */
-.heimdall-gate {
-  max-width: 22rem;
-  margin: var(--space-12) auto;
-  text-align: center;
+/* ── heimdall modal (PLAN-10) ───────────────────────────────── */
+.heimdall-scrim {
+  place-items: center;
 }
 
-.heimdall-gate .card {
+.heimdall-modal {
+  width: min(64rem, 96vw);
+  height: min(44rem, 92dvh);
+  max-width: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   box-shadow:
     var(--shadow-2),
     var(--glow-soft);
+  display: flex;
+  overflow: hidden;
+  position: relative;
 }
 
-.heimdall-gate .empty__icon {
-  margin: 0 auto var(--space-3);
+.heimdall-modal__loading {
+  margin: auto;
+}
+
+.heimdall-modal__login {
+  margin: auto;
+  width: min(22rem, 90vw);
+  position: relative;
+}
+
+.heimdall-login {
+  text-align: center;
+}
+
+.heimdall-login .empty__icon {
+  margin: 0 auto var(--space-2);
   color: var(--accent);
   box-shadow: var(--glow-teal);
 }
 
+/* left panel: search + grouped nav */
+.heimdall-panel {
+  flex: 0 0 15rem;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  min-height: 0;
+}
+
+.heimdall-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--text-lg);
+  color: var(--accent);
+}
+
+.heimdall-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.heimdall-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  outline: none;
+}
+
+.heimdall-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.heimdall-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-3);
+}
+
+.heimdall-nav__group-label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: var(--space-1) var(--space-2);
+}
+
+.heimdall-nav__empty {
+  padding: var(--space-2);
+}
+
+.heimdall-nav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-md);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.heimdall-nav__item > span:first-child {
+  flex: 1;
+}
+
+.heimdall-nav__item:hover {
+  background: var(--surface);
+}
+
+.heimdall-nav__item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* right content area */
+.heimdall-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.heimdall-content__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+
+.heimdall-content__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.heimdall-content__titles h2 {
+  margin: 0;
+}
+
+.heimdall-content__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.heimdall-content__body {
+  padding: var(--space-5);
+}
+
+.heimdall-close {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background var(--dur-1) var(--ease);
+}
+
+.heimdall-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.heimdall-modal__login .heimdall-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+/* iPad-portrait: panel collapses to a toggled overlay */
+.heimdall-panel-toggle {
+  display: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+@media (max-width: 56rem) {
+  .heimdall-panel {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 2;
+    transform: translateX(-100%);
+    transition: transform var(--dur-2) var(--ease);
+    box-shadow: var(--shadow-2);
+  }
+  .heimdall-panel.is-open {
+    transform: translateX(0);
+  }
+  .heimdall-panel-toggle {
+    display: grid;
+  }
+}
+
+/* search-jump pulse */
+.is-highlighted {
+  animation: heimdall-pulse 2s var(--ease);
+  border-radius: var(--radius-md);
+}
+
+@keyframes heimdall-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  15%,
+  60% {
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-highlighted {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+}
+
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
   gap: var(--space-4);
 }
 
@@ -465,9 +703,8 @@
   color: var(--text-muted);
 }
 
-/* Hidden touch entry to Heimdall — looks like plain text, taps silently. */
+/* Server-identity mark in the footer — decorative only. */
 .footer-mark {
-  cursor: default;
   user-select: none;
   -webkit-user-select: none;
 }
