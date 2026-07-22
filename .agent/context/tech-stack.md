@@ -26,4 +26,6 @@
 | Backup/restore | better-sqlite3 `VACUUM INTO` + `zip`/`unzip` | Online-safe DB snapshot (consistent under WAL) + archive of `storage/` + `themes/`; `core/backup` reused in-process by PLAN-10's button — docs/releasing.md for state boundaries |
 | Release automation | GitHub Actions (`release.yml`) + changelogen | On push to `main`: semver from conventional commits → bump + CHANGELOG → tag → GitHub Release + tarball → `main`→`develop` back-merge; needs a `RELEASE_TOKEN` PAT — docs/releasing.md |
 
-Deferred/optional: Postgres (cloud profile), PWA manifest.
+PWA: static `web app manifest` + icons in `client/public/` (favicon SVG + PNG fallbacks, `apple-touch-icon`, 192/512 "any" + maskable icons) — no service worker (LAN app, no offline story needed). Vite copies `public/` to the dist root; `@fastify/static` serves it (manifest as `application/manifest+json`). Brand mark = the Bifrost rainbow bridge (Aurora `--bridge` teal→violet→green arch on `#0b0e14`).
+
+Deferred/optional: Postgres (cloud profile), PWA service worker / offline caching.

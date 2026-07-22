@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bifrost">
+  <defs>
+    <linearGradient id="bridge" x1="98" y1="0" x2="414" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2dd4bf"/>
+      <stop offset="0.5" stop-color="#8b7cf6"/>
+      <stop offset="1" stop-color="#4ade80"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0b0e14"/>
+  <!-- horizon / ground -->
+  <rect x="98" y="392" width="316" height="10" rx="5" fill="#3a4152"/>
+  <!-- Bifrost: the rainbow bridge, an arch spanning the sky -->
+  <path d="M112 372 A158 158 0 0 1 400 372" fill="none" stroke="url(#bridge)" stroke-width="26" stroke-linecap="round"/>
+  <!-- piers -->
+  <rect x="102" y="360" width="20" height="40" rx="10" fill="#2dd4bf"/>
+  <rect x="390" y="360" width="20" height="40" rx="10" fill="#4ade80"/>
+  <!-- stars -->
+  <circle cx="150" cy="150" r="5" fill="#8b7cf6"/>
+  <circle cx="368" cy="118" r="4" fill="#2dd4bf"/>
+  <circle cx="300" cy="176" r="3" fill="#4ade80"/>
+</svg>
