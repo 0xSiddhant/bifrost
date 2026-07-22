@@ -1,21 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bifrost">
   <defs>
-    <linearGradient id="bridge" x1="98" y1="0" x2="414" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#2dd4bf"/>
-      <stop offset="0.5" stop-color="#8b7cf6"/>
-      <stop offset="1" stop-color="#4ade80"/>
+    <linearGradient id="arch" x1="98" y1="0" x2="414" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="rgb(45,212,191)"/>
+      <stop offset="0.5" stop-color="rgb(109,52,214)"/>
+      <stop offset="1" stop-color="rgb(74,222,128)"/>
     </linearGradient>
+    <radialGradient id="sky" cx="50%" cy="42%" r="75%">
+      <stop offset="0" stop-color="#0b0e14"/>
+      <stop offset="1" stop-color="#05070b"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="96" fill="#0b0e14"/>
-  <!-- horizon / ground -->
-  <rect x="98" y="392" width="316" height="10" rx="5" fill="#3a4152"/>
-  <!-- Bifrost: the rainbow bridge, an arch spanning the sky -->
-  <path d="M112 372 A158 158 0 0 1 400 372" fill="none" stroke="url(#bridge)" stroke-width="26" stroke-linecap="round"/>
-  <!-- piers -->
-  <rect x="102" y="360" width="20" height="40" rx="10" fill="#2dd4bf"/>
-  <rect x="390" y="360" width="20" height="40" rx="10" fill="#4ade80"/>
-  <!-- stars -->
-  <circle cx="150" cy="150" r="5" fill="#8b7cf6"/>
-  <circle cx="368" cy="118" r="4" fill="#2dd4bf"/>
-  <circle cx="300" cy="176" r="3" fill="#4ade80"/>
+  <rect width="512" height="512" rx="112" fill="url(#sky)"/>
+  <circle cx="96" cy="118" r="3" fill="rgb(139,124,246)" opacity="0.85"/>
+  <circle cx="150" cy="74" r="2.4" fill="rgb(45,212,191)" opacity="0.85"/>
+  <circle cx="430" cy="96" r="2.6" fill="rgb(45,212,191)" opacity="0.85"/>
+  <circle cx="66" cy="250" r="2" fill="rgb(45,212,191)" opacity="0.85"/>
+  <circle cx="456" cy="300" r="2.4" fill="rgb(139,124,246)" opacity="0.85"/>
+  <circle cx="118" cy="442" r="1.8" fill="rgb(74,222,128)" opacity="0.85"/>
+  <circle cx="300" cy="58" r="1.8" fill="rgb(235,242,250)" opacity="0.85"/>
+  <circle cx="250" cy="452" r="1.6" fill="rgb(45,212,191)" opacity="0.85"/>
+  <g filter="url(#glow)">
+    <path d="M98.1 261.7 L101.5 254.4 L105.2 247.3 L109.2 240.4 L113.5 233.7 L118.1 227.2 L123.1 220.9 L128.3 214.8 L133.8 209.0 L139.5 203.4 L145.5 198.2 L151.8 193.2 L158.3 188.5 L164.9 184.1 L171.8 180.0 L178.9 176.3 L186.1 172.8 L193.5 169.8 L201.0 167.0 L208.6 164.6 L216.4 162.6 L224.2 161.0 L232.1 159.7 L240.0 158.7 L248.0 158.2 L256.0 158.0 L264.0 158.2 L272.0 158.7 L279.9 159.7 L287.8 161.0 L295.6 162.6 L303.4 164.6 L311.0 167.0 L318.5 169.8 L325.9 172.8 L333.1 176.3 L340.2 180.0 L347.1 184.1 L353.7 188.5 L360.2 193.2 L366.5 198.2 L372.5 203.4 L378.2 209.0 L383.7 214.8 L388.9 220.9 L393.9 227.2 L398.5 233.7 L402.8 240.4 L406.8 247.3 L410.5 254.4 L413.9 261.7" fill="none" stroke="url(#arch)" stroke-width="32" stroke-linecap="round"/>
+    <circle cx="98.1" cy="261.7" r="20" fill="rgb(45,212,191)"/>
+    <circle cx="413.9" cy="261.7" r="20" fill="rgb(74,222,128)"/>
+  </g>
 </svg>
