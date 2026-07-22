@@ -20,6 +20,7 @@ export default {
         'audit-log',
         'runestone',
         'variant',
+        'edda',
         // core areas
         'core',
         'client',
