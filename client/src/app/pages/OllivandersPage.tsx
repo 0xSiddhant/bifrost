@@ -47,18 +47,18 @@ export function OllivandersPage() {
           </Link>
         )}
 
-        <div className="hub-card hub-card--amber hub-card--soon" aria-disabled="true">
-          <span className="hub-card__icon">
-            <DocFileIcon size={22} />
-          </span>
-          <span className="hub-card__title">
-            Edda <span className="hub-card__badge">Coming soon</span>
-          </span>
-          <span className="hub-card__desc">
-            A Markdown workspace with live preview and its own library — next to be carved onto the
-            bridge.
-          </span>
-        </div>
+        {has('edda') && (
+          <Link to="/edda" className="hub-card hub-card--amber">
+            <span className="hub-card__icon">
+              <DocFileIcon size={22} />
+            </span>
+            <span className="hub-card__title">Edda</span>
+            <span className="hub-card__desc">
+              A Markdown workspace with live preview and its own library — write, save, and share
+              rendered pages.
+            </span>
+          </Link>
+        )}
       </div>
     </>
   );
