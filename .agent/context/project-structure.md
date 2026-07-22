@@ -46,12 +46,13 @@ bifrost/
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
 │       ├── core/              # api/sse clients, theme engine, device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
-│       │                      #   JsonEditor +in-editor search, TreeView +bulk collapse), json/ (parse/format/diff),
-│       │                      #   textNormalize, runestone client, relicNames name-bank
+│       │                      #   JsonEditor +markdown mode +in-editor search, TreeView +bulk collapse),
+│       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
+│       │                      #   textNormalize, runestone + edda clients, relicNames name-bank
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
-│                              #   runestone + variant added in PLAN-07/08
+│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
 │                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files

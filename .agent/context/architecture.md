@@ -27,6 +27,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `audit-log` | Upload history & activity log (event-bus subscriber) | local only |
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
+| `edda` | Markdown editor + live preview + saved library (PLAN-11) | both |
 
 `variant` is **capability-only**: its `register()` is a deliberate no-op — all comparison runs client-side; the module exists purely so `/api/capabilities` advertises the page (and the Pensieve picker's runestone-capability check). Runestone shares the JSON stack (`core/json`, `core/ui/JsonEditor`, `core/ui/TreeView`) that Variant mounts twice — those live in client `core/` because features may never import features.
 
@@ -40,6 +41,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 - **Live download:** file dropped into `storage/downloads/` via Finder → chokidar (FSEvents, `awaitWriteFinish`) → `bus.emit('download.added')` → sse-hub broadcasts → every open client updates. Downloads served via controlled endpoint with path-traversal protection, never a raw directory listing.
 - **Runestone save:** editor `POST/PUT /api/runestone` → usecase validates (JSON parse, `RUNESTONE_MAX_DOC_KB` cap) → `runestones` table (id = 6-char handle anchoring the `<kebab-name>-<id>` slug; renames regenerate the slug, stale slugs 301) → `bus.emit('runestone.saved'|'runestone.deleted')` → SSE live-updates open libraries (the **Pensieve** page); audit-log records both. Author stored as `author_device_id` only — names resolve client-side.
 - **Runestone public data endpoint:** `GET /runestone/api/:slug` (outside `/api/`, wins over the SPA fallback) serves the **raw stored document text** as `application/json` with `Access-Control-Allow-Origin: *`, so a saved runestone doubles as a stable data URL for third-party tools. Stale slugs 301 to the canonical data URL; read-only — every write still goes through `/api/runestone`.
+- **Edda (Markdown) save + share:** editor `POST/PUT /api/edda` → usecase validates only the `EDDA_MAX_DOC_KB` cap (markdown is free text — no content validation, an empty doc is valid) → `eddas` table (same id/slug/301 scheme as runestone) → `bus.emit('edda.saved'|'edda.deleted')` → SSE live-updates open libraries; audit-log records both. Three share surfaces: `/edda/<slug>` (editor SPA route, opens Preview mode on mobile), `/edda/preview/<slug>` (public rendered SPA page), and `GET /edda/api/<slug>` — the raw stored Markdown as `text/markdown; charset=utf-8`, CORS `*`, outside `/api/` (wins over the SPA fallback), stale slugs 301, `?download=1` → attachment. Reserved first segments (`preview`, `api`, `library`) are guarded in slug resolution. The Markdown renderer (`client/core/markdown/renderMarkdown` — marked GFM + highlight.js + heading ids + DOMPurify) is one pure function shared by the live preview, the public page, and the HTML export.
 
 ## Restart safety (server is stopped/started constantly)
 
