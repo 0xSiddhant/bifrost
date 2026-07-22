@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**PLAN-11 (Edda) implemented on `feat/plan-11-edda` — gate green + live-verified, uncommitted pending owner test**
+**PLAN-11 (Edda) implemented on `feat/plan-11-edda` → PR #29 into develop — gate green + live-verified, awaiting review**
 
 | Plan    | Title                                              | Status         | Branch / PR                                   | Notes                                                                                           |
 | ------- | -------------------------------------------------- | -------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -17,7 +17,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-08 | Variant (JSON & text diff checker)                 | done           | PR #17 → develop (merged)                     | Owner-tested; merged 2026-07-20. Plan archived to `completed/`. Gate cleared — PLAN-09 unlocked |
 | PLAN-09 | Ops (PM2, backup, Docker, observability)           | done           | PR #19 → develop (merged)                     | All 8 items merged; plan archived to `completed/`. Owner-manual left: PM2 reboot, Linux docker run, live Grafana, release-PAT |
 | PLAN-10 | Heimdall Modal (overlay conversion + new sections) | done           | feat/plan-10-heimdall-modal → PR #20 (merged) | Merged to develop; **archived to `completed/`** per owner 2026-07-21. Gate cleared — PLAN-11 unlocked |
-| PLAN-11 | Edda (markdown editor + preview + library)         | in-progress    | feat/plan-11-edda (no PR yet)                  | Implemented; gate green + live-verified; uncommitted pending owner test                         |
+| PLAN-11 | Edda (markdown editor + preview + library)         | in-review      | feat/plan-11-edda → PR #29                     | Implemented; gate green + live-verified; awaiting review/merge                                   |
 | PLAN-99 | Future backlog                                     | reference-only | —                                             | Never "implemented" wholesale                                                                   |
 
 ## Recent activity (newest first)
