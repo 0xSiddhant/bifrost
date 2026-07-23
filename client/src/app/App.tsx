@@ -52,6 +52,9 @@ const EddaLibraryPage = lazy(() =>
 const EddaPreviewPage = lazy(() =>
   import('../features/edda/EddaPreviewPage').then((m) => ({ default: m.EddaPreviewPage })),
 );
+const LokiPage = lazy(() =>
+  import('../features/loki/LokiPage').then((m) => ({ default: m.LokiPage })),
+);
 
 /**
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
@@ -77,8 +80,8 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda'],
-    modules: ['runestone', 'variant', 'edda'],
+    match: ['/runestone', '/variant', '/edda', '/loki'],
+    modules: ['runestone', 'variant', 'edda', 'loki'],
   },
   {
     to: '/diagon-alley',
@@ -186,6 +189,7 @@ export function App() {
             <Route path="/edda/library" element={<Navigate to="/edda/pensieve" replace />} />
             <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
             <Route path="/edda/:slug" element={<EddaPage />} />
+            <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
             <Route path="*" element={<NotFoundPage />} />

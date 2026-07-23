@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useCapabilities } from '../../core/useCapabilities';
-import { BracesIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
+import { BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
 
 /**
  * Ollivanders — the developer tools category ("the tool chooses the maker").
@@ -56,6 +56,19 @@ export function OllivandersPage() {
             <span className="hub-card__desc">
               A Markdown workspace with live preview and its own library — write, save, and share
               rendered pages.
+            </span>
+          </Link>
+        )}
+
+        {has('loki') && (
+          <Link to="/loki" className="hub-card hub-card--loki">
+            <span className="hub-card__icon">
+              <CodeIcon size={22} />
+            </span>
+            <span className="hub-card__title">Loki</span>
+            <span className="hub-card__desc">
+              A JavaScript shapeshifter — beautify, minify, and transform code, test regex, and run
+              snippets in a sandbox.
             </span>
           </Link>
         )}

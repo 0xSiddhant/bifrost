@@ -24,6 +24,9 @@ const envSchema = z.object({
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
+  // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
+  LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  LOKI_CONSOLE_MAX_ENTRIES: z.coerce.number().int().positive().default(500),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -72,6 +75,12 @@ export interface AppConfig {
     maxDocKb: number;
     /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
     livePreviewMaxKb: number;
+  };
+  loki: {
+    /** Default execution watchdog timeout (Part B); user-adjustable per run. */
+    runTimeoutMs: number;
+    /** Default console entry budget per run (Part B). */
+    consoleMaxEntries: number;
   };
   themes: {
     dir: string;
@@ -152,6 +161,10 @@ export function loadConfig(env: Env = process.env): AppConfig {
     edda: {
       maxDocKb: raw.EDDA_MAX_DOC_KB,
       livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
+    },
+    loki: {
+      runTimeoutMs: raw.LOKI_RUN_TIMEOUT_MS,
+      consoleMaxEntries: raw.LOKI_CONSOLE_MAX_ENTRIES,
     },
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
