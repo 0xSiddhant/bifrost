@@ -707,3 +707,53 @@
   min-width: 3.75rem;
   justify-content: center;
 }
+
+/* ── Shared editor-panel controls (PLAN-12) ────────────────────────────────
+   --panel-font is the per-device editor text size (see core/panelFont.ts),
+   scoped to any .panel-scope wrapper. A theme switch keeps working since only
+   the font-size is set here. */
+.panel-scope .cm-editor {
+  font-size: var(--panel-font, var(--text-sm));
+}
+
+.panel-fontctl,
+.panel-undoredo {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex: none;
+}
+
+.panel-fontctl button,
+.panel-iconbtn {
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 3px 8px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition:
+    background var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+
+.panel-fontctl button:first-child,
+.panel-undoredo .panel-iconbtn:first-child {
+  border-left: none;
+}
+
+.panel-fontctl button:hover,
+.panel-iconbtn:not(:disabled):hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.panel-iconbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

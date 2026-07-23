@@ -11,7 +11,15 @@ import {
   placeholder as cmPlaceholder,
   type DecorationSet,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  isolateHistory,
+  redo,
+  undo,
+} from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import {
   HighlightStyle,
@@ -26,6 +34,7 @@ import {
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
+import { javascript } from '@codemirror/lang-javascript';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -77,6 +86,12 @@ export interface JsonEditorProps {
    */
   markdown?: boolean;
   /**
+   * JavaScript mode (Loki): lang-javascript syntax tinting via --syn-* tokens,
+   * bracket matching + auto-close, no JSON lint/fold. Mutually exclusive with
+   * `plain`/`markdown`. Loki drives transforms through `applyEdit`.
+   */
+  javascript?: boolean;
+  /**
    * Fires when the in-editor find widget lands on a match (the matched text).
    * Variant uses it to reveal the same string in the opposite pane.
    */
@@ -88,6 +103,10 @@ export interface JsonEditorHandle {
   unfoldAll(): void;
   /** Open the in-editor find panel (a discoverable button; ⌘/Ctrl-F also works). */
   openSearch(): void;
+  /** Undo the last change (a discoverable button; ⌘/Ctrl-Z also works). */
+  undo(): void;
+  /** Redo the last undone change (⌘/Ctrl-Shift-Z / Ctrl-Y also work). */
+  redo(): void;
   /**
    * Apply a pure selection edit (Edda's markdown toolbar/shortcuts): `next`
    * receives the current doc + selection and returns the replacement doc +
@@ -176,6 +195,28 @@ const markdownHighlight = HighlightStyle.define([
   { tag: tags.list, color: 'var(--syn-punct)' },
   { tag: tags.processingInstruction, color: 'var(--syn-punct)' },
   { tag: tags.contentSeparator, color: 'var(--syn-punct)' },
+]);
+
+/** JavaScript token colors (Loki) — every value is a theme token, no hex here. */
+const jsHighlight = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--syn-key)' },
+  { tag: tags.controlKeyword, color: 'var(--syn-key)' },
+  { tag: tags.definitionKeyword, color: 'var(--syn-key)' },
+  { tag: tags.moduleKeyword, color: 'var(--syn-key)' },
+  { tag: tags.operatorKeyword, color: 'var(--syn-key)' },
+  { tag: tags.string, color: 'var(--syn-string)' },
+  { tag: tags.special(tags.string), color: 'var(--syn-string)' },
+  { tag: tags.regexp, color: 'var(--syn-number)' },
+  { tag: tags.number, color: 'var(--syn-number)' },
+  { tag: tags.bool, color: 'var(--syn-bool)' },
+  { tag: tags.null, color: 'var(--syn-null)' },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--syn-null)', fontStyle: 'italic' },
+  { tag: tags.propertyName, color: 'var(--syn-key)' },
+  { tag: tags.function(tags.variableName), color: 'var(--syn-string)' },
+  { tag: tags.variableName, color: 'var(--text)' },
+  { tag: tags.typeName, color: 'var(--syn-bool)' },
+  { tag: [tags.punctuation, tags.bracket, tags.separator, tags.operator], color: 'var(--syn-punct)' },
+  { tag: tags.invalid, color: 'var(--danger)' },
 ]);
 
 /** Shared editor chrome — Variant's text-mode merge panes reuse it. */
@@ -340,6 +381,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     highlights,
     plain = false,
     markdown = false,
+    javascript: javascriptMode = false,
     onSearchMatch,
   },
   ref,
@@ -359,25 +401,37 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
-    // Three modes: markdown (Edda), plain (Variant text panes), or JSON.
+    // Four modes: markdown (Edda), javascript (Loki), plain (Variant text
+    // panes), or JSON (Runestone/Variant).
     const modeExtensions = markdown
       ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
-      : plain
-        ? []
-        : [
-            foldGutter(),
+      : javascriptMode
+        ? [
             indentOnInput(),
             indentUnit.of('  '),
             bracketMatching(),
-            // Typing {[" inserts the closing pair; backspacing an empty pair
-            // removes both (closeBracketsKeymap precedes defaultKeymap).
             closeBrackets(),
-            json(),
-            syntaxHighlighting(jsonHighlight),
-            linter(jsonDiagnostics, { delay: 300 }),
-            lintGutter(),
-          ];
-    const jsonOnly = !markdown && !plain;
+            javascript(),
+            syntaxHighlighting(jsHighlight),
+          ]
+        : plain
+          ? []
+          : [
+              foldGutter(),
+              indentOnInput(),
+              indentUnit.of('  '),
+              bracketMatching(),
+              // Typing {[" inserts the closing pair; backspacing an empty pair
+              // removes both (closeBracketsKeymap precedes defaultKeymap).
+              closeBrackets(),
+              json(),
+              syntaxHighlighting(jsonHighlight),
+              linter(jsonDiagnostics, { delay: 300 }),
+              lintGutter(),
+            ];
+    const jsonOnly = !markdown && !plain && !javascriptMode;
+    // Bracket auto-close applies to JSON and JS; folding is JSON-only.
+    const closeBracketsMode = jsonOnly || javascriptMode;
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -395,7 +449,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         search({ top: true }),
         keymap.of([
           ...searchKeymap,
-          ...(jsonOnly ? closeBracketsKeymap : []),
+          ...(closeBracketsMode ? closeBracketsKeymap : []),
           ...defaultKeymap,
           ...historyKeymap,
           ...(jsonOnly ? foldKeymap : []),
@@ -445,7 +499,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, plain, markdown]);
+  }, [readOnly, height, placeholder, plain, markdown, javascriptMode]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -476,6 +530,18 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
       openSearchPanel(view);
       view.focus();
     },
+    undo() {
+      const view = viewRef.current;
+      if (!view) return;
+      undo(view);
+      view.focus();
+    },
+    redo() {
+      const view = viewRef.current;
+      if (!view) return;
+      redo(view);
+      view.focus();
+    },
     applyEdit(next) {
       const view = viewRef.current;
       if (!view) return;
@@ -497,6 +563,9 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         changes: { from: start, to: endOld, insert: result.doc.slice(start, endNew) },
         selection: { anchor: result.from, head: result.to },
         scrollIntoView: true,
+        // Isolate each programmatic edit as its own undo group, so a transform
+        // never merges with the typing before it — one transform, one ⌘Z.
+        annotations: isolateHistory.of('full'),
       });
       view.focus();
     },
