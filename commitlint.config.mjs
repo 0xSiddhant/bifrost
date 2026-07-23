@@ -21,6 +21,7 @@ export default {
         'runestone',
         'variant',
         'edda',
+        'loki',
         // core areas
         'core',
         'client',
