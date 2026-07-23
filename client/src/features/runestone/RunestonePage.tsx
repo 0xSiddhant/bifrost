@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type DragEvent,
+} from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
@@ -12,10 +20,13 @@ import {
   validateJson,
   type JsonIssue,
 } from '../../core/json';
+import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
 import { ApiError } from '../../core/api';
+import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
+import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
@@ -72,6 +83,7 @@ type Phase = 'new' | 'loading' | 'saved' | 'notfound';
 export function RunestonePage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const font = usePanelFont();
 
   const [phase, setPhase] = useState<Phase>(slug ? 'loading' : 'new');
   const [docId, setDocId] = useState<string | null>(null);
@@ -255,6 +267,19 @@ export function RunestonePage() {
     else fail('Copy was blocked by the browser.');
   };
 
+  // Loki's jsonToJs (PLAN-12): valid JSON → a JS object literal (identifier
+  // keys unquoted, single-quoted strings), copied to the clipboard. Enabled
+  // only on Valid JSON ✓, so it's safe by construction.
+  const copyAsJs = async () => {
+    try {
+      const js = jsonToJs(text);
+      if (await copyText(js)) ok('Copied as a JS object literal');
+      else fail('Copy was blocked by the browser.');
+    } catch {
+      fail('Fix the errors first — Copy as JS needs valid JSON.');
+    }
+  };
+
   const clearDocument = () => {
     if (!window.confirm('Clear the document? The cached draft is removed too.')) return;
     setText('');
@@ -411,7 +436,10 @@ export function RunestonePage() {
         </div>
       </div>
 
-      <div className="stack rune-workspace">
+      <div
+        className="stack rune-workspace panel-scope"
+        style={{ '--panel-font': `${font.px}px` } as CSSProperties}
+      >
         {restorable && (
           <Toast kind="info">
             <span className="rune-restore">
@@ -447,6 +475,15 @@ export function RunestonePage() {
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={applyUnescape}>
                 Unescape
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!canTransform}
+                title="Copy as a JavaScript object literal"
+                onClick={() => void copyAsJs()}
+              >
+                Copy as JS
               </Button>
             </div>
             <div className="rune-toolbar__group">
@@ -510,6 +547,8 @@ export function RunestonePage() {
               </Button>
             </div>
             <div className="rune-toolbar__group rune-toolbar__group--end">
+              <UndoRedoControl editor={editorRef} disabled={view !== 'code'} />
+              <PanelFontControl font={font} />
               <div className="rune-viewtoggle" role="group" aria-label="View mode">
                 <button
                   type="button"
