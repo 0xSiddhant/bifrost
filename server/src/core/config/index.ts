@@ -22,6 +22,8 @@ const envSchema = z.object({
   CLIPBOARD_MAX_TEXT_KB: z.coerce.number().int().positive().default(64),
   AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
+  EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
+  EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -65,6 +67,11 @@ export interface AppConfig {
   auditRetentionDays: number;
   runestone: {
     maxDocKb: number;
+  };
+  edda: {
+    maxDocKb: number;
+    /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
+    livePreviewMaxKb: number;
   };
   themes: {
     dir: string;
@@ -141,6 +148,10 @@ export function loadConfig(env: Env = process.env): AppConfig {
     auditRetentionDays: raw.AUDIT_RETENTION_DAYS,
     runestone: {
       maxDocKb: raw.RUNESTONE_MAX_DOC_KB,
+    },
+    edda: {
+      maxDocKb: raw.EDDA_MAX_DOC_KB,
+      livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
     },
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),

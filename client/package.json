@@ -13,6 +13,7 @@
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-markdown": "^6.5.1",
     "@codemirror/language": "^6.12.4",
     "@codemirror/lint": "^6.9.7",
     "@codemirror/merge": "^6.12.2",
@@ -34,6 +35,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
   }

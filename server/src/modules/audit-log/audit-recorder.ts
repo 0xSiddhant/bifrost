@@ -66,6 +66,12 @@ export class AuditRecorder {
       this.bus.on('runestone.deleted', (event) =>
         push('runestone.deleted', null, null, `runestone "${event.name}" deleted`),
       ),
+      this.bus.on('edda.saved', ({ edda }) =>
+        push('edda.saved', edda.authorDeviceId, null, `wrote "${edda.name}" (${fmtBytes(edda.sizeBytes)})`),
+      ),
+      this.bus.on('edda.deleted', (event) =>
+        push('edda.deleted', null, null, `edda "${event.name}" deleted`),
+      ),
     );
   }
 

@@ -43,6 +43,15 @@ const PensievePage = lazy(() =>
 const VariantPage = lazy(() =>
   import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
 );
+const EddaPage = lazy(() =>
+  import('../features/edda/EddaPage').then((m) => ({ default: m.EddaPage })),
+);
+const EddaLibraryPage = lazy(() =>
+  import('../features/edda/EddaLibraryPage').then((m) => ({ default: m.EddaLibraryPage })),
+);
+const EddaPreviewPage = lazy(() =>
+  import('../features/edda/EddaPreviewPage').then((m) => ({ default: m.EddaPreviewPage })),
+);
 
 /**
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
@@ -69,7 +78,7 @@ const NAV: NavCategory[] = [
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
     match: ['/runestone', '/variant', '/edda'],
-    modules: ['runestone', 'variant'],
+    modules: ['runestone', 'variant', 'edda'],
   },
   {
     to: '/diagon-alley',
@@ -170,6 +179,13 @@ export function App() {
             <Route path="/runestone/mimir" element={<Navigate to="/runestone/pensieve" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/variant" element={<VariantPage />} />
+            {/* literal segments beat the :slug param — declared first */}
+            <Route path="/edda" element={<EddaPage />} />
+            <Route path="/edda/pensieve" element={<EddaLibraryPage />} />
+            {/* pre-rename URL (development-only "library") */}
+            <Route path="/edda/library" element={<Navigate to="/edda/pensieve" replace />} />
+            <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
+            <Route path="/edda/:slug" element={<EddaPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
             <Route path="*" element={<NotFoundPage />} />

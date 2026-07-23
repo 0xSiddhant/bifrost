@@ -25,6 +25,7 @@ import {
   unfoldAll,
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
+import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -71,6 +72,11 @@ export interface JsonEditorProps {
    */
   plain?: boolean;
   /**
+   * Markdown mode (Edda): lang-markdown syntax tinting via --syn-* tokens, no
+   * JSON lint/fold/bracket-pairing. Mutually exclusive with `plain`.
+   */
+  markdown?: boolean;
+  /**
    * Fires when the in-editor find widget lands on a match (the matched text).
    * Variant uses it to reveal the same string in the opposite pane.
    */
@@ -82,6 +88,17 @@ export interface JsonEditorHandle {
   unfoldAll(): void;
   /** Open the in-editor find panel (a discoverable button; ⌘/Ctrl-F also works). */
   openSearch(): void;
+  /**
+   * Apply a pure selection edit (Edda's markdown toolbar/shortcuts): `next`
+   * receives the current doc + selection and returns the replacement doc +
+   * selection. The editor commits it as a minimal change so undo stays one step
+   * and large documents don't re-flow the whole buffer.
+   */
+  applyEdit(next: (current: { doc: string; from: number; to: number }) => {
+    doc: string;
+    from: number;
+    to: number;
+  }): void;
   /** Move the cursor to a doc offset, scroll it into view, and focus. */
   gotoOffset(offset: number): void;
   /** Scroll a doc offset into view without stealing focus (pane sync jumps). */
@@ -144,6 +161,21 @@ const jsonHighlight = HighlightStyle.define([
   { tag: tags.bracket, color: 'var(--syn-punct)' },
   { tag: tags.separator, color: 'var(--syn-punct)' },
   { tag: tags.invalid, color: 'var(--danger)' },
+]);
+
+/** Markdown token colors (Edda) — every value is a theme token, no hex here. */
+const markdownHighlight = HighlightStyle.define([
+  { tag: tags.heading, color: 'var(--syn-key)', fontWeight: '600' },
+  { tag: tags.strong, fontWeight: '700', color: 'var(--text)' },
+  { tag: tags.emphasis, fontStyle: 'italic', color: 'var(--text)' },
+  { tag: tags.strikethrough, textDecoration: 'line-through' },
+  { tag: tags.link, color: 'var(--syn-string)' },
+  { tag: tags.url, color: 'var(--syn-string)', textDecoration: 'underline' },
+  { tag: tags.monospace, color: 'var(--syn-number)' },
+  { tag: tags.quote, color: 'var(--text-muted)', fontStyle: 'italic' },
+  { tag: tags.list, color: 'var(--syn-punct)' },
+  { tag: tags.processingInstruction, color: 'var(--syn-punct)' },
+  { tag: tags.contentSeparator, color: 'var(--syn-punct)' },
 ]);
 
 /** Shared editor chrome — Variant's text-mode merge panes reuse it. */
@@ -307,6 +339,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     placeholder,
     highlights,
     plain = false,
+    markdown = false,
     onSearchMatch,
   },
   ref,
@@ -326,21 +359,25 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
-    const jsonExtensions = plain
-      ? []
-      : [
-          foldGutter(),
-          indentOnInput(),
-          indentUnit.of('  '),
-          bracketMatching(),
-          // Typing {[" inserts the closing pair; backspacing an empty pair
-          // removes both (closeBracketsKeymap precedes defaultKeymap).
-          closeBrackets(),
-          json(),
-          syntaxHighlighting(jsonHighlight),
-          linter(jsonDiagnostics, { delay: 300 }),
-          lintGutter(),
-        ];
+    // Three modes: markdown (Edda), plain (Variant text panes), or JSON.
+    const modeExtensions = markdown
+      ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
+      : plain
+        ? []
+        : [
+            foldGutter(),
+            indentOnInput(),
+            indentUnit.of('  '),
+            bracketMatching(),
+            // Typing {[" inserts the closing pair; backspacing an empty pair
+            // removes both (closeBracketsKeymap precedes defaultKeymap).
+            closeBrackets(),
+            json(),
+            syntaxHighlighting(jsonHighlight),
+            linter(jsonDiagnostics, { delay: 300 }),
+            lintGutter(),
+          ];
+    const jsonOnly = !markdown && !plain;
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -350,18 +387,18 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         drawSelection(),
         highlightActiveLine(),
         EditorView.lineWrapping,
-        ...jsonExtensions,
+        ...modeExtensions,
         diffHighlightField,
         // In-editor find for every consumer (Runestone / Variant / Edda). The
         // browser's own find can't reach text in a large scrolled buffer; this
-        // can. Works in plain + JSON modes alike.
+        // can. Works in every mode alike.
         search({ top: true }),
         keymap.of([
           ...searchKeymap,
-          ...(plain ? [] : closeBracketsKeymap),
+          ...(jsonOnly ? closeBracketsKeymap : []),
           ...defaultKeymap,
           ...historyKeymap,
-          ...(plain ? [] : foldKeymap),
+          ...(jsonOnly ? foldKeymap : []),
           indentWithTab,
         ]),
         ...(placeholder ? [cmPlaceholder(placeholder)] : []),
@@ -408,7 +445,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, plain]);
+  }, [readOnly, height, placeholder, plain, markdown]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -437,6 +474,30 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
       const view = viewRef.current;
       if (!view) return;
       openSearchPanel(view);
+      view.focus();
+    },
+    applyEdit(next) {
+      const view = viewRef.current;
+      if (!view) return;
+      const doc = view.state.doc.toString();
+      const sel = view.state.selection.main;
+      const result = next({ doc, from: sel.from, to: sel.to });
+      // Minimal change: shrink to the differing middle so undo is one step and
+      // a huge document isn't wholesale-replaced on a single toolbar click.
+      let start = 0;
+      const maxStart = Math.min(doc.length, result.doc.length);
+      while (start < maxStart && doc[start] === result.doc[start]) start += 1;
+      let endOld = doc.length;
+      let endNew = result.doc.length;
+      while (endOld > start && endNew > start && doc[endOld - 1] === result.doc[endNew - 1]) {
+        endOld -= 1;
+        endNew -= 1;
+      }
+      view.dispatch({
+        changes: { from: start, to: endOld, insert: result.doc.slice(start, endNew) },
+        selection: { anchor: result.from, head: result.to },
+        scrollIntoView: true,
+      });
       view.focus();
     },
     gotoOffset(offset: number) {
