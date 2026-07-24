@@ -2910,6 +2910,74 @@ a.hub-card--loki:hover {
   min-width: 0;
 }
 
+/* Code pane | draggable divider | output panel. Stacks below 1024px (the
+   output drops beneath the editor, full width, no divider). */
+.loki-workarea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.loki-divider {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .loki-workarea {
+    flex-direction: row;
+    /* Top-align the panes so the editor box and the output box line up; the
+       code pane is taller (it has the status line below the editor). */
+    align-items: flex-start;
+    gap: 0;
+  }
+  .loki-workarea > .loki-editorwrap {
+    flex: 1 1 auto;
+    min-width: 20vw;
+  }
+  .loki-divider {
+    display: block;
+    flex: 0 0 auto;
+    align-self: stretch;
+    width: 9px;
+    margin: 0 3px;
+    cursor: col-resize;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    transition: background var(--dur-1) var(--ease);
+  }
+  .loki-divider:hover {
+    background: var(--tone-loki);
+  }
+  .loki-output-wrap {
+    flex: 0 0 auto;
+    width: var(--loki-output-w, 20vw);
+    min-width: 20vw;
+    display: flex;
+  }
+}
+
+.loki-editorhead__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.loki-showoutput {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.loki-showoutput:hover {
+  color: var(--text);
+  border-color: var(--tone-loki);
+}
+
 .loki-banner {
   display: inline-flex;
   align-items: center;
@@ -2940,6 +3008,190 @@ a.hub-card--loki:hover {
 
 .loki-status__minify {
   color: var(--tone-loki);
+}
+
+/* Calcifer — run/stop button and the output drawer (Part B). The editor head
+   and the output head share a height so the editor box and output box below
+   them line up. */
+.loki-editorhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: 2.75rem;
+}
+
+.loki-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--tone-loki);
+  border-radius: var(--radius-full);
+  background: var(--tone-loki-soft);
+  color: var(--tone-loki);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-4);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease),
+    box-shadow var(--dur-1) var(--ease);
+}
+
+.loki-run:hover:not(:disabled) {
+  background: var(--tone-loki);
+  color: var(--bg);
+  box-shadow: var(--glow-loki);
+}
+
+.loki-run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Burning while it runs — the Stop target mid-run. */
+.loki-run--stop {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--bg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loki-run--stop {
+    animation: loki-burn 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes loki-burn {
+  from {
+    box-shadow: 0 0 0 0 rgba(255, 120, 60, 0);
+  }
+  to {
+    box-shadow: 0 0 16px 2px rgba(255, 120, 60, 0.55);
+  }
+}
+
+/* The output panel mirrors the code pane: a header row (aligned with the
+   editor head) floating above a bordered body box (aligned with the editor
+   box). So the output box itself is unstyled — only the body is boxed. */
+.loki-output {
+  display: flex;
+  flex-direction: column;
+  /* Same head→box gap as the code pane, so the boxes line up vertically. */
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+/* Header row — no border/background, so it floats above the box like the Run
+   button floats above the editor. Same height as the editor head. */
+.loki-output__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 2.75rem;
+}
+
+.loki-output__status {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.loki-output__status--run {
+  color: var(--tone-loki);
+}
+.loki-output__status--stop {
+  color: var(--text-muted);
+}
+.loki-output__status--error {
+  color: var(--danger);
+}
+
+.loki-output__clear {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loki-output__hide {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loki-output__hide:hover {
+  color: var(--text);
+}
+
+.loki-output__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  /* The bordered box — aligned with the editor box beside it. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  /* A−/A/A+ applies here too (the shared --panel-font). */
+  font-size: var(--panel-font, var(--text-sm));
+  line-height: 1.5;
+  /* Stacked (mobile): a sensible cap. Side-by-side: match the editor height. */
+  max-height: var(--loki-editor-h, 56vh);
+}
+
+@media (min-width: 1024px) {
+  .loki-output__body {
+    /* flex:1 (basis 0%) would collapse in a column with no set height, so pin
+       the body to the editor height explicitly. */
+    flex: none;
+    height: var(--loki-editor-h);
+    max-height: none;
+  }
+}
+
+.loki-output__empty {
+  margin: 0;
+}
+
+.loki-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  padding: 2px 0;
+}
+
+.loki-line--warn {
+  color: var(--syn-bool);
+}
+.loki-line--error {
+  color: var(--danger);
+}
+.loki-line--result {
+  color: var(--tone-loki);
+  font-weight: 600;
+}
+.loki-line--debug {
+  color: var(--text-muted);
+}
+
+.loki-output__error details {
+  margin-top: 2px;
+}
+.loki-output__error pre {
+  white-space: pre-wrap;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin: 2px 0 0;
+}
+
+.loki-line__mark {
+  color: var(--text-muted);
 }
 
 /* Regex mode */

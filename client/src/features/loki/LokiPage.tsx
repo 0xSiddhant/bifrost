@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   beautifyJs,
@@ -16,26 +23,30 @@ import {
   uriDecode,
   uriEncode,
   wrapIife,
+  wrapLastExpression,
   type JsSyntaxError,
 } from '../../core/js';
 import { formatBytes } from '../../core/format';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { usePanelFont } from '../../core/panelFont';
+import { useCapabilities } from '../../core/useCapabilities';
+import { fetchLokiConfig, type LokiConfig } from '../../core/loki';
+import { bifrostEvents } from '../../core/sse';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { Toast } from '../../core/ui/Toast';
-import { AlertIcon, CheckIcon, CodeIcon } from '../../core/ui/icons';
+import { AlertIcon, CheckIcon, CodeIcon, FlameIcon } from '../../core/ui/icons';
 import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type DiffHighlight, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { runRegex } from './regex';
-import { loadLokiDraft, saveLokiDraft } from './draft';
+import { loadLokiDraft, saveLokiDraft, type LokiDraft } from './draft';
+import { LokiRunner } from './runner';
+import { OutputDrawer, emptyOutput, type OutputState } from './OutputDrawer';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or transform JavaScript…';
 const REGEX_PLACEHOLDER = 'Text to test the pattern against…';
 
 type Mode = 'transforms' | 'regex';
-
-const initialDraft = loadLokiDraft();
 
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -63,6 +74,21 @@ export function LokiPage() {
   const navigate = useNavigate();
   const font = usePanelFont();
 
+  // Read the cached workspace ONCE PER MOUNT (not at module load — that value
+  // goes stale, so returning from Variant would restore an old buffer).
+  const draftRef = useRef<LokiDraft | null | undefined>(undefined);
+  if (draftRef.current === undefined) draftRef.current = loadLokiDraft();
+  const initialDraft = draftRef.current;
+  // Latest workspace, mirrored each render so unmount (a nav away) can flush it
+  // synchronously — the 400 ms debounce might not have fired yet.
+  const latestDraftRef = useRef<LokiDraft>({
+    code: initialDraft?.code ?? '',
+    mode: initialDraft?.mode ?? 'transforms',
+    rxPattern: initialDraft?.rxPattern ?? '',
+    rxFlags: initialDraft?.rxFlags ?? 'g',
+    rxSubject: initialDraft?.rxSubject ?? '',
+  });
+
   const [mode, setMode] = useState<Mode>(initialDraft?.mode ?? 'transforms');
 
   // Transforms workspace ----------------------------------------------------
@@ -80,6 +106,77 @@ export function LokiPage() {
   const [rxFlags, setRxFlags] = useState(initialDraft?.rxFlags ?? 'g');
   const [rxSubject, setRxSubject] = useState(initialDraft?.rxSubject ?? '');
 
+  // Execution ("Calcifer", Part B) ------------------------------------------
+  const { capabilities } = useCapabilities();
+  const [lokiConfig, setLokiConfig] = useState<LokiConfig | null>(null);
+  const [output, setOutput] = useState<OutputState>(emptyOutput);
+  const runnerRef = useRef<LokiRunner | null>(null);
+  if (runnerRef.current === null) runnerRef.current = new LokiRunner();
+  const runStartRef = useRef(0);
+  // Output panel lives to the RIGHT of the editor, appears on first Run, is
+  // hide/show-able, and its width is drag-resizable (both panes ≥ 20vw).
+  const [showOutput, setShowOutput] = useState(false);
+  const [everRan, setEverRan] = useState(false);
+  const [outputVw, setOutputVw] = useState(20);
+  const workareaRef = useRef<HTMLDivElement>(null);
+
+  const startDividerDrag = (event: ReactPointerEvent) => {
+    event.preventDefault();
+    const area = workareaRef.current;
+    if (!area) return;
+    const rect = area.getBoundingClientRect();
+    const vw = window.innerWidth;
+    // Keep the code pane ≥ 20vw too, so the output can't grow past this.
+    const maxOutVw = Math.max(20, (rect.width / vw) * 100 - 20);
+    const onMove = (moveEvent: PointerEvent) => {
+      const outPx = rect.right - moveEvent.clientX;
+      const out = Math.max(20, Math.min(maxOutVw, (outPx / vw) * 100));
+      setOutputVw(out);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.userSelect = '';
+    };
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  // Execution is offered only in the local profile AND when Heimdall's master
+  // switch is on — a module in both profiles can't advertise a sub-capability,
+  // so the profile check is the mechanism.
+  const canExecute = capabilities?.profile === 'local' && lokiConfig?.executionEnabled === true;
+
+  // Read the runner policy, and re-read it live when Heimdall changes it.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      void fetchLokiConfig()
+        .then((cfg) => {
+          if (!cancelled) setLokiConfig(cfg);
+        })
+        .catch(() => {
+          // no config → execution just stays hidden; transforms still work
+        });
+    };
+    load();
+    const off = bifrostEvents.on('loki.settingsUpdated', load);
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+
+  // On leaving the page: flush the latest workspace and kill any worker.
+  useEffect(
+    () => () => {
+      saveLokiDraft(latestDraftRef.current);
+      runnerRef.current?.stop();
+    },
+    [],
+  );
+
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
 
@@ -92,10 +189,9 @@ export function LokiPage() {
   // Cache the whole workspace (debounced) so navigating to Variant and back —
   // or a mid-edit refresh — loses nothing.
   useEffect(() => {
-    const id = window.setTimeout(
-      () => saveLokiDraft({ code, mode, rxPattern, rxFlags, rxSubject }),
-      400,
-    );
+    const draft: LokiDraft = { code, mode, rxPattern, rxFlags, rxSubject };
+    latestDraftRef.current = draft;
+    const id = window.setTimeout(() => saveLokiDraft(draft), 400);
     return () => window.clearTimeout(id);
   }, [code, mode, rxPattern, rxFlags, rxSubject]);
 
@@ -180,6 +276,8 @@ export function LokiPage() {
 
   const diffInVariant = () => {
     if (beforeSnapshot === null) return;
+    // Persist the current buffer before we navigate so returning restores it.
+    saveLokiDraft({ code, mode, rxPattern, rxFlags, rxSubject });
     putVariantTextSeed({ left: beforeSnapshot, right: code });
     navigate('/variant');
   };
@@ -189,6 +287,43 @@ export function LokiPage() {
     editorRef.current?.applyEdit(() => ({ doc: '', from: 0, to: 0 }));
     setBeforeSnapshot(null);
     setMinifyInfo(null);
+  };
+
+  const runCode = async () => {
+    const cfg = lokiConfig;
+    const runner = runnerRef.current;
+    if (!cfg || !runner || empty) return;
+    // Reveal the panel (re-appear if it was hidden) and remember we've run.
+    setEverRan(true);
+    setShowOutput(true);
+    setOutput({ ...emptyOutput, running: true });
+    runStartRef.current = performance.now();
+    let key = 0;
+    // Rewrite a trailing expression to `return (…)` so its value shows (REPL).
+    const body = await wrapLastExpression(code);
+    runner.run(
+      body,
+      { fetchAllowed: cfg.fetchAllowed, consoleMaxEntries: cfg.consoleMaxEntries, timeoutMs: cfg.runTimeoutMs },
+      {
+        onLog: (level, text, truncated) =>
+          setOutput((o) => ({ ...o, entries: [...o.entries, { key: key++, level, text, truncated }] })),
+        onTruncated: (dropped) => setOutput((o) => ({ ...o, dropped })),
+        onResult: (value, hasValue) => setOutput((o) => ({ ...o, result: { value, hasValue } })),
+        onError: (name, message, stack) => setOutput((o) => ({ ...o, error: { name, message, stack } })),
+        onSettled: () =>
+          setOutput((o) => ({ ...o, running: false, durationMs: performance.now() - runStartRef.current })),
+      },
+    );
+  };
+
+  const stopRun = () => {
+    runnerRef.current?.stop();
+    setOutput((o) => ({
+      ...o,
+      running: false,
+      stopped: true,
+      durationMs: performance.now() - runStartRef.current,
+    }));
   };
 
   const groups: RailGroup[] = useMemo(() => {
@@ -337,40 +472,106 @@ export function LokiPage() {
                 </div>
               </aside>
 
-              <div className="loki-editorwrap">
-                {syntaxError ? (
-                  <div className="loki-banner loki-banner--bad" role="status">
-                    <AlertIcon size={14} /> {syntaxError.line}:{syntaxError.column} — {syntaxError.message}
-                  </div>
-                ) : !empty ? (
-                  <div className="loki-banner loki-banner--ok" role="status">
-                    <CheckIcon size={14} /> Parses cleanly
-                  </div>
-                ) : null}
+              <div
+                className="loki-workarea"
+                ref={workareaRef}
+                style={{ '--loki-output-w': `${outputVw}vw` } as CSSProperties}
+              >
+                <div className="loki-editorwrap">
+                  <div className="loki-editorhead">
+                    {syntaxError ? (
+                      <div className="loki-banner loki-banner--bad" role="status">
+                        <AlertIcon size={14} /> {syntaxError.line}:{syntaxError.column} —{' '}
+                        {syntaxError.message}
+                      </div>
+                    ) : !empty ? (
+                      <div className="loki-banner loki-banner--ok" role="status">
+                        <CheckIcon size={14} /> Parses cleanly
+                      </div>
+                    ) : (
+                      <span />
+                    )}
 
-                <JsonEditor
-                  ref={editorRef}
-                  value={code}
-                  onChange={setCode}
-                  javascript
-                  height="var(--loki-editor-h, 56vh)"
-                  placeholder={EDITOR_PLACEHOLDER}
-                />
-
-                <div className="loki-status" aria-live="polite">
-                  <span className="caption">
-                    {formatBytes(stats.bytes)} · {stats.lines} {stats.lines === 1 ? 'line' : 'lines'}
-                  </span>
-                  {busy && <span className="caption">Working…</span>}
-                  {minifyInfo && (
-                    <span className="caption loki-status__minify">
-                      {formatBytes(minifyInfo.before)} → {formatBytes(minifyInfo.after)}
-                      {minifyInfo.before > 0 && (
-                        <> ({Math.round((1 - minifyInfo.after / minifyInfo.before) * 100)}% smaller)</>
+                    <div className="loki-editorhead__actions">
+                      {/* "Show output" only exists once there's a run to show. */}
+                      {canExecute && everRan && !showOutput && (
+                        <button
+                          type="button"
+                          className="loki-showoutput"
+                          onClick={() => setShowOutput(true)}
+                        >
+                          Show output
+                        </button>
                       )}
+                      {/* Calcifer — the fire that burns the code; also the Stop target. */}
+                      {canExecute &&
+                        (output.running ? (
+                          <button type="button" className="loki-run loki-run--stop" onClick={stopRun}>
+                            <FlameIcon size={15} /> Stop
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="loki-run"
+                            disabled={empty}
+                            onClick={() => void runCode()}
+                          >
+                            <FlameIcon size={15} /> Run
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+
+                  <JsonEditor
+                    ref={editorRef}
+                    value={code}
+                    onChange={setCode}
+                    javascript
+                    height="var(--loki-editor-h, 56vh)"
+                    placeholder={EDITOR_PLACEHOLDER}
+                  />
+
+                  <div className="loki-status" aria-live="polite">
+                    <span className="caption">
+                      {formatBytes(stats.bytes)} · {stats.lines}{' '}
+                      {stats.lines === 1 ? 'line' : 'lines'}
                     </span>
-                  )}
+                    {busy && <span className="caption">Working…</span>}
+                    {minifyInfo && (
+                      <span className="caption loki-status__minify">
+                        {formatBytes(minifyInfo.before)} → {formatBytes(minifyInfo.after)}
+                        {minifyInfo.before > 0 && (
+                          <> ({Math.round((1 - minifyInfo.after / minifyInfo.before) * 100)}% smaller)</>
+                        )}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {canExecute && showOutput && (
+                  <>
+                    <div
+                      className="loki-divider"
+                      role="separator"
+                      aria-orientation="vertical"
+                      aria-label="Resize output panel"
+                      onPointerDown={startDividerDrag}
+                    />
+                    <div className="loki-output-wrap">
+                      <OutputDrawer
+                        state={output}
+                        onClear={() => {
+                          // Clear = back to pristine: no panel, no "Show output"
+                          // (it would only reopen an empty panel).
+                          setOutput(emptyOutput);
+                          setShowOutput(false);
+                          setEverRan(false);
+                        }}
+                        onHide={() => setShowOutput(false)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </Card>
@@ -465,10 +666,11 @@ export function LokiPage() {
 
         {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}
 
-        <p className="loki-soon caption">
-          Coming to Loki: <strong>Calcifer</strong> — run snippets in a killable sandbox with a
-          console drawer (local network only).
-        </p>
+        {capabilities?.profile === 'local' && lokiConfig && !lokiConfig.executionEnabled && (
+          <p className="loki-soon caption">
+            <strong>Calcifer</strong> (sandboxed execution) is turned off in Heimdall.
+          </p>
+        )}
       </div>
 
       {/* Mobile bottom-sheet for a group's actions. */}
