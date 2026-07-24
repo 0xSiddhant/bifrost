@@ -27,4 +27,4 @@ export {
   type MinifyOptions,
   type MinifyResult,
 } from './format';
-export { checkJsSyntax, type JsSyntaxError } from './syntax';
+export { checkJsSyntax, wrapLastExpression, type JsSyntaxError } from './syntax';

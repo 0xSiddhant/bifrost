@@ -11,6 +11,38 @@ export interface JsSyntaxError {
   column: number;
 }
 
+/**
+ * REPL completion value (Loki Part B). If the last top-level statement is an
+ * expression (a bare call, literal, etc.), rewrite it to `return (…)` so the
+ * runner captures and shows its value — the way a console/REPL does. Anything
+ * else (a declaration, loop, if) yields no value. Returns the code unchanged
+ * when it can't be parsed (the runner then surfaces the syntax error).
+ */
+export async function wrapLastExpression(code: string): Promise<string> {
+  if (code.trim() === '') return code;
+  const { parse } = await import('acorn');
+  let body: Array<{ type: string; start: number; end: number; expression?: { start: number; end: number } }>;
+  try {
+    const ast = parse(code, {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      allowAwaitOutsideFunction: true,
+      allowReturnOutsideFunction: true,
+      allowImportExportEverywhere: true,
+    }) as unknown as { body: typeof body };
+    body = ast.body;
+  } catch {
+    return code;
+  }
+  const last = body[body.length - 1];
+  if (!last || last.type !== 'ExpressionStatement' || !last.expression) return code;
+  // `before` ends exactly where the last statement began (same line), so line
+  // numbers in a thrown stack stay aligned.
+  const before = code.slice(0, last.start);
+  const exprSrc = code.slice(last.expression.start, last.expression.end);
+  return `${before}return (${exprSrc});`;
+}
+
 export async function checkJsSyntax(code: string): Promise<JsSyntaxError | null> {
   if (code.trim() === '') return null;
   const { parse } = await import('acorn');
