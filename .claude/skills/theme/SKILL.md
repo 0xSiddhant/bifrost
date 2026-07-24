@@ -23,7 +23,7 @@ the single source of truth for token names and value formats.
 `--danger-soft` · `--scrim`. Everything else is optional and derived from these
 when omitted (`server/src/modules/themes/resolve.ts`). Copy a built-in
 (`themes/aurora.json`, `olympus.json`) as the starting shape — they define the
-full optional set (atmosphere, syntax, diff, qr, **card palette**).
+full optional set (atmosphere, syntax, diff, qr, **card palette**, **screensaver**).
 
 ## Dark themes must read CALM, not glaring (owner's bar)
 
@@ -54,6 +54,25 @@ hub stays on-brand:
 - A theme that omits them inherits the stylesheet default set (`core/tokens.css`).
 - Cards are coloured by **position** (`cardToneClass(index + 1)`), so slot 1 is
   the first card on each page — order your palette so early slots look good first.
+
+## Screensaver palette (`--screen-*`) — Nótt, the idle overlay
+
+The idle particle screensaver reads seven optional colours; omit them and it
+derives on-brand from your accents/veil, or set them for a house-specific idle sky:
+
+- `--screen-veil` — the full-screen backdrop. **Keep it dark and near-opaque**
+  (calm bar applies double here — it fills the whole screen). Light themes get a
+  soft parchment veil with **dark** motes instead (a dark theme's pale stars
+  vanish on light).
+- `--screen-particle` — the drifting stars; `--screen-particle-2` — the brighter
+  near-layer "suns" (usually `--accent-2`).
+- `--screen-line` / `--screen-ripple` — constellation lines + the click ripple
+  (usually `--accent`; a house may use its secondary for the ripple pop).
+- `--screen-glow` — the sun-glow halo; `--screen-quote` — quote text (defaults to
+  `--text`, so usually leave unset).
+
+Mirror the theme's `--stars`/accents so the sky feels like the same world. Same
+restart rule as below (schema/`tokens.css` change → restart + rebuild).
 
 ## QR + fonts (easy to get wrong)
 

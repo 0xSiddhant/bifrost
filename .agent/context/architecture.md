@@ -28,6 +28,9 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
 | `edda` | Markdown editor + live preview + saved library (PLAN-11) | both |
+| `screensaver` | Idle particle-constellation overlay ("Nótt") — policy only; all rendering is client canvas, desktop-only | both |
+
+`screensaver` is **policy-only** (like `variant` is capability-only): it owns no rendering — the overlay is a client `features/screensaver/` canvas mounted at the app root, gated to desktop pointers and shown after an idle timeout. The module exists to serve/persist the Heimdall-tunable settings (`GET /api/screensaver/config` public, admin `PATCH /api/screensaver/settings`, `screensaver.settingsUpdated` → SSE for live rebind), mirroring the Loki settings pattern.
 
 `variant` is **capability-only**: its `register()` is a deliberate no-op — all comparison runs client-side; the module exists purely so `/api/capabilities` advertises the page (and the Pensieve picker's runestone-capability check). Runestone shares the JSON stack (`core/json`, `core/ui/JsonEditor`, `core/ui/TreeView`) that Variant mounts twice — those live in client `core/` because features may never import features.
 

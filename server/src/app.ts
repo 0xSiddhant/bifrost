@@ -33,6 +33,7 @@ import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { lokiModule } from './modules/loki/module.js';
+import { screensaverModule } from './modules/screensaver/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -54,6 +55,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     lokiModule,
+    screensaverModule,
   ],
   cloud: [
     healthModule,
@@ -64,6 +66,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     lokiModule,
+    screensaverModule,
   ],
 };
 

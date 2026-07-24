@@ -39,6 +39,18 @@
   --stars: rgba(233, 237, 245, 0.55);
   --stars-alpha: 1;
 
+  /* screensaver (Nótt) — the idle constellation overlay. The canvas reads these
+     at draw time; the header/quote DOM reads them via CSS. Kept calm: a deep
+     veil, soft drifting stars, a secondary hue for the near-layer "suns", one
+     accent for the lines + click ripple. Themes may override for a house sky;
+     omitted → these defaults. (--screen-quote defaults to --text, so unset.) */
+  --screen-veil: rgba(6, 8, 14, 0.96);
+  --screen-particle: rgba(233, 237, 245, 0.72);
+  --screen-particle-2: #8b7cf6;
+  --screen-line: #2dd4bf;
+  --screen-ripple: #2dd4bf;
+  --screen-glow: #8b7cf6;
+
   /* glows — per-tone halos for icons, portals, focus moments */
   --glow-teal: 0 0 26px rgba(45, 212, 191, 0.35);
   --glow-violet: 0 0 26px rgba(139, 124, 246, 0.38);
@@ -171,6 +183,15 @@
     radial-gradient(65% 50% at 50% 112%, rgba(233, 179, 91, 0.14), transparent 60%);
   --stars: transparent;
   --stars-alpha: 0;
+
+  /* screensaver (Nótt), light — a soft parchment veil with dark drifting
+     motes (the dark theme's light stars would vanish here) and deeper accents. */
+  --screen-veil: rgba(250, 247, 241, 0.95);
+  --screen-particle: rgba(34, 40, 58, 0.5);
+  --screen-particle-2: #6d5fd0;
+  --screen-line: #0f9d8f;
+  --screen-ripple: #0f9d8f;
+  --screen-glow: #6d5fd0;
 
   --glow-teal: 0 0 26px rgba(15, 157, 143, 0.22);
   --glow-violet: 0 0 26px rgba(109, 95, 208, 0.22);

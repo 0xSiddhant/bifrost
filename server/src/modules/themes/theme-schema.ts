@@ -79,6 +79,24 @@ export const CARD_TONE_TOKENS = [
   '--card-10',
 ] as const;
 
+/**
+ * Screensaver (Nótt) palette — colours for the idle particle overlay: its deep
+ * veil, the drifting stars + brighter near-layer "suns", constellation lines,
+ * the click ripple, and the sun-glow. Omitted slots fall back to the stylesheet
+ * defaults (tokens.css) / the core roles at draw time, so a theme need not set
+ * them; override for a house-specific idle sky. `--screen-quote` is the quote
+ * text colour (defaults to `--text`).
+ */
+export const SCREENSAVER_TOKENS = [
+  '--screen-veil',
+  '--screen-particle',
+  '--screen-particle-2',
+  '--screen-line',
+  '--screen-ripple',
+  '--screen-glow',
+  '--screen-quote',
+] as const;
+
 const ATMOSPHERE_COLOR_TOKENS = [
   '--stars',
   '--tone-teal',
@@ -140,6 +158,7 @@ export const ALL_TOKEN_KEYS = [
   ...DIFF_TOKENS,
   ...QR_TOKENS,
   ...CARD_TONE_TOKENS,
+  ...SCREENSAVER_TOKENS,
   ...FONT_TOKENS,
   ...TYPO_SHAPE_TOKENS,
 ] as const;
@@ -152,6 +171,7 @@ for (const key of SYNTAX_TOKENS) tokenProperties[key] = color;
 for (const key of DIFF_TOKENS) tokenProperties[key] = color;
 for (const key of QR_TOKENS) tokenProperties[key] = color;
 for (const key of CARD_TONE_TOKENS) tokenProperties[key] = color;
+for (const key of SCREENSAVER_TOKENS) tokenProperties[key] = color;
 for (const key of FONT_TOKENS) tokenProperties[key] = font;
 for (const key of TYPO_SHAPE_TOKENS) tokenProperties[key] = cssValue;
 
