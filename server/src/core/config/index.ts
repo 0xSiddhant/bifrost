@@ -35,7 +35,7 @@ const envSchema = z.object({
   // client reads these, Heimdall overrides them at runtime. Idle/rotate are
   // seconds; density/motion are enums the particle engine maps to counts/speed.
   SCREENSAVER_ENABLED: z.enum(['true', 'false']).default('true'),
-  SCREENSAVER_IDLE_SECONDS: z.coerce.number().int().min(5).max(3600).default(5),
+  SCREENSAVER_IDLE_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
   SCREENSAVER_PARTICLE_DENSITY: z.enum(['low', 'medium', 'high']).default('medium'),
   SCREENSAVER_MOTION: z.enum(['calm', 'normal', 'lively']).default('normal'),
   SCREENSAVER_CONNECT_LINES: z.enum(['true', 'false']).default('true'),

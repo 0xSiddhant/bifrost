@@ -36,7 +36,7 @@ describe('screensaver module', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({
       enabled: true,
-      idleSeconds: 5,
+      idleSeconds: 60,
       density: 'medium',
       motion: 'normal',
       connectLines: true,
