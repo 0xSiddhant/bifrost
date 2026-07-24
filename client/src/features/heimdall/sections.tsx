@@ -10,12 +10,19 @@ import { Select } from '../../core/ui/Field';
 import { QrCard } from '../../core/ui/QrCard';
 import {
   ClipboardIcon,
+  CodeIcon,
   FolderIcon,
   MonitorIcon,
   QrIcon,
   ShieldIcon,
   UploadIcon,
 } from '../../core/ui/icons';
+import {
+  fetchLokiConfig,
+  patchLokiSettings,
+  type LokiConfig,
+  type LokiSettingsPatch,
+} from '../../core/loki';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
 import {
@@ -536,6 +543,103 @@ function RelicsSection() {
   );
 }
 
+// ── Loki (execution policy, PLAN-12 Part B) ─────────────────────
+
+function LokiSection() {
+  const [cfg, setCfg] = useState<LokiConfig | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLokiConfig()
+      .then((res) => {
+        if (!cancelled) setCfg(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const apply = async (patch: LokiSettingsPatch) => {
+    setSaved(null);
+    setError(null);
+    try {
+      const updated = await patchLokiSettings(patch);
+      setCfg(updated);
+      setSaved('Saved. Open Loki pages update instantly.');
+    } catch {
+      setError('Could not save Loki settings.');
+    }
+  };
+
+  if (!cfg) return <p className="caption">Loading Loki settings…</p>;
+  return (
+    <Card>
+      <div className="stack">
+        <p className="caption">
+          The Loki workbench's sandboxed execution (“Calcifer”). Runs happen in a killable Web
+          Worker with no DOM access. Execution is never offered in the cloud profile.
+        </p>
+        <label className="check-row" id={ctlId('loki-execution')}>
+          <input
+            type="checkbox"
+            checked={cfg.executionEnabled}
+            onChange={(event) => void apply({ executionEnabled: event.target.checked })}
+          />
+          <span>Enable sandboxed execution</span>
+        </label>
+        <label className="check-row" id={ctlId('loki-fetch')}>
+          <input
+            type="checkbox"
+            checked={cfg.fetchAllowed}
+            disabled={!cfg.executionEnabled}
+            onChange={(event) => void apply({ fetchAllowed: event.target.checked })}
+          />
+          <span>Allow fetch() inside a run</span>
+        </label>
+        <div id={ctlId('loki-timeout')}>
+          <Select
+            label="Run timeout (watchdog)"
+            value={String(cfg.runTimeoutMs)}
+            onChange={(event) => void apply({ runTimeoutMs: Number(event.target.value) })}
+          >
+            {[1000, 3000, 5000, 10000, 30000].map((ms) => (
+              <option key={ms} value={ms}>
+                {ms / 1000}s
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div id={ctlId('loki-budget')}>
+          <Select
+            label="Console entry budget"
+            value={String(cfg.consoleMaxEntries)}
+            onChange={(event) => void apply({ consoleMaxEntries: Number(event.target.value) })}
+          >
+            {[100, 250, 500, 1000, 2000].map((n) => (
+              <option key={n} value={n}>
+                {n} entries
+              </option>
+            ))}
+          </Select>
+        </div>
+        {saved && (
+          <p className="caption" role="status" style={{ color: 'var(--ok)' }}>
+            {saved}
+          </p>
+        )}
+        {error && (
+          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ── Storage (donut; expanded in a later tranche) ────────────────
 
 const FOLDER_ORDER = ['uploads', 'downloads', 'logs', 'data'] as const;
@@ -979,6 +1083,20 @@ export const SECTIONS: HeimdallSection[] = [
     blurb: 'The artifacts drifting in the background sky.',
     Component: RelicsSection,
     manifest: [{ controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] }],
+  },
+  {
+    id: 'loki',
+    label: 'Loki',
+    group: 'Realm',
+    icon: <CodeIcon size={16} />,
+    blurb: 'Sandboxed code execution policy for the Loki workbench.',
+    Component: LokiSection,
+    manifest: [
+      { controlId: 'loki-execution', label: 'Enable sandboxed execution', keywords: ['loki', 'run', 'calcifer', 'execute', 'sandbox'] },
+      { controlId: 'loki-fetch', label: 'Allow fetch() in runs', keywords: ['loki', 'fetch', 'network'] },
+      { controlId: 'loki-timeout', label: 'Run timeout', keywords: ['loki', 'watchdog', 'timeout'] },
+      { controlId: 'loki-budget', label: 'Console entry budget', keywords: ['loki', 'console', 'log', 'budget'] },
+    ],
   },
   {
     id: 'storage',
