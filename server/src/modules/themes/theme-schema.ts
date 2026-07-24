@@ -61,12 +61,32 @@ export const DIFF_TOKENS = [
 
 export const QR_TOKENS = ['--qr-module-a', '--qr-module-b', '--qr-bg'] as const;
 
+/**
+ * Card-tone palette — the 10 rotating hues assigned one-per-card across the hub
+ * and portal grids. Each is a single base color; the corner tint and hover glow
+ * are mixed from it in CSS. Omitted slots inherit the stylesheet default set.
+ */
+export const CARD_TONE_TOKENS = [
+  '--card-1',
+  '--card-2',
+  '--card-3',
+  '--card-4',
+  '--card-5',
+  '--card-6',
+  '--card-7',
+  '--card-8',
+  '--card-9',
+  '--card-10',
+] as const;
+
 const ATMOSPHERE_COLOR_TOKENS = [
   '--stars',
   '--tone-teal',
   '--tone-teal-soft',
   '--tone-violet',
   '--tone-violet-soft',
+  '--tone-amber',
+  '--tone-amber-soft',
   '--header-veil',
   '--relic-muted',
 ] as const;
@@ -78,6 +98,7 @@ const ATMOSPHERE_CSS_TOKENS = [
   '--stars-alpha',
   '--glow-teal',
   '--glow-violet',
+  '--glow-amber',
   '--glow-soft',
   '--card-sheen',
   '--relic-alpha',
@@ -118,6 +139,7 @@ export const ALL_TOKEN_KEYS = [
   ...SYNTAX_TOKENS,
   ...DIFF_TOKENS,
   ...QR_TOKENS,
+  ...CARD_TONE_TOKENS,
   ...FONT_TOKENS,
   ...TYPO_SHAPE_TOKENS,
 ] as const;
@@ -129,6 +151,7 @@ for (const key of ATMOSPHERE_CSS_TOKENS) tokenProperties[key] = cssValue;
 for (const key of SYNTAX_TOKENS) tokenProperties[key] = color;
 for (const key of DIFF_TOKENS) tokenProperties[key] = color;
 for (const key of QR_TOKENS) tokenProperties[key] = color;
+for (const key of CARD_TONE_TOKENS) tokenProperties[key] = color;
 for (const key of FONT_TOKENS) tokenProperties[key] = font;
 for (const key of TYPO_SHAPE_TOKENS) tokenProperties[key] = cssValue;
 
