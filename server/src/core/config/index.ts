@@ -24,6 +24,13 @@ const envSchema = z.object({
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
+  // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
+  LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
+  LOKI_CONSOLE_MAX_ENTRIES: z.coerce.number().int().positive().default(500),
+  // Execution master switch + runner fetch access (Heimdall-overridable). The
+  // run UI is additionally gated to the local profile client-side.
+  LOKI_EXECUTION_ENABLED: z.enum(['true', 'false']).default('true'),
+  LOKI_FETCH_ALLOWED: z.enum(['true', 'false']).default('true'),
   THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string().min(1).default('./storage'),
   HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
@@ -72,6 +79,16 @@ export interface AppConfig {
     maxDocKb: number;
     /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
     livePreviewMaxKb: number;
+  };
+  loki: {
+    /** Default execution watchdog timeout (Part B); user-adjustable per run. */
+    runTimeoutMs: number;
+    /** Default console entry budget per run (Part B). */
+    consoleMaxEntries: number;
+    /** Master switch: is sandboxed execution offered at all (Heimdall). */
+    executionEnabled: boolean;
+    /** May a run call fetch() (LAN self-API use); Heimdall-switchable. */
+    fetchAllowed: boolean;
   };
   themes: {
     dir: string;
@@ -153,6 +170,12 @@ export function loadConfig(env: Env = process.env): AppConfig {
       maxDocKb: raw.EDDA_MAX_DOC_KB,
       livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
     },
+    loki: {
+      runTimeoutMs: raw.LOKI_RUN_TIMEOUT_MS,
+      consoleMaxEntries: raw.LOKI_CONSOLE_MAX_ENTRIES,
+      executionEnabled: raw.LOKI_EXECUTION_ENABLED === 'true',
+      fetchAllowed: raw.LOKI_FETCH_ALLOWED === 'true',
+    },
     themes: {
       dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,
@@ -194,6 +217,20 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
   },
   'log.level': (config, value) => {
     if ((LOG_LEVELS as readonly string[]).includes(value)) config.logLevel = value as LogLevel;
+  },
+  'loki.executionEnabled': (config, value) => {
+    config.loki.executionEnabled = value === 'true';
+  },
+  'loki.fetchAllowed': (config, value) => {
+    config.loki.fetchAllowed = value === 'true';
+  },
+  'loki.runTimeoutMs': (config, value) => {
+    const ms = Number(value);
+    if (Number.isInteger(ms) && ms >= 250 && ms <= 30000) config.loki.runTimeoutMs = ms;
+  },
+  'loki.consoleMaxEntries': (config, value) => {
+    const n = Number(value);
+    if (Number.isInteger(n) && n >= 10 && n <= 5000) config.loki.consoleMaxEntries = n;
   },
 };
 

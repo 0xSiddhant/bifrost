@@ -209,3 +209,32 @@ export const BracesIcon = (p: IconProps) => (
     <path d="M16 4h1a2 2 0 0 1 2 2v3.5c0 1 .6 2.5 2 2.5-1.4 0-2 1.5-2 2.5V18a2 2 0 0 1-2 2h-1" />
   </svg>
 );
+
+export const CodeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m8 7-5 5 5 5" />
+    <path d="m16 7 5 5-5 5" />
+    <path d="M13.5 4.5 10.5 19.5" />
+  </svg>
+);
+
+export const UndoIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h11a5 5 0 0 1 0 10h-4" />
+  </svg>
+);
+
+export const RedoIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9a5 5 0 0 0 0 10h4" />
+  </svg>
+);
+
+// Calcifer — the fire that burns Loki's code (Part B run/stop mark).
+export const FlameIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3c.5 3-2 4.5-2 7a2 2 0 0 0 4 0c0-.7-.2-1.3-.5-1.8C16 10 18 12.5 18 15a6 6 0 0 1-12 0c0-3.6 3-6.5 6-12Z" />
+  </svg>
+);

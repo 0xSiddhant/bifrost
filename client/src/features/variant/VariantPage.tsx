@@ -1,13 +1,22 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCapabilities } from '../../core/useCapabilities';
 import { copyText } from '../../core/copy';
 import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
+import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Toast } from '../../core/ui/Toast';
 import { TreeView } from '../../core/ui/TreeView';
+import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { CheckIcon, AlertIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
@@ -28,6 +37,7 @@ import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer } from './ResultsDrawer';
 import { hasActiveNormalization } from '../../core/textNormalize';
+import { takeVariantTextSeed } from '../../core/variantSeed';
 
 /**
  * Variant (PLAN-08): two-pane JSON & text comparison. Structural JSON diff by
@@ -83,6 +93,7 @@ const emptyPane = (label: string): PaneState => ({
 
 export function VariantPage() {
   const { capabilities } = useCapabilities();
+  const font = usePanelFont();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [mode, setMode] = useState<Mode>('json');
@@ -225,6 +236,25 @@ export function VariantPage() {
     };
     // The slug params are the real dependencies; pane text is read fresh inside.
   }, [leftParam, rightParam]);
+
+  // Loki hands raw before/after JS in through a sessionStorage text seed (the
+  // slug params only carry runestones). Consume it once: fill the text panes,
+  // switch to text mode, and compare.
+  useEffect(() => {
+    const seed = takeVariantTextSeed();
+    if (!seed) return;
+    setMode('text');
+    setPanes((prev) => ({
+      ...prev,
+      text: {
+        left: { ...emptyPane('Before'), text: seed.left },
+        right: { ...emptyPane('After'), text: seed.right },
+      },
+    }));
+    setTextResult(compareText(seed.left, seed.right, textOptions));
+    if (startsMobile()) setDrawerOpen(true);
+    // Runs once on mount; the seed clears itself when taken.
+  }, []);
 
   const setSlugParam = (side: Side, slug: string | null) => {
     setSearchParams(
@@ -505,13 +535,16 @@ export function VariantPage() {
       <div className="variant-pane__actions">
         {/* Find is only present where an editor is mounted (not JSON tree view). */}
         {(mode === 'text' || view === 'code') && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => editorRefFor(side).current?.openSearch()}
-          >
-            Find
-          </Button>
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => editorRefFor(side).current?.openSearch()}
+            >
+              Find
+            </Button>
+            <UndoRedoControl editor={editorRefFor(side)} />
+          </>
         )}
         <Button size="sm" variant="ghost" onClick={() => importInto(side)}>
           Import
@@ -702,7 +735,7 @@ export function VariantPage() {
 
   return (
     <>
-      <div className="page-head">
+      <div className="page-head variant-head">
         <div>
           <span className="eyebrow eyebrow--violet">the variant · two stones, one truth</span>
           <h2>Variant</h2>
@@ -711,9 +744,13 @@ export function VariantPage() {
             text for anything else.
           </p>
         </div>
+        <PanelFontControl font={font} />
       </div>
 
-      <div className="stack variant-stack">
+      <div
+        className="stack variant-stack panel-scope"
+        style={{ '--panel-font': `${font.px}px` } as CSSProperties}
+      >
         {mode === 'json' ? (
           <div className="variant-grid">
             {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues)}

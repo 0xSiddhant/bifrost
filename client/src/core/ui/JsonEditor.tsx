@@ -3,6 +3,7 @@ import { EditorState, StateEffect, StateField, type Text } from '@codemirror/sta
 import {
   Decoration,
   EditorView,
+  ViewPlugin,
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
@@ -10,8 +11,17 @@ import {
   lineNumbers,
   placeholder as cmPlaceholder,
   type DecorationSet,
+  type ViewUpdate,
 } from '@codemirror/view';
-import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+  isolateHistory,
+  redo,
+  undo,
+} from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import {
   HighlightStyle,
@@ -26,6 +36,7 @@ import {
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
+import { javascript } from '@codemirror/lang-javascript';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -77,6 +88,12 @@ export interface JsonEditorProps {
    */
   markdown?: boolean;
   /**
+   * JavaScript mode (Loki): lang-javascript syntax tinting via --syn-* tokens,
+   * bracket matching + auto-close, no JSON lint/fold. Mutually exclusive with
+   * `plain`/`markdown`. Loki drives transforms through `applyEdit`.
+   */
+  javascript?: boolean;
+  /**
    * Fires when the in-editor find widget lands on a match (the matched text).
    * Variant uses it to reveal the same string in the opposite pane.
    */
@@ -88,6 +105,10 @@ export interface JsonEditorHandle {
   unfoldAll(): void;
   /** Open the in-editor find panel (a discoverable button; ⌘/Ctrl-F also works). */
   openSearch(): void;
+  /** Undo the last change (a discoverable button; ⌘/Ctrl-Z also works). */
+  undo(): void;
+  /** Redo the last undone change (⌘/Ctrl-Shift-Z / Ctrl-Y also work). */
+  redo(): void;
   /**
    * Apply a pure selection edit (Edda's markdown toolbar/shortcuts): `next`
    * receives the current doc + selection and returns the replacement doc +
@@ -176,6 +197,28 @@ const markdownHighlight = HighlightStyle.define([
   { tag: tags.list, color: 'var(--syn-punct)' },
   { tag: tags.processingInstruction, color: 'var(--syn-punct)' },
   { tag: tags.contentSeparator, color: 'var(--syn-punct)' },
+]);
+
+/** JavaScript token colors (Loki) — every value is a theme token, no hex here. */
+const jsHighlight = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--syn-key)' },
+  { tag: tags.controlKeyword, color: 'var(--syn-key)' },
+  { tag: tags.definitionKeyword, color: 'var(--syn-key)' },
+  { tag: tags.moduleKeyword, color: 'var(--syn-key)' },
+  { tag: tags.operatorKeyword, color: 'var(--syn-key)' },
+  { tag: tags.string, color: 'var(--syn-string)' },
+  { tag: tags.special(tags.string), color: 'var(--syn-string)' },
+  { tag: tags.regexp, color: 'var(--syn-number)' },
+  { tag: tags.number, color: 'var(--syn-number)' },
+  { tag: tags.bool, color: 'var(--syn-bool)' },
+  { tag: tags.null, color: 'var(--syn-null)' },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--syn-null)', fontStyle: 'italic' },
+  { tag: tags.propertyName, color: 'var(--syn-key)' },
+  { tag: tags.function(tags.variableName), color: 'var(--syn-string)' },
+  { tag: tags.variableName, color: 'var(--text)' },
+  { tag: tags.typeName, color: 'var(--syn-bool)' },
+  { tag: [tags.punctuation, tags.bracket, tags.separator, tags.operator], color: 'var(--syn-punct)' },
+  { tag: tags.invalid, color: 'var(--danger)' },
 ]);
 
 /** Shared editor chrome — Variant's text-mode merge panes reuse it. */
@@ -278,6 +321,15 @@ export const editorChrome = (height: string) =>
       boxShadow: '0 0 0 2px var(--accent-soft)',
     },
     '.cm-panel.cm-search .cm-textfield::placeholder': { color: 'var(--text-muted)' },
+    // "N of M" match counter injected by searchMatchCount.
+    '.cm-panel.cm-search .cm-search-count': {
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: 'var(--text-xs)',
+      alignSelf: 'center',
+      whiteSpace: 'nowrap',
+      marginRight: '2px',
+    },
     '.cm-panel.cm-search .cm-button': {
       background: 'var(--surface)',
       backgroundImage: 'none',
@@ -317,6 +369,73 @@ export const editorChrome = (height: string) =>
     '.cm-searchMatch-selected': { backgroundColor: 'var(--accent)', color: 'var(--bg)' },
   });
 
+/**
+ * A "current of total" counter for the find panel (every consumer inherits it:
+ * Runestone / Variant JSON+text / Loki / Edda). CM6's default search panel has
+ * no match count, so this plugin injects a small label into the panel DOM and
+ * keeps it in sync as the query, selection, or document changes.
+ */
+const MATCH_COUNT_CAP = 1000;
+
+const searchMatchCount = ViewPlugin.fromClass(
+  class {
+    constructor(view: EditorView) {
+      this.render(view);
+    }
+
+    update(update: ViewUpdate): void {
+      // The query lives in editor state (setSearchQuery is a transaction), so a
+      // doc edit, selection move, or any transaction can change the count.
+      if (update.docChanged || update.selectionSet || update.transactions.length > 0) {
+        this.render(update.view);
+      }
+    }
+
+    render(view: EditorView): void {
+      const panel = view.dom.querySelector('.cm-panel.cm-search');
+      if (!panel) return;
+      let label = panel.querySelector<HTMLElement>('.cm-search-count');
+      if (!searchPanelOpen(view.state)) {
+        label?.remove();
+        return;
+      }
+      if (!label) {
+        label = document.createElement('span');
+        label.className = 'cm-search-count';
+        const field = panel.querySelector('.cm-textfield');
+        if (field) field.insertAdjacentElement('afterend', label);
+        else panel.appendChild(label);
+      }
+      const query = getSearchQuery(view.state);
+      if (!query.valid || query.search.length === 0) {
+        label.textContent = '';
+        return;
+      }
+      const sel = view.state.selection.main;
+      let count = 0;
+      let current = 0;
+      let capped = false;
+      try {
+        const cursor = query.getCursor(view.state) as Iterator<{ from: number; to: number }>;
+        for (let next = cursor.next(); !next.done; next = cursor.next()) {
+          count += 1;
+          if (next.value.from === sel.from && next.value.to === sel.to) current = count;
+          if (count >= MATCH_COUNT_CAP) {
+            capped = true;
+            break;
+          }
+        }
+      } catch {
+        label.textContent = '';
+        return;
+      }
+      const total = capped ? `${MATCH_COUNT_CAP}+` : String(count);
+      label.textContent =
+        count === 0 ? 'No results' : current > 0 ? `${current} of ${total}` : `${total} found`;
+    }
+  },
+);
+
 /** All strict-JSON errors as CM diagnostics; an empty doc is "empty", not broken. */
 function jsonDiagnostics(view: EditorView): Diagnostic[] {
   const text = view.state.doc.toString();
@@ -340,6 +459,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     highlights,
     plain = false,
     markdown = false,
+    javascript: javascriptMode = false,
     onSearchMatch,
   },
   ref,
@@ -359,25 +479,37 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
-    // Three modes: markdown (Edda), plain (Variant text panes), or JSON.
+    // Four modes: markdown (Edda), javascript (Loki), plain (Variant text
+    // panes), or JSON (Runestone/Variant).
     const modeExtensions = markdown
       ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
-      : plain
-        ? []
-        : [
-            foldGutter(),
+      : javascriptMode
+        ? [
             indentOnInput(),
             indentUnit.of('  '),
             bracketMatching(),
-            // Typing {[" inserts the closing pair; backspacing an empty pair
-            // removes both (closeBracketsKeymap precedes defaultKeymap).
             closeBrackets(),
-            json(),
-            syntaxHighlighting(jsonHighlight),
-            linter(jsonDiagnostics, { delay: 300 }),
-            lintGutter(),
-          ];
-    const jsonOnly = !markdown && !plain;
+            javascript(),
+            syntaxHighlighting(jsHighlight),
+          ]
+        : plain
+          ? []
+          : [
+              foldGutter(),
+              indentOnInput(),
+              indentUnit.of('  '),
+              bracketMatching(),
+              // Typing {[" inserts the closing pair; backspacing an empty pair
+              // removes both (closeBracketsKeymap precedes defaultKeymap).
+              closeBrackets(),
+              json(),
+              syntaxHighlighting(jsonHighlight),
+              linter(jsonDiagnostics, { delay: 300 }),
+              lintGutter(),
+            ];
+    const jsonOnly = !markdown && !plain && !javascriptMode;
+    // Bracket auto-close applies to JSON and JS; folding is JSON-only.
+    const closeBracketsMode = jsonOnly || javascriptMode;
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -391,11 +523,12 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         diffHighlightField,
         // In-editor find for every consumer (Runestone / Variant / Edda). The
         // browser's own find can't reach text in a large scrolled buffer; this
-        // can. Works in every mode alike.
+        // can. Works in every mode alike. The count plugin adds "N of M".
         search({ top: true }),
+        searchMatchCount,
         keymap.of([
           ...searchKeymap,
-          ...(jsonOnly ? closeBracketsKeymap : []),
+          ...(closeBracketsMode ? closeBracketsKeymap : []),
           ...defaultKeymap,
           ...historyKeymap,
           ...(jsonOnly ? foldKeymap : []),
@@ -445,7 +578,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, plain, markdown]);
+  }, [readOnly, height, placeholder, plain, markdown, javascriptMode]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -476,6 +609,18 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
       openSearchPanel(view);
       view.focus();
     },
+    undo() {
+      const view = viewRef.current;
+      if (!view) return;
+      undo(view);
+      view.focus();
+    },
+    redo() {
+      const view = viewRef.current;
+      if (!view) return;
+      redo(view);
+      view.focus();
+    },
     applyEdit(next) {
       const view = viewRef.current;
       if (!view) return;
@@ -497,6 +642,9 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         changes: { from: start, to: endOld, insert: result.doc.slice(start, endNew) },
         selection: { anchor: result.from, head: result.to },
         scrollIntoView: true,
+        // Isolate each programmatic edit as its own undo group, so a transform
+        // never merges with the typing before it — one transform, one ⌘Z.
+        annotations: isolateHistory.of('full'),
       });
       view.focus();
     },
