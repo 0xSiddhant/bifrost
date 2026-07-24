@@ -1,15 +1,64 @@
-import { Link } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
+import { Portal } from '../../core/ui/Portal';
 import { BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
 
 /**
  * Ollivanders — the developer tools category ("the tool chooses the maker").
- * A hub of cards for the structured-text tools; each links to its own page.
- * Edda is advertised as coming soon until PLAN-11 lands.
+ * A hub of portals for the structured-text tools; each links to its own page.
+ *
+ * Card colour follows **position**: each visible portal takes the next card-tone
+ * slot (1, 2, 3 … wrapping after the last). Reorder this list and the colours
+ * reorder with it — no per-card colour is hardcoded.
  */
+interface Tool {
+  module: string;
+  to: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  go: string;
+}
+
+const TOOLS: Tool[] = [
+  {
+    module: 'runestone',
+    to: '/runestone',
+    icon: <BracesIcon size={24} />,
+    title: 'Runestone',
+    description: 'Validate, explore, and shape JSON — code and tree views, saved to the Pensieve.',
+    go: 'carve the runes',
+  },
+  {
+    module: 'variant',
+    to: '/variant',
+    icon: <DiffIcon size={24} />,
+    title: 'Variant',
+    description: 'Compare two JSON or text documents structurally, side by side, and jump between the differences.',
+    go: 'find the divergence',
+  },
+  {
+    module: 'edda',
+    to: '/edda',
+    icon: <DocFileIcon size={24} />,
+    title: 'Edda',
+    description: 'A Markdown workspace with live preview and its own library — write, save, and share rendered pages.',
+    go: 'tell the saga',
+  },
+  {
+    module: 'loki',
+    to: '/loki',
+    icon: <CodeIcon size={24} />,
+    title: 'Loki',
+    description: 'A JavaScript shapeshifter — beautify, minify, and transform code, test regex, and run snippets in a sandbox.',
+    go: 'change the shape',
+  },
+];
+
 export function OllivandersPage() {
   const { capabilities } = useCapabilities();
   const has = (module: string) => !capabilities || capabilities.modules.includes(module);
+  const tools = TOOLS.filter((tool) => has(tool.module));
 
   return (
     <>
@@ -21,57 +70,10 @@ export function OllivandersPage() {
         </div>
       </div>
 
-      <div className="hub-grid">
-        {has('runestone') && (
-          <Link to="/runestone" className="hub-card hub-card--teal">
-            <span className="hub-card__icon">
-              <BracesIcon size={22} />
-            </span>
-            <span className="hub-card__title">Runestone</span>
-            <span className="hub-card__desc">
-              Validate, explore, and shape JSON — code and tree views, saved to the Pensieve.
-            </span>
-          </Link>
-        )}
-
-        {has('variant') && (
-          <Link to="/variant" className="hub-card hub-card--violet">
-            <span className="hub-card__icon">
-              <DiffIcon size={22} />
-            </span>
-            <span className="hub-card__title">Variant</span>
-            <span className="hub-card__desc">
-              Compare two JSON or text documents structurally, side by side, and jump between the
-              differences.
-            </span>
-          </Link>
-        )}
-
-        {has('edda') && (
-          <Link to="/edda" className="hub-card hub-card--amber">
-            <span className="hub-card__icon">
-              <DocFileIcon size={22} />
-            </span>
-            <span className="hub-card__title">Edda</span>
-            <span className="hub-card__desc">
-              A Markdown workspace with live preview and its own library — write, save, and share
-              rendered pages.
-            </span>
-          </Link>
-        )}
-
-        {has('loki') && (
-          <Link to="/loki" className="hub-card hub-card--loki">
-            <span className="hub-card__icon">
-              <CodeIcon size={22} />
-            </span>
-            <span className="hub-card__title">Loki</span>
-            <span className="hub-card__desc">
-              A JavaScript shapeshifter — beautify, minify, and transform code, test regex, and run
-              snippets in a sandbox.
-            </span>
-          </Link>
-        )}
+      <div className="portals">
+        {tools.map((tool, index) => (
+          <Portal key={tool.module} tone={index + 1} {...tool} />
+        ))}
       </div>
     </>
   );
