@@ -47,6 +47,18 @@ export interface LokiSettings {
   consoleMaxEntries: number;
 }
 
+/** Effective Nótt (idle screensaver) settings — public config shape. */
+export interface ScreensaverSettings {
+  enabled: boolean;
+  idleSeconds: number;
+  density: 'low' | 'medium' | 'high';
+  motion: 'calm' | 'normal' | 'lively';
+  connectLines: boolean;
+  mouseReactive: boolean;
+  showQuotes: boolean;
+  quoteRotateSeconds: number;
+}
+
 /** One validated theme as the listing/SSE payload shows it. */
 export interface ThemeSummary {
   id: string;
@@ -132,6 +144,8 @@ export interface BifrostEventMap {
   'edda.deleted': { id: string; name: string };
   /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
   'loki.settingsUpdated': LokiSettings;
+  /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */
+  'screensaver.settingsUpdated': ScreensaverSettings;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

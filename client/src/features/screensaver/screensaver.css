@@ -1,0 +1,180 @@
+/*
+ * Nótt — the idle screensaver overlay. Colours come entirely from theme tokens
+ * (the `--screen-*` group, falling back to core roles), so it recolours per
+ * house theme. The particle field is canvas-drawn; only the header + quote are
+ * DOM. Full-screen, above everything, and only ever mounted while idle.
+ */
+.nott {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  overflow: hidden;
+  background: var(--screen-veil, var(--bg));
+  color: var(--screen-quote, var(--text));
+  user-select: none;
+  animation: nott-in 600ms var(--ease, cubic-bezier(0.2, 0, 0.2, 1)) both;
+}
+
+.nott--leaving {
+  animation: nott-out 340ms ease forwards;
+}
+
+.nott__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Real edge blur — a backdrop-filter masked to the rim so only the periphery
+   goes out of focus (helmet-visor porthole); the centre stays sharp. */
+.nott__depth {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  /* Visible (blur applied) only where the mask is opaque = the edges. */
+  -webkit-mask-image: radial-gradient(ellipse 60% 64% at 50% 46%, transparent 40%, #000 92%);
+  mask-image: radial-gradient(ellipse 60% 64% at 50% 46%, transparent 40%, #000 92%);
+}
+
+/* Cinematic edge darkening + a deep centre — the "hole" you look into; never
+   intercepts the dismiss click. */
+.nott::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(115% 90% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.6) 100%),
+    radial-gradient(60% 55% at 50% 46%, rgba(0, 0, 0, 0.28), transparent 70%);
+}
+
+.nott__brand {
+  position: absolute;
+  top: clamp(1.5rem, 6vh, 3.5rem);
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  pointer-events: none;
+  text-align: center;
+}
+
+.nott__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.nott__mark svg {
+  color: var(--accent);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 55%, transparent));
+}
+
+.nott__tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.nott__quote {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 0 8vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.3rem;
+  text-align: center;
+  pointer-events: none;
+  animation: nott-quote-in 900ms var(--ease, ease) both;
+}
+
+.nott__quote blockquote {
+  margin: 0;
+  max-width: 60rem;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 3.4vw, 2.7rem);
+  line-height: 1.35;
+  color: var(--screen-quote, var(--text));
+  text-shadow: 0 2px 30px color-mix(in srgb, var(--screen-glow, var(--accent-2)) 30%, transparent);
+}
+
+.nott__quote figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.nott__author {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.nott__world {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@keyframes nott-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nott-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes nott-quote-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nott,
+  .nott--leaving,
+  .nott__quote {
+    animation: none;
+  }
+}

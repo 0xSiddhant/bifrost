@@ -49,6 +49,7 @@ describe('boot → health → capabilities', () => {
         'variant',
         'edda',
         'loki',
+        'screensaver',
       ],
     });
   });
