@@ -47,6 +47,9 @@ describe('boot → health → capabilities', () => {
         'audit-log',
         'runestone',
         'variant',
+        'edda',
+        'loki',
+        'screensaver',
       ],
     });
   });

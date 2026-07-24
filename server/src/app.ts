@@ -31,6 +31,9 @@ import { presenceModule } from './modules/presence/module.js';
 import { auditLogModule } from './modules/audit-log/module.js';
 import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
+import { eddaModule } from './modules/edda/module.js';
+import { lokiModule } from './modules/loki/module.js';
+import { screensaverModule } from './modules/screensaver/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -50,8 +53,21 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     auditLogModule,
     runestoneModule,
     variantModule,
+    eddaModule,
+    lokiModule,
+    screensaverModule,
   ],
-  cloud: [healthModule, qrToolModule, themesModule, heimdallModule, runestoneModule, variantModule],
+  cloud: [
+    healthModule,
+    qrToolModule,
+    themesModule,
+    heimdallModule,
+    runestoneModule,
+    variantModule,
+    eddaModule,
+    lokiModule,
+    screensaverModule,
+  ],
 };
 
 const SESSION_EPOCH_KEY = 'heimdall.sessionEpoch';

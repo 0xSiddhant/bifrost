@@ -36,6 +36,13 @@
       "when": 1784474401018,
       "tag": "0004_runestones",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784747290009,
+      "tag": "0005_edda_documents",
+      "breakpoints": true
     }
   ]
 }

@@ -39,6 +39,26 @@ export interface SettingsUpdatedEvent {
   tapCount: number;
 }
 
+/** Effective Loki execution settings (PLAN-12 Part B) — public config shape. */
+export interface LokiSettings {
+  executionEnabled: boolean;
+  fetchAllowed: boolean;
+  runTimeoutMs: number;
+  consoleMaxEntries: number;
+}
+
+/** Effective Nótt (idle screensaver) settings — public config shape. */
+export interface ScreensaverSettings {
+  enabled: boolean;
+  idleSeconds: number;
+  density: 'low' | 'medium' | 'high';
+  motion: 'calm' | 'normal' | 'lively';
+  connectLines: boolean;
+  mouseReactive: boolean;
+  showQuotes: boolean;
+  quoteRotateSeconds: number;
+}
+
 /** One validated theme as the listing/SSE payload shows it. */
 export interface ThemeSummary {
   id: string;
@@ -92,6 +112,19 @@ export interface RunestoneSummary {
   modifiedAt: number;
 }
 
+/** A saved Markdown document as the Edda library lists it (PLAN-11). */
+export interface EddaSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -106,6 +139,13 @@ export interface BifrostEventMap {
   /** Create or update of a saved JSON document — libraries live-refresh from this. */
   'runestone.saved': { runestone: RunestoneSummary };
   'runestone.deleted': { id: string; name: string };
+  /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
+  'edda.saved': { edda: EddaSummary };
+  'edda.deleted': { id: string; name: string };
+  /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
+  'loki.settingsUpdated': LokiSettings;
+  /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */
+  'screensaver.settingsUpdated': ScreensaverSettings;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

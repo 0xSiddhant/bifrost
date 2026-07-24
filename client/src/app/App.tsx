@@ -1,8 +1,11 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
+import { fetchScreensaverConfig, type ScreensaverConfig } from '../core/screensaver';
+import { isDesktopViewport } from '../features/screensaver/isDesktop';
+import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
@@ -43,6 +46,23 @@ const PensievePage = lazy(() =>
 const VariantPage = lazy(() =>
   import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
 );
+const EddaPage = lazy(() =>
+  import('../features/edda/EddaPage').then((m) => ({ default: m.EddaPage })),
+);
+const EddaLibraryPage = lazy(() =>
+  import('../features/edda/EddaLibraryPage').then((m) => ({ default: m.EddaLibraryPage })),
+);
+const EddaPreviewPage = lazy(() =>
+  import('../features/edda/EddaPreviewPage').then((m) => ({ default: m.EddaPreviewPage })),
+);
+const LokiPage = lazy(() =>
+  import('../features/loki/LokiPage').then((m) => ({ default: m.LokiPage })),
+);
+// Nótt idle screensaver — desktop-only, so the whole chunk is loaded lazily and
+// only ever imported on a real computer that has actually gone idle.
+const Screensaver = lazy(() =>
+  import('../features/screensaver/Screensaver').then((m) => ({ default: m.Screensaver })),
+);
 
 /**
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
@@ -68,8 +88,8 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda'],
-    modules: ['runestone', 'variant'],
+    match: ['/runestone', '/variant', '/edda', '/loki'],
+    modules: ['runestone', 'variant', 'edda', 'loki'],
   },
   {
     to: '/diagon-alley',
@@ -86,6 +106,46 @@ export function App() {
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
   const { pathname } = useLocation();
+
+  // Nótt (idle screensaver). The desktop gate is decided once; on a phone/tablet
+  // we never fetch config, never arm the idle timer, never load the overlay.
+  const [isDesktop] = useState(() => isDesktopViewport());
+  const [screensaverConfig, setScreensaverConfig] = useState<ScreensaverConfig | null>(null);
+  const [screensaverActive, setScreensaverActive] = useState(false);
+  const dismissScreensaver = useCallback(() => setScreensaverActive(false), []);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    let cancelled = false;
+    fetchScreensaverConfig()
+      .then((cfg) => {
+        if (!cancelled) setScreensaverConfig(cfg);
+      })
+      .catch(() => {
+        // Module absent (older/cloud server) — the saver simply stays disabled.
+      });
+    // Heimdall edits broadcast the new policy; rebind live without a reload.
+    const off = bifrostEvents.on('screensaver.settingsUpdated', (payload) => {
+      setScreensaverConfig((prev) =>
+        prev ? { ...prev, ...(payload as Partial<ScreensaverConfig>) } : prev,
+      );
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, [isDesktop]);
+
+  useIdle({
+    enabled: isDesktop && Boolean(screensaverConfig?.enabled) && !screensaverActive,
+    idleMs: (screensaverConfig?.idleSeconds ?? 60) * 1000,
+    onIdle: () => {
+      // If the admin panel is open when we go idle, close it first (it must not
+      // sit under the overlay), then raise the saver.
+      setHeimdallOpen(false);
+      setScreensaverActive(true);
+    },
+  });
   const nav = NAV.filter((category) =>
     category.modules.some(
       (module) => module === null || !capabilities || capabilities.modules.includes(module),
@@ -170,6 +230,14 @@ export function App() {
             <Route path="/runestone/mimir" element={<Navigate to="/runestone/pensieve" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/variant" element={<VariantPage />} />
+            {/* literal segments beat the :slug param — declared first */}
+            <Route path="/edda" element={<EddaPage />} />
+            <Route path="/edda/pensieve" element={<EddaLibraryPage />} />
+            {/* pre-rename URL (development-only "library") */}
+            <Route path="/edda/library" element={<Navigate to="/edda/pensieve" replace />} />
+            <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
+            <Route path="/edda/:slug" element={<EddaPage />} />
+            <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
             <Route path="*" element={<NotFoundPage />} />
@@ -182,6 +250,13 @@ export function App() {
       {heimdallOpen && (
         <Suspense fallback={null}>
           <HeimdallModal onClose={() => setHeimdallOpen(false)} />
+        </Suspense>
+      )}
+
+      {/* Nótt idle screensaver — mounted only while active (desktop-only). */}
+      {screensaverActive && screensaverConfig && (
+        <Suspense fallback={null}>
+          <Screensaver config={screensaverConfig} onDismiss={dismissScreensaver} />
         </Suspense>
       )}
 

@@ -10,12 +10,25 @@ import { Select } from '../../core/ui/Field';
 import { QrCard } from '../../core/ui/QrCard';
 import {
   ClipboardIcon,
+  CodeIcon,
   FolderIcon,
   MonitorIcon,
   QrIcon,
   ShieldIcon,
   UploadIcon,
 } from '../../core/ui/icons';
+import {
+  fetchLokiConfig,
+  patchLokiSettings,
+  type LokiConfig,
+  type LokiSettingsPatch,
+} from '../../core/loki';
+import {
+  fetchScreensaverConfig,
+  patchScreensaverSettings,
+  type ScreensaverConfig,
+  type ScreensaverSettingsPatch,
+} from '../../core/screensaver';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
 import {
@@ -536,6 +549,272 @@ function RelicsSection() {
   );
 }
 
+// ── Loki (execution policy, PLAN-12 Part B) ─────────────────────
+
+function LokiSection() {
+  const [cfg, setCfg] = useState<LokiConfig | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLokiConfig()
+      .then((res) => {
+        if (!cancelled) setCfg(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const apply = async (patch: LokiSettingsPatch) => {
+    setSaved(null);
+    setError(null);
+    try {
+      const updated = await patchLokiSettings(patch);
+      setCfg(updated);
+      setSaved('Saved. Open Loki pages update instantly.');
+    } catch {
+      setError('Could not save Loki settings.');
+    }
+  };
+
+  if (!cfg) return <p className="caption">Loading Loki settings…</p>;
+  return (
+    <Card>
+      <div className="stack">
+        <p className="caption">
+          The Loki workbench's sandboxed execution (“Calcifer”). Runs happen in a killable Web
+          Worker with no DOM access. Execution is never offered in the cloud profile.
+        </p>
+        <label className="check-row" id={ctlId('loki-execution')}>
+          <input
+            type="checkbox"
+            checked={cfg.executionEnabled}
+            onChange={(event) => void apply({ executionEnabled: event.target.checked })}
+          />
+          <span>Enable sandboxed execution</span>
+        </label>
+        <label className="check-row" id={ctlId('loki-fetch')}>
+          <input
+            type="checkbox"
+            checked={cfg.fetchAllowed}
+            disabled={!cfg.executionEnabled}
+            onChange={(event) => void apply({ fetchAllowed: event.target.checked })}
+          />
+          <span>Allow fetch() inside a run</span>
+        </label>
+        <div id={ctlId('loki-timeout')}>
+          <Select
+            label="Run timeout (watchdog)"
+            value={String(cfg.runTimeoutMs)}
+            onChange={(event) => void apply({ runTimeoutMs: Number(event.target.value) })}
+          >
+            {[1000, 3000, 5000, 10000, 30000].map((ms) => (
+              <option key={ms} value={ms}>
+                {ms / 1000}s
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div id={ctlId('loki-budget')}>
+          <Select
+            label="Console entry budget"
+            value={String(cfg.consoleMaxEntries)}
+            onChange={(event) => void apply({ consoleMaxEntries: Number(event.target.value) })}
+          >
+            {[100, 250, 500, 1000, 2000].map((n) => (
+              <option key={n} value={n}>
+                {n} entries
+              </option>
+            ))}
+          </Select>
+        </div>
+        {saved && (
+          <p className="caption" role="status" style={{ color: 'var(--ok)' }}>
+            {saved}
+          </p>
+        )}
+        {error && (
+          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+// ── Nótt (idle screensaver) ────────────────────────────────────
+
+const IDLE_CHOICES: [number, string][] = [
+  [5, '5 seconds'],
+  [30, '30 seconds'],
+  [60, '1 minute'],
+  [120, '2 minutes'],
+  [300, '5 minutes'],
+  [600, '10 minutes'],
+  [1800, '30 minutes'],
+];
+
+const ROTATE_CHOICES: [number, string][] = [
+  [8, '8 seconds'],
+  [12, '12 seconds'],
+  [14, '14 seconds'],
+  [20, '20 seconds'],
+  [30, '30 seconds'],
+];
+
+function NottSection() {
+  const [cfg, setCfg] = useState<ScreensaverConfig | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchScreensaverConfig()
+      .then((res) => {
+        if (!cancelled) setCfg(res);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const apply = async (patch: ScreensaverSettingsPatch) => {
+    setSaved(null);
+    setError(null);
+    try {
+      const updated = await patchScreensaverSettings(patch);
+      setCfg(updated);
+      setSaved('Saved. Open screens update instantly.');
+    } catch {
+      setError('Could not save screensaver settings.');
+    }
+  };
+
+  if (!cfg) return <p className="caption">Loading screensaver settings…</p>;
+  return (
+    <Card>
+      <div className="stack">
+        <p className="caption">
+          Nótt — the idle constellation that keeps watch when a screen goes still. Desktop only
+          (never runs on phones or tablets); a click or keystroke dismisses it.
+        </p>
+        <label className="check-row" id={ctlId('nott-enabled')}>
+          <input
+            type="checkbox"
+            checked={cfg.enabled}
+            onChange={(event) => void apply({ enabled: event.target.checked })}
+          />
+          <span>Enable the screensaver</span>
+        </label>
+        <div id={ctlId('nott-idle')}>
+          <Select
+            label="Appear after"
+            value={String(cfg.idleSeconds)}
+            disabled={!cfg.enabled}
+            onChange={(event) => void apply({ idleSeconds: Number(event.target.value) })}
+          >
+            {IDLE_CHOICES.map(([seconds, label]) => (
+              <option key={seconds} value={seconds}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div id={ctlId('nott-density')}>
+          <Select
+            label="Particle density"
+            value={cfg.density}
+            disabled={!cfg.enabled}
+            onChange={(event) =>
+              void apply({ density: event.target.value as ScreensaverConfig['density'] })
+            }
+          >
+            {(['low', 'medium', 'high'] as const).map((band) => (
+              <option key={band} value={band}>
+                {band[0]?.toUpperCase()}
+                {band.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <div id={ctlId('nott-motion')}>
+          <Select
+            label="Motion"
+            value={cfg.motion}
+            disabled={!cfg.enabled}
+            onChange={(event) =>
+              void apply({ motion: event.target.value as ScreensaverConfig['motion'] })
+            }
+          >
+            {(['calm', 'normal', 'lively'] as const).map((band) => (
+              <option key={band} value={band}>
+                {band[0]?.toUpperCase()}
+                {band.slice(1)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <label className="check-row" id={ctlId('nott-lines')}>
+          <input
+            type="checkbox"
+            checked={cfg.connectLines}
+            disabled={!cfg.enabled}
+            onChange={(event) => void apply({ connectLines: event.target.checked })}
+          />
+          <span>Draw constellation lines</span>
+        </label>
+        <label className="check-row" id={ctlId('nott-mouse')}>
+          <input
+            type="checkbox"
+            checked={cfg.mouseReactive}
+            disabled={!cfg.enabled}
+            onChange={(event) => void apply({ mouseReactive: event.target.checked })}
+          />
+          <span>Particles react to the cursor</span>
+        </label>
+        <label className="check-row" id={ctlId('nott-quotes')}>
+          <input
+            type="checkbox"
+            checked={cfg.showQuotes}
+            disabled={!cfg.enabled}
+            onChange={(event) => void apply({ showQuotes: event.target.checked })}
+          />
+          <span>Show a random lore quote</span>
+        </label>
+        <div id={ctlId('nott-rotate')}>
+          <Select
+            label="Quote changes every"
+            value={String(cfg.quoteRotateSeconds)}
+            disabled={!cfg.enabled || !cfg.showQuotes}
+            onChange={(event) => void apply({ quoteRotateSeconds: Number(event.target.value) })}
+          >
+            {ROTATE_CHOICES.map(([seconds, label]) => (
+              <option key={seconds} value={seconds}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {saved && (
+          <p className="caption" role="status" style={{ color: 'var(--ok)' }}>
+            {saved}
+          </p>
+        )}
+        {error && (
+          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ── Storage (donut; expanded in a later tranche) ────────────────
 
 const FOLDER_ORDER = ['uploads', 'downloads', 'logs', 'data'] as const;
@@ -979,6 +1258,38 @@ export const SECTIONS: HeimdallSection[] = [
     blurb: 'The artifacts drifting in the background sky.',
     Component: RelicsSection,
     manifest: [{ controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] }],
+  },
+  {
+    id: 'loki',
+    label: 'Loki',
+    group: 'Realm',
+    icon: <CodeIcon size={16} />,
+    blurb: 'Sandboxed code execution policy for the Loki workbench.',
+    Component: LokiSection,
+    manifest: [
+      { controlId: 'loki-execution', label: 'Enable sandboxed execution', keywords: ['loki', 'run', 'calcifer', 'execute', 'sandbox'] },
+      { controlId: 'loki-fetch', label: 'Allow fetch() in runs', keywords: ['loki', 'fetch', 'network'] },
+      { controlId: 'loki-timeout', label: 'Run timeout', keywords: ['loki', 'watchdog', 'timeout'] },
+      { controlId: 'loki-budget', label: 'Console entry budget', keywords: ['loki', 'console', 'log', 'budget'] },
+    ],
+  },
+  {
+    id: 'nott',
+    label: 'Screensaver',
+    group: 'Realm',
+    icon: <MonitorIcon size={16} />,
+    blurb: 'The idle particle constellation (Nótt) — timing and animation.',
+    Component: NottSection,
+    manifest: [
+      { controlId: 'nott-enabled', label: 'Enable screensaver', keywords: ['screensaver', 'idle', 'nott', 'particles', 'stars'] },
+      { controlId: 'nott-idle', label: 'Idle delay', keywords: ['screensaver', 'idle', 'timeout', 'delay', 'inactivity'] },
+      { controlId: 'nott-density', label: 'Particle density', keywords: ['screensaver', 'particles', 'density', 'stars'] },
+      { controlId: 'nott-motion', label: 'Motion', keywords: ['screensaver', 'motion', 'speed', 'animation'] },
+      { controlId: 'nott-lines', label: 'Constellation lines', keywords: ['screensaver', 'lines', 'constellation'] },
+      { controlId: 'nott-mouse', label: 'Cursor reactivity', keywords: ['screensaver', 'mouse', 'cursor', 'parallax'] },
+      { controlId: 'nott-quotes', label: 'Show quotes', keywords: ['screensaver', 'quote', 'quotes'] },
+      { controlId: 'nott-rotate', label: 'Quote rotation', keywords: ['screensaver', 'quote', 'rotate', 'interval'] },
+    ],
   },
   {
     id: 'storage',

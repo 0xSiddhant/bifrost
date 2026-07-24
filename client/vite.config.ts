@@ -20,6 +20,8 @@ export default defineConfig({
       '/api': { target: `http://localhost:${serverPort}` },
       // public runestone data endpoint lives outside /api (PLAN-07 addendum)
       '/runestone/api': { target: `http://localhost:${serverPort}` },
+      // public edda raw-markdown endpoint lives outside /api (PLAN-11)
+      '/edda/api': { target: `http://localhost:${serverPort}` },
     },
   },
 });

@@ -34,5 +34,6 @@
 ## Frontend
 
 - Design tokens/themes only via CSS custom properties — never hardcode colors in components.
+- Hub/portal cards get their color from the **10-slot card palette** (`--card-1..10`, class `.card-tone-N`). Colour follows **position, per page**: build the grid from an ordered array and render with `cardToneClass(index + 1)` (`core/ui/cardTone.ts`, wraps after 10). Never hand-pick a card color, write a literal `card-tone-N` string, or pass a fixed number — derive from the render index so reordering recolours. Each theme defines its own 10 hues in `themes/*.json`.
 - Responsive-first: layouts verified at 375px, 768px, 1280px.
 - No `localStorage` for critical state; server is the source of truth. Allowed non-critical class (per decision log): theme-choice cache, `deviceId`, relic-collection prefs, draft buffers.

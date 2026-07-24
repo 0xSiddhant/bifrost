@@ -352,14 +352,10 @@
   font-size: var(--text-lg);
 }
 
+/* One grid for every hub of portals (Midgard doors, Ollivanders tools, Diagon
+   Alley stalls). Cards are equal-height by nature; footers align via margin. */
 .portals {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-6);
-}
-
-/* Three transfer doors (Send / Receive / Hermes) — equal-height by nature. */
-.portals--triple {
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-4);
 }
@@ -421,136 +417,37 @@
   text-align: center;
 }
 
-/* ── category hub pages (Ollivanders / Diagon Alley + Midgard extras) ── */
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: var(--space-4);
+/* Card-tone slots — map each card's position to one hue of the 10-tone palette
+   (--card-1..10). The .portal card component (core/ui/ui.css) reads --ct. */
+.card-tone-1 {
+  --ct: var(--card-1);
 }
-
-.hub-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    var(--card-sheen),
-    var(--surface);
-  color: var(--text);
-  overflow: hidden;
-  transition:
-    border-color var(--dur-2) var(--ease),
-    transform var(--dur-2) var(--ease),
-    box-shadow var(--dur-2) var(--ease);
+.card-tone-2 {
+  --ct: var(--card-2);
 }
-
-/* Each card is lit by its own tone — the same gradient language as the Home
-   portals, carried across every category hub. */
-.hub-card--teal {
-  background:
-    radial-gradient(120% 90% at 0% 0%, var(--tone-teal-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-3 {
+  --ct: var(--card-3);
 }
-
-.hub-card--violet {
-  background:
-    radial-gradient(120% 90% at 100% 0%, var(--tone-violet-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-4 {
+  --ct: var(--card-4);
 }
-
-.hub-card--amber {
-  background:
-    radial-gradient(120% 90% at 50% 0%, var(--tone-amber-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-5 {
+  --ct: var(--card-5);
 }
-
-a.hub-card:hover {
-  text-decoration: none;
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-2);
+.card-tone-6 {
+  --ct: var(--card-6);
 }
-
-a.hub-card--teal:hover {
-  border-color: var(--tone-teal);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-teal);
+.card-tone-7 {
+  --ct: var(--card-7);
 }
-
-a.hub-card--violet:hover {
-  border-color: var(--tone-violet);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-violet);
+.card-tone-8 {
+  --ct: var(--card-8);
 }
-
-a.hub-card--amber:hover {
-  border-color: var(--tone-amber);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-amber);
+.card-tone-9 {
+  --ct: var(--card-9);
 }
-
-.hub-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.hub-card--teal .hub-card__icon {
-  background: var(--tone-teal-soft);
-  color: var(--tone-teal);
-}
-
-.hub-card--violet .hub-card__icon {
-  background: var(--tone-violet-soft);
-  color: var(--tone-violet);
-}
-
-.hub-card--amber .hub-card__icon {
-  background: var(--tone-amber-soft);
-  color: var(--tone-amber);
-}
-
-.hub-card__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.hub-card__desc {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-
-.hub-card__badge {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  padding: 1px var(--space-2);
-  white-space: nowrap;
-}
-
-.hub-card--soon {
-  opacity: 0.55;
-  cursor: default;
+.card-tone-10 {
+  --ct: var(--card-10);
 }
 
 .hub-soon-note {
@@ -1791,6 +1688,14 @@ a.hub-card--amber:hover {
 
 /* ═══ Variant — two-pane compare (PLAN-08) ═══════════════════════ */
 
+.variant-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
 .variant-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -2294,4 +2199,1006 @@ a.hub-card--amber:hover {
     grid-template-columns: 1fr;
     gap: var(--space-2);
   }
+}
+
+/* ── Edda (PLAN-11): Markdown editor + live preview + library ─────────────── */
+
+.eyebrow--amber {
+  color: var(--tone-amber);
+}
+
+.edda-workspace-wrap {
+  --edda-h: 60vh;
+}
+
+/* Full-width breakout at ≥1024px (Variant/Runestone precedent); the page head
+   comes along so the whole page aligns. Below that it stays in the column. */
+@media (min-width: 1024px) {
+  .edda-head,
+  .edda-workspace-wrap {
+    --edda-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--edda-w);
+    margin-inline: calc((100% - var(--edda-w)) / 2);
+  }
+  .edda-workspace-wrap {
+    --edda-h: max(30rem, calc(100vh - 22rem));
+  }
+}
+
+.edda-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.edda-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.edda-toolbar__group--end {
+  margin-left: auto;
+  gap: var(--space-1) var(--space-2);
+}
+
+.edda-tool {
+  min-width: 2.2rem;
+  height: 2rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.edda-tool:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.edda-panetoggle {
+  margin-bottom: var(--space-3);
+}
+
+.edda-workspace {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.edda-panes {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+  height: var(--edda-h);
+}
+
+.edda-workspace--stacked .edda-panes {
+  flex-direction: column;
+  gap: var(--space-3);
+  height: auto;
+}
+
+.edda-editor {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+}
+
+.edda-editor .json-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Split mode: editor width from the draggable ratio, preview takes the rest. */
+.edda-workspace--split .edda-editor {
+  flex: 0 0 calc(var(--edda-ratio, 0.5) * 100% - 0.5 * var(--space-3));
+}
+
+.edda-workspace--stacked .edda-editor {
+  height: 50vh;
+}
+
+.edda-divider {
+  flex: 0 0 6px;
+  align-self: stretch;
+  margin: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.edda-divider:hover {
+  background: var(--accent);
+}
+
+.edda-preview-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.edda-workspace--stacked .edda-preview-wrap {
+  height: 50vh;
+}
+
+.edda-preview-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--surface-2);
+}
+
+.edda-outline {
+  flex: 0 0 14rem;
+  max-height: var(--edda-h);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+
+.edda-outline__title {
+  margin-bottom: var(--space-2);
+}
+
+.edda-outline ul,
+.edda-read__outline ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.edda-outline button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.edda-outline button:hover {
+  color: var(--accent);
+}
+
+.edda-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.edda-status__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.edda-status__toggle input {
+  accent-color: var(--accent);
+}
+
+.edda-soon {
+  text-align: center;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+/* Rendered Markdown surface — live preview, public page, shared typography. */
+.md-preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-5);
+  font-size: var(--text-md);
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.md-preview :is(h1, h2, h3, h4, h5, h6) {
+  line-height: 1.25;
+  margin: 1.4em 0 0.5em;
+  scroll-margin-top: var(--space-4);
+}
+
+.md-preview h1 { font-size: 1.7em; }
+.md-preview h2 { font-size: 1.4em; }
+.md-preview h3 { font-size: 1.2em; }
+
+.md-preview :is(p, ul, ol, blockquote, table, pre) {
+  margin: 0 0 var(--space-3);
+}
+
+.md-preview :is(ul, ol) {
+  padding-left: var(--space-6);
+}
+
+.md-preview li {
+  margin: 0.2em 0;
+}
+
+.md-preview a {
+  color: var(--accent);
+}
+
+.md-preview blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: var(--space-3);
+  color: var(--text-muted);
+}
+
+.md-preview code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+.md-preview :not(pre) > code {
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+}
+
+.md-preview pre {
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+
+.md-preview img {
+  max-width: 100%;
+}
+
+.md-preview table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+.md-preview :is(td, th) {
+  border: 1px solid var(--border);
+  padding: var(--space-1) var(--space-2);
+}
+
+.md-preview input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin-right: 0.4em;
+}
+
+.md-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-4) 0;
+}
+
+/* highlight.js token colors from design tokens — theme-aware for free. */
+.md-preview .hljs-comment,
+.md-preview .hljs-quote,
+.md-preview .hljs-meta {
+  color: var(--text-muted);
+}
+
+.md-preview .hljs-keyword,
+.md-preview .hljs-selector-tag,
+.md-preview .hljs-built_in,
+.md-preview .hljs-tag {
+  color: var(--accent);
+}
+
+.md-preview .hljs-string,
+.md-preview .hljs-regexp,
+.md-preview .hljs-addition {
+  color: var(--ok);
+}
+
+.md-preview .hljs-number,
+.md-preview .hljs-literal,
+.md-preview .hljs-symbol,
+.md-preview .hljs-attribute,
+.md-preview .hljs-attr {
+  color: var(--tone-violet);
+}
+
+.md-preview .hljs-title,
+.md-preview .hljs-name,
+.md-preview .hljs-section {
+  color: var(--warn);
+}
+
+.md-preview .hljs-deletion {
+  color: var(--danger);
+}
+
+/* Public read-only page (/edda/preview/:slug). */
+.edda-read__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.edda-read__title {
+  margin: 0;
+}
+
+.edda-read__body {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+
+.edda-read__outline {
+  position: sticky;
+  top: var(--space-4);
+  flex: 0 0 14rem;
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+}
+
+.edda-read__outline a {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.edda-read__outline a:hover {
+  color: var(--accent);
+}
+
+.md-preview--read {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  overflow: visible;
+  max-width: 46rem;
+}
+
+@media (max-width: 900px) {
+  .edda-read__outline {
+    display: none;
+  }
+}
+
+/* ── Loki (PLAN-12): JavaScript workbench ──────────────────────────────────
+   A JS document earns the screen like Runestone/Variant: it breaks out of the
+   62rem shell at ≥1024px into a rail + editor layout. Panel text size is a
+   per-device control scoped to the editor via the shared --panel-font
+   (.panel-scope, see core/ui/ui.css). */
+.loki-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.loki-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.loki-modetoggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.loki-modetoggle__btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-4);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+
+.loki-modetoggle__btn.is-active {
+  background: var(--tone-loki-soft);
+  color: var(--tone-loki);
+}
+
+.loki-workspace {
+  --loki-editor-h: 56vh;
+}
+
+@media (min-width: 1024px) {
+  .loki-head,
+  .loki-workspace {
+    --loki-workspace-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--loki-workspace-w);
+    margin-inline: calc((100% - var(--loki-workspace-w)) / 2);
+  }
+  .loki-workspace {
+    --loki-editor-h: max(28rem, calc(100vh - 22rem));
+  }
+}
+
+.loki-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .loki-body {
+    grid-template-columns: 15rem 1fr;
+    align-items: start;
+  }
+}
+
+.loki-rail {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .loki-rail {
+    display: flex;
+  }
+}
+
+.loki-rail__group,
+.loki-rail__fontrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.loki-rail__fontrow {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.loki-rail__grouplabel {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--text-xs);
+}
+
+.loki-rail__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: stretch;
+}
+
+.loki-rail__actions .btn {
+  justify-content: flex-start;
+}
+
+.loki-sheetbar__controls {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-2);
+}
+
+/* Mobile group chips + font control; hidden on desktop where the rail shows. */
+.loki-sheetbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .loki-sheetbar {
+    display: none;
+  }
+}
+
+.loki-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.loki-editorwrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Code pane | draggable divider | output panel. Stacks below 1024px (the
+   output drops beneath the editor, full width, no divider). */
+.loki-workarea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.loki-divider {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .loki-workarea {
+    flex-direction: row;
+    /* Top-align the panes so the editor box and the output box line up; the
+       code pane is taller (it has the status line below the editor). */
+    align-items: flex-start;
+    gap: 0;
+  }
+  .loki-workarea > .loki-editorwrap {
+    flex: 1 1 auto;
+    min-width: 20vw;
+  }
+  .loki-divider {
+    display: block;
+    flex: 0 0 auto;
+    align-self: stretch;
+    width: 9px;
+    margin: 0 3px;
+    cursor: col-resize;
+    border-radius: var(--radius-full);
+    background: var(--border);
+    transition: background var(--dur-1) var(--ease);
+  }
+  .loki-divider:hover {
+    background: var(--tone-loki);
+  }
+  .loki-output-wrap {
+    flex: 0 0 auto;
+    width: var(--loki-output-w, 20vw);
+    min-width: 20vw;
+    display: flex;
+  }
+}
+
+.loki-editorhead__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.loki-showoutput {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.loki-showoutput:hover {
+  color: var(--text);
+  border-color: var(--tone-loki);
+}
+
+.loki-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.loki-banner--ok {
+  color: var(--ok);
+  background: var(--diff-add-soft);
+}
+
+.loki-banner--bad {
+  color: var(--danger);
+  background: var(--diff-remove-soft);
+}
+
+.loki-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.loki-status__minify {
+  color: var(--tone-loki);
+}
+
+/* Calcifer — run/stop button and the output drawer (Part B). The editor head
+   and the output head share a height so the editor box and output box below
+   them line up. */
+.loki-editorhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: 2.75rem;
+}
+
+.loki-run {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--tone-loki);
+  border-radius: var(--radius-full);
+  background: var(--tone-loki-soft);
+  color: var(--tone-loki);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-4);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) var(--ease),
+    box-shadow var(--dur-1) var(--ease);
+}
+
+.loki-run:hover:not(:disabled) {
+  background: var(--tone-loki);
+  color: var(--bg);
+  box-shadow: var(--glow-loki);
+}
+
+.loki-run:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Burning while it runs — the Stop target mid-run. */
+.loki-run--stop {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--bg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loki-run--stop {
+    animation: loki-burn 0.9s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes loki-burn {
+  from {
+    box-shadow: 0 0 0 0 rgba(255, 120, 60, 0);
+  }
+  to {
+    box-shadow: 0 0 16px 2px rgba(255, 120, 60, 0.55);
+  }
+}
+
+/* The output panel mirrors the code pane: a header row (aligned with the
+   editor head) floating above a bordered body box (aligned with the editor
+   box). So the output box itself is unstyled — only the body is boxed. */
+.loki-output {
+  display: flex;
+  flex-direction: column;
+  /* Same head→box gap as the code pane, so the boxes line up vertically. */
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+/* Header row — no border/background, so it floats above the box like the Run
+   button floats above the editor. Same height as the editor head. */
+.loki-output__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 2.75rem;
+}
+
+.loki-output__status {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.loki-output__status--run {
+  color: var(--tone-loki);
+}
+.loki-output__status--stop {
+  color: var(--text-muted);
+}
+.loki-output__status--error {
+  color: var(--danger);
+}
+
+.loki-output__clear {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loki-output__hide {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loki-output__hide:hover {
+  color: var(--text);
+}
+
+.loki-output__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  /* The bordered box — aligned with the editor box beside it. */
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  /* A−/A/A+ applies here too (the shared --panel-font). */
+  font-size: var(--panel-font, var(--text-sm));
+  line-height: 1.5;
+  /* Stacked (mobile): a sensible cap. Side-by-side: match the editor height. */
+  max-height: var(--loki-editor-h, 56vh);
+}
+
+@media (min-width: 1024px) {
+  .loki-output__body {
+    /* flex:1 (basis 0%) would collapse in a column with no set height, so pin
+       the body to the editor height explicitly. */
+    flex: none;
+    height: var(--loki-editor-h);
+    max-height: none;
+  }
+}
+
+.loki-output__empty {
+  margin: 0;
+}
+
+.loki-line {
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  padding: 2px 0;
+}
+
+.loki-line--warn {
+  color: var(--syn-bool);
+}
+.loki-line--error {
+  color: var(--danger);
+}
+.loki-line--result {
+  color: var(--tone-loki);
+  font-weight: 600;
+}
+.loki-line--debug {
+  color: var(--text-muted);
+}
+
+.loki-output__error details {
+  margin-top: 2px;
+}
+.loki-output__error pre {
+  white-space: pre-wrap;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin: 2px 0 0;
+}
+
+.loki-line__mark {
+  color: var(--text-muted);
+}
+
+/* Regex mode */
+.loki-regex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.loki-regex__inputs {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.loki-regex__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 20rem;
+}
+
+.loki-regex__patternrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: var(--space-1) var(--space-2);
+}
+
+.loki-regex__slash {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.loki-regex__input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.loki-regex__flags {
+  width: 4rem;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-2);
+  color: var(--syn-key);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.loki-regex__count {
+  white-space: nowrap;
+}
+
+.loki-regex__results {
+  max-height: 30vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.loki-regex__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.loki-regex__table th,
+.loki-regex__table td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.loki-regex__table th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.loki-regex__matchtext {
+  color: var(--tone-loki);
+  word-break: break-all;
+}
+
+.loki-regex__group {
+  display: inline-block;
+  margin-right: var(--space-2);
+  color: var(--text-muted);
+}
+
+.loki-soon {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+/* Mobile bottom sheet for a transform group */
+.loki-sheet-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+}
+
+.loki-sheet {
+  width: 100%;
+  background: var(--surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  border-top: 1px solid var(--border);
+  padding: var(--space-4);
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.loki-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.loki-sheet__close {
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.loki-sheet__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.loki-sheet__action {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.loki-sheet__action:disabled {
+  opacity: 0.45;
+  cursor: default;
 }

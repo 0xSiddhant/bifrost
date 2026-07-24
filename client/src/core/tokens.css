@@ -39,6 +39,18 @@
   --stars: rgba(233, 237, 245, 0.55);
   --stars-alpha: 1;
 
+  /* screensaver (Nótt) — the idle constellation overlay. The canvas reads these
+     at draw time; the header/quote DOM reads them via CSS. Kept calm: a deep
+     veil, soft drifting stars, a secondary hue for the near-layer "suns", one
+     accent for the lines + click ripple. Themes may override for a house sky;
+     omitted → these defaults. (--screen-quote defaults to --text, so unset.) */
+  --screen-veil: rgba(6, 8, 14, 0.96);
+  --screen-particle: rgba(233, 237, 245, 0.72);
+  --screen-particle-2: #8b7cf6;
+  --screen-line: #2dd4bf;
+  --screen-ripple: #2dd4bf;
+  --screen-glow: #8b7cf6;
+
   /* glows — per-tone halos for icons, portals, focus moments */
   --glow-teal: 0 0 26px rgba(45, 212, 191, 0.35);
   --glow-violet: 0 0 26px rgba(139, 124, 246, 0.38);
@@ -52,6 +64,28 @@
   --tone-amber: #fbbf24;
   --tone-amber-soft: rgba(251, 191, 36, 0.13);
   --glow-amber: 0 0 26px rgba(251, 191, 36, 0.3);
+  /* Loki (PLAN-12) — the Loki tool page's own emerald accent (Calcifer flame,
+     Run button, etc.). Its hub card rides the shared card palette like every
+     other tool; this token only themes the page UI. */
+  --tone-loki: #34d399;
+  --tone-loki-soft: rgba(52, 211, 153, 0.14);
+  --glow-loki: 0 0 26px rgba(52, 211, 153, 0.34);
+
+  /* Card-tone palette — the 10 rotating hues for hub/portal cards. Each card is
+     assigned one slot (--card-1 → the next unused slot, wrapping after 10). Only
+     the base color is defined; the corner tint and hover glow are mixed from it
+     in CSS (see .card-tone-* in app.css). Themes may override any slot to stay
+     on-brand; a theme that omits them inherits this default jewel set. */
+  --card-1: #2dd4bf;
+  --card-2: #a78bfa;
+  --card-3: #fbbf24;
+  --card-4: #fb7185;
+  --card-5: #38bdf8;
+  --card-6: #34d399;
+  --card-7: #fb923c;
+  --card-8: #818cf8;
+  --card-9: #a3e635;
+  --card-10: #f472b6;
 
   /* translucent chrome */
   --header-veil: rgba(19, 24, 36, 0.78);
@@ -150,6 +184,15 @@
   --stars: transparent;
   --stars-alpha: 0;
 
+  /* screensaver (Nótt), light — a soft parchment veil with dark drifting
+     motes (the dark theme's light stars would vanish here) and deeper accents. */
+  --screen-veil: rgba(250, 247, 241, 0.95);
+  --screen-particle: rgba(34, 40, 58, 0.5);
+  --screen-particle-2: #6d5fd0;
+  --screen-line: #0f9d8f;
+  --screen-ripple: #0f9d8f;
+  --screen-glow: #6d5fd0;
+
   --glow-teal: 0 0 26px rgba(15, 157, 143, 0.22);
   --glow-violet: 0 0 26px rgba(109, 95, 208, 0.22);
   --glow-soft: 0 0 46px rgba(109, 95, 208, 0.1);
@@ -179,6 +222,22 @@
   --tone-amber: #d99b0c;
   --tone-amber-soft: rgba(217, 155, 12, 0.1);
   --glow-amber: 0 0 26px rgba(217, 155, 12, 0.2);
+  --tone-loki: #0f9d6b;
+  --tone-loki-soft: rgba(15, 157, 107, 0.1);
+  --glow-loki: 0 0 26px rgba(15, 157, 107, 0.2);
+
+  /* Card-tone palette (light) — deeper/saturated so the tint reads on a light
+     surface. Same 10 slots as the dark default. */
+  --card-1: #0d9488;
+  --card-2: #7c3aed;
+  --card-3: #d97706;
+  --card-4: #e11d48;
+  --card-5: #0284c7;
+  --card-6: #059669;
+  --card-7: #ea580c;
+  --card-8: #4f46e5;
+  --card-9: #65a30d;
+  --card-10: #db2777;
 
   --header-veil: rgba(255, 255, 255, 0.82);
   --card-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.65) 0%, transparent 42%);

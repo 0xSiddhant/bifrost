@@ -22,6 +22,12 @@
     "--sky": "radial-gradient(55% 40% at 50% -6%, rgba(224, 180, 88, 0.14), transparent 60%), radial-gradient(48% 36% at 12% 108%, rgba(86, 184, 216, 0.1), transparent 62%), radial-gradient(50% 38% at 88% 104%, rgba(127, 191, 110, 0.07), transparent 60%)",
     "--stars": "rgba(242, 238, 227, 0.55)",
     "--stars-alpha": "1",
+    "--screen-veil": "rgba(6, 11, 18, 0.96)",
+    "--screen-particle": "rgba(242, 238, 227, 0.5)",
+    "--screen-particle-2": "#e0b458",
+    "--screen-line": "#56b8d8",
+    "--screen-ripple": "#56b8d8",
+    "--screen-glow": "#e0b458",
     "--glow-teal": "0 0 26px rgba(86, 184, 216, 0.32)",
     "--glow-violet": "0 0 26px rgba(224, 180, 88, 0.24)",
     "--glow-soft": "0 0 46px rgba(224, 180, 88, 0.12)",
@@ -49,6 +55,16 @@
     "--diff-change-soft": "rgba(234, 184, 79, 0.16)",
     "--qr-module-a": "#a2792c",
     "--qr-module-b": "#1f6f8b",
-    "--qr-bg": "#f1ecdf"
+    "--qr-bg": "#f1ecdf",
+    "--card-1": "#e0b458",
+    "--card-2": "#56b8d8",
+    "--card-3": "#7fbf6e",
+    "--card-4": "#eab84f",
+    "--card-5": "#6f8fd8",
+    "--card-6": "#c9a24a",
+    "--card-7": "#86cabf",
+    "--card-8": "#d98f5a",
+    "--card-9": "#b3bcc8",
+    "--card-10": "#9ad3e2"
   }
 }
