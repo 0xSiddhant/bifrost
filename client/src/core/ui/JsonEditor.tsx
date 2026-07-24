@@ -3,6 +3,7 @@ import { EditorState, StateEffect, StateField, type Text } from '@codemirror/sta
 import {
   Decoration,
   EditorView,
+  ViewPlugin,
   drawSelection,
   highlightActiveLine,
   highlightActiveLineGutter,
@@ -10,6 +11,7 @@ import {
   lineNumbers,
   placeholder as cmPlaceholder,
   type DecorationSet,
+  type ViewUpdate,
 } from '@codemirror/view';
 import {
   defaultKeymap,
@@ -319,6 +321,15 @@ export const editorChrome = (height: string) =>
       boxShadow: '0 0 0 2px var(--accent-soft)',
     },
     '.cm-panel.cm-search .cm-textfield::placeholder': { color: 'var(--text-muted)' },
+    // "N of M" match counter injected by searchMatchCount.
+    '.cm-panel.cm-search .cm-search-count': {
+      color: 'var(--text-muted)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: 'var(--text-xs)',
+      alignSelf: 'center',
+      whiteSpace: 'nowrap',
+      marginRight: '2px',
+    },
     '.cm-panel.cm-search .cm-button': {
       background: 'var(--surface)',
       backgroundImage: 'none',
@@ -357,6 +368,73 @@ export const editorChrome = (height: string) =>
     },
     '.cm-searchMatch-selected': { backgroundColor: 'var(--accent)', color: 'var(--bg)' },
   });
+
+/**
+ * A "current of total" counter for the find panel (every consumer inherits it:
+ * Runestone / Variant JSON+text / Loki / Edda). CM6's default search panel has
+ * no match count, so this plugin injects a small label into the panel DOM and
+ * keeps it in sync as the query, selection, or document changes.
+ */
+const MATCH_COUNT_CAP = 1000;
+
+const searchMatchCount = ViewPlugin.fromClass(
+  class {
+    constructor(view: EditorView) {
+      this.render(view);
+    }
+
+    update(update: ViewUpdate): void {
+      // The query lives in editor state (setSearchQuery is a transaction), so a
+      // doc edit, selection move, or any transaction can change the count.
+      if (update.docChanged || update.selectionSet || update.transactions.length > 0) {
+        this.render(update.view);
+      }
+    }
+
+    render(view: EditorView): void {
+      const panel = view.dom.querySelector('.cm-panel.cm-search');
+      if (!panel) return;
+      let label = panel.querySelector<HTMLElement>('.cm-search-count');
+      if (!searchPanelOpen(view.state)) {
+        label?.remove();
+        return;
+      }
+      if (!label) {
+        label = document.createElement('span');
+        label.className = 'cm-search-count';
+        const field = panel.querySelector('.cm-textfield');
+        if (field) field.insertAdjacentElement('afterend', label);
+        else panel.appendChild(label);
+      }
+      const query = getSearchQuery(view.state);
+      if (!query.valid || query.search.length === 0) {
+        label.textContent = '';
+        return;
+      }
+      const sel = view.state.selection.main;
+      let count = 0;
+      let current = 0;
+      let capped = false;
+      try {
+        const cursor = query.getCursor(view.state) as Iterator<{ from: number; to: number }>;
+        for (let next = cursor.next(); !next.done; next = cursor.next()) {
+          count += 1;
+          if (next.value.from === sel.from && next.value.to === sel.to) current = count;
+          if (count >= MATCH_COUNT_CAP) {
+            capped = true;
+            break;
+          }
+        }
+      } catch {
+        label.textContent = '';
+        return;
+      }
+      const total = capped ? `${MATCH_COUNT_CAP}+` : String(count);
+      label.textContent =
+        count === 0 ? 'No results' : current > 0 ? `${current} of ${total}` : `${total} found`;
+    }
+  },
+);
 
 /** All strict-JSON errors as CM diagnostics; an empty doc is "empty", not broken. */
 function jsonDiagnostics(view: EditorView): Diagnostic[] {
@@ -445,8 +523,9 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         diffHighlightField,
         // In-editor find for every consumer (Runestone / Variant / Edda). The
         // browser's own find can't reach text in a large scrolled buffer; this
-        // can. Works in every mode alike.
+        // can. Works in every mode alike. The count plugin adds "N of M".
         search({ top: true }),
+        searchMatchCount,
         keymap.of([
           ...searchKeymap,
           ...(closeBracketsMode ? closeBracketsKeymap : []),
