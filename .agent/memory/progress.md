@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**PLAN-12 (Loki): Part A + Part B both committed on `feat/plan-12b-loki-execution` (stacked on 12a; owner-tested through several feedback rounds). Gate green + live-verified. Pushing + raising the PR into develop.**
+**PLAN-12 (Loki): Part A + Part B committed on `feat/plan-12b-loki-execution` → PR #30 into develop (combines both parts; owner-tested through several feedback rounds). Gate green + live-verified. Awaiting review/merge.**
 
 | Plan    | Title                                              | Status         | Branch / PR                                   | Notes                                                                                                                         |
 | ------- | -------------------------------------------------- | -------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -18,7 +18,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-09 | Ops (PM2, backup, Docker, observability)           | done           | PR #19 → develop (merged)                     | All 8 items merged; plan archived to `completed/`. Owner-manual left: PM2 reboot, Linux docker run, live Grafana, release-PAT |
 | PLAN-10 | Heimdall Modal (overlay conversion + new sections) | done           | feat/plan-10-heimdall-modal → PR #20 (merged) | Merged to develop; **archived to `completed/`** per owner 2026-07-21. Gate cleared — PLAN-11 unlocked                         |
 | PLAN-11 | Edda (markdown editor + preview + library)         | done           | feat/plan-11-edda → PR #29 (merged 2026-07-23) | Merged to develop; **archived to `completed/`**. Gate cleared — PLAN-12 unlocked                                              |
-| PLAN-12 | Loki (JS transforms + regex + execution)           | in-review      | feat/plan-12b-loki-execution → PR into develop | Part A + Part B "Calcifer" both committed (owner-tested through several rounds). Worker sandbox + Heimdall Loki card + find-panel counter; gate green + live-verified. PR raised into develop |
+| PLAN-12 | Loki (JS transforms + regex + execution)           | in-review      | feat/plan-12b → PR #30 into develop            | Part A + Part B "Calcifer" both committed (owner-tested through several rounds). Worker sandbox + Heimdall Loki card + find-panel counter; gate green + live-verified. PR #30 raised (combines 12a+12b) |
 | PLAN-99 | Future backlog                                     | reference-only | —                                             | Never "implemented" wholesale                                                                                                 |
 
 ## Recent activity (newest first)
