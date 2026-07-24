@@ -38,9 +38,11 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
   `--text-muted` · `--border` · `--accent` · `--accent-2` · `--ok` ·
   `--danger` · `--warn` · softs (`--accent-soft`, `--danger-soft`) ·
   `--scrim` · `--bridge` (the rainbow gradient)
-- **Card tones** (the per-card gradient language): `--tone-teal` · `--tone-violet` ·
-  `--tone-amber` + `-soft` variants, and matching `--glow-teal/violet/amber`.
-  Derived from the theme's accents when omitted.
+- **Atmosphere tones** (eyebrows, code highlights, join band, sky relics):
+  `--tone-teal` · `--tone-violet` · `--tone-amber` + `-soft` variants, and matching
+  `--glow-teal/violet/amber`. Derived from the theme's accents when omitted.
+- **Card palette** (the per-card colour, one per card): `--card-1` … `--card-10`.
+  A single base colour per slot; the corner tint and hover glow are mixed from it.
 - **Type**: `--font-display/body/mono`, sizes `--text-xs…--text-2xl`
 - **Space**: `--space-1…12` (0.25rem base scale)
 - **Shape/depth**: `--radius-sm/md/lg/full`, `--shadow-1/2`
@@ -103,18 +105,37 @@ sanctioned slow-motion zone — owner-approved 2026-07-13.
 
 ## Cards & tones
 
-Two card families share one visual language — each card is **lit by its own
-tone**: a soft radial gradient in a corner (`--tone-*-soft`), a tone-matched
-icon chip, and a tone border + glow on hover.
+**One card component — `Portal`** (`core/ui/Portal.tsx`, class `.portal`) — is
+used on every hub: the Midgard transfer doors, the Ollivanders tools, the Diagon
+Alley stalls. A portal is a doorway to another dimension of the app: a tone-lit
+corner, an icon chip, a title, a description, and a **footer tagline naming where
+it leads** (Send → `midgard → asgard`, Runestone → `carve the runes`). It renders
+as a `<Link>` normally, or a dimmed non-navigating `<div>` with a "Coming soon"
+badge when `soon`. The grid is `.portals` (one class, everywhere).
 
-- **Portal cards** (`PortalCard`, tones `teal` / `violet` / `amber`) — the big
-  doors. Home shows three: Send (teal) · Receive (violet) · Hermes (amber).
-- **Hub cards** (`.hub-card--{tone}`) — the tool cards on the category hub
-  pages; tones cycle teal → violet → amber. A `--soon` modifier dims a
-  not-yet-built tool (e.g. Edda, the toolbox utilities).
+Each portal is **lit by one hue of the card palette**: a soft radial gradient in a
+corner, a tone-matched icon chip, a tone border + glow on hover — all mixed from a
+single base colour via `color-mix`. The colour comes from a **10-slot palette**
+(`--card-1` … `--card-10`); the class `.card-tone-N` sets `--ct`.
 
-Reach for `--accent-soft` for generic hover/selected fills; use the tone system
-when a card wants its own identity in a grid of siblings.
+(The wide **Join Bifrost** onboarding band on Midgard is *not* a portal — it stays
+its own `JoinBifrostCard`. And Loki's tool page keeps its own emerald accent
+`--tone-loki`, but its hub portal is an ordinary palette card like the rest.)
+
+**Colour follows position, per page.** Each hub/portal grid is built from an
+ordered list and rendered with `cardToneClass(index + 1)` (`core/ui/cardTone.ts`):
+the first visible card is `--card-1`, the second `--card-2`, … wrapping back to
+`--card-1` after the last slot. Every page starts its own sequence from 1, so no
+card hardcodes a colour — **reorder the list and the colours reorder with it**, and
+a page can hold any number of cards. (This is why the same colour can appear once
+per page — e.g. Send and Runestone are both slot 1 — which is fine across
+different pages.) Every card, Loki included, is an ordinary palette card.
+
+Each theme defines its own 10 hues (`themes/*.json`), so the palette stays
+on-brand — a warm house theme gets ten warm shades, not a rainbow. A theme that
+omits the slots inherits the stylesheet default set. Reach for `--accent-soft`
+for generic hover/selected fills; use the card palette when a card wants its own
+identity in a grid of siblings.
 
 ## Layout language
 
