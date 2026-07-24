@@ -352,14 +352,10 @@
   font-size: var(--text-lg);
 }
 
+/* One grid for every hub of portals (Midgard doors, Ollivanders tools, Diagon
+   Alley stalls). Cards are equal-height by nature; footers align via margin. */
 .portals {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-6);
-}
-
-/* Three transfer doors (Send / Receive / Hermes) — equal-height by nature. */
-.portals--triple {
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: var(--space-4);
 }
@@ -421,194 +417,37 @@
   text-align: center;
 }
 
-/* ── category hub pages (Ollivanders / Diagon Alley + Midgard extras) ── */
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-  gap: var(--space-4);
+/* Card-tone slots — map each card's position to one hue of the 10-tone palette
+   (--card-1..10). The .portal card component (core/ui/ui.css) reads --ct. */
+.card-tone-1 {
+  --ct: var(--card-1);
 }
-
-.hub-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background:
-    var(--card-sheen),
-    var(--surface);
-  color: var(--text);
-  overflow: hidden;
-  transition:
-    border-color var(--dur-2) var(--ease),
-    transform var(--dur-2) var(--ease),
-    box-shadow var(--dur-2) var(--ease);
+.card-tone-2 {
+  --ct: var(--card-2);
 }
-
-/* Each card is lit by its own tone — the same gradient language as the Home
-   portals, carried across every category hub. */
-.hub-card--teal {
-  background:
-    radial-gradient(120% 90% at 0% 0%, var(--tone-teal-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-3 {
+  --ct: var(--card-3);
 }
-
-.hub-card--violet {
-  background:
-    radial-gradient(120% 90% at 100% 0%, var(--tone-violet-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-4 {
+  --ct: var(--card-4);
 }
-
-.hub-card--amber {
-  background:
-    radial-gradient(120% 90% at 50% 0%, var(--tone-amber-soft), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+.card-tone-5 {
+  --ct: var(--card-5);
 }
-
-/* Loki's card is deliberately unlike the other three: not a single soft corner
-   tint but a two-stop diagonal sweep that shifts hue (emerald → lime/ember),
-   so the shapeshifter's card reads as "changing". */
-.hub-card--loki {
-  background:
-    linear-gradient(
-      135deg,
-      var(--tone-loki-soft) 0%,
-      transparent 46%,
-      var(--tone-loki-2-soft) 100%
-    ),
-    var(--card-sheen),
-    var(--surface);
-  background-size:
-    100% 100%,
-    100% 100%,
-    100% 100%;
+.card-tone-6 {
+  --ct: var(--card-6);
 }
-
-/* Slow, subtle drift of the sweep — ambient motion only, off under
-   prefers-reduced-motion (the PLAN-01 ambient-motion decision). */
-@media (prefers-reduced-motion: no-preference) {
-  .hub-card--loki {
-    background-size:
-      220% 220%,
-      100% 100%,
-      100% 100%;
-    animation: loki-shift 15s ease-in-out infinite alternate;
-  }
+.card-tone-7 {
+  --ct: var(--card-7);
 }
-
-@keyframes loki-shift {
-  from {
-    background-position:
-      0% 0%,
-      0 0,
-      0 0;
-  }
-  to {
-    background-position:
-      100% 100%,
-      0 0,
-      0 0;
-  }
+.card-tone-8 {
+  --ct: var(--card-8);
 }
-
-a.hub-card:hover {
-  text-decoration: none;
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-2);
+.card-tone-9 {
+  --ct: var(--card-9);
 }
-
-a.hub-card--teal:hover {
-  border-color: var(--tone-teal);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-teal);
-}
-
-a.hub-card--violet:hover {
-  border-color: var(--tone-violet);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-violet);
-}
-
-a.hub-card--amber:hover {
-  border-color: var(--tone-amber);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-amber);
-}
-
-a.hub-card--loki:hover {
-  border-color: var(--tone-loki);
-  box-shadow:
-    var(--shadow-2),
-    var(--glow-loki);
-}
-
-.hub-card__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-md);
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.hub-card--teal .hub-card__icon {
-  background: var(--tone-teal-soft);
-  color: var(--tone-teal);
-}
-
-.hub-card--violet .hub-card__icon {
-  background: var(--tone-violet-soft);
-  color: var(--tone-violet);
-}
-
-.hub-card--amber .hub-card__icon {
-  background: var(--tone-amber-soft);
-  color: var(--tone-amber);
-}
-
-.hub-card--loki .hub-card__icon {
-  background: var(--tone-loki-soft);
-  color: var(--tone-loki);
-}
-
-.hub-card__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: 600;
-}
-
-.hub-card__desc {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  line-height: 1.5;
-}
-
-.hub-card__badge {
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  padding: 1px var(--space-2);
-  white-space: nowrap;
-}
-
-.hub-card--soon {
-  opacity: 0.55;
-  cursor: default;
+.card-tone-10 {
+  --ct: var(--card-10);
 }
 
 .hub-soon-note {
