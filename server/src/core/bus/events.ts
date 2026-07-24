@@ -39,6 +39,14 @@ export interface SettingsUpdatedEvent {
   tapCount: number;
 }
 
+/** Effective Loki execution settings (PLAN-12 Part B) — public config shape. */
+export interface LokiSettings {
+  executionEnabled: boolean;
+  fetchAllowed: boolean;
+  runTimeoutMs: number;
+  consoleMaxEntries: number;
+}
+
 /** One validated theme as the listing/SSE payload shows it. */
 export interface ThemeSummary {
   id: string;
@@ -122,6 +130,8 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
+  'loki.settingsUpdated': LokiSettings;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;
