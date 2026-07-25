@@ -96,6 +96,25 @@ export const eddas = sqliteTable('eddas', {
 });
 
 /**
+ * Read-later shelf ("accio links", PLAN-13). Owned by the `accio` module.
+ * `id` is a short random handle (no slug — links are never shared by URL, the
+ * shelf is the surface). `url` is the normalized absolute URL; `title` is
+ * best-effort and starts null when the client supplied none — the enrichment
+ * service patches it in after the row already exists. `tags` is a JSON array of
+ * strings (flat, no folders — see the plan). `author_device_id` is the PLAN-06
+ * device id; display names resolve client-side.
+ */
+export const accioLinks = sqliteTable('accio_links', {
+  id: text('id').primaryKey(),
+  url: text('url').notNull(),
+  title: text('title'),
+  /** JSON-encoded `string[]`; SQLite has no array type and we never query into it. */
+  tags: text('tags').notNull().default('[]'),
+  authorDeviceId: text('author_device_id'),
+  createdAt: integer('created_at').notNull(),
+});
+
+/**
  * Activity log (PLAN-06). A pure bus subscriber (`audit-log` module) appends
  * one row per cross-module event; `actor` is a deviceId and/or ip. Pruned by
  * retention. Nothing else imports the module — delete it and Bifrost still runs.

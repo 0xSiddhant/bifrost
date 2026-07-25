@@ -22,6 +22,7 @@ export default {
         'variant',
         'edda',
         'loki',
+        'accio',
         'screensaver',
         // core areas
         'core',

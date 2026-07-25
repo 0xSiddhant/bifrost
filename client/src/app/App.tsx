@@ -58,6 +58,9 @@ const EddaPreviewPage = lazy(() =>
 const LokiPage = lazy(() =>
   import('../features/loki/LokiPage').then((m) => ({ default: m.LokiPage })),
 );
+const AccioPage = lazy(() =>
+  import('../features/accio/AccioPage').then((m) => ({ default: m.AccioPage })),
+);
 // Nótt idle screensaver — desktop-only, so the whole chunk is loaded lazily and
 // only ever imported on a real computer that has actually gone idle.
 const Screensaver = lazy(() =>
@@ -220,6 +223,7 @@ export function App() {
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
             <Route path="/hermes" element={<HermesPage />} />
+            <Route path="/accio" element={<AccioPage />} />
             {/* pre-rename URL (shipped as "muninn") */}
             <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
             <Route path="/runestone" element={<RunestonePage />} />

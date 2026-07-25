@@ -33,6 +33,7 @@ import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { lokiModule } from './modules/loki/module.js';
+import { accioModule } from './modules/accio/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 
 /**
@@ -55,6 +56,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     lokiModule,
+    // Local only: a household bookmark shelf has no auth story of its own
+    // (PLAN-13 decision) — revisit for cloud when real accounts exist.
+    accioModule,
     screensaverModule,
   ],
   cloud: [
