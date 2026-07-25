@@ -28,6 +28,9 @@ const envSchema = z.object({
   // request to a user-pasted address, so neither may be hardcoded.
   ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
+  // Nimbus (PLAN-14) — the largest payload one speed test may move in either
+  // direction. Also the upload cap: past it /api/nimbus/up answers 413.
+  NIMBUS_MAX_TEST_MB: z.coerce.number().int().min(1).max(1024).default(100),
   // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
   LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   LOKI_CONSOLE_MAX_ENTRIES: z.coerce.number().int().positive().default(500),
@@ -100,6 +103,10 @@ export interface AppConfig {
     titleTimeoutMs: number;
     /** Hard cap on how much of a page body the lookup reads. */
     titleMaxBytes: number;
+  };
+  nimbus: {
+    /** Largest test payload per direction; also the hard upload cap (413 past it). */
+    maxTestMb: number;
   };
   loki: {
     /** Default execution watchdog timeout (Part B); user-adjustable per run. */
@@ -212,6 +219,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,
       titleMaxBytes: raw.ACCIO_TITLE_MAX_BYTES,
+    },
+    nimbus: {
+      maxTestMb: raw.NIMBUS_MAX_TEST_MB,
     },
     loki: {
       runTimeoutMs: raw.LOKI_RUN_TIMEOUT_MS,
