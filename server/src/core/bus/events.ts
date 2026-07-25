@@ -142,6 +142,19 @@ export interface AccioLink {
   createdAt: number;
 }
 
+/** One completed LAN speed test as the history lists it (PLAN-14). */
+export interface NimbusResult {
+  id: number;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  deviceId: string | null;
+  downMbps: number;
+  upMbps: number;
+  /** Median of the ping round trips, milliseconds. */
+  latencyMs: number;
+  testMb: number;
+  createdAt: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -167,6 +180,8 @@ export interface BifrostEventMap {
    */
   'accio.updated': { link: AccioLink };
   'accio.deleted': { id: string; url: string; title: string | null };
+  /** A speed test finished and was saved — other open Nimbus pages add the row live. */
+  'nimbus.completed': { result: NimbusResult };
   /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */

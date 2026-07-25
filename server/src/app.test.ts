@@ -50,6 +50,7 @@ describe('boot → health → capabilities', () => {
         'edda',
         'loki',
         'accio',
+        'nimbus',
         'screensaver',
       ],
     });

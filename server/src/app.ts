@@ -34,6 +34,7 @@ import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { lokiModule } from './modules/loki/module.js';
 import { accioModule } from './modules/accio/module.js';
+import { nimbusModule } from './modules/nimbus/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 
 /**
@@ -59,6 +60,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Local only: a household bookmark shelf has no auth story of its own
     // (PLAN-13 decision) — revisit for cloud when real accounts exist.
     accioModule,
+    // Local only: it measures the LAN path to this machine, and an open
+    // byte-firehose on a public host is a bandwidth bill (PLAN-14).
+    nimbusModule,
     screensaverModule,
   ],
   cloud: [

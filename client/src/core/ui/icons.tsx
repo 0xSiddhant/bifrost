@@ -246,6 +246,15 @@ export const BookmarkIcon = (p: IconProps) => (
   </svg>
 );
 
+// Nimbus — the LAN speed test's mark: a dial with its needle swung over (PLAN-14).
+export const GaugeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3.5 17a9 9 0 1 1 17 0" />
+    <path d="M12 13.5 16.5 9" />
+    <circle cx="12" cy="14.5" r="1.4" />
+  </svg>
+);
+
 // Inline edit affordance (Accio shelf cards).
 export const PencilIcon = (p: IconProps) => (
   <svg {...base(p)}>

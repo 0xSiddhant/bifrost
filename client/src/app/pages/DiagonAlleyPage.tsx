@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
-import { QrIcon, SparklesIcon } from '../../core/ui/icons';
+import { GaugeIcon, QrIcon, SparklesIcon } from '../../core/ui/icons';
 
 /**
  * Diagon Alley — the utility toolbox category. A row of small, self-contained
@@ -29,6 +29,15 @@ const STALLS: Stall[] = [
     icon: <QrIcon size={24} />,
     to: '/sigil',
     module: 'qr-tool',
+  },
+  {
+    title: 'Nimbus',
+    description:
+      'Measure the Wi-Fi between this device and the bridge: download, upload, latency — with a trend per device.',
+    go: 'how fast is your air',
+    icon: <GaugeIcon size={24} />,
+    to: '/nimbus',
+    module: 'nimbus',
   },
   {
     title: 'Base64',

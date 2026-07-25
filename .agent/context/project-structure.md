@@ -53,7 +53,8 @@ bifrost/
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
 │                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11;
-│                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13
+│                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
+│                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
 │                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
