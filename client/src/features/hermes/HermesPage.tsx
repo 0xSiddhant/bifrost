@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ApiError } from '../../core/api';
+import { saveLink } from '../../core/accio';
+import { useCapabilities } from '../../core/useCapabilities';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceName } from '../../core/devices';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
-import { CheckIcon, ClipboardIcon, CloseIcon } from '../../core/ui/icons';
+import { BookmarkIcon, CheckIcon, ClipboardIcon, CloseIcon } from '../../core/ui/icons';
 import { copyText } from '../../core/copy';
 import { addClipboard, deleteClipboard, type ClipboardEntry } from './api';
 import { linkify, opensInNewTab } from './linkify';
@@ -51,8 +53,27 @@ function CodeBlock({ text, lang }: { text: string; lang: string | null }) {
   );
 }
 
+/**
+ * The first web link in a shared text, or null. Hermes already tokenizes its
+ * entries for rendering, so "is this shelf-able?" is just: does tokenizing find
+ * an http(s) URL. Non-web hrefs (tel:, mailto:, deeplinks) are not shelf-able —
+ * Accio would 422 them anyway.
+ */
+function firstWebLink(text: string): string | null {
+  for (const token of linkify(text)) {
+    if (token.type === 'link' && opensInNewTab(token.href) && /^https?:/i.test(token.href)) {
+      return token.href;
+    }
+  }
+  return null;
+}
+
 export function HermesPage() {
   const { entries, ready } = useClipboard();
+  const { capabilities } = useCapabilities();
+  // Accio is local-profile only; without it the action simply isn't offered.
+  const hasAccio = capabilities?.modules.includes('accio') ?? false;
+  const [accioed, setAccioed] = useState<Record<string, 'done' | 'failed'>>({});
   const [text, setText] = useState('');
   const [isCode, setIsCode] = useState(false);
   const [lang, setLang] = useState('');
@@ -79,6 +100,20 @@ export function HermesPage() {
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * Copy a shared link onto the Accio shelf. Cross-feature calls are illegal,
+   * so this goes through the shared `core/accio` HTTP client — Hermes never
+   * imports anything from features/accio.
+   */
+  const accio = async (entry: ClipboardEntry, url: string) => {
+    try {
+      await saveLink({ url });
+      setAccioed((state) => ({ ...state, [entry.id]: 'done' }));
+    } catch {
+      setAccioed((state) => ({ ...state, [entry.id]: 'failed' }));
     }
   };
 
@@ -159,6 +194,9 @@ export function HermesPage() {
             {entries.map((entry) => {
               const who = deviceName(entry.deviceId);
               const copied = copiedId === entry.id;
+              // Code snippets are never linkified, so they are never shelf-able.
+              const shelfUrl = hasAccio && entry.kind === 'text' ? firstWebLink(entry.text) : null;
+              const shelved = accioed[entry.id];
               return (
                 <div className="clip-entry" key={entry.id}>
                   {entry.kind === 'code' ? (
@@ -186,6 +224,18 @@ export function HermesPage() {
                       )}
                     </div>
                     <div className="clip-entry__actions">
+                      {shelfUrl && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title={`Save ${shelfUrl} to the Accio shelf`}
+                          disabled={shelved === 'done'}
+                          onClick={() => void accio(entry, shelfUrl)}
+                        >
+                          {shelved === 'done' ? <CheckIcon size={15} /> : <BookmarkIcon size={15} />}
+                          {shelved === 'done' ? 'Shelved' : shelved === 'failed' ? 'Retry' : 'Accio it'}
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => void copy(entry)}>
                         {copied ? <CheckIcon size={15} /> : <ClipboardIcon size={15} />}
                         {copied ? 'Copied' : 'Copy'}
