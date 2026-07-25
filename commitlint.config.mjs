@@ -23,6 +23,7 @@ export default {
         'edda',
         'loki',
         'accio',
+        'nimbus',
         'screensaver',
         // core areas
         'core',
