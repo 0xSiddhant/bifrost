@@ -1,6 +1,66 @@
 # Changelog
 
 
+## v1.2.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.1.0...v1.2.0)
+
+### 🚀 Enhancements
+
+- **client:** Add favicon and installable PWA support ([#28](https://github.com/0xSiddhant/bifrost/pull/28))
+- **core:** Add eddas table, config, and bus events ([642ce9a](https://github.com/0xSiddhant/bifrost/commit/642ce9a))
+- **edda:** Add server module with crud, public raw api, and audit ([4ee6cda](https://github.com/0xSiddhant/bifrost/commit/4ee6cda))
+- **client:** Add markdown renderer core and editor markdown mode ([e8bc8d5](https://github.com/0xSiddhant/bifrost/commit/e8bc8d5))
+- **edda:** Add editor, live preview, and pensieve library pages ([5a8c072](https://github.com/0xSiddhant/bifrost/commit/5a8c072))
+- **core:** Add eval-free javascript transform toolkit ([0404c2a](https://github.com/0xSiddhant/bifrost/commit/0404c2a))
+- **core:** Add editor js-mode, undo/redo, and shared panel controls ([641d2f5](https://github.com/0xSiddhant/bifrost/commit/641d2f5))
+- **loki:** Add module, config, workbench page, regex, and hub card ([57ad8bb](https://github.com/0xSiddhant/bifrost/commit/57ad8bb))
+- **runestone:** Add copy-as-js, panel font, and undo/redo ([20c72b7](https://github.com/0xSiddhant/bifrost/commit/20c72b7))
+- **variant:** Seed loki before/after diffs and add panel controls ([602f9d7](https://github.com/0xSiddhant/bifrost/commit/602f9d7))
+- **loki:** Add execution config, settings routes, and events ([96b6c9f](https://github.com/0xSiddhant/bifrost/commit/96b6c9f))
+- **core:** Capture the repl completion value of a run ([d057597](https://github.com/0xSiddhant/bifrost/commit/d057597))
+- **loki:** Add the calcifer worker sandbox, output panel, and run ui ([832a2d3](https://github.com/0xSiddhant/bifrost/commit/832a2d3))
+- **heimdall:** Add the loki execution settings card ([b8e33d1](https://github.com/0xSiddhant/bifrost/commit/b8e33d1))
+- **core:** Show match count in the editor find panel ([a6bbd3b](https://github.com/0xSiddhant/bifrost/commit/a6bbd3b))
+- **themes:** Add gryffindor + slytherin and a 10-slot card palette ([7448c6d](https://github.com/0xSiddhant/bifrost/commit/7448c6d))
+- **screensaver:** Add nótt idle particle screensaver ([#32](https://github.com/0xSiddhant/bifrost/pull/32))
+
+### 🩹 Fixes
+
+- **screensaver:** Restore the 60s idle default ([220940e](https://github.com/0xSiddhant/bifrost/commit/220940e))
+
+### 💅 Refactors
+
+- **client:** Unify hub cards into one shared portal component ([497ab0f](https://github.com/0xSiddhant/bifrost/commit/497ab0f))
+
+### 📖 Documentation
+
+- Log the v1.1.0 release and the tag-push fix ([d55c874](https://github.com/0xSiddhant/bifrost/commit/d55c874))
+- **edda:** Sync .agent context and memory for plan-11 ([389d59a](https://github.com/0xSiddhant/bifrost/commit/389d59a))
+- **edda:** Record pr #29 in progress tracker ([#29](https://github.com/0xSiddhant/bifrost/issues/29))
+- Review plan-12 (loki) and log its decisions ([1b19425](https://github.com/0xSiddhant/bifrost/commit/1b19425))
+- Complete plan-11, log plan-12 part a ([5ad1a9b](https://github.com/0xSiddhant/bifrost/commit/5ad1a9b))
+- Record multi-tab sse rca and shared-sse backlog item ([e260d04](https://github.com/0xSiddhant/bifrost/commit/e260d04))
+- Log plan-12 part b (calcifer), find-counter, and fixes ([ea57a75](https://github.com/0xSiddhant/bifrost/commit/ea57a75))
+- Record the loki pr number ([ace4c0e](https://github.com/0xSiddhant/bifrost/commit/ace4c0e))
+- Add plans 13-15 and reconcile the backlog ([6688a82](https://github.com/0xSiddhant/bifrost/commit/6688a82))
+- **themes:** Add theme skill and sync design, spec, and memory ([a68b52a](https://github.com/0xSiddhant/bifrost/commit/a68b52a))
+
+### 🏡 Chore
+
+- Register edda commit scope ([63d32b6](https://github.com/0xSiddhant/bifrost/commit/63d32b6))
+- **loki:** Allow the loki commit scope ([cfe0775](https://github.com/0xSiddhant/bifrost/commit/cfe0775))
+
+### 🤖 CI
+
+- Push the release tag as an explicit ref ([6528825](https://github.com/0xSiddhant/bifrost/commit/6528825))
+- Attribute release commits to the github-actions bot ([c6b35c6](https://github.com/0xSiddhant/bifrost/commit/c6b35c6))
+
+### ❤️ Contributors
+
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+
 ## v1.1.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.0.0...v1.1.0)
