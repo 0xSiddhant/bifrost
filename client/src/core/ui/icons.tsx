@@ -238,3 +238,18 @@ export const FlameIcon = (p: IconProps) => (
     <path d="M12 3c.5 3-2 4.5-2 7a2 2 0 0 0 4 0c0-.7-.2-1.3-.5-1.8C16 10 18 12.5 18 15a6 6 0 0 1-12 0c0-3.6 3-6.5 6-12Z" />
   </svg>
 );
+
+// Accio — the read-later shelf's mark: a bookmark ribbon (PLAN-13).
+export const BookmarkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4.5L5 21V4a1 1 0 0 1 1-1Z" />
+  </svg>
+);
+
+// Inline edit affordance (Accio shelf cards).
+export const PencilIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);

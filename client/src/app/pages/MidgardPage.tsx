@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
+import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
 import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
-import { ClipboardIcon, DownloadIcon, UploadIcon } from '../../core/ui/icons';
+import { BookmarkIcon, ClipboardIcon, DownloadIcon, UploadIcon } from '../../core/ui/icons';
 
 /**
- * The three transfer doors. Colour follows position: the Nth portal takes the
- * Nth card-tone slot, so reordering this list reorders the colours too.
+ * The transfer doors, plus the shelf. Colour follows position: the Nth *visible*
+ * portal takes the Nth card-tone slot, so reordering this list reorders the
+ * colours too.
  */
 interface Portal {
   to: string;
@@ -13,6 +15,8 @@ interface Portal {
   title: string;
   description: string;
   go: string;
+  /** Card shows only when this module is loaded (omitted = always). */
+  module?: string;
 }
 
 const PORTALS: Portal[] = [
@@ -37,9 +41,23 @@ const PORTALS: Portal[] = [
     description: 'A shared clipboard for the bridge — paste text on one device, read it on every other.',
     go: 'one board · every device',
   },
+  {
+    to: '/accio',
+    icon: <BookmarkIcon size={26} />,
+    // Deliberately next to Hermes: the pair reads as "pass it" vs "keep it".
+    title: 'Accio',
+    description: 'A shelf for links worth keeping — summon any of them back from any device.',
+    go: 'saved · summoned later',
+    module: 'accio',
+  },
 ];
 
 export function MidgardPage() {
+  const { capabilities } = useCapabilities();
+  const portals = PORTALS.filter(
+    (portal) => !portal.module || !capabilities || capabilities.modules.includes(portal.module),
+  );
+
   return (
     <>
       <section className="hero">
@@ -51,7 +69,7 @@ export function MidgardPage() {
       </section>
 
       <div className="portals">
-        {PORTALS.map((portal, index) => (
+        {portals.map((portal, index) => (
           <Portal key={portal.to} tone={index + 1} {...portal} />
         ))}
       </div>
