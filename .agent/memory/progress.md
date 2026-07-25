@@ -2,7 +2,7 @@
 
 Update after every work session: status, branch/PR, notes. Statuses: `not-started` · `in-progress` · `in-review` · `blocked` · `done`.
 
-**PLAN-13 (Accio) implemented on `feat/plan-13-accio` and raised as a PR into develop (owner-tested through several rounds). Gate green + live-verified. Plan archived to `completed/`.**
+**PLAN-13 (Accio) implemented on `feat/plan-13-accio` and raised as **PR #35** into develop (owner-tested through several rounds). Gate green + live-verified. Plan archived to `completed/`.**
 
 | Plan    | Title                                              | Status         | Branch / PR                                   | Notes                                                                                                                         |
 | ------- | -------------------------------------------------- | -------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -19,7 +19,7 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-10 | Heimdall Modal (overlay conversion + new sections) | done           | feat/plan-10-heimdall-modal → PR #20 (merged) | Merged to develop; **archived to `completed/`** per owner 2026-07-21. Gate cleared — PLAN-11 unlocked                         |
 | PLAN-11 | Edda (markdown editor + preview + library)         | done           | feat/plan-11-edda → PR #29 (merged 2026-07-23) | Merged to develop; **archived to `completed/`**. Gate cleared — PLAN-12 unlocked                                              |
 | PLAN-12 | Loki (JS transforms + regex + execution)           | done           | feat/plan-12b → PR #30 (merged 2026-07-24)     | Part A + Part B "Calcifer" combined in one PR; owner-tested through several rounds. Plan archived to `completed/`. Gate cleared — PLAN-13 unlocked |
-| PLAN-13 | Accio (read-later / bookmark shelf)                | in-review      | feat/plan-13-accio → PR into develop           | Owner-tested through 4 feedback rounds (schemes, error clearing, tag suggestions, grid revamp). Plan archived to `completed/`                   |
+| PLAN-13 | Accio (read-later / bookmark shelf)                | in-review      | feat/plan-13-accio → PR #35 into develop       | Owner-tested through 4 feedback rounds (schemes, error clearing, tag suggestions, grid revamp). Plan archived to `completed/`                   |
 | PLAN-99 | Future backlog                                     | reference-only | —                                             | Never "implemented" wholesale                                                                                                 |
 
 ## Recent activity (newest first)
