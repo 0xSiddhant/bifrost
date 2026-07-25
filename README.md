@@ -42,11 +42,12 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
+- 🧹 Nimbus — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
-**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda soon), and **Diagon Alley** (Sigil + a coming-soon utility toolbox). Each tool keeps its own URL.
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 
