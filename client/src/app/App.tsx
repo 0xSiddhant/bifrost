@@ -61,6 +61,9 @@ const LokiPage = lazy(() =>
 const AccioPage = lazy(() =>
   import('../features/accio/AccioPage').then((m) => ({ default: m.AccioPage })),
 );
+const NimbusPage = lazy(() =>
+  import('../features/nimbus/NimbusPage').then((m) => ({ default: m.NimbusPage })),
+);
 // Nótt idle screensaver — desktop-only, so the whole chunk is loaded lazily and
 // only ever imported on a real computer that has actually gone idle.
 const Screensaver = lazy(() =>
@@ -98,8 +101,8 @@ const NAV: NavCategory[] = [
     to: '/diagon-alley',
     label: 'Diagon Alley',
     icon: <SparklesIcon size={18} />,
-    match: ['/sigil'],
-    modules: ['qr-tool'],
+    match: ['/sigil', '/nimbus'],
+    modules: ['qr-tool', 'nimbus'],
   },
 ];
 
@@ -244,6 +247,7 @@ export function App() {
             <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
+            <Route path="/nimbus" element={<NimbusPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
