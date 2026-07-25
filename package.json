@@ -28,6 +28,9 @@
     "test": "npm run test --workspaces --if-present",
     "prepare": "husky"
   },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
