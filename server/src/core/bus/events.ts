@@ -125,6 +125,23 @@ export interface EddaSummary {
   modifiedAt: number;
 }
 
+/** A saved link as the Accio shelf lists it (PLAN-13). */
+export interface AccioLink {
+  id: string;
+  /** Normalized absolute http(s) URL. */
+  url: string;
+  /**
+   * Best-effort page title. Null when the client supplied none and enrichment
+   * has not (or will never) find one — the shelf then shows the bare URL.
+   */
+  title: string | null;
+  /** Flat, lowercased, deduped labels — no folders (see the plan). */
+  tags: string[];
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  createdAt: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -142,6 +159,14 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  /** A link was added to the read-later shelf — open shelves add the row live. */
+  'accio.saved': { link: AccioLink };
+  /**
+   * An existing link changed: a user edit, or the async title enrichment
+   * landing after the row was already broadcast. Same payload either way.
+   */
+  'accio.updated': { link: AccioLink };
+  'accio.deleted': { id: string; url: string; title: string | null };
   /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */

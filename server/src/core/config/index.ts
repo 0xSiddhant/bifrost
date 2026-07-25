@@ -24,6 +24,10 @@ const envSchema = z.object({
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
+  // Accio (PLAN-13) — best-effort title enrichment. Both bound an outbound
+  // request to a user-pasted address, so neither may be hardcoded.
+  ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
   // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
   LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   LOKI_CONSOLE_MAX_ENTRIES: z.coerce.number().int().positive().default(500),
@@ -90,6 +94,12 @@ export interface AppConfig {
     maxDocKb: number;
     /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
     livePreviewMaxKb: number;
+  };
+  accio: {
+    /** Per-attempt timeout for the post-save `<title>` lookup. */
+    titleTimeoutMs: number;
+    /** Hard cap on how much of a page body the lookup reads. */
+    titleMaxBytes: number;
   };
   loki: {
     /** Default execution watchdog timeout (Part B); user-adjustable per run. */
@@ -198,6 +208,10 @@ export function loadConfig(env: Env = process.env): AppConfig {
     edda: {
       maxDocKb: raw.EDDA_MAX_DOC_KB,
       livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
+    },
+    accio: {
+      titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,
+      titleMaxBytes: raw.ACCIO_TITLE_MAX_BYTES,
     },
     loki: {
       runTimeoutMs: raw.LOKI_RUN_TIMEOUT_MS,

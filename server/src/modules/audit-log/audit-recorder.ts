@@ -72,6 +72,12 @@ export class AuditRecorder {
       this.bus.on('edda.deleted', (event) =>
         push('edda.deleted', null, null, `edda "${event.name}" deleted`),
       ),
+      this.bus.on('accio.saved', ({ link }) =>
+        push('accio.saved', link.authorDeviceId, null, `summoned ${link.title ?? link.url}`),
+      ),
+      this.bus.on('accio.deleted', (event) =>
+        push('accio.deleted', null, null, `link "${event.title ?? event.url}" released`),
+      ),
     );
   }
 
