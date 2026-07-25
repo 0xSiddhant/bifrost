@@ -78,6 +78,14 @@ export class AuditRecorder {
       this.bus.on('accio.deleted', (event) =>
         push('accio.deleted', null, null, `link "${event.title ?? event.url}" released`),
       ),
+      this.bus.on('nimbus.completed', ({ result }) =>
+        push(
+          'nimbus.completed',
+          result.deviceId,
+          null,
+          `speed test: ↓${result.downMbps} / ↑${result.upMbps} Mbps, ${result.latencyMs} ms (${result.testMb} MB)`,
+        ),
+      ),
     );
   }
 
