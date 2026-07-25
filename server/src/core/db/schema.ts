@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * Runtime-mutable settings overlaid onto the .env config at boot
@@ -111,6 +111,27 @@ export const accioLinks = sqliteTable('accio_links', {
   /** JSON-encoded `string[]`; SQLite has no array type and we never query into it. */
   tags: text('tags').notNull().default('[]'),
   authorDeviceId: text('author_device_id'),
+  createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * LAN speed-test history ("nimbus results", PLAN-14). Owned by the `nimbus`
+ * module. One row per completed test — direction-agnostic, because a test always
+ * measures all three figures in one pass, and a partial (cancelled) test is
+ * never saved. `device_id` is the PLAN-06 device id (names resolve client-side),
+ * so history groups per device without nimbus reading presence's table. Pruned
+ * by the audit retention policy.
+ */
+export const nimbusResults = sqliteTable('nimbus_results', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  deviceId: text('device_id'),
+  /** Megabits per second, as measured by the client's own chunk timings. */
+  downMbps: real('down_mbps').notNull(),
+  upMbps: real('up_mbps').notNull(),
+  /** Median of the ping round trips, milliseconds. */
+  latencyMs: real('latency_ms').notNull(),
+  /** Payload size the run used, so a 10 MB result is never compared to a 100 MB one blindly. */
+  testMb: integer('test_mb').notNull(),
   createdAt: integer('created_at').notNull(),
 });
 
