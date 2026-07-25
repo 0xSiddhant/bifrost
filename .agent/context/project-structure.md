@@ -48,11 +48,12 @@ bifrost/
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
 │       │                      #   JsonEditor +markdown mode +in-editor search, TreeView +bulk collapse),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
-│       │                      #   textNormalize, runestone + edda clients, relicNames name-bank
+│       │                      #   textNormalize, runestone + edda + accio clients, relicNames name-bank
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
-│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
+│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11;
+│                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
 │                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
