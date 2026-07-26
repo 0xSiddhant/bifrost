@@ -1,0 +1,281 @@
+/* Portkey (PLAN-15) — LAN go-links management page. Feature-local styles
+   (nimbus/screensaver precedent): the grid, slug-prefixed input and per-card QR
+   are used on exactly one page, so they don't belong in the 3.5k-line app.css. */
+
+.pk-wrap {
+  gap: var(--space-4);
+}
+
+/* Full-width breakout at ≥1024px (Variant/Runestone/Edda/Accio precedent): a
+   list of go-links is a browsing surface and earns the width. */
+@media (min-width: 1024px) {
+  .pk-wrap {
+    --pk-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--pk-w);
+    margin-inline: calc((100% - var(--pk-w)) / 2);
+  }
+}
+
+/* Create bar: slug · target · note · button. Stacks on phones; on wider screens
+   the target takes the room since it's the longest field. */
+.pk-add {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+@media (min-width: 768px) {
+  .pk-add {
+    grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 2fr) minmax(7rem, 1fr) auto;
+  }
+}
+
+/* Slug input with a fixed `/go/` prefix carved into the field so the address
+   the person is building is always visible. */
+.pk-slug-input {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.pk-slug-input:focus-within {
+  border-color: var(--accent);
+}
+
+.pk-slug-input--bad,
+.pk-slug-input--bad:focus-within {
+  border-color: var(--danger);
+}
+
+.pk-slug-prefix {
+  display: flex;
+  align-items: center;
+  padding-inline: var(--space-3);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-right: 1px solid var(--border);
+  font-size: var(--text-sm);
+  user-select: none;
+}
+
+.pk-slug-input .field__input {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.pk-slug-input .field__input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.pk-hint {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+}
+
+.pk-error {
+  margin-top: var(--space-2);
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* Inline text button ("View it" after a duplicate), tinted like a link. */
+.pk-linkbtn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* Creative-404 hand-off banner: the word someone just tried, waiting for a target. */
+.pk-enchant-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.pk-enchant-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+/* Search bar — a slim frosted panel matching the shell header, sticky ≥768px. */
+.pk-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--header-veil);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--text-muted);
+}
+
+.pk-search .field__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pk-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .pk-search {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 6;
+  }
+}
+
+/* The grid of go-links. auto-fill + minmax → the column count follows the
+   viewport with no per-device breakpoints. */
+.pk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-3);
+}
+
+.pk-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.pk-card:hover,
+.pk-card:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.pk-card__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.pk-card__slug {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.pk-card__slug:hover {
+  text-decoration: underline;
+}
+
+.pk-card__hits {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pk-card__target {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.pk-card__target:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.pk-card__note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.pk-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-muted);
+}
+
+.pk-card__who::before {
+  content: '· ';
+}
+
+.pk-card__qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  text-align: center;
+}
+
+.pk-edit,
+.pk-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.pk-confirm {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Action row: revealed on hover/focus on a pointer device; always shown on
+   touch (no hover to reveal it). */
+.pk-card__actions {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-1);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.pk-card:hover .pk-card__actions,
+.pk-card:focus-within .pk-card__actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .pk-card__actions {
+    opacity: 1;
+  }
+}

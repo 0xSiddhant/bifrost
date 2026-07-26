@@ -155,6 +155,22 @@ export interface NimbusResult {
   createdAt: number;
 }
 
+/** One go-link as the Portkey management list shows it (PLAN-15). */
+export interface Portkey {
+  /** User-chosen memorable word; the immutable identity of the link. */
+  slug: string;
+  /** Normalized absolute http(s) target — any host. */
+  url: string;
+  note: string | null;
+  /** Redirect count, incremented async after each hop. */
+  hits: number;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  createdAt: number;
+  /** Epoch ms of the most recent redirect, or null if never used. */
+  lastUsedAt: number | null;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
   'download.added': DownloadEntry;
@@ -182,6 +198,15 @@ export interface BifrostEventMap {
   'accio.deleted': { id: string; url: string; title: string | null };
   /** A speed test finished and was saved — other open Nimbus pages add the row live. */
   'nimbus.completed': { result: NimbusResult };
+  /** A go-link was created or edited — open management lists live-refresh. */
+  'portkey.saved': { portkey: Portkey };
+  'portkey.deleted': { slug: string; url: string };
+  /**
+   * A redirect happened: the hit count + last-used were bumped. Broadcast so
+   * open management pages update within a heartbeat — deliberately NOT audited
+   * (a hop happens constantly and says nothing about a person's action).
+   */
+  'portkey.hit': { portkey: Portkey };
   /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */

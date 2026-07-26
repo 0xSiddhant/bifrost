@@ -86,6 +86,14 @@ export class AuditRecorder {
           `speed test: ↓${result.downMbps} / ↑${result.upMbps} Mbps, ${result.latencyMs} ms (${result.testMb} MB)`,
         ),
       ),
+      // Portkey create/edit + delete are audited; redirect hits are not (a hop
+      // happens constantly and says nothing about a person's action).
+      this.bus.on('portkey.saved', ({ portkey }) =>
+        push('portkey.saved', portkey.authorDeviceId, null, `enchanted /go/${portkey.slug} → ${portkey.url}`),
+      ),
+      this.bus.on('portkey.deleted', (event) =>
+        push('portkey.deleted', null, null, `portkey /go/${event.slug} removed`),
+      ),
     );
   }
 

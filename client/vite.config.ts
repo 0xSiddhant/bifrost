@@ -22,6 +22,8 @@ export default defineConfig({
       '/runestone/api': { target: `http://localhost:${serverPort}` },
       // public edda raw-markdown endpoint lives outside /api (PLAN-11)
       '/edda/api': { target: `http://localhost:${serverPort}` },
+      // portkey go-link redirects live outside /api (PLAN-15)
+      '/go': { target: `http://localhost:${serverPort}` },
     },
   },
 });

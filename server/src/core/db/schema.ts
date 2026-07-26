@@ -136,6 +136,25 @@ export const nimbusResults = sqliteTable('nimbus_results', {
 });
 
 /**
+ * LAN go-links ("portkeys", PLAN-15). Owned by the `portkey` module. The `slug`
+ * IS the primary key — it's a user-chosen memorable word (`router`, `nas`) and
+ * the identity of the link, so it's immutable (rename = delete + recreate). `url`
+ * is the normalized absolute http(s) target (any host). `hits` counts redirects,
+ * bumped async after the hop so a slow write never delays it; `last_used_at` is
+ * the epoch-ms of the most recent hit (null until first used). `author_device_id`
+ * is the PLAN-06 device id; display names resolve client-side.
+ */
+export const portkeys = sqliteTable('portkeys', {
+  slug: text('slug').primaryKey(),
+  url: text('url').notNull(),
+  note: text('note'),
+  hits: integer('hits').notNull().default(0),
+  authorDeviceId: text('author_device_id'),
+  createdAt: integer('created_at').notNull(),
+  lastUsedAt: integer('last_used_at'),
+});
+
+/**
  * Activity log (PLAN-06). A pure bus subscriber (`audit-log` module) appends
  * one row per cross-module event; `actor` is a deviceId and/or ip. Pruned by
  * retention. Nothing else imports the module — delete it and Bifrost still runs.

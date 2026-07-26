@@ -24,6 +24,7 @@ export default {
         'loki',
         'accio',
         'nimbus',
+        'portkey',
         'screensaver',
         // core areas
         'core',
