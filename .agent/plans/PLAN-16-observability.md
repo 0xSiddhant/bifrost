@@ -38,6 +38,8 @@ PLAN-15 merged. **Declared exception: two PRs** (the PLAN-07 precedent), because
 - **`module` becomes a cross-cutting label, which is the real prize.** Ten client features and server modules already share names exactly — `accio`, `edda`, `file-transfer`, `heimdall`, `loki`, `nimbus`, `previews`, `runestone`, `screensaver`, `variant`. If client lines reuse the feature name for `module`, then `{module="accio"}` returns **both halves of that feature** in one query, and `{module="accio", source="client"}` narrows to the browser side. The existing "Errors by module" panel starts covering the frontend for free instead of silently dropping it. Client-only features (`hermes`, `sigil`, `wardens`) and server-only modules (`audit-log`, `clipboard`, `presence`, `qr-tool`, `themes`, `health`) simply appear under one `source`.
 - **macOS/Docker split is load-bearing.** Bifrost runs natively (PM2/launchd); the stack runs in Docker. Prometheus must scrape `host.docker.internal:4646`, not `localhost`. **`node_exporter` is deliberately excluded** — in Docker on macOS it measures the Linux VM, not the Mac, producing numbers that look real and mean nothing. All process metrics come from inside Node.
 - **OTel is gated off by default (`OTEL_ENABLED=false`).** A dead OTLP endpoint makes the exporter retry and log connection errors into `storage/logs/` — observability tooling degrading the observability record. Flip it on only when the stack is up.
+- **⚠️ Silencing the exporter makes Step 4 undiagnosable — bound the noise instead of muting it.** Four distinct failures all present identically as "no traces appear": the `--import` was missed so the SDK patched nothing (**silent by design — no error is raised**), the exporter cannot reach Tempo, Tempo ingests but the datasource/query is wrong, or sampling is misconfigured. Turning diagnostics fully off protects the archive but leaves no way to tell them apart. Two additions fix it: an **`otel: sdk started, endpoint=…, instrumentations=N` line at startup** — whose *absence* is the direct signal for the `--import` trap this plan already flags as the classic gotcha — and **rate-limited exporter-failure logging**: the first failure at `warn`, then at most one per five minutes. That is neither invisible nor a flood.
+- **⚠️ `LOG_LEVEL=trace` buys future-proofing, not present-day output — the criteria must not overclaim it.** With zero `log.trace()` calls in the codebase, `trace` will never appear as a Loki label value, because label values only exist for lines that were actually written. Any criterion promising "the dropdown lists all six names" is unsatisfiable. What is verifiable: every level the code *emits* appears with a text name, and a temporary `log.trace()` proves the path end to end.
 - **`/metrics` is unauthenticated on the LAN.** Prometheus has no session, so `requireAdmin` would break scraping. This matches the existing LAN trust model; an optional bearer token from `.env` is the escape hatch if that ever changes.
 - **Heimdall's Logs section is deleted entirely — viewer *and* runtime level switch.** Grafana is the log UI now, so the tail, the module/level filters, the SSE follow stream, and `core/logtap.ts` all go. The level dropdown goes with them: **`LOG_LEVEL` in `.env` + a restart becomes the single source of truth**, which is a deliberate simplification, not an oversight.
 - **This is the plan's biggest contract win.** Both `logTap` **and** `setLogLevel` leave `ModuleDeps` — the module contract loses two fields that only ever had one consumer. Three further things fall out with them: the `moduleLoggers[]` array in `app.ts` exists *solely* so `setLogLevel` can walk the pino children (they don't inherit a level change after creation), the "apply persisted level before child loggers are created" ordering constraint disappears, and the settings-table `logLevel` key must be **dropped from `applySettingsOverlay` and deleted from the DB** — leaving a stale persisted row with no UI to change it would strand the app at whatever level it was last set to, permanently.
@@ -125,6 +127,7 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 
 - [ ] `.agent/memory/decisions.md`: numeric `level` → `logLevel` (and why the archive is not rewritten), Heimdall Logs removed viewer + level switch, client logging introduced with `source`/`module` as cross-cutting labels, `LOG_LEVEL` default → `trace`
 - [ ] Run the **`context-sync`** skill: `architecture.md`'s module table gains `client-logs`, the `core` list loses `logtap`, `project-structure.md` reflects the new client `core/log.ts`
+- [ ] Update `.agent/memory/progress.md` in the 16a PR (`git.md` step 7)
 - [ ] `verify` green before the PR
 
 ### Step 2 — Metrics snapshot (no containers, no dependencies)
@@ -152,7 +155,9 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 
 - [ ] `@opentelemetry/sdk-node`, `auto-instrumentations-node`, `exporter-trace-otlp-http`; `server/src/otel.ts`
 - [ ] **Load before the app**: `node --import ./dist/otel.js dist/bootstrap.js` — ESM hoists imports, so initialising inside `bootstrap.ts` silently instruments nothing. Update `ecosystem.config.cjs`, the root `start` script, and `Dockerfile`
-- [ ] `OTEL_ENABLED=false` default + `OTEL_EXPORTER_OTLP_ENDPOINT`; short timeout, small queue, exporter diagnostics off
+- [ ] `OTEL_ENABLED=false` default + `OTEL_EXPORTER_OTLP_ENDPOINT`; short timeout, small queue
+- [ ] **Startup line `otel: sdk started, endpoint=…, instrumentations=N`** — its absence is how you detect the `--import` trap, which raises no error of its own
+- [ ] **Rate-limited exporter-failure logging**: first failure at `warn`, then ≤1 per 5 minutes. Not silent (undiagnosable), not unbounded (destroys the archive)
 - [ ] Tempo service + `observability/tempo/tempo.yml`; datasource with the Loki→Tempo trace-ID correlation
 - [ ] Emit `trace_id` into the pino line so a log jumps to its trace
 
@@ -162,6 +167,7 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 - [ ] `docs/observability.md` — what is durable vs on-demand, and why
 - [ ] `.agent/memory/decisions.md`: the snapshot-as-record decision, deltas-not-counters, the `node_exporter`-on-macOS exclusion, the slow-cycle `diskMb` sampling, and snapshots being level-independent
 - [ ] Run **`context-sync`** again for the `metrics` module + the new observability services
+- [ ] Update `.agent/memory/progress.md` in the 16b PR (`git.md` step 7)
 - [ ] Archive this file to `.agent/plans/completed/` as part of the 16b PR
 
 ## Acceptance criteria
@@ -175,11 +181,14 @@ Criteria 8–17 gate **16a**; 1–7 gate **16b**.
 3. A deliberate synchronous block (a large `readdirSync`, or a `while` spin) shows as a `loopLagP99Ms` spike in Grafana at the right timestamp.
 4. `uploadsDelta` summed over 24h in LogQL equals the upload count Heimdall reports, **including across a Bifrost restart**.
 5. `METRICS_ENABLED=false` stops the snapshots with no other behaviour change; the timer never blocks shutdown.
-6. With `OTEL_ENABLED=true` and Tempo **down**, the app starts, serves normally, and does not flood `storage/logs/` with exporter errors.
+6. With `OTEL_ENABLED=true` and Tempo **down**, the app starts, serves normally, and logs the failure **once** at `warn` then at most once per five minutes — neither silent nor flooding. (Note: a mute implementation would pass "does not flood" trivially, which is why the positive half is part of the criterion.)
+6a. **Step 4 actually works — the positive case.** With Tempo up, one request produces a trace containing **both an HTTP span and a DB span**, and the `trace_id` on the matching Loki log line jumps to that trace in Grafana. Without this, Step 4 can ship entirely non-functional and still pass every other criterion.
+6b. **The `--import` trap is detectable.** Booting with the flag produces the `otel: sdk started …` line; booting without it does not — so "no traces" can always be told apart from "never instrumented".
 7. Prometheus scrapes `/metrics` from Docker; stopping it for an hour leaves a visible gap that does **not** corrupt the snapshot record — proving which path is the source of truth.
 8. Heimdall has no Logs section; all three `/api/heimdall/logs*` routes 404; `ModuleDeps` no longer carries `logTap` or `setLogLevel` and every module still compiles.
 9. A DB that previously held a persisted `logLevel` row upgrades cleanly and honours `.env` afterwards (verified on both an upgraded and a fresh DB, per the `db-migration` skill).
-10. New lines carry `"logLevel":"info"` and **no `level` key at all**. At the new default an SSE connect writes a `debug` line, queryable as `{job="bifrost", logLevel="debug"}` — text, not `20`. Grafana's dropdown lists all six names.
+10. New lines carry `"logLevel":"info"` and **no `level` key at all**. At the new default an SSE connect writes a `debug` line, queryable as `{job="bifrost", logLevel="debug"}` — text, not `20`. Grafana's dropdown lists **every level the code actually emits** (`debug`/`info`/`warn`/`error`, plus `fatal` once Step 1's handlers fire) — *not* all six, since `trace` cannot appear as a label value while no `log.trace()` call exists.
+10a. **The trace path is proven end to end, not just at the formatter.** A temporary `log.trace()` line reaches disk and is queryable as `{logLevel="trace"}`; removing it again leaves the default intact. This is what makes `LOG_LEVEL=trace` more than a config change.
 11. **Old and new files filter identically.** A `logLevel="error"` query spans log files written before and after this plan, returning matches from both — proving the Alloy fallback covers the pre-change archive and nothing was orphaned.
 12. `npm run logs` **actually tails a file that exists** (the pre-existing `app.log` path bug is fixed) and renders `INFO`/`WARN`/`ERROR` with colour on new lines; dev-mode stdout does the same — the no-Docker fallback is intact, not silently degraded.
 13. Log volume at trace over a normal day stays within the rotation budget, and `LOG_RETENTION_FILES` bounds `storage/logs/` — verified by forcing rotation rather than waiting for it.
@@ -208,4 +217,6 @@ Criteria 8–17 gate **16a**; 1–7 gate **16b**.
 - [ ] Integration: `/api/client-logs` accepts a batch and re-emits with `source:"client"`; rejects oversized bodies; rate limit trips; `/config` returns the env-seeded level
 - [ ] Client unit: the error boundary renders its fallback and reports once (not per re-render); the batcher drops rather than retries when the endpoint fails
 - [ ] Manual: kill the process with an uncaught throw and confirm the `fatal` line reached disk before exit
-- [ ] Live-verify: stack up, snapshot lines land in Loki, panels render, and the `level` dropdown filters by name across all six values
+- [ ] Unit: exporter-failure logging is rate-limited — N failures in a minute produce one line, not N
+- [ ] Live-verify: stack up, snapshot lines land in Loki, panels render, the `logLevel` dropdown filters by name across every emitted level, and a temporary `log.trace()` appears end to end
+- [ ] Live-verify (Step 4): a request yields an HTTP + DB span in Tempo, and the log line's `trace_id` jumps to it
