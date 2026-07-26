@@ -20,8 +20,11 @@ Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see
 | ✅ 13 | [Accio](completed/PLAN-13-accio.md) — read-later / bookmark shelf                                                    | PLAN-12 merged. Single PR                                                                                                                     |
 | ✅ 14 | [Nimbus](completed/PLAN-14-nimbus.md) — LAN speed test                                                              | PLAN-13 merged (as PR #35). Single PR                                                                                                         |
 | 15    | [Portkey](PLAN-15-portkey.md) — LAN go-links                                                                        | PLAN-14 merged. Single PR                                                                                                                     |
+| 16    | [Observability](PLAN-16-observability.md) — logging coverage (Part A) · metrics snapshot, Prometheus, Tempo (Part B) | PLAN-15 merged. **Declared exception: two PRs** — `feat/plan-16a-logging`, then `feat/plan-16b-metrics` after A merges                        |
 | 99    | Future backlog                                                                                                      | Reference only — pull items into new numbered plans when scheduled                                                                            |
 
 Completed plans live in `completed/` — they remain the spec of record and must be consulted when later plans reference them.
 
 Rules of engagement: never start a gated plan early; never modify a plan file unprompted; deviations from a plan must be listed in the PR body and logged in `memory/decisions.md`.
+
+**A plan is not done until its failure paths are logged** (PLAN-16). Every plan ships the critical logs for the code it adds — each new failure path gets a `warn`/`error`/`fatal` line where it is handled, and a deliberately silent `catch` carries a comment saying why silence is correct. See `rules/coding.md` → "Errors & logging".
