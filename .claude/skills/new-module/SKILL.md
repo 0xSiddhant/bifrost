@@ -19,6 +19,7 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 ## Client (`client/src/features/<name>/`)
 
 7. Feature slice with route-level code splitting; nav renders from `/api/capabilities`, never hardcoded. The client folder name may be a page codename that differs from the server module name (existing mappings: `clipboard`→`hermes`, `qr-tool`→`sigil`, `presence`→`wardens`) — record the mapping in architecture.md's module registry.
+   - **New top-level route root?** Add its first segment to `RESERVED_ROOTS` in `server/src/core/reserved-roots.ts` (and the assertion list in `reserved-roots.test.ts`) in the same change — otherwise a Portkey go-link slug could shadow the new page (`rules/coding.md` → Routing). Applies to any new server route outside `/api/` too. Nested/param routes under an existing root need no entry.
 8. Styling via tokens only — zero hardcoded colors/sizes (grep for hex before finishing).
 9. Shared logic goes in `client/src/core/`, never imported across feature folders.
 

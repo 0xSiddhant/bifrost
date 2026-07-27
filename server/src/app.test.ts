@@ -51,6 +51,7 @@ describe('boot → health → capabilities', () => {
         'loki',
         'accio',
         'nimbus',
+        'portkey',
         'screensaver',
       ],
     });

@@ -35,6 +35,7 @@ import { eddaModule } from './modules/edda/module.js';
 import { lokiModule } from './modules/loki/module.js';
 import { accioModule } from './modules/accio/module.js';
 import { nimbusModule } from './modules/nimbus/module.js';
+import { portkeyModule } from './modules/portkey/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 
 /**
@@ -63,6 +64,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Local only: it measures the LAN path to this machine, and an open
     // byte-firehose on a public host is a bandwidth bill (PLAN-14).
     nimbusModule,
+    // Local only, permanently: a public go-links service is an open-redirect /
+    // phishing primitive; on the LAN it's a convenience (PLAN-15).
+    portkeyModule,
     screensaverModule,
   ],
   cloud: [
