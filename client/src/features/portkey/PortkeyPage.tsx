@@ -18,7 +18,7 @@ import {
   WandIcon,
 } from '../../core/ui/icons';
 import { createPortkey, deletePortkey, goPath, goUrl, updatePortkey, type Portkey } from './api';
-import { isValidSlugFormat, slugFormatError } from './slug';
+import { isValidSlugFormat, slugFormatError, suggestSlug } from './slug';
 import { usePortkeys } from './usePortkeys';
 import './portkey.css';
 
@@ -98,6 +98,8 @@ export function PortkeyPage() {
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [conflictSlug, setConflictSlug] = useState<string | null>(null);
+  // A still-memorable free variant offered when the chosen slug is taken.
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   const [q, setQ] = useState('');
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
@@ -137,13 +139,17 @@ export function PortkeyPage() {
     );
   }, [links, q]);
 
-  const enchant = async () => {
-    if (!canEnchant) return;
+  // `override` lets the "Use /go/<suggestion>" button retry with the suggested
+  // slug directly, instead of racing a setSlug state update.
+  const enchant = async (override?: string) => {
+    const slugValue = (override ?? slug).trim();
+    if (!isValidSlugFormat(slugValue) || url.trim().length === 0 || saving) return;
     setSaving(true);
     setCreateError(null);
     setConflictSlug(null);
+    setSuggestion(null);
     try {
-      await createPortkey({ slug: slug.trim(), url: url.trim(), note: note.trim() || undefined });
+      await createPortkey({ slug: slugValue, url: url.trim(), note: note.trim() || undefined });
       // The row arrives over SSE; clearing here is the make-another loop.
       setSlug('');
       setUrl('');
@@ -151,8 +157,12 @@ export function PortkeyPage() {
       setEnchantSlug(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setConflictSlug(slug.trim());
-        setCreateError(err.detail ?? `/go/${slug.trim()} is already enchanted.`);
+        setConflictSlug(slugValue);
+        // Offer the nearest free variant from the live list — memorability kept,
+        // no dead-end. A race (another device just took it too) re-suggests on
+        // the next click.
+        setSuggestion(suggestSlug(slugValue, new Set(links.map((link) => link.slug))));
+        setCreateError(err.detail ?? `/go/${slugValue} is already enchanted.`);
       } else if (err instanceof ApiError && err.detail) {
         setCreateError(err.detail);
       } else {
@@ -163,9 +173,16 @@ export function PortkeyPage() {
     }
   };
 
+  const useSuggestion = () => {
+    if (!suggestion) return;
+    setSlug(suggestion);
+    void enchant(suggestion);
+  };
+
   const viewConflict = () => {
     if (conflictSlug) setQ(conflictSlug);
     setConflictSlug(null);
+    setSuggestion(null);
     setCreateError(null);
     gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -226,6 +243,7 @@ export function PortkeyPage() {
                     setSlug(event.target.value);
                     setCreateError(null);
                     setConflictSlug(null);
+                    setSuggestion(null);
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') void enchant();
@@ -277,6 +295,11 @@ export function PortkeyPage() {
           {createError && (
             <p className="caption pk-error" role="alert">
               {createError}
+              {suggestion && (
+                <button type="button" className="pk-linkbtn" onClick={useSuggestion} disabled={saving}>
+                  Use /go/{suggestion}
+                </button>
+              )}
               {conflictSlug && (
                 <button type="button" className="pk-linkbtn" onClick={viewConflict}>
                   View it
