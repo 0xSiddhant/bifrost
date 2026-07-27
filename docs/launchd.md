@@ -89,5 +89,5 @@ launchctl load ~/Library/LaunchAgents/local.bifrost.plist
   login; mDNS and `storage/` permissions still apply.
 - Bifrost loads `.env` itself from `WorkingDirectory`, so no secrets go in the
   plist. Set the PIN in `.env`.
-- Logs: structured pino JSON is at `storage/logs/app.log` (`npm run logs`); the
+- Logs: structured pino JSON is at `storage/logs/current.log` (`npm run logs`); the
   plist's `StandardOut/ErrorPath` only capture the boot banner and crashes.

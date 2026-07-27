@@ -18,7 +18,7 @@
     "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
     "start": "node server/dist/bootstrap.js",
-    "logs": "tail -f storage/logs/app.log | pino-pretty",
+    "logs": "tail -F storage/logs/current.log | pino-pretty",
     "changelog": "changelogen --output CHANGELOG.md",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
