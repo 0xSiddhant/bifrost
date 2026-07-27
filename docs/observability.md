@@ -1,6 +1,7 @@
 # Observability (optional Grafana view of the logs)
 
-Bifrost logs structured pino JSON to `storage/logs/app.log` — that alone is the
+Bifrost logs structured pino JSON to `storage/logs/` — rotated `app.N.log` files
+with a `current.log` symlink on the active one. That alone is the
 source of truth (`npm run logs` pretty-prints it). This stack is a **nice-to-
 have** Grafana view on top; it is never load-bearing.
 
