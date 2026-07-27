@@ -1297,6 +1297,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  /* CodeMirror's base theme stacks its own chrome high — .cm-gutters at 200 and
+     .cm-panels (the find/replace bar) at 300 — which it needs internally, since
+     both are sticky and content scrolls under them. Those values leak into the
+     page's stacking context, where they beat the sticky app header (z-index 10)
+     and every popover anchored inside it, so an open find panel painted over
+     the theme menu. `isolation: isolate` traps CM's ordering inside the editor
+     box: the panel still sits above the gutters and the content, but the editor
+     as a whole now stacks as one ordinary element beneath the app chrome. */
+  isolation: isolate;
 }
 
 /* ≥16px on touch screens or iOS zooms the page on focus */
