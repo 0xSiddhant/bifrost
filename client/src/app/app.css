@@ -109,8 +109,12 @@
 /* Measured height of the sticky header (62px at every width — its content is
    fixed). Anything else that sticks parks below it via this var rather than
    guessing an offset. */
+/* Companion for the bottom nav, which only exists ≤640px (see .nav--bottom):
+   0 on desktop, its measured height below the breakpoint. Anything floating at
+   the bottom of the viewport clears it via this var. */
 :root {
   --header-h: 3.875rem;
+  --bottomnav-h: 0px;
 }
 
 .shell-header {
@@ -1488,6 +1492,18 @@
 .rune-tree__value {
   overflow-wrap: anywhere;
   min-width: 0;
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rune-tree__value:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .rune-tree__value--string {
@@ -1642,6 +1658,12 @@
 }
 
 @media (max-width: 640px) {
+  /* Measured height of .nav--bottom (61px — icon + label + its own padding and
+     border). Kept in sync by hand, like --header-h. */
+  :root {
+    --bottomnav-h: 3.8125rem;
+  }
+
   .nav--top {
     display: none;
   }

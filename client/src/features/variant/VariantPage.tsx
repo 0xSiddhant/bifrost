@@ -168,6 +168,13 @@ export function VariantPage() {
     else fail('Copy was blocked by the browser.');
   };
 
+  const copyValue = async (value: string) => {
+    // The whole value goes to the clipboard; only the toast is trimmed.
+    const shown = value.length > 60 ? `${value.slice(0, 60)}…` : value;
+    if (await copyText(value)) ok(`Value copied — ${shown}`);
+    else fail('Copy was blocked by the browser.');
+  };
+
   useEffect(() => {
     if (!notice) return;
     const id = window.setTimeout(() => setNotice(null), 2400);
@@ -604,7 +611,11 @@ export function VariantPage() {
           <p className="variant-pane__treeempty caption">Nothing here yet.</p>
         ) : parsed !== undefined ? (
           <div className="variant-pane__tree">
-            <TreeView value={parsed} onCopyPath={(path) => void copyPath(path)} />
+            <TreeView
+              value={parsed}
+              onCopyPath={(path) => void copyPath(path)}
+              onCopyValue={(value) => void copyValue(value)}
+            />
           </div>
         ) : (
           <p className="variant-pane__treeempty caption">
@@ -807,7 +818,11 @@ export function VariantPage() {
           onJumpChunk={jumpToChunk}
         />
 
-        {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}
+        {notice && (
+          <Toast kind={notice.kind} floating>
+            {notice.message}
+          </Toast>
+        )}
       </div>
 
       <LibraryPicker

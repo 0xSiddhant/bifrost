@@ -4,15 +4,16 @@ import { ChevronRightIcon } from './icons';
 
 /**
  * Read-only explorer for a parsed JSON document (PLAN-07): collapsible nodes,
- * type badges, item counts. Tapping a key copies its JSON path — editing
- * happens in code mode only. Expand all / Collapse all fold or unfold the whole
- * tree (incl. the outermost array/object) in one action; per-node toggles still
- * work between bulk actions.
+ * type badges, item counts. Tapping a key copies its JSON path, tapping a
+ * primitive value copies the value itself — editing happens in code mode only.
+ * Expand all / Collapse all fold or unfold the whole tree (incl. the outermost
+ * array/object) in one action; per-node toggles still work between bulk actions.
  */
 
 interface TreeViewProps {
   value: unknown;
   onCopyPath: (path: string) => void;
+  onCopyValue: (value: string) => void;
 }
 
 const MAX_STRING_PREVIEW = 160;
@@ -43,6 +44,11 @@ function primitiveLabel(value: unknown): string {
   return String(value);
 }
 
+/** What lands on the clipboard: the whole value, never the truncated preview. */
+function copyableValue(value: unknown): string {
+  return typeof value === 'string' ? value : String(value);
+}
+
 function countLabel(value: object): string {
   if (Array.isArray(value)) {
     return value.length === 1 ? '1 item' : `${value.length} items`;
@@ -58,9 +64,10 @@ interface TreeNodeProps {
   depth: number;
   openMode: OpenMode;
   onCopyPath: (path: string) => void;
+  onCopyValue: (value: string) => void;
 }
 
-function TreeNode({ name, value, path, depth, openMode, onCopyPath }: TreeNodeProps) {
+function TreeNode({ name, value, path, depth, openMode, onCopyPath, onCopyValue }: TreeNodeProps) {
   const kind = kindOf(value);
   const container = kind === 'object' || kind === 'array';
   // Initialised once per mount; a bulk action bumps the tree key to remount,
@@ -83,9 +90,14 @@ function TreeNode({ name, value, path, depth, openMode, onCopyPath }: TreeNodePr
       <div className="rune-tree__row" style={{ '--tree-depth': depth } as React.CSSProperties}>
         <span className="rune-tree__spacer" aria-hidden="true" />
         {keyButton}
-        <span className={`rune-tree__value rune-tree__value--${kind}`}>
+        <button
+          type="button"
+          className={`rune-tree__value rune-tree__value--${kind}`}
+          title="Copy value"
+          onClick={() => onCopyValue(copyableValue(value))}
+        >
           {primitiveLabel(value)}
-        </span>
+        </button>
         <span className="rune-tree__badge">{kind}</span>
       </div>
     );
@@ -121,13 +133,14 @@ function TreeNode({ name, value, path, depth, openMode, onCopyPath }: TreeNodePr
             depth={depth + 1}
             openMode={openMode}
             onCopyPath={onCopyPath}
+            onCopyValue={onCopyValue}
           />
         ))}
     </div>
   );
 }
 
-export function TreeView({ value, onCopyPath }: TreeViewProps) {
+export function TreeView({ value, onCopyPath, onCopyValue }: TreeViewProps) {
   const [openMode, setOpenMode] = useState<OpenMode>('auto');
   // Bumped on every bulk action so the node subtree remounts and every node
   // re-initialises its open state from the new mode — no per-node effects.
@@ -156,6 +169,7 @@ export function TreeView({ value, onCopyPath }: TreeViewProps) {
         depth={0}
         openMode={openMode}
         onCopyPath={onCopyPath}
+        onCopyValue={onCopyValue}
       />
     </div>
   );
