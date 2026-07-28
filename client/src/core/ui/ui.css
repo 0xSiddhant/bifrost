@@ -329,6 +329,39 @@ a.portal:hover .portal__go {
   color: var(--danger);
 }
 
+/* Floating variant: pinned to the bottom of the viewport so a copy confirmation
+   is seen without scrolling. Above the modal scrim (50) and Loki's sheet (60);
+   `pointer-events: none` keeps it from swallowing clicks on what it covers.
+   --bottomnav-h lifts it clear of the mobile bottom nav (0 on desktop). */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottomnav-h, 0px) + max(var(--space-4), env(safe-area-inset-bottom)));
+  transform: translateX(-50%);
+  z-index: 70;
+  max-width: min(28rem, calc(100vw - var(--space-8)));
+  pointer-events: none;
+}
+
+.toast-host .toast {
+  background: var(--surface);
+  overflow-wrap: anywhere;
+  animation: toast-rise var(--dur-2) var(--ease);
+}
+
+@keyframes toast-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-host .toast {
+    animation: none;
+  }
+}
+
 /* ── EmptyState ─────────────────────────────────────────────── */
 .empty {
   display: flex;

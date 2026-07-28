@@ -292,6 +292,13 @@ export function RunestonePage() {
     else fail('Copy was blocked by the browser.');
   };
 
+  const copyValue = async (value: string) => {
+    // The whole value goes to the clipboard; only the toast is trimmed.
+    const shown = value.length > 60 ? `${value.slice(0, 60)}…` : value;
+    if (await copyText(value)) ok(`Value copied — ${shown}`);
+    else fail('Copy was blocked by the browser.');
+  };
+
   // Jump after the editor exists — switching tree→code mounts it on the next render.
   const [pendingJump, setPendingJump] = useState<number | null>(null);
   useEffect(() => {
@@ -587,7 +594,11 @@ export function RunestonePage() {
                 Nothing carved yet — switch to Code and paste some JSON.
               </p>
             ) : valid && parsed !== undefined ? (
-              <TreeView value={parsed} onCopyPath={(path) => void copyPath(path)} />
+              <TreeView
+                value={parsed}
+                onCopyPath={(path) => void copyPath(path)}
+                onCopyValue={(value) => void copyValue(value)}
+              />
             ) : (
               <p className="rune-tree-empty caption">
                 The tree appears once the JSON is valid — {issues.length}{' '}
@@ -654,7 +665,11 @@ export function RunestonePage() {
           )}
         </Card>
 
-        {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}
+        {notice && (
+          <Toast kind={notice.kind} floating>
+            {notice.message}
+          </Toast>
+        )}
       </div>
 
       <input

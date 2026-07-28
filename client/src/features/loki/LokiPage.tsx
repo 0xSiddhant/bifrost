@@ -685,7 +685,11 @@ export function LokiPage() {
           </Card>
         )}
 
-        {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}
+        {notice && (
+          <Toast kind={notice.kind} floating>
+            {notice.message}
+          </Toast>
+        )}
 
         {capabilities?.profile === 'local' && lokiConfig && !lokiConfig.executionEnabled && (
           <p className="loki-soon caption">
