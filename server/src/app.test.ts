@@ -53,6 +53,7 @@ describe('boot → health → capabilities', () => {
         'nimbus',
         'portkey',
         'screensaver',
+        'client-logs',
       ],
     });
   });
