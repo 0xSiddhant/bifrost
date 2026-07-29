@@ -27,7 +27,7 @@ export const accioModule: FeatureModule = {
   name: 'accio',
   register(app, deps) {
     const { config, log, bus, sse, db } = deps;
-    const repo = new DbAccioRepository(db);
+    const repo = new DbAccioRepository(db, log);
 
     const enrich = new EnrichTitleUseCase(
       repo,

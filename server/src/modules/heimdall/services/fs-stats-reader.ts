@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Logger } from '../../../core/logger/index.js';
 import type { FolderUsage, StatsReader } from '../ports.js';
 
 export interface WatchedFolder {
@@ -11,7 +12,10 @@ export interface WatchedFolder {
 
 /** Recursive on-demand disk accounting for the storage folders. */
 export class FsStatsReader implements StatsReader {
-  constructor(private readonly folders: WatchedFolder[]) {}
+  constructor(
+    private readonly folders: WatchedFolder[],
+    private readonly log: Logger,
+  ) {}
 
   diskUsage(): FolderUsage[] {
     return this.folders.map(({ folder, dir }) => {
@@ -21,7 +25,11 @@ export class FsStatsReader implements StatsReader {
         let entries: fs.Dirent[];
         try {
           entries = fs.readdirSync(current, { withFileTypes: true });
-        } catch {
+        } catch (error) {
+          // A whole subtree drops out of the total. The number still renders,
+          // just wrong and low — which is the worst kind of wrong for a disk
+          // figure, since nothing about the UI suggests it is incomplete.
+          this.log.warn({ err: error, folder, dir: current }, 'disk usage: directory unreadable, subtree skipped');
           return;
         }
         for (const entry of entries) {
@@ -33,8 +41,11 @@ export class FsStatsReader implements StatsReader {
             try {
               bytes += fs.statSync(full).size;
               files += 1;
-            } catch {
-              // vanished mid-walk — skip
+            } catch (error) {
+              // Usually benign: a tmp file vanished between the listing and the
+              // stat. Logged at debug rather than warn because it is expected
+              // during an upload, and at trace-level default it still lands.
+              this.log.debug({ err: error, file: full }, 'disk usage: file vanished mid-walk');
             }
           }
         }

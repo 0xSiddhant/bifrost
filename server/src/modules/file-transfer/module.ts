@@ -28,7 +28,7 @@ export const fileTransferModule: FeatureModule = {
       blockedExtensions: config.uploadExtBlocklist,
     });
     const listDownloads = new ListDownloadsUseCase(watcher);
-    const getDownloadStream = new GetDownloadStreamUseCase(watcher, reader);
+    const getDownloadStream = new GetDownloadStreamUseCase(watcher, reader, log);
 
     // Modules publish through the bus; each module decides which of its own
     // events fan out to browsers (architecture: sse-hub wiring).

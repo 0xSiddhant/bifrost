@@ -42,7 +42,11 @@ export class UploadAuditRecorder {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(this.uploadsDir, { withFileTypes: true });
-    } catch {
+    } catch (error) {
+      // Not fatal — the app runs fine — but every pre-existing upload is now
+      // missing from the audit with no other symptom, so Heimdall's counts
+      // silently under-report until someone reads this line.
+      this.log.warn({ err: error, dir: this.uploadsDir }, 'upload audit reconcile skipped: uploads dir unreadable');
       return;
     }
     let seeded = 0;
@@ -51,7 +55,11 @@ export class UploadAuditRecorder {
       let stat: fs.Stats;
       try {
         stat = fs.statSync(path.join(this.uploadsDir, entry.name));
-      } catch {
+      } catch (error) {
+        // One file the directory listed but couldn't be stat'd: it is dropped
+        // from the audit entirely, so name the file rather than leaving a
+        // one-row discrepancy nobody can account for.
+        this.log.warn({ err: error, file: entry.name }, 'upload audit skipped one file');
         continue;
       }
       // Stored names are `<timestamp>-<sanitized>`; recover both halves.

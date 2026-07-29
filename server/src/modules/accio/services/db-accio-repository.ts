@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, or, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../../../core/db/index.js';
+import type { Logger } from '../../../core/logger/index.js';
 import { accioLinks } from '../../../core/db/schema.js';
 import type { AccioLink, AccioListFilter, AccioRepository } from '../ports.js';
 
@@ -18,13 +19,17 @@ interface LinkRow {
 }
 
 /** Tags live as a JSON array in one column; a corrupt value degrades to none. */
-function toLink(row: LinkRow): AccioLink {
+function toLink(row: LinkRow, log: Logger): AccioLink {
   let tags: string[] = [];
   try {
     const parsed: unknown = JSON.parse(row.tags);
     if (Array.isArray(parsed)) tags = parsed.filter((tag): tag is string => typeof tag === 'string');
-  } catch {
+  } catch (error) {
     // A hand-edited DB shouldn't take the shelf down — show the link untagged.
+    // But an unparseable tags column means a row was written by something other
+    // than this code, and the only visible symptom is tags quietly disappearing
+    // from one card, so it gets a line naming the row.
+    log.warn({ err: error, id: row.id }, 'accio row has unparseable tags — showing it untagged');
   }
   return {
     id: row.id,
@@ -37,7 +42,10 @@ function toLink(row: LinkRow): AccioLink {
 }
 
 export class DbAccioRepository implements AccioRepository {
-  constructor(private readonly handle: DbHandle) {}
+  constructor(
+    private readonly handle: DbHandle,
+    private readonly log: Logger,
+  ) {}
 
   private get db() {
     return this.handle.db;
@@ -60,7 +68,7 @@ export class DbAccioRepository implements AccioRepository {
 
   findById(id: string): AccioLink | null {
     const row = this.db.select().from(accioLinks).where(eq(accioLinks.id, id)).get();
-    return row ? toLink(row) : null;
+    return row ? toLink(row, this.log) : null;
   }
 
   list(filter: AccioListFilter): AccioLink[] {
@@ -98,7 +106,7 @@ export class DbAccioRepository implements AccioRepository {
       .limit(filter.limit)
       .offset(filter.offset)
       .all()
-      .map(toLink);
+      .map((row) => toLink(row, this.log));
   }
 
   delete(id: string): AccioLink | null {
