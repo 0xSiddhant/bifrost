@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { trace } from '@opentelemetry/api';
 import pino from 'pino';
 import type { LogLevel } from '../config/index.js';
 
@@ -59,6 +60,21 @@ export function rollOptions(logsDir: string, retainFiles: number) {
   } as const;
 }
 
+/**
+ * Stamps the active trace on every line, so a log jumps to its trace in Grafana
+ * (the Loki→Tempo correlation, PLAN-16b).
+ *
+ * Costs one function call per line and returns nothing when tracing is off,
+ * which is the default — `trace.getActiveSpan()` is a no-op lookup until an SDK
+ * registers a real tracer provider, so this stays inert rather than conditional.
+ */
+function traceContext(): Record<string, string> {
+  const span = trace.getActiveSpan();
+  if (!span) return {};
+  const { traceId, spanId } = span.spanContext();
+  return { trace_id: traceId, span_id: spanId };
+}
+
 export function createLogger(options: LoggerOptions): Logger {
   // Destination levels are 'trace' so the root logger's level is the single
   // gate, with no per-stream re-filtering.
@@ -81,7 +97,10 @@ export function createLogger(options: LoggerOptions): Logger {
       level: 'trace',
     });
   }
-  return pino({ level: options.level, formatters: LEVEL_FORMATTER }, pino.transport({ targets }));
+  return pino(
+    { level: options.level, formatters: LEVEL_FORMATTER, mixin: traceContext },
+    pino.transport({ targets }),
+  );
 }
 
 /**

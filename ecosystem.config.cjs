@@ -16,6 +16,12 @@ module.exports = {
       // and PM2 fork mode wraps the script, so it would exit immediately.
       script: 'server/dist/bootstrap.js',
       cwd: __dirname,
+      // --import, not an import inside bootstrap: ESM hoists, so initialising
+      // the OTel SDK from application code would run after http/fastify were
+      // already imported and the instrumentations would patch nothing — with no
+      // error to show for it. Tracing is off unless OTEL_ENABLED=true, so this
+      // flag costs a no-op module load in the normal case (PLAN-16b).
+      node_args: '--import ./server/dist/otel.js',
       // Single instance: SQLite (one writer) and mDNS are not cluster-safe.
       exec_mode: 'fork',
       instances: 1,
