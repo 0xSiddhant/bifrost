@@ -1,0 +1,36 @@
+# Tempo — trace storage for the optional stack (PLAN-16b Step 4).
+#
+# PUSHED to, unlike Loki's files-first tail: when Tempo is down the exporter
+# buffers, retries and drops, so traces are the least durable signal Bifrost
+# produces. That is deliberate and bounded — the metrics snapshot in the log
+# archive remains the record; traces answer "what did this one request do?"
+# while the stack happens to be up.
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        # http/protobuf only: that is what the app's exporter speaks, and an
+        # unused gRPC port on a LAN box is a port nobody audits.
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  # Short, because Bifrost is restarted constantly and a half-hour flush window
+  # would mean losing the tail of every session.
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    # Traces are for recent investigation; the durable history is the log archive.
+    block_retention: 48h
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks

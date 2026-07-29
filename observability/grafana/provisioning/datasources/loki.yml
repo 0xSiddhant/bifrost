@@ -9,3 +9,13 @@ datasources:
     isDefault: true
     jsonData:
       maxLines: 1000
+      # The other half of the correlation (PLAN-16b): core/logger stamps
+      # `trace_id` on every line written inside a span, so a log line in the
+      # explorer becomes a one-click jump into the trace that produced it.
+      derivedFields:
+        - name: TraceID
+          datasourceUid: bifrost-tempo
+          matcherType: label
+          matcherRegex: trace_id
+          url: '${__value.raw}'
+          urlDisplayLabel: 'View trace'

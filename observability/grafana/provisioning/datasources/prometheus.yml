@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: bifrost-prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    # Loki stays the default: the log archive is the system of record, and this
+    # only holds whatever was scraped while the stack happened to be running.
+    isDefault: false
+    jsonData:
+      httpMethod: POST
