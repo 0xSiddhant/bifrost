@@ -1,7 +1,6 @@
 import type { FeatureModule } from '../../core/module.js';
-import { writeSetting } from '../../core/db/index.js';
 import { registerHeimdallRoutes } from './routes/heimdall.js';
-import { registerObservabilityRoutes } from './routes/observability.js';
+import { registerAboutRoutes } from './routes/about.js';
 import { LoginThrottle } from './login-throttle.js';
 import { DbSettingsRepository } from './services/db-settings-repository.js';
 import { DbUploadAuditRepository } from './services/db-upload-audit-repository.js';
@@ -19,16 +18,19 @@ import { ListUploadsUseCase } from './usecases/list-uploads.js';
 export const heimdallModule: FeatureModule = {
   name: 'heimdall',
   async register(app, deps) {
-    const { config, log, db, bus, sse, auth, logTap, setLogLevel } = deps;
+    const { config, log, db, bus, sse, auth } = deps;
 
     const settingsRepo = new DbSettingsRepository(db);
     const auditRepo = new DbUploadAuditRepository(db);
-    const statsReader = new FsStatsReader([
-      { folder: 'uploads', dir: config.storage.uploads },
-      { folder: 'downloads', dir: config.storage.downloads },
-      { folder: 'logs', dir: config.storage.logs },
-      { folder: 'data', dir: config.storage.data },
-    ]);
+    const statsReader = new FsStatsReader(
+      [
+        { folder: 'uploads', dir: config.storage.uploads },
+        { folder: 'downloads', dir: config.storage.downloads },
+        { folder: 'logs', dir: config.storage.logs },
+        { folder: 'data', dir: config.storage.data },
+      ],
+      log,
+    );
 
     const defaults = {
       shortcut: config.heimdall.shortcut,
@@ -63,14 +65,7 @@ export const heimdallModule: FeatureModule = {
       listUploads: new ListUploadsUseCase(auditRepo),
     });
 
-    registerObservabilityRoutes(app, {
-      config,
-      log,
-      logTap,
-      setLogLevel,
-      persistLevel: (level) => writeSetting(db, 'log.level', level),
-      auth,
-    });
+    registerAboutRoutes(app, { config });
 
     app.addHook('onClose', () => {
       unsubscribe();
