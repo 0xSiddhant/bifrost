@@ -5,8 +5,13 @@
 // Bifrost itself never knows or cares whether this is running.
 
 local.file_match "bifrost" {
+	// `app*.log`, NOT `*.log`. pino-roll writes `app.N.log` and keeps a
+	// `current.log` SYMLINK pointing at the active one, so a `*.log` glob matches
+	// the live file twice — once by each name — and every error panel counts each
+	// line twice. It also skips `launchd-error.log`, which is raw stderr rather
+	// than pino JSON and would arrive with no level or module at all.
 	path_targets = [{
-		__path__ = "/var/log/bifrost/*.log",
+		__path__ = "/var/log/bifrost/app*.log",
 		job      = "bifrost",
 	}]
 }
@@ -17,20 +22,45 @@ loki.source.file "bifrost" {
 }
 
 loki.process "bifrost" {
-	// Parse the pino JSON line and promote level + module to labels so the
-	// dashboard can group errors by module. (pino `level` is numeric:
-	// 30=info, 40=warn, 50=error, 60=fatal.)
+	// Parse the pino JSON line. `logLevel` is the text level name written since
+	// PLAN-16a; `level` is the numeric one older files still carry, read here
+	// only so the fallback below can translate it. `source` separates the server
+	// from the browser (PLAN-16a client logging).
 	stage.json {
 		expressions = {
-			level  = "level",
-			module = "module",
+			logLevel = "logLevel",
+			level    = "level",
+			module   = "module",
+			source   = "source",
 		}
+	}
+
+	// Backward compatibility lives HERE, not in the log files: the existing
+	// archive is never rewritten. Lines predating PLAN-16a carry only the numeric
+	// `level`, so fill `logLevel` from it when the text key is absent. One
+	// `logLevel` label therefore spans the whole archive — paid for once at
+	// ingest instead of on every line forever — and the numeric label is dropped
+	// as redundant. `printf "%v"` because the JSON number may arrive as a float
+	// or a string depending on the parser's typing.
+	stage.template {
+		source   = "logLevel"
+		template = "{{ if .Value }}{{ .Value }}{{ else }}{{ $n := printf \"%v\" .level }}{{ if eq $n \"10\" }}trace{{ else if eq $n \"20\" }}debug{{ else if eq $n \"30\" }}info{{ else if eq $n \"40\" }}warn{{ else if eq $n \"50\" }}error{{ else if eq $n \"60\" }}fatal{{ else }}unknown{{ end }}{{ end }}"
+	}
+
+	// Root-logger lines — boot, shutdown, and Fastify's own request logs — carry
+	// no `source` binding at all (only module/client loggers do), so default them
+	// to `server`. Without this they would fall outside both `{source="server"}`
+	// and `{source="client"}` and silently vanish from every split panel.
+	stage.template {
+		source   = "source"
+		template = "{{ if .Value }}{{ .Value }}{{ else }}server{{ end }}"
 	}
 
 	stage.labels {
 		values = {
-			level  = "",
-			module = "",
+			logLevel = "",
+			module   = "",
+			source   = "",
 		}
 	}
 

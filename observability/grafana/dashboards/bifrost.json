@@ -8,13 +8,65 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["bifrost"],
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Source",
+        "description": "server = this process, client = a browser on the LAN. Alloy labels lines with no source binding (boot, shutdown, request logs) as server.",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "bifrost-loki" },
+        "query": { "label": "source", "refId": "BifrostSourceVariable", "type": 1 },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "module",
+        "label": "Module",
+        "description": "Server module or client feature. Ten names exist on both sides, so one selection spans both halves of a feature. `.*` also matches lines with no module (boot, shutdown, request logs).",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "bifrost-loki" },
+        "query": { "label": "module", "refId": "BifrostModuleVariable", "type": 1 },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "options": [],
+        "hide": 0
+      },
+      {
+        "name": "logLevel",
+        "label": "Level",
+        "description": "Text level name (PLAN-16a). Alloy fills it from the old numeric `level` for files written before that, so one query spans the whole archive.",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "bifrost-loki" },
+        "query": { "label": "logLevel", "refId": "BifrostLevelVariable", "type": 1 },
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": ["warn", "error", "fatal"],
+          "value": ["warn", "error", "fatal"]
+        },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "Bifrost",
   "uid": "bifrost-overview",
-  "version": 1,
+  "version": 2,
   "panels": [
     {
       "id": 1,
@@ -35,6 +87,7 @@
     {
       "id": 2,
       "title": "Errors + warnings / min",
+      "description": "Filtered by the Source variable. Level matcher is the text name since PLAN-16a — `level=~\"40|50|60\"` returns nothing now.",
       "type": "stat",
       "datasource": { "type": "loki", "uid": "bifrost-loki" },
       "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
@@ -44,7 +97,7 @@
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "bifrost-loki" },
-          "expr": "sum(count_over_time({job=\"bifrost\", level=~\"40|50|60\"} [1m]))",
+          "expr": "sum(count_over_time({job=\"bifrost\", source=~\"$source\", logLevel=~\"warn|error|fatal\"} [1m]))",
           "queryType": "range"
         }
       ]
@@ -84,16 +137,35 @@
     {
       "id": 5,
       "title": "Errors by module",
+      "description": "Counts both halves of a feature: ten module names exist on the server and in the client, so `accio` here means the whole feature unless Source narrows it.",
       "type": "timeseries",
       "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "bifrost-loki" },
-          "expr": "sum by (module) (count_over_time({job=\"bifrost\", level=~\"50|60\"} [$__auto]))",
+          "expr": "sum by (module) (count_over_time({job=\"bifrost\", source=~\"$source\", logLevel=~\"error|fatal\"} [$__auto]))",
           "legendFormat": "{{module}}",
+          "queryType": "range"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Errors by source",
+      "description": "Server vs browser. A client bar means a device on the LAN hit something the server never saw.",
+      "type": "timeseries",
+      "datasource": { "type": "loki", "uid": "bifrost-loki" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "expr": "sum by (source) (count_over_time({job=\"bifrost\", module=~\"$module\", logLevel=~\"error|fatal\"} [$__auto]))",
+          "legendFormat": "{{source}}",
           "queryType": "range"
         }
       ]
@@ -103,7 +175,7 @@
       "title": "Request throughput",
       "type": "timeseries",
       "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
       "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] },
       "targets": [
         {
@@ -117,16 +189,17 @@
     },
     {
       "id": 7,
-      "title": "Recent warnings & errors",
+      "title": "Log explorer (warnings & errors by default)",
+      "description": "The in-app log viewer is gone since PLAN-16a — this is it. Widen the Level variable to All to read everything Bifrost writes, including trace.",
       "type": "logs",
       "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 14 },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 14 },
       "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true },
       "targets": [
         {
           "refId": "A",
           "datasource": { "type": "loki", "uid": "bifrost-loki" },
-          "expr": "{job=\"bifrost\", level=~\"40|50|60\"}",
+          "expr": "{job=\"bifrost\", source=~\"$source\", module=~\"$module\", logLevel=~\"$logLevel\"}",
           "queryType": "range"
         }
       ]
