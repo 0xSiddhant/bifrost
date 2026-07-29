@@ -20,8 +20,11 @@
 ## Errors & logging
 
 - Fastify error handler maps domain errors → HTTP codes; never leak filesystem paths or stack traces to clients.
-- Use the module's pino child logger (`logger.child({ module })`). No `console.log` outside scripts.
+- Use the module's pino logger (`deps.log`, already bound to `{ source: 'server', module }`). Client code logs through `core/log.ts` (`log.warn` / `log.error` / `log.reportError`) — never bare `console.*`, in either workspace, outside `scripts/`.
 - Log at boundaries: request start/end (Fastify built-in), usecase failures, watcher events, shutdown steps.
+- **Every plan ships the critical logs for the code it adds** — a plan is not done until its failure paths are logged. Each new failure path gets a `warn`/`error`/`fatal` line **where it is handled**, carrying enough context to act on (`{ err, ...identifiers }`).
+- **A deliberately silent `catch` carries a comment saying why silence is correct** — so the next audit doesn't re-litigate it and trace-level noise doesn't bury the real signal. Silence is correct when the "failure" is a designed fallback (`core/copy`'s clipboard path, `core/theme`'s cached tokens, `core/deviceId`'s private-mode id, `core/build-info`'s missing dev stamp) or ordinary validation control flow. It is *not* correct when the swallow hides a real failure whose only symptom is a number quietly reading low.
+- `LOG_LEVEL` defaults to `trace` and the file is a pure archive: write everything, filter in Grafana. There is no in-app viewer and no runtime level switch — `.env` plus a restart is the control.
 
 ## Security defaults
 

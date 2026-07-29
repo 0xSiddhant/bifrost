@@ -44,11 +44,14 @@ bifrost/
 │       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
-│       ├── core/              # api/sse clients, theme engine, device registry, tokens,
+│       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
+│       │                      #   theme engine, device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
-│       │                      #   JsonEditor +markdown mode +in-editor search, TreeView +bulk collapse),
+│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode
+│       │                      #   +in-editor search, TreeView +bulk collapse),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
 │       │                      #   textNormalize, runestone + edda + accio clients, relicNames name-bank
+│       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);

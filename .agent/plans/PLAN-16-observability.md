@@ -84,51 +84,51 @@ Log-line contract for the snapshot (`module: "metrics"`, `msg: "snapshot"`):
 
 ### Step 0 — Remove the Heimdall Logs section; Grafana becomes the only log UI
 
-- [ ] Delete `LogsSection` from `client/src/features/heimdall/sections.tsx` + its entry in the section registry; drop `fetchLogs`, `setLogLevel`, `LOGS_STREAM_URL`, `LogEntry`, `LogsResponse`, `LogLevel`, `LOG_LEVELS` from `api.ts`
-- [ ] Delete all three log routes from `routes/observability.ts`, plus `sessionStreamLive`, `LEVEL_VALUE`, `HEARTBEAT_MS`, and both JSON schemas. Rename the file `routes/about.ts`; its deps collapse to `config`
-- [ ] Delete `server/src/core/logtap.ts` + tests; drop the tap stream from `createLogger` (the `pino.multistream` branch goes — the transport is the only sink again)
-- [ ] Drop **`logTap` and `setLogLevel`** from `ModuleDeps`, `app.ts`, and `heimdall/module.ts`; delete the `moduleLoggers[]` array and the persisted-level ordering comment
-- [ ] Remove `logLevel` from `applySettingsOverlay` + a migration deleting the stale settings row, so `LOG_LEVEL` in `.env` is authoritative
-- [ ] Prune `observability.int.test.ts` → `about.int.test.ts`; drop `manage-settings` coverage for the removed key
-- [ ] `LOG_LEVEL` default `info` → `trace` in `core/config` + `.env.example`, with a comment saying why (archive feeds Loki; filter at query time)
-- [ ] Add `LOG_RETENTION_FILES` (default ~30) → pino-roll's file-count `limit` in `rollOptions`; confirm the option shape against the installed pino-roll version
-- [ ] `core/logger`: `formatters.level(label) => ({ logLevel: label })` — numeric `level` dropped from new lines
-- [ ] `levelKey: 'logLevel'` on the pino-pretty transport target **and** in the root `logs` npm script
+- [x] Delete `LogsSection` from `client/src/features/heimdall/sections.tsx` + its entry in the section registry; drop `fetchLogs`, `setLogLevel`, `LOGS_STREAM_URL`, `LogEntry`, `LogsResponse`, `LogLevel`, `LOG_LEVELS` from `api.ts`
+- [x] Delete all three log routes from `routes/observability.ts`, plus `sessionStreamLive`, `LEVEL_VALUE`, `HEARTBEAT_MS`, and both JSON schemas. Rename the file `routes/about.ts`; its deps collapse to `config`
+- [x] Delete `server/src/core/logtap.ts` + tests; drop the tap stream from `createLogger` (the `pino.multistream` branch goes — the transport is the only sink again)
+- [x] Drop **`logTap` and `setLogLevel`** from `ModuleDeps`, `app.ts`, and `heimdall/module.ts`; delete the `moduleLoggers[]` array and the persisted-level ordering comment
+- [x] Remove `logLevel` from `applySettingsOverlay` + a migration deleting the stale settings row, so `LOG_LEVEL` in `.env` is authoritative
+- [x] Prune `observability.int.test.ts` → `about.int.test.ts`; drop `manage-settings` coverage for the removed key
+- [x] `LOG_LEVEL` default `info` → `trace` in `core/config` + `.env.example`, with a comment saying why (archive feeds Loki; filter at query time)
+- [x] Add `LOG_RETENTION_FILES` (default ~30) → pino-roll's file-count `limit` in `rollOptions`; confirm the option shape against the installed pino-roll version
+- [x] `core/logger`: `formatters.level(label) => ({ logLevel: label })` — numeric `level` dropped from new lines
+- [x] `levelKey: 'logLevel'` on the pino-pretty transport target **and** in the root `logs` npm script
 - [x] **Fix `npm run logs`, which is already broken:** it tails `storage/logs/app.log`, but pino-roll's symlink is `current.log` and no `app.log` exists. Point it at `current.log`. This command is the designated no-Docker fallback, so it has to actually work — **done ahead of 16a in PR #39** (`fix/npm-logs-path`, 2026-07-27); used `tail -F` so rotation repointing the symlink doesn't strand the tail on a stale inode. The `levelKey` half of item 4 above still applies to this script
-- [ ] `observability/alloy/config.alloy`: promote `logLevel`; `stage.template` fills it from numeric `level` when absent (pre-change files); drop the numeric label; rewrite the "level is numeric" comment
-- [ ] Migrate the three numeric-level panels to `logLevel=~"warn|error|fatal"` / `"error|fatal"` — **required**, they break otherwise
-- [ ] Dashboard: `logLevel` + `module` template variables, wired into "Recent warnings & errors" so it becomes a general filterable log explorer
+- [x] `observability/alloy/config.alloy`: promote `logLevel`; `stage.template` fills it from numeric `level` when absent (pre-change files); drop the numeric label; rewrite the "level is numeric" comment
+- [x] Migrate the three numeric-level panels to `logLevel=~"warn|error|fatal"` / `"error|fatal"` — **required**, they break otherwise
+- [x] Dashboard: `logLevel` + `module` template variables, wired into "Recent warnings & errors" so it becomes a general filterable log explorer
 
 ### Step 1 — Logging coverage: fill the server gaps, give the client a voice
 
 Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error / 3 debug / **0 fatal**) against **34 catch sites, ~22 logging nothing**, and **zero client-side logging of any kind**.
 
-- [ ] `process.on('uncaughtException')` + `('unhandledRejection')` → `logger.fatal` then flush and exit. Today a crashing process leaves no trace — the exact case the snapshot exists to explain
-- [ ] `app.ts:203`: config failure writes to `stderr` + `process.exit(1)`, bypassing the logger, so the commonest startup failure never reaches Loki. Emit a `fatal` line (flushed) before exiting
-- [ ] Log the shutdown reason (signal vs error) on the existing shutdown path
-- [ ] Work the silent-catch list; add `warn`/`error` where the swallow hides a real failure — `upload-audit-recorder` (reconcile skips rows), `fs-stats-reader` (the disk walk behind Heimdall stats *and* the new `diskMb`), `get-download-stream`, `manage-settings`, `db-accio-repository`. **Leave the deliberate fallbacks silent** (`build-info`, `core/copy`, `core/theme`, `core/deviceId`) and comment why, so the next audit doesn't re-litigate them
-- [ ] `source` as a **child** binding (not `base` — see the duplicate-key trap): `moduleLogger()` binds `{ source: 'server', module }`; the client re-emitter binds `{ source: 'client', module }`
-- [ ] Alloy: promote `source` as a label; `stage.template` defaults it to `server` when absent, covering root-logger and Fastify request lines
-- [ ] Client lines carry `module` = the feature name, so the ten shared names line up with their server counterparts and `{module="accio"}` spans both sides
-- [ ] Client `ErrorBoundary` around `<App />` in `main.tsx` — a render throw currently white-screens with nothing recorded
-- [ ] Client `window.onerror` + `unhandledrejection` handlers
-- [ ] `client/vite.config.ts`: `build.sourcemap: true` — without it every reported stack is a minified hash and the feature is half-useless
-- [ ] `client/src/core/log.ts`: batched, debounced `POST /api/client-logs`, dropping on failure (never a crash loop); **`warn`+ only**, floor settable via `CLIENT_LOG_LEVEL`
-- [ ] Carry `route`, `deviceId`, and UA on client lines — "which device, which page" is the first question every time
-- [ ] New `client-logs` server module — **scaffold via the `new-module` skill**; registered in **both profiles** (browser errors happen in cloud too). Rate-limited and size-capped (it is an unauthenticated write path), re-emitting through pino with `source:"client"` and the device id so browser errors land in the same archive
-- [ ] `GET /api/client-logs/config` (public) shipping `CLIENT_LOG_LEVEL`; `CLIENT_LOG_LEVEL=warn` in `.env.example` + `core/config`; client fetches once on boot and falls back to `warn` if it fails
-- [ ] Replace the blind `.catch(() => {})` sites in `client/src/core/` with reports through the new logger
-- [ ] Dashboard: `source` + `module` template variables (both multi-select, both defaulting to All) wired into every log panel, so one pane splits into backend/frontend on demand; point "Errors by module" at both sources and add a stacked errors-by-source panel
-- [ ] **Make this a standing convention, not a one-off cleanup.** `.agent/rules/coding.md` → "Errors & logging": every plan ships the critical logs for the code it adds — each new failure path gets a `warn`/`error`/`fatal` line where it is handled, and a deliberately silent `catch` carries a comment saying why silence is correct. Replace "No `console.log` outside scripts" with the positive rule now that a client path exists: client code logs through `core/log.ts`, never bare `console.*`
-- [ ] `.agent/plans/README.md` → rules of engagement: a plan is not done until its failure paths are logged
-- [ ] Add the logging line to `.claude/skills/new-module/SKILL.md` so scaffolded modules start with it
+- [x] `process.on('uncaughtException')` + `('unhandledRejection')` → `logger.fatal` then flush and exit. Today a crashing process leaves no trace — the exact case the snapshot exists to explain
+- [x] `app.ts:203`: config failure writes to `stderr` + `process.exit(1)`, bypassing the logger, so the commonest startup failure never reaches Loki. Emit a `fatal` line (flushed) before exiting
+- [x] Log the shutdown reason (signal vs error) on the existing shutdown path
+- [x] Work the silent-catch list; add `warn`/`error` where the swallow hides a real failure — `upload-audit-recorder` (reconcile skips rows), `fs-stats-reader` (the disk walk behind Heimdall stats *and* the new `diskMb`), `get-download-stream`, `manage-settings`, `db-accio-repository`. **Leave the deliberate fallbacks silent** (`build-info`, `core/copy`, `core/theme`, `core/deviceId`) and comment why, so the next audit doesn't re-litigate them
+- [x] `source` as a **child** binding (not `base` — see the duplicate-key trap): `moduleLogger()` binds `{ source: 'server', module }`; the client re-emitter binds `{ source: 'client', module }`
+- [x] Alloy: promote `source` as a label; `stage.template` defaults it to `server` when absent, covering root-logger and Fastify request lines
+- [x] Client lines carry `module` = the feature name, so the ten shared names line up with their server counterparts and `{module="accio"}` spans both sides
+- [x] Client `ErrorBoundary` around `<App />` in `main.tsx` — a render throw currently white-screens with nothing recorded
+- [x] Client `window.onerror` + `unhandledrejection` handlers
+- [x] `client/vite.config.ts`: `build.sourcemap: true` — without it every reported stack is a minified hash and the feature is half-useless
+- [x] `client/src/core/log.ts`: batched, debounced `POST /api/client-logs`, dropping on failure (never a crash loop); **`warn`+ only**, floor settable via `CLIENT_LOG_LEVEL`
+- [x] Carry `route`, `deviceId`, and UA on client lines — "which device, which page" is the first question every time
+- [x] New `client-logs` server module — **scaffold via the `new-module` skill**; registered in **both profiles** (browser errors happen in cloud too). Rate-limited and size-capped (it is an unauthenticated write path), re-emitting through pino with `source:"client"` and the device id so browser errors land in the same archive
+- [x] `GET /api/client-logs/config` (public) shipping `CLIENT_LOG_LEVEL`; `CLIENT_LOG_LEVEL=warn` in `.env.example` + `core/config`; client fetches once on boot and falls back to `warn` if it fails
+- [x] Replace the blind `.catch(() => {})` sites in `client/src/core/` with reports through the new logger
+- [x] Dashboard: `source` + `module` template variables (both multi-select, both defaulting to All) wired into every log panel, so one pane splits into backend/frontend on demand; point "Errors by module" at both sources and add a stacked errors-by-source panel
+- [x] **Make this a standing convention, not a one-off cleanup.** `.agent/rules/coding.md` → "Errors & logging": every plan ships the critical logs for the code it adds — each new failure path gets a `warn`/`error`/`fatal` line where it is handled, and a deliberately silent `catch` carries a comment saying why silence is correct. Replace "No `console.log` outside scripts" with the positive rule now that a client path exists: client code logs through `core/log.ts`, never bare `console.*`
+- [x] `.agent/plans/README.md` → rules of engagement: a plan is not done until its failure paths are logged
+- [x] Add the logging line to `.claude/skills/new-module/SKILL.md` so scaffolded modules start with it
 
 **16a wrap-up** — must land in the 16a PR, not deferred to 16b:
 
-- [ ] `.agent/memory/decisions.md`: numeric `level` → `logLevel` (and why the archive is not rewritten), Heimdall Logs removed viewer + level switch, client logging introduced with `source`/`module` as cross-cutting labels, `LOG_LEVEL` default → `trace`
-- [ ] Run the **`context-sync`** skill: `architecture.md`'s module table gains `client-logs`, the `core` list loses `logtap`, `project-structure.md` reflects the new client `core/log.ts`
-- [ ] Update `.agent/memory/progress.md` in the 16a PR (`git.md` step 7)
-- [ ] `verify` green before the PR
+- [x] `.agent/memory/decisions.md`: numeric `level` → `logLevel` (and why the archive is not rewritten), Heimdall Logs removed viewer + level switch, client logging introduced with `source`/`module` as cross-cutting labels, `LOG_LEVEL` default → `trace`
+- [x] Run the **`context-sync`** skill: `architecture.md`'s module table gains `client-logs`, the `core` list loses `logtap`, `project-structure.md` reflects the new client `core/log.ts`
+- [x] Update `.agent/memory/progress.md` in the 16a PR (`git.md` step 7)
+- [x] `verify` green before the PR
 
 ### Step 2 — Metrics snapshot (no containers, no dependencies)
 
@@ -210,13 +210,13 @@ Criteria 8–17 gate **16a**; 1–7 gate **16b**.
 - [ ] Unit: the shared `core` disk walker returns the same totals Heimdall reported before the lift (guards the refactor)
 - [ ] Integration: `/metrics` exposition parses; the `onResponse` histogram records the right route label; `METRICS_ENABLED=false` registers no timer
 - [ ] Kill test: `SIGTERM` mid-interval exits cleanly with no dangling handle
-- [ ] Regression: the deleted Heimdall routes 404; settings overlay ignores a legacy `logLevel` row; `verify` (lint, typecheck, tests, build) green
-- [ ] Unit: `LOG_LEVEL` default is `trace`; `LOG_RETENTION_FILES` reaches `rollOptions` as the file-count limit
+- [x] Regression: the deleted Heimdall routes 404; settings overlay ignores a legacy `logLevel` row; `verify` (lint, typecheck, tests, build) green
+- [x] Unit: `LOG_LEVEL` default is `trace`; `LOG_RETENTION_FILES` reaches `rollOptions` as the file-count limit
 - [ ] Unit: the level formatter emits `logLevel` with the right label at all six levels and **no `level` key**
 - [ ] Manual: an old rotated file and a new one, both in Loki, return matches for the same `logLevel` query
-- [ ] Integration: `/api/client-logs` accepts a batch and re-emits with `source:"client"`; rejects oversized bodies; rate limit trips; `/config` returns the env-seeded level
-- [ ] Client unit: the error boundary renders its fallback and reports once (not per re-render); the batcher drops rather than retries when the endpoint fails
-- [ ] Manual: kill the process with an uncaught throw and confirm the `fatal` line reached disk before exit
+- [x] Integration: `/api/client-logs` accepts a batch and re-emits with `source:"client"`; rejects oversized bodies; rate limit trips; `/config` returns the env-seeded level
+- [x] Client unit: the error boundary renders its fallback and reports once (not per re-render); the batcher drops rather than retries when the endpoint fails
+- [x] Manual: kill the process with an uncaught throw and confirm the `fatal` line reached disk before exit
 - [ ] Unit: exporter-failure logging is rate-limited — N failures in a minute produce one line, not N
 - [ ] Live-verify: stack up, snapshot lines land in Loki, panels render, the `logLevel` dropdown filters by name across every emitted level, and a temporary `log.trace()` appears end to end
 - [ ] Live-verify (Step 4): a request yields an HTTP + DB span in Tempo, and the log line's `trace_id` jumps to it
