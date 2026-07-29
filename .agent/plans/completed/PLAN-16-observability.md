@@ -132,43 +132,43 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 
 ### Step 2 — Metrics snapshot (no containers, no dependencies)
 
-- [ ] `server/src/modules/metrics/` — **scaffold via the `new-module` skill**; registered in **both** profiles
-- [ ] Emit through a child logger **pinned at `trace`** (`log.child(bindings, { level: 'trace' })`) so raising `LOG_LEVEL` cannot silently kill the metrics record; `METRICS_ENABLED` is the only off-switch
-- [ ] Sampler: `process.cpuUsage()` delta → `cpuPct`; `process.memoryUsage()`; `monitorEventLoopDelay({ resolution: 20 })` percentiles then `.reset()`; `sse.clientCount` (already public — no new API needed)
-- [ ] Deltas via `EventBus` subscription (upload events) — a counter reset to 0 each snapshot, **never** cumulative. No cross-module imports; `sse` and `bus` come from `ModuleDeps`
-- [ ] Lift the recursive disk walk out of `heimdall/services/fs-stats-reader.ts` into `core/` and repoint **both** Heimdall and metrics at it — modules cannot import each other, and one walker beats two
-- [ ] Sample `diskMb` on its own slow timer (`METRICS_DISK_INTERVAL_SEC`, default 1800), carrying the last value between ticks and `null` before the first — **never** per snapshot, or the sync walk becomes a 60s lag spike the sampler then records
-- [ ] Both timers `.unref()`d so they never hold the process open; wired into the existing shutdown path
-- [ ] Config: `METRICS_ENABLED=true`, `METRICS_SNAPSHOT_INTERVAL_SEC=60`, `METRICS_DISK_INTERVAL_SEC=1800` in `.env.example` + `core/config`
-- [ ] Grafana: **Runtime** row on `observability/grafana/dashboards/bifrost.json` — loop lag p99, CPU %, RSS, uploads/day. No Alloy change needed (JSON is parsed at query time, so nothing becomes an ingestion label)
-- [ ] Add the latency panels the existing `responseTime` already supports: `quantile_over_time(0.95, {job="bifrost"} | json | unwrap responseTime [5m])`
+- [x] `server/src/modules/metrics/` — **scaffold via the `new-module` skill**; registered in **both** profiles
+- [x] Emit through a child logger **pinned at `trace`** (`log.child(bindings, { level: 'trace' })`) so raising `LOG_LEVEL` cannot silently kill the metrics record; `METRICS_ENABLED` is the only off-switch
+- [x] Sampler: `process.cpuUsage()` delta → `cpuPct`; `process.memoryUsage()`; `monitorEventLoopDelay({ resolution: 20 })` percentiles then `.reset()`; `sse.clientCount` (already public — no new API needed)
+- [x] Deltas via `EventBus` subscription (upload events) — a counter reset to 0 each snapshot, **never** cumulative. No cross-module imports; `sse` and `bus` come from `ModuleDeps`
+- [x] Lift the recursive disk walk out of `heimdall/services/fs-stats-reader.ts` into `core/` and repoint **both** Heimdall and metrics at it — modules cannot import each other, and one walker beats two
+- [x] Sample `diskMb` on its own slow timer (`METRICS_DISK_INTERVAL_SEC`, default 1800), carrying the last value between ticks and `null` before the first — **never** per snapshot, or the sync walk becomes a 60s lag spike the sampler then records
+- [x] Both timers `.unref()`d so they never hold the process open; wired into the existing shutdown path
+- [x] Config: `METRICS_ENABLED=true`, `METRICS_SNAPSHOT_INTERVAL_SEC=60`, `METRICS_DISK_INTERVAL_SEC=1800` in `.env.example` + `core/config`
+- [x] Grafana: **Runtime** row on `observability/grafana/dashboards/bifrost.json` — loop lag p99, CPU %, RSS, uploads/day. No Alloy change needed (JSON is parsed at query time, so nothing becomes an ingestion label)
+- [x] Add the latency panels the existing `responseTime` already supports: `quantile_over_time(0.95, {job="bifrost"} | json | unwrap responseTime [5m])`
 
 ### Step 3 — Prometheus (`prom-client` + one container)
 
-- [ ] `prom-client` in `server`; `collectDefaultMetrics()` + `GET /metrics` on the `metrics` module
-- [ ] `bifrost_http_request_duration_seconds{route,method,status}` histogram via a Fastify `onResponse` hook
-- [ ] Gauges fed from the same sampler as Step 2 — one source of truth, two exposition formats
-- [ ] Prometheus service in `docker-compose.observability.yml` + `observability/prometheus/prometheus.yml` scraping `host.docker.internal:4646`
-- [ ] Provision the Prometheus datasource; add a PromQL row to the dashboard
+- [x] `prom-client` in `server`; `collectDefaultMetrics()` + `GET /metrics` on the `metrics` module
+- [x] `bifrost_http_request_duration_seconds{route,method,status}` histogram via a Fastify `onResponse` hook
+- [x] Gauges fed from the same sampler as Step 2 — one source of truth, two exposition formats
+- [x] Prometheus service in `docker-compose.observability.yml` + `observability/prometheus/prometheus.yml` scraping `host.docker.internal:4646`
+- [x] Provision the Prometheus datasource; add a PromQL row to the dashboard
 
 ### Step 4 — Tempo + OpenTelemetry
 
-- [ ] `@opentelemetry/sdk-node`, `auto-instrumentations-node`, `exporter-trace-otlp-http`; `server/src/otel.ts`
-- [ ] **Load before the app**: `node --import ./dist/otel.js dist/bootstrap.js` — ESM hoists imports, so initialising inside `bootstrap.ts` silently instruments nothing. Update `ecosystem.config.cjs`, the root `start` script, and `Dockerfile`
-- [ ] `OTEL_ENABLED=false` default + `OTEL_EXPORTER_OTLP_ENDPOINT`; short timeout, small queue
-- [ ] **Startup line `otel: sdk started, endpoint=…, instrumentations=N`** — its absence is how you detect the `--import` trap, which raises no error of its own
-- [ ] **Rate-limited exporter-failure logging**: first failure at `warn`, then ≤1 per 5 minutes. Not silent (undiagnosable), not unbounded (destroys the archive)
-- [ ] Tempo service + `observability/tempo/tempo.yml`; datasource with the Loki→Tempo trace-ID correlation
-- [ ] Emit `trace_id` into the pino line so a log jumps to its trace
+- [x] `@opentelemetry/sdk-node`, `auto-instrumentations-node`, `exporter-trace-otlp-http`; `server/src/otel.ts`
+- [x] **Load before the app**: `node --import ./dist/otel.js dist/bootstrap.js` — ESM hoists imports, so initialising inside `bootstrap.ts` silently instruments nothing. Update `ecosystem.config.cjs`, the root `start` script, and `Dockerfile`
+- [x] `OTEL_ENABLED=false` default + `OTEL_EXPORTER_OTLP_ENDPOINT`; short timeout, small queue
+- [x] **Startup line `otel: sdk started, endpoint=…, instrumentations=N`** — its absence is how you detect the `--import` trap, which raises no error of its own
+- [x] **Rate-limited exporter-failure logging**: first failure at `warn`, then ≤1 per 5 minutes. Not silent (undiagnosable), not unbounded (destroys the archive)
+- [x] Tempo service + `observability/tempo/tempo.yml`; datasource with the Loki→Tempo trace-ID correlation
+- [x] Emit `trace_id` into the pino line so a log jumps to its trace
 
 ### Wrap-up (16b)
 
-- [ ] Grafana alert rules: error rate > N/min, loop lag p99 > 100ms
-- [ ] `docs/observability.md` — what is durable vs on-demand, and why
-- [ ] `.agent/memory/decisions.md`: the snapshot-as-record decision, deltas-not-counters, the `node_exporter`-on-macOS exclusion, the slow-cycle `diskMb` sampling, and snapshots being level-independent
-- [ ] Run **`context-sync`** again for the `metrics` module + the new observability services
-- [ ] Update `.agent/memory/progress.md` in the 16b PR (`git.md` step 7)
-- [ ] Archive this file to `.agent/plans/completed/` as part of the 16b PR
+- [x] Grafana alert rules: error rate > N/min, loop lag p99 > 100ms
+- [x] `docs/observability.md` — what is durable vs on-demand, and why
+- [x] `.agent/memory/decisions.md`: the snapshot-as-record decision, deltas-not-counters, the `node_exporter`-on-macOS exclusion, the slow-cycle `diskMb` sampling, and snapshots being level-independent
+- [x] Run **`context-sync`** again for the `metrics` module + the new observability services
+- [x] Update `.agent/memory/progress.md` in the 16b PR (`git.md` step 7)
+- [x] Archive this file to `.agent/plans/completed/` as part of the 16b PR
 
 ## Acceptance criteria
 
@@ -204,19 +204,19 @@ Criteria 8–17 gate **16a**; 1–7 gate **16b**.
 
 ## Tests
 
-- [ ] Unit: CPU-percent maths across an interval, delta counters reset per snapshot (property: sum of deltas = total events), snapshot serialisation shape
-- [ ] Unit: sampler with an injected clock — no real timers in tests; `diskMb` recomputes only on the slow cycle and carries its previous value otherwise
-- [ ] Unit: the trace-pinned child still emits when the root logger sits at `error`
-- [ ] Unit: the shared `core` disk walker returns the same totals Heimdall reported before the lift (guards the refactor)
-- [ ] Integration: `/metrics` exposition parses; the `onResponse` histogram records the right route label; `METRICS_ENABLED=false` registers no timer
-- [ ] Kill test: `SIGTERM` mid-interval exits cleanly with no dangling handle
+- [x] Unit: CPU-percent maths across an interval, delta counters reset per snapshot (property: sum of deltas = total events), snapshot serialisation shape
+- [x] Unit: sampler with an injected clock — no real timers in tests; `diskMb` recomputes only on the slow cycle and carries its previous value otherwise
+- [x] Unit: the trace-pinned child still emits when the root logger sits at `error`
+- [x] Unit: the shared `core` disk walker returns the same totals Heimdall reported before the lift (guards the refactor)
+- [x] Integration: `/metrics` exposition parses; the `onResponse` histogram records the right route label; `METRICS_ENABLED=false` registers no timer
+- [x] Kill test: `SIGTERM` mid-interval exits cleanly with no dangling handle
 - [x] Regression: the deleted Heimdall routes 404; settings overlay ignores a legacy `logLevel` row; `verify` (lint, typecheck, tests, build) green
 - [x] Unit: `LOG_LEVEL` default is `trace`; `LOG_RETENTION_FILES` reaches `rollOptions` as the file-count limit
-- [ ] Unit: the level formatter emits `logLevel` with the right label at all six levels and **no `level` key**
-- [ ] Manual: an old rotated file and a new one, both in Loki, return matches for the same `logLevel` query
+- [ ] Unit: the level formatter emits `logLevel` with the right label at all six levels and **no `level` key** — _first half done; the second half is deliberately NOT met, see the decision row: pino's multi-target transport worker routes on the numeric key and dropping it silenced every sink_
+- [x] Manual: an old rotated file and a new one, both in Loki, return matches for the same `logLevel` query
 - [x] Integration: `/api/client-logs` accepts a batch and re-emits with `source:"client"`; rejects oversized bodies; rate limit trips; `/config` returns the env-seeded level
 - [x] Client unit: the error boundary renders its fallback and reports once (not per re-render); the batcher drops rather than retries when the endpoint fails
 - [x] Manual: kill the process with an uncaught throw and confirm the `fatal` line reached disk before exit
-- [ ] Unit: exporter-failure logging is rate-limited — N failures in a minute produce one line, not N
-- [ ] Live-verify: stack up, snapshot lines land in Loki, panels render, the `logLevel` dropdown filters by name across every emitted level, and a temporary `log.trace()` appears end to end
-- [ ] Live-verify (Step 4): a request yields an HTTP + DB span in Tempo, and the log line's `trace_id` jumps to it
+- [x] Unit: exporter-failure logging is rate-limited — N failures in a minute produce one line, not N
+- [ ] Live-verify: stack up, snapshot lines land in Loki, panels render, the `logLevel` dropdown filters by name across every emitted level, and a temporary `log.trace()` appears end to end — _stack brought up and verified via the API (datasources, alert rules, label values, a snapshot line answering the Runtime row's LogQL, one `logLevel` query spanning both file generations); the panels were not opened in a browser_
+- [ ] Live-verify (Step 4): a request yields an HTTP + DB span in Tempo, and the log line's `trace_id` jumps to it — _`trace_id`/`span_id` confirmed on real log lines and the exporter/startup/rate-limit paths verified against a live Tempo endpoint; the span round-trip in Grafana is still owner-manual_

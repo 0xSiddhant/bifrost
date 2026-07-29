@@ -13,7 +13,8 @@ bifrost/
 ├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
 ├── docker-compose.yml         # run on a Linux host (host networking)
 ├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
-├── observability/             # loki/ alloy/ grafana/ configs + starter dashboard JSON
+├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
+│                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
 │   ├── ARCHITECTURE.md        # pointer → .agent/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
@@ -29,8 +30,11 @@ bifrost/
 │   └── src/
 │       ├── app.ts             # composition root: reads DEPLOY_PROFILE manifest, registers modules
 │       ├── bootstrap.ts       # production entry (always starts; PM2/launchd/Docker/npm start use it)
+│       ├── otel.ts            # OpenTelemetry SDK — loaded via `node --import`, BEFORE the app
+│       │                      #   (ESM hoists, so starting it from app code instruments nothing)
 │       ├── core/              # shared kernel — NEVER imports from modules/
 │       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
+│       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
 │           └── <feature>/     # file-transfer, previews, clipboard, themes, heimdall,
