@@ -757,3 +757,46 @@ a.portal:hover .portal__go {
   opacity: 0.4;
   cursor: default;
 }
+
+/* Crash screen — the ErrorBoundary fallback (PLAN-16a). Deliberately plain:
+   it has to render when the app's own components are the thing that broke, so
+   it uses only base tokens and no shared component. */
+.crash {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}
+
+.crash__panel {
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-1);
+}
+
+.crash__title {
+  margin: 0;
+}
+
+.crash__body {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.crash__detail {
+  margin: 0;
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  word-break: break-word;
+}
