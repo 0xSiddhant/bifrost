@@ -8,7 +8,6 @@ import { loadConfig } from '../../core/config/index.js';
 import { openDb, checkpointAndClose, type DbHandle } from '../../core/db/index.js';
 import { EventBus } from '../../core/bus/index.js';
 import { SseHub } from '../../core/sse/index.js';
-import { LogTap } from '../../core/logtap.js';
 import { AuthService } from '../../core/auth/index.js';
 import type { Logger } from '../../core/logger/index.js';
 import { fileTransferModule } from './module.js';
@@ -43,8 +42,7 @@ describe('downloads watcher → bus → sse', () => {
         bus,
         sse,
         auth,
-        logTap: new LogTap(),
-        setLogLevel: () => {},
+        clientLog: () => log,
       });
     });
     await app.ready();
