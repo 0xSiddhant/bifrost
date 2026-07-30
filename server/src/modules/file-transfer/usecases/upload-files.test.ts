@@ -37,7 +37,7 @@ function makeUseCase(repo: FileStorageRepository, bus = new EventBus()) {
 }
 
 describe('UploadFilesUseCase', () => {
-  it('accepts a clean file, publishes it timestamped-sanitized, and emits file.uploaded', async () => {
+  it('accepts a clean file, publishes it under its own name, and emits file.uploaded', async () => {
     const repo = repoMock();
     const bus = new EventBus();
     const emitted = vi.fn();
@@ -46,13 +46,13 @@ describe('UploadFilesUseCase', () => {
     const result = await makeUseCase(repo, bus).execute(toAsync([incoming('photo.jpg', 'abcd')]));
 
     expect(result.rejected).toEqual([]);
-    expect(result.accepted).toEqual([
-      { name: 'photo.jpg', storedName: '1752000000000-photo.jpg', size: 4 },
-    ]);
-    expect(repo.publish).toHaveBeenCalledWith('/tmp/fake', '1752000000000-photo.jpg');
+    // No timestamp prefix since PLAN-17b: the name a person chose is the name
+    // that lands, and only a real collision changes it (in `publish`).
+    expect(result.accepted).toEqual([{ name: 'photo.jpg', storedName: 'photo.jpg', size: 4 }]);
+    expect(repo.publish).toHaveBeenCalledWith('/tmp/fake', 'photo.jpg');
     expect(emitted).toHaveBeenCalledWith({
       originalName: 'photo.jpg',
-      storedName: '1752000000000-photo.jpg',
+      storedName: 'photo.jpg',
       size: 4,
       uploadedAt: 1_752_000_000_000,
     });
@@ -61,7 +61,7 @@ describe('UploadFilesUseCase', () => {
   it('sanitizes hostile names before storing', async () => {
     const repo = repoMock();
     await makeUseCase(repo).execute(toAsync([incoming('../../evil.sh')]));
-    expect(repo.publish).toHaveBeenCalledWith('/tmp/fake', '1752000000000-evil.sh');
+    expect(repo.publish).toHaveBeenCalledWith('/tmp/fake', 'evil.sh');
   });
 
   it('rejects blocklisted extensions without touching storage, draining the stream', async () => {

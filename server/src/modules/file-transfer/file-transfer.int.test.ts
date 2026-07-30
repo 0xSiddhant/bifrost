@@ -48,7 +48,7 @@ describe('file-transfer over HTTP', () => {
     fs.rmSync(storageRoot, { recursive: true, force: true });
   });
 
-  it('accepts a multi-file upload: sanitized timestamped names, mode 0644, empty tmp', async () => {
+  it('accepts a multi-file upload: clean sanitized names, mode 0644, empty tmp', async () => {
     const response = await app.fastify.inject({
       method: 'POST',
       url: '/api/files',
@@ -63,8 +63,10 @@ describe('file-transfer over HTTP', () => {
     const body = response.json();
     expect(body.rejected).toEqual([]);
     expect(body.accepted).toHaveLength(2);
-    expect(body.accepted[0].storedName).toMatch(/^\d{13}-notes\.txt$/);
-    expect(body.accepted[1].storedName).toMatch(/^\d{13}-escape\.txt$/);
+    // PLAN-17b criterion 1: no timestamp, and `../../escape.txt` still lands
+    // as a plain name inside uploads/ rather than anywhere above it.
+    expect(body.accepted[0].storedName).toBe('notes.txt');
+    expect(body.accepted[1].storedName).toBe('escape.txt');
 
     for (const accepted of body.accepted) {
       const filePath = path.join(storageRoot, 'uploads', accepted.storedName);
