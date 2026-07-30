@@ -30,6 +30,55 @@ export interface FolderUsage {
   files: number;
 }
 
+/** One file as a listing shows it. */
+export interface FileEntry {
+  name: string;
+  bytes: number;
+  /** Epoch milliseconds. */
+  mtime: number;
+}
+
+/**
+ * Dot-entries are the operating system's, not the user's: `.DS_Store` is not
+ * an upload, `.gitkeep` only exists so the folder survives git, and the
+ * in-flight copies this module's siblings write are hidden on purpose. They
+ * must be skipped by *every* reader — the totals and the listing disagreeing
+ * about what is in a folder is worse than either number being wrong.
+ */
+export function isUserFile(name: string): boolean {
+  return !name.startsWith('.');
+}
+
+/**
+ * Flat listing of one directory — name, size, mtime. Reading the directory is
+ * the point: a listing derived from a table drifts the moment a file is
+ * deleted outside the app, and then shows rows for files that are gone.
+ */
+export function listFiles(dir: string, log: Logger): FileEntry[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    // An unreadable folder renders as empty, which reads exactly like "nothing
+    // has been sent yet" — the one line that tells the two apart.
+    log.warn({ err: error, dir }, 'file listing: directory unreadable');
+    return [];
+  }
+  const files: FileEntry[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !isUserFile(entry.name)) continue;
+    try {
+      const stat = fs.statSync(path.join(dir, entry.name));
+      files.push({ name: entry.name, bytes: stat.size, mtime: Math.round(stat.mtimeMs) });
+    } catch (error) {
+      // Deleted between the listing and the stat — expected while a move is in
+      // flight, so it is not a warning, but the row silently vanishes.
+      log.debug({ err: error, dir, file: entry.name }, 'file listing: file vanished mid-scan');
+    }
+  }
+  return files;
+}
+
 export function diskUsage(folders: readonly WatchedFolder[], log: Logger): FolderUsage[] {
   return folders.map(({ folder, dir }) => {
     let bytes = 0;
@@ -46,7 +95,9 @@ export function diskUsage(folders: readonly WatchedFolder[], log: Logger): Folde
         return;
       }
       for (const entry of entries) {
-        if (entry.name === '.gitkeep') continue;
+        // Same filter as the listing: `.DS_Store` counted 6 KB toward "uploads"
+        // in the owner's Heimdall while never appearing as an upload anywhere.
+        if (!isUserFile(entry.name)) continue;
         const full = path.join(current, entry.name);
         if (entry.isDirectory()) {
           walk(full);

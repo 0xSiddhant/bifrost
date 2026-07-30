@@ -13,6 +13,14 @@ export class AppError extends Error {
     message: string,
     public readonly statusCode: number,
     public readonly code: string,
+    /**
+     * Machine-readable extras for refusals the client can *act* on rather than
+     * only display — PLAN-17b's rename sends back the cleaned-up name it would
+     * have used, so the UI can offer it as one click instead of asking the
+     * user to guess what the sanitizer objected to. Parsing that out of the
+     * prose message would be a contract nobody could see.
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'AppError';
@@ -75,7 +83,11 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
         { code: error.code, statusCode: error.statusCode, reason: error.message },
         'request refused',
       );
-      return reply.code(error.statusCode).send({ error: error.code, message: error.message });
+      return reply.code(error.statusCode).send({
+        error: error.code,
+        message: error.message,
+        ...(error.details ? { details: error.details } : {}),
+      });
     }
     if (error instanceof Error && 'validation' in error && error.validation) {
       return reply.code(400).send({ error: 'BAD_REQUEST', message: error.message });

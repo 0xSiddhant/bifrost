@@ -11,7 +11,13 @@ const MIME_BY_EXT: Record<string, string> = {
   '.gif': 'image/gif',
   '.webp': 'image/webp',
   '.avif': 'image/avif',
-  '.svg': 'image/svg+xml',
+  // Never image/svg+xml: an inline SVG runs same-origin scripts exactly like an
+  // HTML page does, and since PLAN-17b uploads/ — writable by anyone on the LAN
+  // — can be previewed, that is a real path from "drop a file on the bridge" to
+  // "execute script on bifrost.local". Previews already render SVG as source
+  // (see previews/kind.ts TEXT_EXTS), so this only closes the direct-URL hole,
+  // and it closes it for downloads/ at the same time.
+  '.svg': 'text/plain; charset=utf-8',
   '.heic': 'image/heic',
   '.mp4': 'video/mp4',
   '.m4v': 'video/mp4',

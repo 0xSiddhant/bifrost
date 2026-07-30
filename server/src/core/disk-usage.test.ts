@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import pino from 'pino';
-import { diskUsage, totalBytes } from './disk-usage.js';
+import { diskUsage, listFiles, totalBytes } from './disk-usage.js';
 
 const silent = pino({ level: 'silent' });
 
@@ -23,6 +23,9 @@ describe('core disk usage', () => {
     fs.writeFileSync(path.join(root, 'uploads', 'a.bin'), Buffer.alloc(1000));
     fs.writeFileSync(path.join(root, 'uploads', 'nested', 'b.bin'), Buffer.alloc(2000));
     fs.writeFileSync(path.join(root, 'uploads', '.gitkeep'), '');
+    // The OS's, not the user's — and 6 KB of it showed up as "uploads" in the
+    // owner's Heimdall before PLAN-17b (criterion 27).
+    fs.writeFileSync(path.join(root, 'uploads', '.DS_Store'), Buffer.alloc(6144));
     fs.writeFileSync(path.join(root, 'downloads', 'c.bin'), Buffer.alloc(500));
   });
 
@@ -35,7 +38,7 @@ describe('core disk usage', () => {
     { folder: 'downloads', dir: path.join(root, 'downloads') },
   ];
 
-  it('sums bytes and files recursively, ignoring .gitkeep', () => {
+  it('sums bytes and files recursively, ignoring every dot-file', () => {
     expect(diskUsage(folders(), silent)).toEqual([
       { folder: 'uploads', bytes: 3000, files: 2 },
       { folder: 'downloads', bytes: 500, files: 1 },
@@ -56,5 +59,32 @@ describe('core disk usage', () => {
     const warn = vi.spyOn(log, 'warn');
     diskUsage([{ folder: 'ghost', dir: path.join(root, 'nope') }], log);
     expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  describe('listFiles', () => {
+    it('lists one flat folder with sizes and mtimes, skipping dot-files', () => {
+      const listed = listFiles(path.join(root, 'uploads'), silent);
+
+      // Flat: `nested/` is a directory, and the listing is of files.
+      expect(listed.map((entry) => entry.name)).toEqual(['a.bin']);
+      expect(listed[0]?.bytes).toBe(1000);
+      expect(listed[0]?.mtime).toBeGreaterThan(0);
+    });
+
+    it('filters exactly what the totals filter — one helper, both readers', () => {
+      const dir = path.join(root, 'uploads');
+      const listedBytes = listFiles(dir, silent).reduce((sum, entry) => sum + entry.bytes, 0);
+      const nested = listFiles(path.join(dir, 'nested'), silent);
+      const walked = diskUsage([{ folder: 'uploads', dir }], silent)[0];
+
+      expect(listedBytes + nested.reduce((sum, entry) => sum + entry.bytes, 0)).toBe(walked?.bytes);
+    });
+
+    it('answers with an empty list, and a line, for a folder it cannot read', () => {
+      const log = pino({ level: 'silent' });
+      const warn = vi.spyOn(log, 'warn');
+      expect(listFiles(path.join(root, 'nope'), log)).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 });
