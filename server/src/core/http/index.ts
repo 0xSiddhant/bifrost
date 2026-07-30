@@ -37,6 +37,17 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
 
   app.setErrorHandler((error: unknown, request, reply) => {
     if (error instanceof AppError) {
+      // The client is told *what* was refused; the archive is told *why*, in one
+      // place instead of a log line per usecase. Fastify's own "request
+      // completed" line carries the 4xx status but never the reason, so without
+      // this a rejected settings patch, a 422 slug, or a 404 download leaves no
+      // trace of what was wrong with it. `debug`, not `warn`: a domain
+      // rejection is the system working, and at the trace-level default it
+      // still reaches disk (PLAN-16a).
+      request.log.debug(
+        { code: error.code, statusCode: error.statusCode, reason: error.message },
+        'request refused',
+      );
       return reply.code(error.statusCode).send({ error: error.code, message: error.message });
     }
     if (error instanceof Error && 'validation' in error && error.validation) {

@@ -64,6 +64,13 @@
       "when": 1785078290368,
       "tag": "0008_portkeys",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785322598669,
+      "tag": "0009_drop_log_level_setting",
+      "breakpoints": true
     }
   ]
 }

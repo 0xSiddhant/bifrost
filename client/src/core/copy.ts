@@ -10,7 +10,10 @@ export async function copyText(text: string): Promise<boolean> {
       return true;
     }
   } catch {
-    // fall through to the legacy path
+    // Deliberately silent (PLAN-16a audit): the async Clipboard API is blocked
+    // on plain-LAN http as a matter of course — which is how Bifrost is
+    // normally served — so this is the expected route into the legacy path
+    // below, not an error. The caller learns the outcome from the return value.
   }
 
   try {

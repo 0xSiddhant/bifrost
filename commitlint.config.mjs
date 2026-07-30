@@ -26,6 +26,7 @@ export default {
         'nimbus',
         'portkey',
         'screensaver',
+        'client-logs',
         // core areas
         'core',
         'client',

@@ -32,7 +32,10 @@ function readBaked(): BuildInfo | null {
       return { version: parsed.version, commit: parsed.commit, buildDate: parsed.buildDate };
     }
   } catch {
-    // no baked stamp — dev
+    // Deliberately silent (PLAN-16a audit): no baked stamp is the NORMAL state
+    // in dev — the file is written by the prebuild step and gitignored — so a
+    // line here would fire on every dev boot and mean nothing. devFallback()
+    // below covers it, and About still answers.
   }
   return null;
 }
@@ -44,7 +47,9 @@ function devFallback(): BuildInfo {
       .toString()
       .trim() || 'dev';
   } catch {
-    // git unavailable
+    // Deliberately silent (PLAN-16a audit): git is legitimately absent under
+    // PM2/Docker, which is exactly why the stamp is baked at build time. The
+    // 'dev' placeholder is the designed answer, not a degraded one.
   }
   return { version: readVersion(), commit, buildDate: new Date().toISOString() };
 }
@@ -55,6 +60,9 @@ function readVersion(): string {
     const pkg = require(path.join(REPO_ROOT, 'package.json')) as { version?: string };
     return pkg.version ?? '0.0.0';
   } catch {
+    // Deliberately silent (PLAN-16a audit): a cosmetic version string on one
+    // admin panel is not worth a log line, and this path only runs when the
+    // baked stamp is already missing — which the caller above has covered.
     return '0.0.0';
   }
 }

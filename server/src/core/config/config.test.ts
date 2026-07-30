@@ -14,9 +14,31 @@ describe('loadConfig', () => {
     expect(config.maxFilesPerUpload).toBe(20);
     expect(config.heimdall.shortcut).toBe('shift+meta+comma');
     expect(config.heimdall.tapCount).toBe(7);
-    expect(config.logLevel).toBe('info');
+    // trace, not info: the file is a pure archive feeding Loki now, so the
+    // level is filtered at query time rather than discarded at write time.
+    expect(config.logLevel).toBe('trace');
+    expect(config.logRetentionFiles).toBe(30);
+    // The client does NOT follow the server down to trace — every browser line
+    // crosses the network into an unauthenticated endpoint.
+    expect(config.clientLogs.level).toBe('warn');
+    expect(config.clientLogs.maxBatch).toBe(50);
+    expect(config.clientLogs.maxBodyBytes).toBe(64 * 1024);
     expect(config.backupDir).toBeNull();
     expect(config.runestone.maxDocKb).toBe(2048);
+  });
+
+  it('reads LOG_RETENTION_FILES and the client-log bounds', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      LOG_RETENTION_FILES: '7',
+      CLIENT_LOG_LEVEL: 'debug',
+      CLIENT_LOG_MAX_BODY_KB: '8',
+      CLIENT_LOG_RATE_LIMIT_PER_MIN: '5',
+    });
+    expect(config.logRetentionFiles).toBe(7);
+    expect(config.clientLogs.level).toBe('debug');
+    expect(config.clientLogs.maxBodyBytes).toBe(8 * 1024);
+    expect(config.clientLogs.rateLimitPerMin).toBe(5);
   });
 
   it('reads RUNESTONE_MAX_DOC_KB', () => {
@@ -87,9 +109,13 @@ describe('applySettingsOverlay', () => {
     expect(overlaid.heimdall.tapCount).toBe(7);
   });
 
-  it('applies a persisted log level (Heimdall runtime switch survives restart)', () => {
-    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'debug' }]).logLevel).toBe('debug');
-    // a bad value is ignored, leaving the .env default
-    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'loud' }]).logLevel).toBe(base.logLevel);
+  // PLAN-16a: Heimdall's runtime level switch is gone and LOG_LEVEL in .env is
+  // authoritative. Migration 0009 deletes the row, but a DB restored from an
+  // old backup can still carry one — it must be ignored, not obeyed, or the
+  // install stays stuck at a level nobody can change any more.
+  it('ignores a legacy persisted log.level row', () => {
+    expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'debug' }]).logLevel).toBe(
+      base.logLevel,
+    );
   });
 });

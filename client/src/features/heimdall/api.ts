@@ -130,35 +130,6 @@ export const fetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>('/api/heim
 export const fetchChangelog = (): Promise<{ content: string }> =>
   apiGet<{ content: string }>('/api/heimdall/changelog');
 
-export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-export const LOG_LEVELS: LogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
-
-export interface LogEntry {
-  time: number;
-  level: number;
-  levelLabel: string;
-  module: string | null;
-  msg: string;
-  extra?: Record<string, unknown>;
-}
-
-export interface LogsResponse {
-  level: LogLevel;
-  entries: LogEntry[];
-  modules: string[];
-}
-
-export const fetchLogs = (params: { lines?: number; level?: LogLevel; module?: string } = {}): Promise<LogsResponse> => {
-  const query = new URLSearchParams();
-  if (params.lines) query.set('lines', String(params.lines));
-  if (params.level) query.set('level', params.level);
-  if (params.module) query.set('module', params.module);
-  const qs = query.toString();
-  return apiGet<LogsResponse>(`/api/heimdall/logs${qs ? `?${qs}` : ''}`);
-};
-
-export const setLogLevel = (level: LogLevel): Promise<{ level: LogLevel }> =>
-  apiSend<{ level: LogLevel }>('PATCH', '/api/heimdall/logs/level', { level });
-
-/** URL for the admin-gated live log tail (EventSource). */
-export const LOGS_STREAM_URL = '/api/heimdall/logs/stream';
+// The log viewer, its filters, and the runtime level switch were removed in
+// PLAN-16a: Grafana/Loki is the log UI now, and `LOG_LEVEL` in .env (+ restart)
+// is the single control. Nothing here reads log lines any more.
