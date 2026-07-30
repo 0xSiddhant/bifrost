@@ -101,17 +101,17 @@ All four are **local profile only** — they inherit `file-transfer`'s existing 
 
 ### 17a — Notification system
 
-- [ ] `client/src/core/notify/`: store, `<NotificationHost/>`, imperative `notify` handle usable outside React
-- [ ] Mount once in `App.tsx` outside `<Routes>`; verify a notification survives a route change
-- [ ] Stack cap 4 + overflow count; `dedupeKey` collapsing with a repeat counter
-- [ ] **Per-kind cap so non-dismissing errors cannot deadlock the stack**: errors evict oldest-error-first, ≥1 slot reserved for transient kinds, "dismiss all" once >1 error is stacked
-- [ ] Auto-dismiss with visible progress + cross; **pause on hover/focus**; errors do not auto-dismiss
-- [ ] `prefers-reduced-motion` path; `aria-live` polite/assertive split; focusable, labelled dismiss button
-- [ ] Theme-aware styling using the existing token system — no hardcoded colours
-- [ ] **Real adoption:** route upload and download failures through `notify.error` (an owner requirement in its own right)
-- [ ] Unit tests: timer pause/resume, dedupe counter, stack cap, reduced-motion branch
-- [ ] `live-verify` + screenshots for the owner checkpoint
-- [ ] Update `.agent/memory/progress.md` in the 17a PR (`git.md` step 7)
+- [x] `client/src/core/notify/`: store, `<NotificationHost/>`, imperative `notify` handle usable outside React
+- [x] Mount once in `App.tsx` outside `<Routes>`; verify a notification survives a route change
+- [x] Stack cap 4 + overflow count; `dedupeKey` collapsing with a repeat counter
+- [x] **Per-kind cap so non-dismissing errors cannot deadlock the stack**: errors evict oldest-error-first, ≥1 slot reserved for transient kinds, "dismiss all" once >1 error is stacked
+- [x] Auto-dismiss with visible progress + cross; **pause on hover/focus**; errors do not auto-dismiss
+- [x] `prefers-reduced-motion` path; `aria-live` polite/assertive split; focusable, labelled dismiss button
+- [x] Theme-aware styling using the existing token system — no hardcoded colours
+- [x] **Real adoption:** route upload and download failures through `notify.error` (an owner requirement in its own right)
+- [x] Unit tests: timer pause/resume, dedupe counter, stack cap, reduced-motion branch
+- [x] `live-verify` + screenshots for the owner checkpoint
+- [x] Update `.agent/memory/progress.md` in the 17a PR (`git.md` step 7)
 - [ ] ⛔ **Stop. Owner approves UI + flow, and picks LAN-trust vs capability-token, before 17b starts**
 
 ### 17b — Send/Receive flow
