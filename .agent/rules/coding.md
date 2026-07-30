@@ -28,9 +28,10 @@
 
 ## Security defaults
 
-- Sanitize every user-supplied filename: strip path separators, `..`, control chars; store as `<timestamp>-<name>`.
-- Uploaded files: mode 0644, never executed, never served, no read route.
-- Download serving: resolve path, verify it stays inside `storage/downloads/` (realpath prefix check) before streaming.
+- Sanitize every user-supplied filename: strip path separators, `..`, control chars. Store under the **sanitized name itself** — no timestamp prefix (PLAN-17b) — with `-1`, `-2`, … appended only on a real collision.
+- Uploaded files: mode 0644, never executed. They **are** served since PLAN-17b (`uploads/` is a staging area the sender can preview, rename, delete and publish), so `UPLOAD_EXT_BLOCKLIST` is load-bearing, not belt-and-suspenders. This reverses the PLAN-02 "no read route" rule — see decisions.md (2026-07-30).
+- Serving from `uploads/` **or** `downloads/`: resolve the name through `realpath` and verify it stays inside the intended folder (prefix check) before streaming.
+- Never serve a type the browser will execute same-origin: `core/http/mime.ts` maps `.html` **and `.svg`** to `text/plain` for both folders.
 - Validate all request bodies/params with Fastify JSON schemas.
 
 ## Testing
