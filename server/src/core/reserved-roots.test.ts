@@ -11,6 +11,7 @@ describe('reserved roots', () => {
     // A new top-level route must be added here too — otherwise its name would
     // silently become an allowable Portkey slug that shadows the real page.
     for (const root of [
+      'metrics',
       'runestone',
       'edda',
       'variant',

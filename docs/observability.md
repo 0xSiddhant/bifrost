@@ -40,11 +40,71 @@ uploads, watcher events, errors-by-module, errors-by-source, request throughput,
 and a filterable log explorer). Three template variables sit at the top:
 **Source** (`server` / `client`), **Module**, and **Level**.
 
+## What is durable, and what is not
+
+This is the distinction the whole setup rests on. Three signals, three very
+different guarantees:
+
+| Signal | How it gets there | If the stack is down |
+| --- | --- | --- |
+| **Logs** (incl. the metrics snapshot) | Bifrost writes files; Alloy **tails** them and remembers its position | Nothing is lost. The whole gap backfills on the next start |
+| **Prometheus metrics** | Prometheus **scrapes** `/metrics` | The data never existed. A gap cannot be backfilled, ever |
+| **Traces** | The app **pushes** to Tempo | The exporter buffers, retries, then drops |
+
+So the **system of record is the log archive**, and the runtime history inside it
+is the `module:"metrics"` snapshot — one line per `METRICS_SNAPSHOT_INTERVAL_SEC`
+carrying CPU, memory, event-loop lag percentiles, SSE clients, uploads and disk
+use. It survives with zero Docker dependency, which matters because Bifrost runs
+far more often than this stack does: "why did it hang at 3am last Tuesday?" can
+only be answered by something that was already writing at 3am.
+
+Prometheus and Tempo are **accelerators** for investigating something while the
+stack is up. They are not storage you can lean on, and the dashboard is laid out
+to say so — the Runtime row reads the log archive, and the Prometheus row is
+labelled "live only, gaps do not backfill".
+
+Two details that follow from this:
+
+- **Snapshots are level-independent.** They are log lines, so raising
+  `LOG_LEVEL` would otherwise silently stop the record. The metrics module logs
+  through a `trace`-pinned child, leaving `METRICS_ENABLED=false` as the one
+  intended off-switch.
+- **`diskMb` is sampled on its own slow cycle** (`METRICS_DISK_INTERVAL_SEC`).
+  The folder walk is synchronous and recursive; running it every snapshot would
+  block the event loop every snapshot, and the sampler would then faithfully
+  record the lag spike it had just caused.
+
+## Tracing (off by default)
+
+`OTEL_ENABLED=false` ships as the default deliberately: a dead OTLP endpoint
+makes the exporter retry and log connection errors into `storage/logs/` —
+observability tooling degrading the observability record. Turn it on when the
+stack is up.
+
+The SDK is loaded with **`node --import ./server/dist/otel.js`** (npm start, PM2
+and Docker all do this). It cannot be initialised from application code: ESM
+hoists imports, so the instrumentations would patch nothing — and that failure
+raises no error at all. Four different faults present identically as "no traces
+appear", so two things tell them apart:
+
+- the boot line **`otel: sdk started, endpoint=…, instrumentations=N`**, whose
+  *absence* means the `--import` was missed;
+- **rate-limited exporter failures** on stderr — the first one immediately, then
+  at most one per five minutes, carrying a count of what it swallowed.
+
+Every log line written inside a span carries `trace_id`, so a line in the log
+explorer links straight to its trace, and Tempo links back to the logs.
+
 ## How it fits together
 
 ```
-storage/logs/app*.log  ──tail──▶  Alloy  ──push──▶  Loki  ◀──query──  Grafana
-    (pino JSON)      (labels source+module+logLevel)  (stores)      (dashboard)
+storage/logs/app*.log ──tail──▶ Alloy ──push──▶ Loki  ◀─┐
+   (pino JSON, incl.   (labels source+module+logLevel)   │
+    metrics snapshots)                                   ├─query── Grafana
+GET /metrics          ◀──scrape── Prometheus  ◀──────────┤        (dashboard,
+   (prom-client)                                         │         alerts)
+spans ────────────────push──────▶ Tempo       ◀──────────┘
+   (OTel, off by default)
 ```
 
 - **Alloy** (`observability/alloy/config.alloy`) tails `storage/logs/app*.log`
@@ -62,6 +122,14 @@ storage/logs/app*.log  ──tail──▶  Alloy  ──push──▶  Loki  �
     defaults those to `server`.
 - **Loki** (`observability/loki/config.yml`) stores on a local filesystem
   volume; `reject_old_samples: false` is what lets it accept the backlog.
+- **Prometheus** (`observability/prometheus/prometheus.yml`) scrapes
+  `host.docker.internal:4646` — **not** `localhost`, because Bifrost runs native
+  on macOS while this runs in a container. `node_exporter` is deliberately
+  absent: in Docker on macOS it would measure the Linux VM rather than the Mac,
+  producing numbers that look real and mean nothing. Every process metric comes
+  from inside Node instead.
+- **Tempo** (`observability/tempo/tempo.yml`) accepts OTLP/HTTP on 4318 and
+  keeps blocks for 48h — recent investigation only, by design.
 - **Grafana** provisions the Loki datasource and the dashboard from
   `observability/grafana/`.
 
@@ -100,6 +168,13 @@ halves of a feature and adding `source="client"` narrows it to the browser.
   `observability/grafana/dashboards/bifrost.json` to keep it provisioned.
 - Change the Grafana admin password (`GF_SECURITY_ADMIN_PASSWORD`) before
   exposing port 3000 anywhere but localhost.
+- Two alert rules ship provisioned (`observability/grafana/provisioning/
+  alerting/`): error rate and event-loop lag. Both query **Loki**, not
+  Prometheus, so they keep meaning something over an archive that backfills —
+  a rule against a scraped series would silently evaluate over holes.
+- `/metrics` is unauthenticated on the LAN. Prometheus carries no session, so a
+  guard would not secure anything, it would just stop the scrape; the endpoint
+  exposes counters and gauges, never content.
 
 ## Verify (owner)
 

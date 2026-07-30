@@ -15,6 +15,8 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'api',
   'go',
   'health',
+  // Prometheus scrapes this by convention at the root, not under /api (PLAN-16b).
+  'metrics',
   // Public data/preview routes that escape the SPA fallback.
   'runestone',
   'edda',

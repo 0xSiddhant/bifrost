@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: Tempo
+    uid: bifrost-tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    jsonData:
+      # Traces → logs: from a span, jump to the lines that request wrote.
+      tracesToLogsV2:
+        datasourceUid: bifrost-loki
+        spanStartTimeShift: -5m
+        spanEndTimeShift: 5m
+        filterByTraceID: true
+        tags: []
+      serviceMap:
+        datasourceUid: bifrost-prometheus

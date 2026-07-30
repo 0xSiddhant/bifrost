@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
+import type { EventBus } from '../bus/index.js';
 import type { Logger } from '../logger/index.js';
 
 /**
@@ -22,6 +23,12 @@ export interface HttpOptions {
   logger: Logger;
   /** Absolute path to the built client. Skipped when absent (dev mode: Vite serves it). */
   clientDistDir: string;
+  /**
+   * Publishes `http.requestCompleted` for every finished request, so a module
+   * can measure the whole app without reaching into anyone else's routes
+   * (PLAN-16b). Optional: tests that build a bare instance need not care.
+   */
+  bus?: EventBus;
 }
 
 export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> {
@@ -34,6 +41,26 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     loggerInstance: options.logger,
     forceCloseConnections: true,
   }) as unknown as FastifyInstance;
+
+  // Registered on the ROOT instance, which is the point: hooks are scoped to
+  // the encapsulation context they are added in, and every module lives in its
+  // own. Only core sees all of them.
+  if (options.bus) {
+    const bus = options.bus;
+    app.addHook('onResponse', (request, reply, done) => {
+      // The route TEMPLATE, never the concrete url — `/api/downloads/:id` is
+      // one series, while the raw path would mint one per file id and turn a
+      // histogram into a cardinality problem. Unmatched requests (404s, static
+      // assets) share a single bucket for the same reason.
+      bus.emit('http.requestCompleted', {
+        route: request.routeOptions?.url ?? 'unmatched',
+        method: request.method,
+        statusCode: reply.statusCode,
+        durationMs: reply.elapsedTime,
+      });
+      done();
+    });
+  }
 
   app.setErrorHandler((error: unknown, request, reply) => {
     if (error instanceof AppError) {

@@ -27,6 +27,7 @@ export default {
         'portkey',
         'screensaver',
         'client-logs',
+        'metrics',
         // core areas
         'core',
         'client',

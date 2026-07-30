@@ -39,6 +39,7 @@ import { nimbusModule } from './modules/nimbus/module.js';
 import { portkeyModule } from './modules/portkey/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 import { clientLogsModule } from './modules/client-logs/module.js';
+import { metricsModule } from './modules/metrics/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -73,6 +74,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Both profiles: browsers crash in cloud too, and a phone's crash reaches
     // the archive through nothing else (PLAN-16a).
     clientLogsModule,
+    // Both profiles: the snapshot is the durable runtime record, and it has to
+    // exist whether or not any container is running (PLAN-16b).
+    metricsModule,
   ],
   cloud: [
     healthModule,
@@ -85,6 +89,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     lokiModule,
     screensaverModule,
     clientLogsModule,
+    metricsModule,
   ],
 };
 
@@ -136,7 +141,7 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
-  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist') });
+  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist'), bus });
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 

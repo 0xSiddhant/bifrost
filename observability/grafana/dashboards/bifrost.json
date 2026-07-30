@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -7,7 +9,9 @@
   "liveNow": false,
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["bifrost"],
+  "tags": [
+    "bifrost"
+  ],
   "templating": {
     "list": [
       {
@@ -15,13 +19,28 @@
         "label": "Source",
         "description": "server = this process, client = a browser on the LAN. Alloy labels lines with no source binding (boot, shutdown, request logs) as server.",
         "type": "query",
-        "datasource": { "type": "loki", "uid": "bifrost-loki" },
-        "query": { "label": "source", "refId": "BifrostSourceVariable", "type": 1 },
+        "datasource": {
+          "type": "loki",
+          "uid": "bifrost-loki"
+        },
+        "query": {
+          "label": "source",
+          "refId": "BifrostSourceVariable",
+          "type": 1
+        },
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
         "options": [],
         "hide": 0
       },
@@ -30,13 +49,28 @@
         "label": "Module",
         "description": "Server module or client feature. Ten names exist on both sides, so one selection spans both halves of a feature. `.*` also matches lines with no module (boot, shutdown, request logs).",
         "type": "query",
-        "datasource": { "type": "loki", "uid": "bifrost-loki" },
-        "query": { "label": "module", "refId": "BifrostModuleVariable", "type": 1 },
+        "datasource": {
+          "type": "loki",
+          "uid": "bifrost-loki"
+        },
+        "query": {
+          "label": "module",
+          "refId": "BifrostModuleVariable",
+          "type": 1
+        },
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
         "options": [],
         "hide": 0
       },
@@ -45,40 +79,77 @@
         "label": "Level",
         "description": "Text level name (PLAN-16a). Alloy fills it from the old numeric `level` for files written before that, so one query spans the whole archive.",
         "type": "query",
-        "datasource": { "type": "loki", "uid": "bifrost-loki" },
-        "query": { "label": "logLevel", "refId": "BifrostLevelVariable", "type": 1 },
+        "datasource": {
+          "type": "loki",
+          "uid": "bifrost-loki"
+        },
+        "query": {
+          "label": "logLevel",
+          "refId": "BifrostLevelVariable",
+          "type": 1
+        },
         "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
         "current": {
           "selected": true,
-          "text": ["warn", "error", "fatal"],
-          "value": ["warn", "error", "fatal"]
+          "text": [
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "value": [
+            "warn",
+            "error",
+            "fatal"
+          ]
         },
         "options": [],
         "hide": 0
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "",
   "title": "Bifrost",
   "uid": "bifrost-overview",
-  "version": 2,
+  "version": 3,
   "panels": [
     {
       "id": 1,
       "title": "Requests / min",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum(count_over_time({job=\"bifrost\"} |= \"request completed\" [1m]))",
           "queryType": "range"
         }
@@ -87,16 +158,51 @@
     {
       "id": 2,
       "title": "Errors + warnings / min",
-      "description": "Filtered by the Source variable. Level matcher is the text name since PLAN-16a — `level=~\"40|50|60\"` returns nothing now.",
+      "description": "Filtered by the Source variable. Level matcher is the text name since PLAN-16a \u2014 `level=~\"40|50|60\"` returns nothing now.",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
-      "fieldConfig": { "defaults": { "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum(count_over_time({job=\"bifrost\", source=~\"$source\", logLevel=~\"warn|error|fatal\"} [1m]))",
           "queryType": "range"
         }
@@ -106,13 +212,32 @@
       "id": 3,
       "title": "Uploads received",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum(count_over_time({job=\"bifrost\"} |= \"file.uploaded\" [$__range]))",
           "queryType": "range"
         }
@@ -122,13 +247,32 @@
       "id": 4,
       "title": "Watcher events (downloads seen)",
       "type": "stat",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum(count_over_time({job=\"bifrost\"} |= \"download.added\" [$__range]))",
           "queryType": "range"
         }
@@ -139,13 +283,35 @@
       "title": "Errors by module",
       "description": "Counts both halves of a feature: ten module names exist on the server and in the client, so `accio` here means the whole feature unless Source narrows it.",
       "type": "timeseries",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum by (module) (count_over_time({job=\"bifrost\", source=~\"$source\", logLevel=~\"error|fatal\"} [$__auto]))",
           "legendFormat": "{{module}}",
           "queryType": "range"
@@ -157,13 +323,35 @@
       "title": "Errors by source",
       "description": "Server vs browser. A client bar means a device on the LAN hit something the server never saw.",
       "type": "timeseries",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 40,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum by (source) (count_over_time({job=\"bifrost\", module=~\"$module\", logLevel=~\"error|fatal\"} [$__auto]))",
           "legendFormat": "{{source}}",
           "queryType": "range"
@@ -174,13 +362,32 @@
       "id": 6,
       "title": "Request throughput",
       "type": "timeseries",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 20 } }, "overrides": [] },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "sum(count_over_time({job=\"bifrost\"} |= \"request completed\" [$__auto]))",
           "legendFormat": "requests",
           "queryType": "range"
@@ -190,19 +397,427 @@
     {
       "id": 7,
       "title": "Log explorer (warnings & errors by default)",
-      "description": "The in-app log viewer is gone since PLAN-16a — this is it. Widen the Level variable to All to read everything Bifrost writes, including trace.",
+      "description": "The in-app log viewer is gone since PLAN-16a \u2014 this is it. Widen the Level variable to All to read everything Bifrost writes, including trace.",
       "type": "logs",
-      "datasource": { "type": "loki", "uid": "bifrost-loki" },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 14 },
-      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true },
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none",
+        "enableLogDetails": true
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "loki", "uid": "bifrost-loki" },
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
           "expr": "{job=\"bifrost\", source=~\"$source\", module=~\"$module\", logLevel=~\"$logLevel\"}",
           "queryType": "range"
         }
       ]
+    },
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Runtime \u2014 durable, from the log archive",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "panels": [],
+      "description": "These read the metrics snapshot lines, so they are as complete as the logs: a stack that was off for days backfills the whole gap on the next start."
+    },
+    {
+      "id": 101,
+      "title": "Event-loop lag p99",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 27
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "max_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap loopLagP99Ms [$__auto])",
+          "queryType": "range",
+          "legendFormat": "p99 ms"
+        }
+      ],
+      "description": "In Node a hang is almost always a synchronous block, and nothing else on this dashboard would catch it. A spike here is the first thing to look at.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 102,
+      "title": "Process CPU %",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "avg_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap cpuPct [$__auto])",
+          "queryType": "range",
+          "legendFormat": "cpu %"
+        }
+      ],
+      "description": "100% means one core saturated for the whole interval, the same convention top uses.",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        }
+      },
+      "overrides": []
+    },
+    {
+      "id": 103,
+      "title": "Memory (RSS / heap)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 27
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "avg_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap rssMb [$__auto])",
+          "queryType": "range",
+          "legendFormat": "rss MB"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "avg_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap heapUsedMb [$__auto])",
+          "queryType": "range",
+          "legendFormat": "heap MB"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        }
+      },
+      "overrides": []
+    },
+    {
+      "id": 104,
+      "title": "Uploads in range",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "sum(sum_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap uploadsDelta [$__range]))",
+          "queryType": "range"
+        }
+      ],
+      "description": "Deltas, never a cumulative counter \u2014 they sum correctly over any window and survive a restart, which a counter resetting to zero could not.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 105,
+      "title": "Storage used",
+      "type": "stat",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "last_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap diskMb [$__range])",
+          "queryType": "range"
+        }
+      ],
+      "description": "Sampled on its own slow cycle. Walking the folders is synchronous, so doing it per snapshot would manufacture the very lag spike this dashboard exists to detect.",
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 106,
+      "title": "SSE clients connected",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "max_over_time({job=\"bifrost\", module=\"metrics\"} | json | unwrap sseClients [$__auto])",
+          "queryType": "range",
+          "legendFormat": "clients"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        }
+      },
+      "overrides": []
+    },
+    {
+      "id": 107,
+      "title": "Request latency p95 (from the log line)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "bifrost-loki"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 35
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "bifrost-loki"
+          },
+          "expr": "quantile_over_time(0.95, {job=\"bifrost\"} | json | unwrap responseTime [$__auto])",
+          "queryType": "range",
+          "legendFormat": "p95 ms"
+        }
+      ],
+      "description": "Fastify's own request-completed line already carries responseTime, so this works with no Prometheus at all.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 110,
+      "type": "row",
+      "title": "Prometheus \u2014 live only, gaps do not backfill",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "panels": [],
+      "description": "High resolution while the stack is up. Prometheus scrapes, so anything it missed never existed for it \u2014 the row above is the record."
+    },
+    {
+      "id": 111,
+      "title": "Request rate by route",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bifrost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bifrost-prometheus"
+          },
+          "expr": "sum by (route) (rate(bifrost_http_request_duration_seconds_count[$__rate_interval]))",
+          "queryType": "range",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        }
+      },
+      "overrides": []
+    },
+    {
+      "id": 112,
+      "title": "Request latency p95 by route",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "bifrost-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "bifrost-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(bifrost_http_request_duration_seconds_bucket[$__rate_interval])))",
+          "queryType": "range",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "description": "The histogram labels on the route TEMPLATE, so /api/downloads/:id is one series rather than one per file.",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15
+          }
+        },
+        "overrides": []
+      }
     }
   ]
 }

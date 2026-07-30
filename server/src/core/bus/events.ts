@@ -171,8 +171,27 @@ export interface Portkey {
   lastUsedAt: number | null;
 }
 
+/** One finished HTTP request, as the core HTTP layer saw it (PLAN-16b). */
+export interface RequestCompletedEvent {
+  /** The Fastify route TEMPLATE (`/api/downloads/:id/content`), or 'unmatched'. */
+  route: string;
+  method: string;
+  statusCode: number;
+  durationMs: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
+  /**
+   * Emitted by core/http for every finished request. It exists because the
+   * latency histogram has to see EVERY route, and a Fastify hook added inside a
+   * module's own plugin scope only ever sees that module's routes — the
+   * composition root wraps each module in its own encapsulation context, so
+   * even fastify-plugin would only lift a hook one level, to the wrapper. The
+   * bus is the architecture's own answer to "one module needs to know what the
+   * whole app is doing", and it keeps prom-client out of core.
+   */
+  'http.requestCompleted': RequestCompletedEvent;
   'download.added': DownloadEntry;
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;

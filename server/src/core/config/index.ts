@@ -89,6 +89,23 @@ const envSchema = z.object({
   CLIENT_LOG_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
   CLIENT_LOG_MAX_BATCH: z.coerce.number().int().positive().max(500).default(50),
   CLIENT_LOG_MAX_BODY_KB: z.coerce.number().int().positive().default(64),
+  // Metrics snapshots (PLAN-16b). The snapshot is the durable record, so
+  // METRICS_ENABLED is the ONLY off-switch — raising LOG_LEVEL must never stop
+  // it (the module logs through a trace-pinned child for exactly that reason).
+  METRICS_ENABLED: z.enum(['true', 'false']).default('true'),
+  METRICS_SNAPSHOT_INTERVAL_SEC: z.coerce.number().int().min(1).default(60),
+  // Deliberately far slower than the snapshot: the disk walk is synchronous and
+  // recursive, so sampling it per snapshot would block the event loop on every
+  // snapshot and the sampler would record the lag spike it just caused.
+  METRICS_DISK_INTERVAL_SEC: z.coerce.number().int().min(1).default(1800),
+  // OpenTelemetry tracing (PLAN-16b). OFF by default: a dead OTLP endpoint
+  // makes the exporter retry and log connection errors into storage/logs/ —
+  // observability tooling degrading the observability record. Flip it on only
+  // when the stack is up.
+  OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4318'),
+  OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  OTEL_SERVICE_NAME: z.string().min(1).default('bifrost'),
   BACKUP_DIR: z.string().default(''),
   // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
@@ -193,6 +210,14 @@ export interface AppConfig {
     /** Request body cap; past it the route answers 413 without reading it. */
     maxBodyBytes: number;
   };
+  metrics: {
+    /** The one off-switch for the snapshot record; LOG_LEVEL must not affect it. */
+    enabled: boolean;
+    /** Seconds between snapshot lines. */
+    snapshotIntervalSec: number;
+    /** Seconds between the (expensive, synchronous) disk walks. */
+    diskIntervalSec: number;
+  };
   backupDir: string | null;
   /** Rotation: keep only the newest N archives (0 = keep all). */
   backupKeep: number;
@@ -232,6 +257,32 @@ export function resolveStoragePaths(storageRoot: string): StoragePaths {
  */
 export function logsDirFromEnv(env: Env = process.env): string {
   return resolveStoragePaths(env.STORAGE_ROOT || './storage').logs;
+}
+
+export interface OtelSettings {
+  enabled: boolean;
+  endpoint: string;
+  timeoutMs: number;
+  serviceName: string;
+}
+
+/**
+ * Tracing settings, read without validating anything else.
+ *
+ * `server/src/otel.ts` is loaded via `node --import` *before* the app, so a
+ * full `loadConfig()` there would fail on unrelated keys (HEIMDALL_PIN) and
+ * take the process down before it ever started — for a feature that is off by
+ * default. Keeping the raw read here means `process.env` still has exactly one
+ * home (coding rule), and the defaults stay beside every other default.
+ */
+export function otelSettingsFromEnv(env: Env = process.env): OtelSettings {
+  const timeout = Number(env.OTEL_EXPORT_TIMEOUT_MS);
+  return {
+    enabled: env.OTEL_ENABLED === 'true',
+    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
+    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 3000,
+    serviceName: env.OTEL_SERVICE_NAME || 'bifrost',
+  };
 }
 
 export function loadConfig(env: Env = process.env): AppConfig {
@@ -306,6 +357,11 @@ export function loadConfig(env: Env = process.env): AppConfig {
       rateLimitPerMin: raw.CLIENT_LOG_RATE_LIMIT_PER_MIN,
       maxBatch: raw.CLIENT_LOG_MAX_BATCH,
       maxBodyBytes: raw.CLIENT_LOG_MAX_BODY_KB * 1024,
+    },
+    metrics: {
+      enabled: raw.METRICS_ENABLED === 'true',
+      snapshotIntervalSec: raw.METRICS_SNAPSHOT_INTERVAL_SEC,
+      diskIntervalSec: raw.METRICS_DISK_INTERVAL_SEC,
     },
     backupDir: raw.BACKUP_DIR || null,
     backupKeep: raw.BACKUP_KEEP,

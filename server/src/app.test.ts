@@ -54,6 +54,7 @@ describe('boot → health → capabilities', () => {
         'portkey',
         'screensaver',
         'client-logs',
+        'metrics',
       ],
     });
   });
