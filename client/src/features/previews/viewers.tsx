@@ -2,29 +2,33 @@ import { useEffect, useState } from 'react';
 import DOMPurify from 'dompurify';
 import hljs from 'highlight.js/lib/common';
 import { marked } from 'marked';
-import { downloadUrl } from '../../core/api';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { FileIcon } from '../../core/ui/icons';
 
-export function ImageViewer({ id, name }: { id: string; name: string }) {
-  return <img className="preview-media" src={downloadUrl(id, { inline: true })} alt={name} />;
+/**
+ * Viewers take the inline content URL, not an id: since PLAN-17b the same
+ * viewers render a staged upload (`/api/files/:name/content`) as well as a
+ * download (`/api/downloads/:id/content`), and the modal is the only thing
+ * that needs to know which is which.
+ */
+export function ImageViewer({ src, name }: { src: string; name: string }) {
+  return <img className="preview-media" src={src} alt={name} />;
 }
 
-export function VideoViewer({ id }: { id: string }) {
+export function VideoViewer({ src }: { src: string }) {
   // Seeking works because the server answers Range requests with 206s.
   return (
     <video className="preview-media" controls playsInline preload="metadata">
-      <source src={downloadUrl(id, { inline: true })} />
+      <source src={src} />
     </video>
   );
 }
 
-export function AudioViewer({ id }: { id: string }) {
-  return <audio className="preview-audio" controls src={downloadUrl(id, { inline: true })} />;
+export function AudioViewer({ src }: { src: string }) {
+  return <audio className="preview-audio" controls src={src} />;
 }
 
-export function PdfViewer({ id, name }: { id: string; name: string }) {
-  const src = downloadUrl(id, { inline: true });
+export function PdfViewer({ src, name }: { src: string; name: string }) {
   return (
     <object className="preview-pdf" data={src} type="application/pdf" aria-label={name}>
       <EmptyState
@@ -42,12 +46,12 @@ export function PdfViewer({ id, name }: { id: string; name: string }) {
 
 type TextState = { state: 'loading' } | { state: 'error' } | { state: 'ready'; text: string };
 
-function useTextContent(id: string): TextState {
+function useTextContent(src: string): TextState {
   const [state, setState] = useState<TextState>({ state: 'loading' });
   useEffect(() => {
     let disposed = false;
     setState({ state: 'loading' });
-    fetch(downloadUrl(id, { inline: true }))
+    fetch(src)
       .then((response) => {
         if (!response.ok) throw new Error(`fetch failed: ${response.status}`);
         return response.text();
@@ -61,7 +65,7 @@ function useTextContent(id: string): TextState {
     return () => {
       disposed = true;
     };
-  }, [id]);
+  }, [src]);
   return state;
 }
 
@@ -73,8 +77,8 @@ function TextStates({ content }: { content: TextState }) {
   );
 }
 
-export function MarkdownViewer({ id }: { id: string }) {
-  const content = useTextContent(id);
+export function MarkdownViewer({ src }: { src: string }) {
+  const content = useTextContent(src);
   if (content.state !== 'ready') return <TextStates content={content} />;
   // Folder contents are the owner's own files, but sanitizing is free —
   // acceptance criterion: embedded <script> renders inert.
@@ -82,8 +86,8 @@ export function MarkdownViewer({ id }: { id: string }) {
   return <div className="preview-markdown" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-export function TextViewer({ id }: { id: string }) {
-  const content = useTextContent(id);
+export function TextViewer({ src }: { src: string }) {
+  const content = useTextContent(src);
   if (content.state !== 'ready') return <TextStates content={content} />;
   // hljs escapes the source itself; its output is markup we generated.
   const { value } = hljs.highlightAuto(content.text);
