@@ -37,8 +37,10 @@ bifrost/
 │       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
-│           └── <feature>/     # file-transfer, previews, clipboard, themes, heimdall,
-│               ├── module.ts  #   qr-tool, presence, audit-log, runestone, variant
+│           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
+│               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
+│               │              #   variant, edda, loki, accio, nimbus, portkey,
+│               │              #   screensaver, client-logs, metrics
 │               ├── routes/
 │               ├── usecases/
 │               ├── services/  # concrete repo/service implementations

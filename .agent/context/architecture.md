@@ -6,7 +6,7 @@ One Node/Fastify process serves the static frontend, REST API, and SSE stream on
 
 1. **Vertical slices.** Code is organized feature-first: `src/modules/<feature>/` contains that feature's routes, usecases, services, and DB schema. Shared infrastructure lives in `src/core/` only.
 2. **Modules never import each other. Only `core`.** Cross-feature communication goes through the core **event bus** (e.g. `bus.emit('file.uploaded', meta)`). Enforced by `eslint-plugin-boundaries` — a violating import is a build failure, not a style nit.
-3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently qr-tool, themes, heimdall, runestone, variant — see `MANIFEST` in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles. The nav groups pages into **three category hub tabs** (Midgard = transfer, Ollivanders = dev tools, Diagon Alley = utilities); each tool keeps its own route and is surfaced as a card on its hub, and a category tab shows only when one of its modules is in the capabilities list.
+3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` selects which modules the composition root registers. `local` = everything. `cloud` (future) = internet-safe modules only (currently health, qr-tool, themes, heimdall, runestone, variant, edda, loki, screensaver, client-logs, metrics — see `MANIFEST` in `server/src/app.ts`), Postgres instead of SQLite, no mDNS. The server exposes `GET /api/capabilities`; the frontend renders nav/pages from it — one client build serves both profiles. The nav groups pages into **three category hub tabs** (Midgard = transfer, Ollivanders = dev tools, Diagon Alley = utilities); each tool keeps its own route and is surfaced as a card on its hub, and a category tab shows only when one of its modules is in the capabilities list.
 
 ## Layers inside every module
 
@@ -17,6 +17,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 
 | Module | Purpose | Profile |
 |---|---|---|
+| `health` | Built-in pseudo-module: `GET /api/health`, proves the module contract (PLAN-00) | both |
 | `file-transfer` | Upload → a **staging area** the sender can preview/rename/delete/publish + download (read-only) + live folder watch | local only |
 | `previews` | In-browser image/PDF/video/markdown preview, range requests | local only |
 | `clipboard` | Cross-device text/clipboard sync (Hermes page) | local only |
@@ -28,6 +29,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
 | `variant` | JSON & text diff checker (PLAN-08) | both |
 | `edda` | Markdown editor + live preview + saved library (PLAN-11) | both |
+| `loki` | JS workbench — transforms, regex tester, Web-Worker runner ("Calcifer"); server owns **policy only** (run/fetch gates, watchdog, console budget) via DB settings + `loki.settingsUpdated` (PLAN-12) | both (run UI client-gated to local) |
 | `accio` | Read-later / bookmark shelf, with best-effort page-title enrichment (PLAN-13) | local only |
 | `nimbus` | LAN speed test — byte streamer, discarding upload sink, single-flight guard, per-device history (PLAN-14) | local only |
 | `portkey` | LAN go-links — user-chosen slugs, `/go/:slug` 302 redirect, async hit counting, QR per link (PLAN-15) | local only |
