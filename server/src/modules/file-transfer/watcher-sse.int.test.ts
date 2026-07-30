@@ -101,4 +101,54 @@ describe('downloads watcher → bus → sse', () => {
     const listing = await app.inject({ method: 'GET', url: '/api/downloads' });
     expect(listing.json()).toEqual([]);
   }, 15_000);
+
+  /**
+   * PLAN-17b: publishing fires `file.published` immediately, and chokidar fires
+   * `download.added` later. Both reach SSE — the split is deliberate, and the
+   * client bans anything from bannering on the second one (or every published
+   * file would announce itself twice).
+   */
+  it('broadcasts file.published with the origin device, then download.added', async () => {
+    fs.writeFileSync(path.join(storageRoot, 'uploads', 'moved.txt'), 'staged');
+    broadcast.mockClear();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/files/moved.txt/publish',
+      headers: { 'x-bifrost-device': 'device-a' },
+    });
+    expect(res.statusCode).toBe(200);
+
+    expect(broadcast).toHaveBeenCalledWith(
+      'file.published',
+      expect.objectContaining({ name: 'moved.txt', size: 6, originDeviceId: 'device-a' }),
+    );
+
+    await vi.waitFor(
+      () => {
+        expect(broadcast).toHaveBeenCalledWith(
+          'download.added',
+          expect.objectContaining({ name: 'moved.txt' }),
+        );
+      },
+      { timeout: 10_000, interval: 200 },
+    );
+    // Exactly one banner event for one published file.
+    const publishedCalls = broadcast.mock.calls.filter(([event]) => event === 'file.published');
+    expect(publishedCalls).toHaveLength(1);
+  }, 15_000);
+
+  it('carries a null origin when no device header was sent', async () => {
+    fs.writeFileSync(path.join(storageRoot, 'uploads', 'anon.txt'), 'staged');
+    broadcast.mockClear();
+
+    await app.inject({ method: 'POST', url: '/api/files/anon.txt/publish' });
+
+    // Null, not omitted: the client filter must tell "unknown sender" from
+    // "me", and show the banner in the first case.
+    expect(broadcast).toHaveBeenCalledWith(
+      'file.published',
+      expect.objectContaining({ originDeviceId: null }),
+    );
+  }, 15_000);
 });
