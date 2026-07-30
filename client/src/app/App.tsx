@@ -9,6 +9,7 @@ import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
+import { usePublishedBanner } from './usePublishedBanner';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
@@ -25,6 +26,11 @@ const DownloadsPage = lazy(() =>
 );
 const PreviewModal = lazy(() =>
   import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
+);
+const UploadPreviewModal = lazy(() =>
+  import('../features/previews/UploadPreviewModal').then((m) => ({
+    default: m.UploadPreviewModal,
+  })),
 );
 const HermesPage = lazy(() =>
   import('../features/hermes/HermesPage').then((m) => ({ default: m.HermesPage })),
@@ -114,6 +120,7 @@ export function App() {
   const { capabilities } = useCapabilities();
   const [heimdallOpen, setHeimdallOpen] = useState(false);
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
+  usePublishedBanner();
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
   const { pathname } = useLocation();
 
@@ -224,7 +231,10 @@ export function App() {
             {/* Category hubs — the tools they list keep their own routes below. */}
             <Route path="/ollivanders" element={<OllivandersPage />} />
             <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
-            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/upload" element={<UploadPage />}>
+              {/* Preview a staged file before publishing it; back closes it. */}
+              <Route path=":name/preview" element={<UploadPreviewModal />} />
+            </Route>
             <Route path="/downloads" element={<DownloadsPage />}>
               {/* Modal route: deep-linkable, back button closes the preview. */}
               <Route path=":id/preview" element={<PreviewModal />} />

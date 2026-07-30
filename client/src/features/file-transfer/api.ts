@@ -1,4 +1,4 @@
-import { apiGet } from '../../core/api';
+import { apiGet, apiSend } from '../../core/api';
 
 export interface UploadConfig {
   maxUploadSizeMb: number;
@@ -17,6 +17,29 @@ export const fetchUploadConfig = (): Promise<UploadConfig> =>
 export class UploadCancelledError extends Error {
   override name = 'UploadCancelledError';
 }
+
+/** What the four staging actions answer with (PLAN-17b). */
+export interface StagedFileResult {
+  finalName: string;
+  /** The wanted name was taken, so a `-1` style suffix was added. */
+  renamed: boolean;
+}
+
+const seg = (name: string): string => encodeURIComponent(name);
+
+/** Move a staged upload into downloads/, where the whole LAN can see it. */
+export const publishUpload = (name: string): Promise<StagedFileResult> =>
+  apiSend<StagedFileResult>('POST', `/api/files/${seg(name)}/publish`);
+
+/** Rename within uploads/. A name the server would clean up comes back 422. */
+export const renameUpload = (name: string, newName: string): Promise<StagedFileResult> =>
+  apiSend<StagedFileResult>('PATCH', `/api/files/${seg(name)}`, { name: newName });
+
+export const deleteUpload = (name: string): Promise<null> =>
+  apiSend<null>('DELETE', `/api/files/${seg(name)}`);
+
+export const uploadContentUrl = (name: string, options: { inline?: boolean } = {}): string =>
+  `/api/files/${seg(name)}/content${options.inline ? '?inline=1' : ''}`;
 
 const REJECTION_TEXT: Record<string, string> = {
   'too-large': 'file is larger than the server allows',
