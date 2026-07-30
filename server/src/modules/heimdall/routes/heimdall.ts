@@ -5,7 +5,7 @@ import type { Logger } from '../../../core/logger/index.js';
 import type { LoginThrottle } from '../login-throttle.js';
 import type { GetSettingsUseCase, UpdateSettingsUseCase } from '../usecases/manage-settings.js';
 import type { GetStatsUseCase } from '../usecases/get-stats.js';
-import type { ListUploadsUseCase } from '../usecases/list-uploads.js';
+import type { ListUploadFilesUseCase } from '../usecases/list-upload-files.js';
 
 export interface HeimdallRoutesDeps {
   auth: AuthService;
@@ -15,7 +15,7 @@ export interface HeimdallRoutesDeps {
   getSettings: GetSettingsUseCase;
   updateSettings: UpdateSettingsUseCase;
   getStats: GetStatsUseCase;
-  listUploads: ListUploadsUseCase;
+  listUploadFiles: ListUploadFilesUseCase;
 }
 
 const loginSchema = {
@@ -113,7 +113,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   app.get<{ Querystring: { limit?: number; offset?: number } }>(
     '/api/heimdall/uploads',
     { ...guard, schema: { querystring: uploadsQuerySchema } },
-    (request) => deps.listUploads.execute(request.query.limit, request.query.offset),
+    (request) => deps.listUploadFiles.execute(request.query.limit, request.query.offset),
   );
 
   app.get('/api/heimdall/stats', guard, () => deps.getStats.execute());

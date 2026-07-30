@@ -71,6 +71,13 @@
       "when": 1785322598669,
       "tag": "0009_drop_log_level_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785429698506,
+      "tag": "0010_drop_upload_audit",
+      "breakpoints": true
     }
   ]
 }

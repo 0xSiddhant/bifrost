@@ -12,19 +12,16 @@ export const settings = sqliteTable('settings', {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-/**
- * Minimal upload audit trail: Heimdall's metadata view (PLAN-05) reads this.
- * A recorder persists `file.uploaded` events; boot reconciliation seeds rows
- * for files already on disk. Metadata only — never the content. Keyed by the
- * unique stored name so reconciliation is idempotent. Full audit UI is PLAN-06.
+/*
+ * `upload_audit` was dropped in PLAN-17b (migration 0010). It duplicated
+ * `audit_events` — which already records every `file.uploaded` with its time,
+ * uploader hint, name and size — for the sake of one extra column,
+ * `stored_name`, which stopped being interesting the moment this plan removed
+ * the timestamp prefix and made the stored name the original name. Worse, it
+ * drifted: rows survived files deleted outside the app, so Heimdall's "Uploads"
+ * listed files that were not there. That listing now reads the directory (it
+ * cannot drift), and the dashboard's upload counts come from `audit_events`.
  */
-export const uploadAudit = sqliteTable('upload_audit', {
-  storedName: text('stored_name').primaryKey(),
-  originalName: text('original_name').notNull(),
-  size: integer('size').notNull(),
-  uploadedAt: integer('uploaded_at').notNull(),
-  uploaderHint: text('uploader_hint'),
-});
 
 /**
  * Shared LAN clipboard (PLAN-06). One board of text entries; `kind` = 'text' |

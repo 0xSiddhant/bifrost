@@ -1,0 +1,15 @@
+-- PLAN-17b: `upload_audit` is near-total duplication of `audit_events`, which
+-- already records every `file.uploaded` with its timestamp, uploader hint, and
+-- a summary carrying the original name and size. Its one unique column,
+-- `stored_name`, converged with `original_name` the moment this plan dropped
+-- the timestamp prefix from stored names — so a table, a repository, a port, a
+-- recorder and a boot reconciler were being maintained for nothing.
+--
+-- It also drifted from the filesystem: rows outlived files deleted outside the
+-- app, so Heimdall's "Uploads" section listed files that were not on disk while
+-- claiming to show what had been sent. That section now reads the directory,
+-- and the dashboard's upload counts read `audit_events`.
+--
+-- Dropping is safe: nothing else referenced this table, and the history it held
+-- is still in `audit_events`.
+DROP TABLE `upload_audit`;

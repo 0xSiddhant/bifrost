@@ -1,4 +1,4 @@
-import type { FolderUsage, StatsReader, UploadAuditRepository } from '../ports.js';
+import type { FolderUsage, StatsReader, UploadStatsRepository } from '../ports.js';
 
 export interface StatsResult {
   uptimeSeconds: number;
@@ -17,7 +17,7 @@ const ACTIVITY_HOURS = 24;
 export class GetStatsUseCase {
   constructor(
     private readonly stats: StatsReader,
-    private readonly audit: UploadAuditRepository,
+    private readonly uploads: UploadStatsRepository,
     private readonly connectedClients: () => number,
     private readonly uptimeSeconds: () => number = () => process.uptime(),
     private readonly now: () => number = Date.now,
@@ -31,11 +31,14 @@ export class GetStatsUseCase {
     const disk = this.stats.diskUsage();
     const totalBytes = disk.reduce((sum, entry) => sum + entry.bytes, 0);
 
-    const total = this.audit.page(1, 0).total;
-    const today = this.audit.timestampsSince(startOfDay.getTime()).length;
+    // All three figures come from `audit_events` since PLAN-17b — the same
+    // rows the History section shows, so the dashboard and the log can no
+    // longer report different numbers for the same day.
+    const total = this.uploads.total();
+    const today = this.uploads.timestampsSince(startOfDay.getTime()).length;
 
     const activity = new Array<number>(ACTIVITY_HOURS).fill(0);
-    for (const stamp of this.audit.timestampsSince(now - ACTIVITY_HOURS * HOUR_MS)) {
+    for (const stamp of this.uploads.timestampsSince(now - ACTIVITY_HOURS * HOUR_MS)) {
       const hoursAgo = Math.floor((now - stamp) / HOUR_MS);
       const index = ACTIVITY_HOURS - 1 - hoursAgo;
       if (index >= 0 && index < ACTIVITY_HOURS) activity[index] = (activity[index] ?? 0) + 1;
