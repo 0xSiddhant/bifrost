@@ -5,13 +5,14 @@ import type { FastifyInstance } from 'fastify';
 import {
   applySettingsOverlay,
   ConfigError,
+  DEFAULT_LOG_RETENTION_FILES,
   loadConfig,
+  logsDirFromEnv,
   type AppConfig,
   type DeployProfile,
 } from './core/config/index.js';
 import { loadDotenv } from './core/config/dotenv.js';
-import { createLogger, moduleLogger, type Logger } from './core/logger/index.js';
-import { LogTap } from './core/logtap.js';
+import { clientLogger, createLogger, moduleLogger, type Logger } from './core/logger/index.js';
 import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
@@ -33,7 +34,12 @@ import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { lokiModule } from './modules/loki/module.js';
+import { accioModule } from './modules/accio/module.js';
+import { nimbusModule } from './modules/nimbus/module.js';
+import { portkeyModule } from './modules/portkey/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
+import { clientLogsModule } from './modules/client-logs/module.js';
+import { metricsModule } from './modules/metrics/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -55,7 +61,22 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     lokiModule,
+    // Local only: a household bookmark shelf has no auth story of its own
+    // (PLAN-13 decision) — revisit for cloud when real accounts exist.
+    accioModule,
+    // Local only: it measures the LAN path to this machine, and an open
+    // byte-firehose on a public host is a bandwidth bill (PLAN-14).
+    nimbusModule,
+    // Local only, permanently: a public go-links service is an open-redirect /
+    // phishing primitive; on the LAN it's a convenience (PLAN-15).
+    portkeyModule,
     screensaverModule,
+    // Both profiles: browsers crash in cloud too, and a phone's crash reaches
+    // the archive through nothing else (PLAN-16a).
+    clientLogsModule,
+    // Both profiles: the snapshot is the durable runtime record, and it has to
+    // exist whether or not any container is running (PLAN-16b).
+    metricsModule,
   ],
   cloud: [
     healthModule,
@@ -67,6 +88,8 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     eddaModule,
     lokiModule,
     screensaverModule,
+    clientLogsModule,
+    metricsModule,
   ],
 };
 
@@ -75,7 +98,8 @@ const SESSION_EPOCH_KEY = 'heimdall.sessionEpoch';
 export interface RunningApp {
   fastify: FastifyInstance;
   config: AppConfig;
-  shutdown: () => Promise<void>;
+  /** `reason` is recorded on the first shutdown line — a signal name, or why else. */
+  shutdown: (reason?: string) => Promise<void>;
 }
 
 interface CreateAppOptions {
@@ -87,17 +111,14 @@ export async function createApp(
   baseConfig: AppConfig,
   options: CreateAppOptions = {},
 ): Promise<RunningApp> {
-  const logTap = new LogTap();
   const logger =
     options.logger ??
-    createLogger(
-      {
-        level: baseConfig.logLevel,
-        logsDir: baseConfig.storage.logs,
-        pretty: process.env.NODE_ENV !== 'production',
-      },
-      logTap,
-    );
+    createLogger({
+      level: baseConfig.logLevel,
+      logsDir: baseConfig.storage.logs,
+      pretty: process.env.NODE_ENV !== 'production',
+      retainFiles: baseConfig.logRetentionFiles,
+    });
 
   ensureStorageDirs(baseConfig);
   sweepTmp(baseConfig.storage.tmp, logger);
@@ -106,10 +127,6 @@ export async function createApp(
   runMigrations(db);
   const settingsRows = readSettings(db);
   const config = applySettingsOverlay(baseConfig, settingsRows);
-  // Apply a persisted log level (Heimdall's runtime switch) before any module
-  // child loggers are created, so they inherit it. Skip when a logger was
-  // injected (tests own its level — e.g. a silent one).
-  if (!options.logger) logger.level = config.logLevel;
 
   // Session epoch persists across restarts so a "revoke all" stays in effect.
   const epochRow = settingsRows.find((row) => row.key === SESSION_EPOCH_KEY);
@@ -124,24 +141,20 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
-  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist') });
+  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist'), bus });
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 
-  // Live log-level switch (Heimdall Logs): set on the root and every module
-  // child (pino children don't inherit a level change after creation).
-  const moduleLoggers: Logger[] = [];
-  const setLogLevel = (level: AppConfig['logLevel']): void => {
-    logger.level = level;
-    for (const child of moduleLoggers) child.level = level;
-  };
+  // Relayed browser lines are siblings of the module loggers, not descendants —
+  // both hang off the source-free root so each line carries exactly one
+  // `source` (pino appends child bindings; see core/logger).
+  const clientLog = (moduleName: string): Logger => clientLogger(logger, moduleName);
 
   const modules = MANIFEST[config.profile];
   for (const mod of modules) {
     const log = moduleLogger(logger, mod.name);
-    moduleLoggers.push(log);
     await fastify.register(async (scope) => {
-      await mod.register(scope, { config, log, db, bus, sse, auth, logTap, setLogLevel });
+      await mod.register(scope, { config, log, db, bus, sse, auth, clientLog });
     });
     logger.info({ module: mod.name }, 'module loaded');
   }
@@ -152,9 +165,13 @@ export async function createApp(
   }));
 
   let closed = false;
-  const shutdown = async (): Promise<void> => {
+  const shutdown = async (reason = 'unspecified'): Promise<void> => {
     if (closed) return;
     closed = true;
+    // Why the process is going down is the first thing you want when reading
+    // back a gap in the archive: a clean SIGTERM from PM2 and a shutdown
+    // triggered by a listen failure produce the same sequence of lines below.
+    logger.info({ reason }, 'shutdown: starting');
     logger.info('shutdown: closing sse clients');
     sse.close();
     logger.info('shutdown: closing http server');
@@ -163,7 +180,7 @@ export async function createApp(
     logger.info('shutdown: checkpointing database');
     checkpointAndClose(db);
     logger.info('shutdown complete');
-    await new Promise<void>((resolve) => logger.flush(() => resolve()));
+    await flushLogs(logger);
   };
 
   return { fastify, config, shutdown };
@@ -186,6 +203,40 @@ function sweepTmp(tmpDir: string, log: Logger): void {
   if (entries.length > 0) log.info({ swept: entries.length }, 'tmp swept on boot');
 }
 
+/** Longest we'll wait on the log transport before giving up on it. */
+const FLUSH_TIMEOUT_MS = 1500;
+
+/**
+ * Wait for the log transport to drain — but never indefinitely.
+ *
+ * pino's `flush(cb)` **never invokes the callback** if the transport worker is
+ * still starting up, which is exactly the situation on the paths that use this:
+ * a bad `.env` or an uncaught throw seconds into boot. Awaiting it unbounded
+ * hangs the process instead of exiting (observed: exit code 0 on a config
+ * failure that must exit 1). thread-stream flushes on process exit anyway, so
+ * the bound costs nothing — the line still lands.
+ */
+async function flushLogs(logger: Logger): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  await Promise.race([
+    new Promise<void>((resolve) => logger.flush(() => resolve())),
+    // Deliberately NOT `.unref()`d: an unref'd timer lets an otherwise-idle
+    // loop exit before it fires, so the process ends on its own with code 0
+    // and never reaches the `process.exit(code)` this is guarding. It is
+    // cleared the moment the flush callback wins, so it delays nothing.
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, FLUSH_TIMEOUT_MS);
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
+}
+
+/** Write one last line, give it a chance to land, then go. */
+async function flushAndExit(logger: Logger, code: number): Promise<never> {
+  await flushLogs(logger);
+  process.exit(code);
+}
+
 export async function main(): Promise<void> {
   loadDotenv();
 
@@ -194,14 +245,39 @@ export async function main(): Promise<void> {
     baseConfig = loadConfig();
   } catch (error) {
     if (error instanceof ConfigError) {
+      // stderr AND the archive. stderr alone is what this used to do, and it is
+      // invisible under PM2/launchd — an invalid .env is the commonest startup
+      // failure there is, and it was the one failure that never reached Loki.
       process.stderr.write(`${error.message}\n`);
-      process.exit(1);
+      const logger = createLogger({
+        level: 'fatal',
+        logsDir: logsDirFromEnv(),
+        pretty: false,
+        retainFiles: DEFAULT_LOG_RETENTION_FILES,
+      });
+      logger.fatal({ err: error }, 'fatal: invalid configuration — refusing to start');
+      await flushAndExit(logger, 1);
     }
     throw error;
   }
 
   const app = await createApp(baseConfig);
   const { fastify, config } = app;
+  const rootLog = fastify.log as Logger;
+
+  // A crash used to leave nothing at all behind — the exact case the archive
+  // exists to explain. Deliberately no graceful shutdown: process state is
+  // unknown after an uncaught throw, so record it and go, rather than risk
+  // hanging in a close path and losing the line too.
+  let dying = false;
+  const onFatal = (kind: string) => (error: unknown) => {
+    if (dying) return;
+    dying = true;
+    rootLog.fatal({ err: error, kind }, `fatal: ${kind} — exiting`);
+    void flushAndExit(rootLog, 1);
+  };
+  process.on('uncaughtException', onFatal('uncaughtException'));
+  process.on('unhandledRejection', onFatal('unhandledRejection'));
 
   await fastify.listen({ port: config.port, host: '0.0.0.0' });
 
@@ -227,7 +303,7 @@ export async function main(): Promise<void> {
     fastify.log.info({ signal }, 'shutdown: signal received');
     void (async () => {
       if (mdns) await mdns.stop();
-      await app.shutdown();
+      await app.shutdown(`signal ${signal}`);
       process.exit(0);
     })();
   };

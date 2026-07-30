@@ -19,23 +19,32 @@ export interface SettingsRepository {
   update(patch: Partial<HeimdallSettings>): void;
 }
 
-/** One upload's metadata — never its content (uploads have no read route). */
-export interface UploadRecord {
-  storedName: string;
-  originalName: string;
-  size: number;
-  uploadedAt: number;
-  uploaderHint: string | null;
-}
-
-export interface UploadAuditRepository {
-  /** Upsert — live `file.uploaded` events carry the real uploader hint. */
-  record(record: UploadRecord): void;
-  /** Insert-or-ignore — boot reconciliation must not clobber a recorded hint. */
-  seed(record: UploadRecord): void;
-  page(limit: number, offset: number): { total: number; items: UploadRecord[] };
+/**
+ * Upload counts for the dashboard, read from `audit_events` (PLAN-17b).
+ *
+ * That table is conceptually the `audit-log` module's, and this is a
+ * deliberate, visible coupling: modules may not import each other, but they do
+ * share one database, and the alternative was keeping a second table whose
+ * only remaining job was to say the same thing twice — and to say it wrongly
+ * whenever a file was deleted outside the app.
+ */
+export interface UploadStatsRepository {
+  /** Every upload ever recorded. */
+  total(): number;
   /** Upload timestamps (epoch ms) at or after `sinceMs`, for counts + activity. */
   timestampsSince(sinceMs: number): number[];
+}
+
+/** One file currently sitting in uploads/ — read from the directory, not a table. */
+export interface UploadFileEntry {
+  name: string;
+  size: number;
+  /** Epoch milliseconds. */
+  mtime: number;
+}
+
+export interface UploadFilesReader {
+  list(): UploadFileEntry[];
 }
 
 /** Per-folder disk usage under storage/. */

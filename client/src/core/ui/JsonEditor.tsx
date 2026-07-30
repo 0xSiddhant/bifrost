@@ -1,5 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import { EditorState, StateEffect, StateField, type Text } from '@codemirror/state';
+import {
+  EditorState,
+  StateEffect,
+  StateField,
+  type Extension,
+  type Text,
+} from '@codemirror/state';
 import {
   Decoration,
   EditorView,
@@ -28,10 +34,13 @@ import {
   bracketMatching,
   foldAll,
   foldGutter,
+  foldInside,
   foldKeymap,
+  foldService,
   indentOnInput,
   indentUnit,
   syntaxHighlighting,
+  syntaxTree,
   unfoldAll,
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
@@ -89,8 +98,9 @@ export interface JsonEditorProps {
   markdown?: boolean;
   /**
    * JavaScript mode (Loki): lang-javascript syntax tinting via --syn-* tokens,
-   * bracket matching + auto-close, no JSON lint/fold. Mutually exclusive with
-   * `plain`/`markdown`. Loki drives transforms through `applyEdit`.
+   * bracket matching + auto-close, and code folding (no JSON lint). Mutually
+   * exclusive with `plain`/`markdown`. Loki drives transforms through
+   * `applyEdit`.
    */
   javascript?: boolean;
   /**
@@ -436,6 +446,77 @@ const searchMatchCount = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * Parameter-position nodes lang-javascript's `foldNodeProp` does not cover: it
+ * folds `ObjectExpression` (a value) but not `ObjectPattern` (a destructuring
+ * target), so the very common
+ *
+ *     function make({
+ *       color, radius, elevation,
+ *     }) {
+ *
+ * offered no fold arrow at all — the signature stayed expanded while the body
+ * collapsed. `ParamList` covers the same shape without destructuring.
+ *
+ * `ArgList` is deliberately **excluded**. Call arguments overlap the callback
+ * idiom `app.get('/x', function () {`, where the line already folds the
+ * callback's `Block`; folding the argument list instead would silently change
+ * long-standing behaviour for a case nobody asked about.
+ */
+const FOLDABLE_PARAM_NODES = new Set(['ObjectPattern', 'ArrayPattern', 'ParamList']);
+
+/**
+ * `foldService` is consulted before the grammar's own `foldNodeProp`, and a
+ * `null` falls through to it — so this adds parameter folding without
+ * disturbing any existing fold (blocks, objects, arrays, comments).
+ */
+const paramFolding = foldService.of((state, lineStart, lineEnd) => {
+  const tree = syntaxTree(state);
+  if (tree.length < lineEnd) return null;
+  let found: { from: number; to: number } | null = null;
+  tree.iterate({
+    from: lineStart,
+    to: lineEnd,
+    enter(node) {
+      // Only a construct that *opens* on this line gets this line's arrow;
+      // otherwise the closing `}) {` line would steal the body's fold.
+      if (node.from < lineStart || node.from > lineEnd) return;
+      if (!FOLDABLE_PARAM_NODES.has(node.name)) return;
+      const range = foldInside(node.node);
+      if (!range) return;
+      // Nothing to gain from folding something that already fits on one line.
+      if (state.doc.lineAt(range.from).number === state.doc.lineAt(range.to).number) return;
+      // Keep descending: the innermost match wins, so a destructured parameter
+      // folds as `({…})` — braces kept as a cue — rather than the whole `(…)`.
+      found = range;
+    },
+  });
+  return found;
+});
+
+/**
+ * JavaScript mode (Loki). Exported so the fold test can assert against the real
+ * editor configuration rather than a hand-rolled copy of it.
+ *
+ * Folding comes from lang-javascript's `foldNodeProp`, which covers `Block`,
+ * `ClassBody`, `SwitchBody`, `ObjectExpression`, `ArrayExpression` and
+ * `BlockComment` — so one gutter folds function bodies, objects, arrays, nested
+ * blocks and IIFEs alike. The ranges come from the syntax tree, not from
+ * indentation, so a fold survives reformatting and nesting depth.
+ */
+export function javascriptModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    paramFolding,
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    closeBrackets(),
+    javascript(),
+    syntaxHighlighting(jsHighlight),
+  ];
+}
+
 /** All strict-JSON errors as CM diagnostics; an empty doc is "empty", not broken. */
 function jsonDiagnostics(view: EditorView): Diagnostic[] {
   const text = view.state.doc.toString();
@@ -484,14 +565,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const modeExtensions = markdown
       ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
       : javascriptMode
-        ? [
-            indentOnInput(),
-            indentUnit.of('  '),
-            bracketMatching(),
-            closeBrackets(),
-            javascript(),
-            syntaxHighlighting(jsHighlight),
-          ]
+        ? javascriptModeExtensions()
         : plain
           ? []
           : [
@@ -508,8 +582,10 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
               lintGutter(),
             ];
     const jsonOnly = !markdown && !plain && !javascriptMode;
-    // Bracket auto-close applies to JSON and JS; folding is JSON-only.
+    // Bracket auto-close and folding both apply to JSON and JS; markdown and
+    // plain get neither.
     const closeBracketsMode = jsonOnly || javascriptMode;
+    const foldMode = closeBracketsMode;
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -531,7 +607,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
           ...(closeBracketsMode ? closeBracketsKeymap : []),
           ...defaultKeymap,
           ...historyKeymap,
-          ...(jsonOnly ? foldKeymap : []),
+          ...(foldMode ? foldKeymap : []),
           indentWithTab,
         ]),
         ...(placeholder ? [cmPlaceholder(placeholder)] : []),

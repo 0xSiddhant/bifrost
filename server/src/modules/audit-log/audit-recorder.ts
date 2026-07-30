@@ -72,6 +72,28 @@ export class AuditRecorder {
       this.bus.on('edda.deleted', (event) =>
         push('edda.deleted', null, null, `edda "${event.name}" deleted`),
       ),
+      this.bus.on('accio.saved', ({ link }) =>
+        push('accio.saved', link.authorDeviceId, null, `summoned ${link.title ?? link.url}`),
+      ),
+      this.bus.on('accio.deleted', (event) =>
+        push('accio.deleted', null, null, `link "${event.title ?? event.url}" released`),
+      ),
+      this.bus.on('nimbus.completed', ({ result }) =>
+        push(
+          'nimbus.completed',
+          result.deviceId,
+          null,
+          `speed test: ↓${result.downMbps} / ↑${result.upMbps} Mbps, ${result.latencyMs} ms (${result.testMb} MB)`,
+        ),
+      ),
+      // Portkey create/edit + delete are audited; redirect hits are not (a hop
+      // happens constantly and says nothing about a person's action).
+      this.bus.on('portkey.saved', ({ portkey }) =>
+        push('portkey.saved', portkey.authorDeviceId, null, `enchanted /go/${portkey.slug} → ${portkey.url}`),
+      ),
+      this.bus.on('portkey.deleted', (event) =>
+        push('portkey.deleted', null, null, `portkey /go/${event.slug} removed`),
+      ),
     );
   }
 

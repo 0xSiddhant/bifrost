@@ -13,7 +13,8 @@ bifrost/
 ├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
 ├── docker-compose.yml         # run on a Linux host (host networking)
 ├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
-├── observability/             # loki/ alloy/ grafana/ configs + starter dashboard JSON
+├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
+│                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
 │   ├── ARCHITECTURE.md        # pointer → .agent/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
@@ -29,12 +30,17 @@ bifrost/
 │   └── src/
 │       ├── app.ts             # composition root: reads DEPLOY_PROFILE manifest, registers modules
 │       ├── bootstrap.ts       # production entry (always starts; PM2/launchd/Docker/npm start use it)
+│       ├── otel.ts            # OpenTelemetry SDK — loaded via `node --import`, BEFORE the app
+│       │                      #   (ESM hoists, so starting it from app code instruments nothing)
 │       ├── core/              # shared kernel — NEVER imports from modules/
 │       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
+│       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
-│           └── <feature>/     # file-transfer, previews, clipboard, themes, heimdall,
-│               ├── module.ts  #   qr-tool, presence, audit-log, runestone, variant
+│           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
+│               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
+│               │              #   variant, edda, loki, accio, nimbus, portkey,
+│               │              #   screensaver, client-logs, metrics
 │               ├── routes/
 │               ├── usecases/
 │               ├── services/  # concrete repo/service implementations
@@ -44,15 +50,23 @@ bifrost/
 │       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
-│       ├── core/              # api/sse clients, theme engine, device registry, tokens,
+│       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
+│       │                      #   notify/ (global notification stack: store + host +
+│       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
+│       │                      #   theme engine, device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
-│       │                      #   JsonEditor +markdown mode +in-editor search, TreeView +bulk collapse),
+│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode
+│       │                      #   +in-editor search, TreeView +bulk collapse),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
-│       │                      #   textNormalize, runestone + edda clients, relicNames name-bank
+│       │                      #   textNormalize, runestone + edda + accio clients, relicNames name-bank
+│       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
-│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
+│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11;
+│                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
+│                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14;
+│                              #   portkey (LAN go-links — own portkey.css) in PLAN-15
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
 │                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files

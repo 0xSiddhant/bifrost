@@ -17,8 +17,8 @@
     "setup": "tsx scripts/setup.ts",
     "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
-    "start": "node server/dist/bootstrap.js",
-    "logs": "tail -f storage/logs/app.log | pino-pretty",
+    "start": "node --import ./server/dist/otel.js server/dist/bootstrap.js",
+    "logs": "tail -F storage/logs/current.log | pino-pretty --levelKey logLevel",
     "changelog": "changelogen --output CHANGELOG.md",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
@@ -27,6 +27,9 @@
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
     "prepare": "husky"
+  },
+  "overrides": {
+    "brace-expansion": "^5.0.8"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

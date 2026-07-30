@@ -1,4 +1,5 @@
 import { getDeviceId } from './deviceId';
+import { log } from './log';
 
 export type SseStatus = 'connecting' | 'open' | 'closed';
 
@@ -77,8 +78,11 @@ export class BifrostEvents {
       let payload: unknown = null;
       try {
         payload = JSON.parse((message as MessageEvent<string>).data);
-      } catch {
-        // non-JSON payloads delivered as null
+      } catch (error) {
+        // Delivered as null so a listener still fires, but a frame the server
+        // sent and this page couldn't read is a contract mismatch between the
+        // two halves — invisible from either side without a line.
+        log.reportError(`unreadable SSE frame on "${event}"`, error);
       }
       for (const listener of listeners) listener(payload);
     });

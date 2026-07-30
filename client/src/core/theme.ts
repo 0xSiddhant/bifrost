@@ -93,7 +93,10 @@ class ThemeEngine {
       this.themes = listing.themes;
       await this.reconcile(listing.defaultId);
     } catch {
-      // Offline or pre-PLAN-04 server: cached/stylesheet tokens keep working.
+      // Deliberately silent (PLAN-16a audit): the cached tokens and the
+      // stylesheet defaults already render a correct page, so this is a
+      // designed fallback, not a failure. It also fires on every offline load,
+      // which would make it the noisiest line in the archive for no signal.
       this.notify();
     }
   }
@@ -117,6 +120,9 @@ class ThemeEngine {
     try {
       this.apply(await apiGet<ResolvedTheme>(`/api/themes/${id}`), { cache: true });
     } catch {
+      // Deliberately silent, same reason as refresh(): a theme that can't be
+      // fetched leaves the previous one on screen, which is the intended
+      // degradation rather than something to page anyone about.
       this.notify();
     }
   }

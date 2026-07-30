@@ -57,7 +57,7 @@ After changing code: `npm run build && pm2 restart bifrost`.
 ## Logs
 
 - **Structured app logs** (what you actually want): pino JSON at
-  `storage/logs/app.log` — `npm run logs` pretty-prints them, and the optional
+  `storage/logs/current.log` — `npm run logs` pretty-prints them, and the optional
   [observability stack](observability.md) tails them into Grafana.
 - **Process logs** (boot banner, uncaught crashes): `storage/logs/pm2-out.log`
   and `pm2-error.log`, also via `pm2 logs`.

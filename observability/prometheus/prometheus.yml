@@ -1,0 +1,25 @@
+# Prometheus scrapes Bifrost's /metrics endpoint (PLAN-16b Step 3).
+#
+# An ACCELERATOR, not the record. Prometheus pulls, so a gap while this
+# container was down is a gap that can never be backfilled — the durable runtime
+# history is the `module:"metrics"` snapshot line in storage/logs/, which Alloy
+# picks up from the files whenever it next runs. Use this for high-resolution
+# investigation while the stack is up, never as the system of record.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: bifrost
+    metrics_path: /metrics
+    static_configs:
+      # host.docker.internal, NOT localhost: Bifrost runs NATIVE on macOS
+      # (PM2/launchd), so "localhost" inside this container is the container.
+      # On a Linux host, run the stack with --network host and use localhost.
+      - targets: ['host.docker.internal:4646']
+        labels:
+          instance: bifrost
+
+# node_exporter is deliberately absent. In Docker on macOS it would measure the
+# Linux VM rather than the Mac — numbers that look real and mean nothing. Every
+# process metric comes from inside Node instead.

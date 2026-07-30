@@ -329,6 +329,39 @@ a.portal:hover .portal__go {
   color: var(--danger);
 }
 
+/* Floating variant: pinned to the bottom of the viewport so a copy confirmation
+   is seen without scrolling. Above the modal scrim (50) and Loki's sheet (60);
+   `pointer-events: none` keeps it from swallowing clicks on what it covers.
+   --bottomnav-h lifts it clear of the mobile bottom nav (0 on desktop). */
+.toast-host {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--bottomnav-h, 0px) + max(var(--space-4), env(safe-area-inset-bottom)));
+  transform: translateX(-50%);
+  z-index: 70;
+  max-width: min(28rem, calc(100vw - var(--space-8)));
+  pointer-events: none;
+}
+
+.toast-host .toast {
+  background: var(--surface);
+  overflow-wrap: anywhere;
+  animation: toast-rise var(--dur-2) var(--ease);
+}
+
+@keyframes toast-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-3));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-host .toast {
+    animation: none;
+  }
+}
+
 /* ── EmptyState ─────────────────────────────────────────────── */
 .empty {
   display: flex;
@@ -723,4 +756,47 @@ a.portal:hover .portal__go {
 .panel-iconbtn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Crash screen — the ErrorBoundary fallback (PLAN-16a). Deliberately plain:
+   it has to render when the app's own components are the thing that broke, so
+   it uses only base tokens and no shared component. */
+.crash {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+}
+
+.crash__panel {
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-1);
+}
+
+.crash__title {
+  margin: 0;
+}
+
+.crash__body {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.crash__detail {
+  margin: 0;
+  width: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--danger);
+  font-size: var(--text-sm);
+  word-break: break-word;
 }

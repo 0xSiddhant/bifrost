@@ -5,6 +5,13 @@ import { fromRepoRoot } from '../paths.js';
 export const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+/**
+ * Rotated log files kept beside the active one. Exported because the boot path
+ * needs it *before* config validation can succeed — a broken `.env` still has
+ * to be able to write its own fatal line into the archive.
+ */
+export const DEFAULT_LOG_RETENTION_FILES = 30;
+
 export type DeployProfile = 'local' | 'cloud';
 
 const envSchema = z.object({
@@ -24,6 +31,13 @@ const envSchema = z.object({
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
+  // Accio (PLAN-13) — best-effort title enrichment. Both bound an outbound
+  // request to a user-pasted address, so neither may be hardcoded.
+  ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
+  // Nimbus (PLAN-14) — the largest payload one speed test may move in either
+  // direction. Also the upload cap: past it /api/nimbus/up answers 413.
+  NIMBUS_MAX_TEST_MB: z.coerce.number().int().min(1).max(1024).default(100),
   // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
   LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   LOKI_CONSOLE_MAX_ENTRIES: z.coerce.number().int().positive().default(500),
@@ -54,7 +68,44 @@ const envSchema = z.object({
     .string()
     .min(32, 'must be at least 32 characters when set')
     .optional(),
-  LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  // Default `trace`, not `info` (PLAN-16a): with the in-app log viewer gone the
+  // file is a pure archive feeding Loki, so level is a *query-time* decision,
+  // not a write-time one that silently discards data you can never get back.
+  // The knob stays as the escape hatch if a dependency turns out to be noisy.
+  LOG_LEVEL: z.enum(LOG_LEVELS).default('trace'),
+  // Rotated log files kept beside the active one. Trace-level volume makes an
+  // unbounded log folder a real disk-growth path on an unattended appliance;
+  // Loki holds the searchable history, so the local files only need to cover
+  // the window before Alloy catches up.
+  LOG_RETENTION_FILES: z.coerce.number().int().min(1).default(DEFAULT_LOG_RETENTION_FILES),
+  // Floor for browser-side logging (PLAN-16a). Every client line crosses the
+  // network into an unauthenticated endpoint, so the economics invert against
+  // the server's `trace`: warn+ only, lowered temporarily when chasing a bug.
+  // Shipped to the static bundle via GET /api/client-logs/config.
+  CLIENT_LOG_LEVEL: z.enum(LOG_LEVELS).default('warn'),
+  // Bounds on that unauthenticated write path: a misbehaving tab must not be
+  // able to fill storage/logs/. Batches per minute per IP, entries per batch,
+  // and the request body cap (past it the route answers 413).
+  CLIENT_LOG_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
+  CLIENT_LOG_MAX_BATCH: z.coerce.number().int().positive().max(500).default(50),
+  CLIENT_LOG_MAX_BODY_KB: z.coerce.number().int().positive().default(64),
+  // Metrics snapshots (PLAN-16b). The snapshot is the durable record, so
+  // METRICS_ENABLED is the ONLY off-switch — raising LOG_LEVEL must never stop
+  // it (the module logs through a trace-pinned child for exactly that reason).
+  METRICS_ENABLED: z.enum(['true', 'false']).default('true'),
+  METRICS_SNAPSHOT_INTERVAL_SEC: z.coerce.number().int().min(1).default(60),
+  // Deliberately far slower than the snapshot: the disk walk is synchronous and
+  // recursive, so sampling it per snapshot would block the event loop on every
+  // snapshot and the sampler would record the lag spike it just caused.
+  METRICS_DISK_INTERVAL_SEC: z.coerce.number().int().min(1).default(1800),
+  // OpenTelemetry tracing (PLAN-16b). OFF by default: a dead OTLP endpoint
+  // makes the exporter retry and log connection errors into storage/logs/ —
+  // observability tooling degrading the observability record. Flip it on only
+  // when the stack is up.
+  OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4318'),
+  OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
+  OTEL_SERVICE_NAME: z.string().min(1).default('bifrost'),
   BACKUP_DIR: z.string().default(''),
   // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
@@ -90,6 +141,16 @@ export interface AppConfig {
     maxDocKb: number;
     /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
     livePreviewMaxKb: number;
+  };
+  accio: {
+    /** Per-attempt timeout for the post-save `<title>` lookup. */
+    titleTimeoutMs: number;
+    /** Hard cap on how much of a page body the lookup reads. */
+    titleMaxBytes: number;
+  };
+  nimbus: {
+    /** Largest test payload per direction; also the hard upload cap (413 past it). */
+    maxTestMb: number;
   };
   loki: {
     /** Default execution watchdog timeout (Part B); user-adjustable per run. */
@@ -137,6 +198,26 @@ export interface AppConfig {
     sessionSecret: string | null;
   };
   logLevel: LogLevel;
+  /** Rotated log files kept beside the active one (pino-roll's file limit). */
+  logRetentionFiles: number;
+  clientLogs: {
+    /** Floor for browser-side logging: the client filters, the server enforces. */
+    level: LogLevel;
+    /** Batches accepted per minute, per IP. */
+    rateLimitPerMin: number;
+    /** Entries one batch may carry. */
+    maxBatch: number;
+    /** Request body cap; past it the route answers 413 without reading it. */
+    maxBodyBytes: number;
+  };
+  metrics: {
+    /** The one off-switch for the snapshot record; LOG_LEVEL must not affect it. */
+    enabled: boolean;
+    /** Seconds between snapshot lines. */
+    snapshotIntervalSec: number;
+    /** Seconds between the (expensive, synchronous) disk walks. */
+    diskIntervalSec: number;
+  };
   backupDir: string | null;
   /** Rotation: keep only the newest N archives (0 = keep all). */
   backupKeep: number;
@@ -165,6 +246,42 @@ export function resolveStoragePaths(storageRoot: string): StoragePaths {
     data: path.join(root, 'data'),
     logs: path.join(root, 'logs'),
     dbFile: path.join(root, 'data', 'app.db'),
+  };
+}
+
+/**
+ * Where logs go, resolved from the raw environment with nothing else validated.
+ * Exists for exactly one caller: the boot path, which must be able to write a
+ * `fatal` line about an invalid `.env` — the commonest startup failure — into
+ * the archive rather than only to a stderr nobody is watching under PM2.
+ */
+export function logsDirFromEnv(env: Env = process.env): string {
+  return resolveStoragePaths(env.STORAGE_ROOT || './storage').logs;
+}
+
+export interface OtelSettings {
+  enabled: boolean;
+  endpoint: string;
+  timeoutMs: number;
+  serviceName: string;
+}
+
+/**
+ * Tracing settings, read without validating anything else.
+ *
+ * `server/src/otel.ts` is loaded via `node --import` *before* the app, so a
+ * full `loadConfig()` there would fail on unrelated keys (HEIMDALL_PIN) and
+ * take the process down before it ever started — for a feature that is off by
+ * default. Keeping the raw read here means `process.env` still has exactly one
+ * home (coding rule), and the defaults stay beside every other default.
+ */
+export function otelSettingsFromEnv(env: Env = process.env): OtelSettings {
+  const timeout = Number(env.OTEL_EXPORT_TIMEOUT_MS);
+  return {
+    enabled: env.OTEL_ENABLED === 'true',
+    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
+    timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 3000,
+    serviceName: env.OTEL_SERVICE_NAME || 'bifrost',
   };
 }
 
@@ -199,6 +316,13 @@ export function loadConfig(env: Env = process.env): AppConfig {
       maxDocKb: raw.EDDA_MAX_DOC_KB,
       livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
     },
+    accio: {
+      titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,
+      titleMaxBytes: raw.ACCIO_TITLE_MAX_BYTES,
+    },
+    nimbus: {
+      maxTestMb: raw.NIMBUS_MAX_TEST_MB,
+    },
     loki: {
       runTimeoutMs: raw.LOKI_RUN_TIMEOUT_MS,
       consoleMaxEntries: raw.LOKI_CONSOLE_MAX_ENTRIES,
@@ -227,6 +351,18 @@ export function loadConfig(env: Env = process.env): AppConfig {
       sessionSecret: raw.HEIMDALL_SESSION_SECRET ?? null,
     },
     logLevel: raw.LOG_LEVEL,
+    logRetentionFiles: raw.LOG_RETENTION_FILES,
+    clientLogs: {
+      level: raw.CLIENT_LOG_LEVEL,
+      rateLimitPerMin: raw.CLIENT_LOG_RATE_LIMIT_PER_MIN,
+      maxBatch: raw.CLIENT_LOG_MAX_BATCH,
+      maxBodyBytes: raw.CLIENT_LOG_MAX_BODY_KB * 1024,
+    },
+    metrics: {
+      enabled: raw.METRICS_ENABLED === 'true',
+      snapshotIntervalSec: raw.METRICS_SNAPSHOT_INTERVAL_SEC,
+      diskIntervalSec: raw.METRICS_DISK_INTERVAL_SEC,
+    },
     backupDir: raw.BACKUP_DIR || null,
     backupKeep: raw.BACKUP_KEEP,
   };
@@ -254,9 +390,10 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
     const count = Number(value);
     if (Number.isInteger(count) && count >= 3 && count <= 20) config.heimdall.tapCount = count;
   },
-  'log.level': (config, value) => {
-    if ((LOG_LEVELS as readonly string[]).includes(value)) config.logLevel = value as LogLevel;
-  },
+  // NOTE: there is deliberately no 'log.level' overlay. PLAN-16a deleted
+  // Heimdall's runtime level switch, making LOG_LEVEL in .env authoritative;
+  // migration 0009 removes any row a previous version persisted. Re-adding an
+  // overlay here would strand an upgraded install at a level nobody chose.
   'loki.executionEnabled': (config, value) => {
     config.loki.executionEnabled = value === 'true';
   },

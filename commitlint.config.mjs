@@ -22,7 +22,12 @@ export default {
         'variant',
         'edda',
         'loki',
+        'accio',
+        'nimbus',
+        'portkey',
         'screensaver',
+        'client-logs',
+        'metrics',
         // core areas
         'core',
         'client',

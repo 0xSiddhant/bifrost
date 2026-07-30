@@ -8,6 +8,8 @@ import { isDesktopViewport } from '../features/screensaver/isDesktop';
 import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
+import { NotificationHost } from '../core/notify';
+import { usePublishedBanner } from './usePublishedBanner';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
@@ -24,6 +26,11 @@ const DownloadsPage = lazy(() =>
 );
 const PreviewModal = lazy(() =>
   import('../features/previews/PreviewModal').then((m) => ({ default: m.PreviewModal })),
+);
+const UploadPreviewModal = lazy(() =>
+  import('../features/previews/UploadPreviewModal').then((m) => ({
+    default: m.UploadPreviewModal,
+  })),
 );
 const HermesPage = lazy(() =>
   import('../features/hermes/HermesPage').then((m) => ({ default: m.HermesPage })),
@@ -57,6 +64,15 @@ const EddaPreviewPage = lazy(() =>
 );
 const LokiPage = lazy(() =>
   import('../features/loki/LokiPage').then((m) => ({ default: m.LokiPage })),
+);
+const AccioPage = lazy(() =>
+  import('../features/accio/AccioPage').then((m) => ({ default: m.AccioPage })),
+);
+const NimbusPage = lazy(() =>
+  import('../features/nimbus/NimbusPage').then((m) => ({ default: m.NimbusPage })),
+);
+const PortkeyPage = lazy(() =>
+  import('../features/portkey/PortkeyPage').then((m) => ({ default: m.PortkeyPage })),
 );
 // Nótt idle screensaver — desktop-only, so the whole chunk is loaded lazily and
 // only ever imported on a real computer that has actually gone idle.
@@ -95,8 +111,8 @@ const NAV: NavCategory[] = [
     to: '/diagon-alley',
     label: 'Diagon Alley',
     icon: <SparklesIcon size={18} />,
-    match: ['/sigil'],
-    modules: ['qr-tool'],
+    match: ['/sigil', '/nimbus', '/portkey'],
+    modules: ['qr-tool', 'nimbus', 'portkey'],
   },
 ];
 
@@ -104,6 +120,7 @@ export function App() {
   const { capabilities } = useCapabilities();
   const [heimdallOpen, setHeimdallOpen] = useState(false);
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
+  usePublishedBanner();
   const [sseStatus, setSseStatus] = useState<SseStatus>('connecting');
   const { pathname } = useLocation();
 
@@ -214,12 +231,16 @@ export function App() {
             {/* Category hubs — the tools they list keep their own routes below. */}
             <Route path="/ollivanders" element={<OllivandersPage />} />
             <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
-            <Route path="/upload" element={<UploadPage />} />
+            <Route path="/upload" element={<UploadPage />}>
+              {/* Preview a staged file before publishing it; back closes it. */}
+              <Route path=":name/preview" element={<UploadPreviewModal />} />
+            </Route>
             <Route path="/downloads" element={<DownloadsPage />}>
               {/* Modal route: deep-linkable, back button closes the preview. */}
               <Route path=":id/preview" element={<PreviewModal />} />
             </Route>
             <Route path="/hermes" element={<HermesPage />} />
+            <Route path="/accio" element={<AccioPage />} />
             {/* pre-rename URL (shipped as "muninn") */}
             <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
             <Route path="/runestone" element={<RunestonePage />} />
@@ -240,10 +261,16 @@ export function App() {
             <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             <Route path="/sigil" element={<SigilPage />} />
+            <Route path="/nimbus" element={<NimbusPage />} />
+            <Route path="/portkey" element={<PortkeyPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </main>
+
+      {/* Outside <Routes> on purpose: a notification raised on one page must
+          survive navigating to another, so it cannot live inside the router. */}
+      <NotificationHost />
 
       {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
           Opened by the gesture/shortcut only (≥768px). */}

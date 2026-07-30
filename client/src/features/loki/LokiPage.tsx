@@ -465,6 +465,27 @@ export function LokiPage() {
                 <div className="loki-rail__group">
                   <span className="caption loki-rail__grouplabel">Buffer</span>
                   <div className="loki-rail__actions">
+                    {/* Bulk companions to the per-block gutter arrows, matching
+                        Runestone's toolbar. The gutter is the primary control
+                        and is the only one mobile gets — the rail is ≥768px. */}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={empty}
+                      title="Collapse every function, object, array and block"
+                      onClick={() => editorRef.current?.foldAll()}
+                    >
+                      Fold all
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={empty}
+                      title="Expand everything"
+                      onClick={() => editorRef.current?.unfoldAll()}
+                    >
+                      Unfold
+                    </Button>
                     <Button size="sm" variant="ghost" disabled={empty} onClick={clearAll}>
                       Clear
                     </Button>
@@ -664,7 +685,11 @@ export function LokiPage() {
           </Card>
         )}
 
-        {notice && <Toast kind={notice.kind}>{notice.message}</Toast>}
+        {notice && (
+          <Toast kind={notice.kind} floating>
+            {notice.message}
+          </Toast>
+        )}
 
         {capabilities?.profile === 'local' && lokiConfig && !lokiConfig.executionEnabled && (
           <p className="loki-soon caption">

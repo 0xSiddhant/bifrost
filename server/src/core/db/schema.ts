@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
  * Runtime-mutable settings overlaid onto the .env config at boot
@@ -12,19 +12,16 @@ export const settings = sqliteTable('settings', {
     .$defaultFn(() => new Date().toISOString()),
 });
 
-/**
- * Minimal upload audit trail: Heimdall's metadata view (PLAN-05) reads this.
- * A recorder persists `file.uploaded` events; boot reconciliation seeds rows
- * for files already on disk. Metadata only — never the content. Keyed by the
- * unique stored name so reconciliation is idempotent. Full audit UI is PLAN-06.
+/*
+ * `upload_audit` was dropped in PLAN-17b (migration 0010). It duplicated
+ * `audit_events` — which already records every `file.uploaded` with its time,
+ * uploader hint, name and size — for the sake of one extra column,
+ * `stored_name`, which stopped being interesting the moment this plan removed
+ * the timestamp prefix and made the stored name the original name. Worse, it
+ * drifted: rows survived files deleted outside the app, so Heimdall's "Uploads"
+ * listed files that were not there. That listing now reads the directory (it
+ * cannot drift), and the dashboard's upload counts come from `audit_events`.
  */
-export const uploadAudit = sqliteTable('upload_audit', {
-  storedName: text('stored_name').primaryKey(),
-  originalName: text('original_name').notNull(),
-  size: integer('size').notNull(),
-  uploadedAt: integer('uploaded_at').notNull(),
-  uploaderHint: text('uploader_hint'),
-});
 
 /**
  * Shared LAN clipboard (PLAN-06). One board of text entries; `kind` = 'text' |
@@ -93,6 +90,65 @@ export const eddas = sqliteTable('eddas', {
   sizeBytes: integer('size_bytes').notNull(),
   createdAt: integer('created_at').notNull(),
   modifiedAt: integer('modified_at').notNull(),
+});
+
+/**
+ * Read-later shelf ("accio links", PLAN-13). Owned by the `accio` module.
+ * `id` is a short random handle (no slug — links are never shared by URL, the
+ * shelf is the surface). `url` is the normalized absolute URL; `title` is
+ * best-effort and starts null when the client supplied none — the enrichment
+ * service patches it in after the row already exists. `tags` is a JSON array of
+ * strings (flat, no folders — see the plan). `author_device_id` is the PLAN-06
+ * device id; display names resolve client-side.
+ */
+export const accioLinks = sqliteTable('accio_links', {
+  id: text('id').primaryKey(),
+  url: text('url').notNull(),
+  title: text('title'),
+  /** JSON-encoded `string[]`; SQLite has no array type and we never query into it. */
+  tags: text('tags').notNull().default('[]'),
+  authorDeviceId: text('author_device_id'),
+  createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * LAN speed-test history ("nimbus results", PLAN-14). Owned by the `nimbus`
+ * module. One row per completed test — direction-agnostic, because a test always
+ * measures all three figures in one pass, and a partial (cancelled) test is
+ * never saved. `device_id` is the PLAN-06 device id (names resolve client-side),
+ * so history groups per device without nimbus reading presence's table. Pruned
+ * by the audit retention policy.
+ */
+export const nimbusResults = sqliteTable('nimbus_results', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  deviceId: text('device_id'),
+  /** Megabits per second, as measured by the client's own chunk timings. */
+  downMbps: real('down_mbps').notNull(),
+  upMbps: real('up_mbps').notNull(),
+  /** Median of the ping round trips, milliseconds. */
+  latencyMs: real('latency_ms').notNull(),
+  /** Payload size the run used, so a 10 MB result is never compared to a 100 MB one blindly. */
+  testMb: integer('test_mb').notNull(),
+  createdAt: integer('created_at').notNull(),
+});
+
+/**
+ * LAN go-links ("portkeys", PLAN-15). Owned by the `portkey` module. The `slug`
+ * IS the primary key — it's a user-chosen memorable word (`router`, `nas`) and
+ * the identity of the link, so it's immutable (rename = delete + recreate). `url`
+ * is the normalized absolute http(s) target (any host). `hits` counts redirects,
+ * bumped async after the hop so a slow write never delays it; `last_used_at` is
+ * the epoch-ms of the most recent hit (null until first used). `author_device_id`
+ * is the PLAN-06 device id; display names resolve client-side.
+ */
+export const portkeys = sqliteTable('portkeys', {
+  slug: text('slug').primaryKey(),
+  url: text('url').notNull(),
+  note: text('note'),
+  hits: integer('hits').notNull().default(0),
+  authorDeviceId: text('author_device_id'),
+  createdAt: integer('created_at').notNull(),
+  lastUsedAt: integer('last_used_at'),
 });
 
 /**

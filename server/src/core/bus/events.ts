@@ -20,7 +20,11 @@ export interface DownloadEntry {
 export interface FileUploadedEvent {
   /** Name as supplied by the client, pre-sanitization. */
   originalName: string;
-  /** Final `<timestamp>-<sanitized>` name inside uploads/. */
+  /**
+   * Final name inside uploads/. Since PLAN-17b this is the sanitized name
+   * itself — no timestamp prefix — with `-1`, `-2`, … added only when that
+   * name was already taken.
+   */
   storedName: string;
   /** Bytes. */
   size: number;
@@ -28,6 +32,27 @@ export interface FileUploadedEvent {
   uploadedAt: number;
   /** Best-effort uploader identity (request IP) for the Heimdall metadata view; absent when unknown. */
   uploaderHint?: string;
+}
+
+/**
+ * A staged upload was moved into downloads/ and is now on offer to the whole
+ * LAN (PLAN-17b). It exists for the **banner only** — the Downloads listing
+ * still comes from the watcher's `download.added`, which arrives later (after
+ * chokidar's awaitWriteFinish debounce). Anything that banners on both events
+ * announces every published file twice.
+ */
+export interface FilePublishedEvent {
+  /** Final name in downloads/, suffixed if that name was already taken. */
+  name: string;
+  size: number;
+  /** Epoch milliseconds. */
+  publishedAt: number;
+  /**
+   * Device that pressed Move, so its own browser can stay quiet. Null when the
+   * caller sent no device header — and a null origin must be shown to
+   * *everyone*, never suppressed for everyone (see `shouldShowForOrigin`).
+   */
+  originDeviceId: string | null;
 }
 
 /**
@@ -125,8 +150,75 @@ export interface EddaSummary {
   modifiedAt: number;
 }
 
+/** A saved link as the Accio shelf lists it (PLAN-13). */
+export interface AccioLink {
+  id: string;
+  /** Normalized absolute http(s) URL. */
+  url: string;
+  /**
+   * Best-effort page title. Null when the client supplied none and enrichment
+   * has not (or will never) find one — the shelf then shows the bare URL.
+   */
+  title: string | null;
+  /** Flat, lowercased, deduped labels — no folders (see the plan). */
+  tags: string[];
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  createdAt: number;
+}
+
+/** One completed LAN speed test as the history lists it (PLAN-14). */
+export interface NimbusResult {
+  id: number;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  deviceId: string | null;
+  downMbps: number;
+  upMbps: number;
+  /** Median of the ping round trips, milliseconds. */
+  latencyMs: number;
+  testMb: number;
+  createdAt: number;
+}
+
+/** One go-link as the Portkey management list shows it (PLAN-15). */
+export interface Portkey {
+  /** User-chosen memorable word; the immutable identity of the link. */
+  slug: string;
+  /** Normalized absolute http(s) target — any host. */
+  url: string;
+  note: string | null;
+  /** Redirect count, incremented async after each hop. */
+  hits: number;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  createdAt: number;
+  /** Epoch ms of the most recent redirect, or null if never used. */
+  lastUsedAt: number | null;
+}
+
+/** One finished HTTP request, as the core HTTP layer saw it (PLAN-16b). */
+export interface RequestCompletedEvent {
+  /** The Fastify route TEMPLATE (`/api/downloads/:id/content`), or 'unmatched'. */
+  route: string;
+  method: string;
+  statusCode: number;
+  durationMs: number;
+}
+
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
+  /** A staged upload was published to downloads/ — the banner, and only the banner. */
+  'file.published': FilePublishedEvent;
+  /**
+   * Emitted by core/http for every finished request. It exists because the
+   * latency histogram has to see EVERY route, and a Fastify hook added inside a
+   * module's own plugin scope only ever sees that module's routes — the
+   * composition root wraps each module in its own encapsulation context, so
+   * even fastify-plugin would only lift a hook one level, to the wrapper. The
+   * bus is the architecture's own answer to "one module needs to know what the
+   * whole app is doing", and it keeps prom-client out of core.
+   */
+  'http.requestCompleted': RequestCompletedEvent;
   'download.added': DownloadEntry;
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;
@@ -142,6 +234,25 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  /** A link was added to the read-later shelf — open shelves add the row live. */
+  'accio.saved': { link: AccioLink };
+  /**
+   * An existing link changed: a user edit, or the async title enrichment
+   * landing after the row was already broadcast. Same payload either way.
+   */
+  'accio.updated': { link: AccioLink };
+  'accio.deleted': { id: string; url: string; title: string | null };
+  /** A speed test finished and was saved — other open Nimbus pages add the row live. */
+  'nimbus.completed': { result: NimbusResult };
+  /** A go-link was created or edited — open management lists live-refresh. */
+  'portkey.saved': { portkey: Portkey };
+  'portkey.deleted': { slug: string; url: string };
+  /**
+   * A redirect happened: the hit count + last-used were bumped. Broadcast so
+   * open management pages update within a heartbeat — deliberately NOT audited
+   * (a hop happens constantly and says nothing about a person's action).
+   */
+  'portkey.hit': { portkey: Portkey };
   /** Loki execution/runner settings changed in Heimdall — open pages rebind. */
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */

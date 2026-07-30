@@ -1,0 +1,103 @@
+# Alert rules (PLAN-16b wrap-up).
+#
+# Both query **Loki**, not Prometheus, on purpose: the log archive is the system
+# of record and backfills after downtime, so these keep meaning something even
+# though the stack that evaluates them is off most of the time. A rule against a
+# scraped series would silently evaluate over holes.
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: bifrost
+    # NOT "Bifrost": Grafana refuses to create a folder whose name matches one
+    # of its dashboards, and the dashboard is called Bifrost — provisioning
+    # fails hard and the container crash-loops on boot. Found by running it.
+    folder: Bifrost alerts
+    interval: 1m
+    rules:
+      - uid: bifrost-error-rate
+        title: Bifrost error rate
+        condition: THRESHOLD
+        # 5 minutes of errors, not an instant reading: one failed request at an
+        # awkward moment is not an incident, and a page that fires on it gets
+        # muted, which is worse than no alert at all.
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: >-
+            More than 5 error/fatal lines in 5 minutes. Open the log explorer and
+            filter Level to error+fatal; the Source variable splits server from
+            browser.
+        labels:
+          severity: warning
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: bifrost-loki
+            model:
+              refId: QUERY
+              expr: sum(count_over_time({job="bifrost", logLevel=~"error|fatal"} [5m]))
+              queryType: range
+          - refId: REDUCE
+            datasourceUid: __expr__
+            model:
+              refId: REDUCE
+              type: reduce
+              reducer: last
+              expression: QUERY
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: REDUCE
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5]
+
+      - uid: bifrost-loop-lag
+        title: Bifrost event-loop lag
+        condition: THRESHOLD
+        # In Node a "hang" is almost always a synchronous block, and this is the
+        # only signal that catches all of it. 100ms p99 is where a LAN app stops
+        # feeling instant.
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: >-
+            Event-loop p99 above 100ms. Something is blocking the loop — check
+            the Runtime row for a matching CPU or disk-walk spike.
+        labels:
+          severity: warning
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: bifrost-loki
+            model:
+              refId: QUERY
+              expr: max_over_time({job="bifrost", module="metrics"} | json | unwrap loopLagP99Ms [5m])
+              queryType: range
+          - refId: REDUCE
+            datasourceUid: __expr__
+            model:
+              refId: REDUCE
+              type: reduce
+              reducer: max
+              expression: QUERY
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: REDUCE
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [100]

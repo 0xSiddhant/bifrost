@@ -33,6 +33,43 @@ services:
       - loki
     restart: unless-stopped
 
+  # Accelerator, never the record: Prometheus SCRAPES, so anything it missed
+  # while this stack was down never existed as far as it is concerned. The
+  # durable runtime history is the metrics snapshot in storage/logs/, which
+  # Alloy backfills from the files (PLAN-16b).
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '9090:9090'
+    # Bifrost runs native on macOS, so the scrape target is the host, not a
+    # sibling container. Docker Desktop resolves host.docker.internal already;
+    # this keeps the same config working on Linux, where it does not.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
+  # Traces. Pushed to, so the least durable of the three signals — see
+  # observability/tempo/tempo.yml. OTEL_ENABLED must be true in .env for the app
+  # to send anything, and it defaults to false so a dead endpoint never degrades
+  # the log archive with retry noise (PLAN-16b).
+  tempo:
+    image: grafana/tempo:2.6.0
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ./observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      # OTLP/HTTP in, and the query API Grafana uses.
+      - '4318:4318'
+      - '3200:3200'
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:11.2.0
     environment:
@@ -47,9 +84,13 @@ services:
       - '3000:3000'
     depends_on:
       - loki
+      - prometheus
+      - tempo
     restart: unless-stopped
 
 volumes:
   loki-data:
   alloy-data:
   grafana-data:
+  prometheus-data:
+  tempo-data:

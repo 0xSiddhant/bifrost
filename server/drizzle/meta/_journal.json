@@ -43,6 +43,41 @@
       "when": 1784747290009,
       "tag": "0005_edda_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784968209803,
+      "tag": "0006_accio_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784989552728,
+      "tag": "0007_nimbus_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1785078290368,
+      "tag": "0008_portkeys",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1785322598669,
+      "tag": "0009_drop_log_level_setting",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1785429698506,
+      "tag": "0010_drop_upload_audit",
+      "breakpoints": true
     }
   ]
 }

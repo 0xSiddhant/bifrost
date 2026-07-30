@@ -34,19 +34,25 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 
 **Features**
 
-- 📤 Multi-file upload (streamed, 2 GB configurable limit) into a write-only folder
+- 📤 Multi-file upload (streamed, 2 GB configurable limit) into a staging area — preview, rename or delete what you sent, then move it to Downloads and every device gets a banner
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Hermes — clipboard/text sync across devices
 - 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus built in), addable via JSON
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin built in), addable via JSON
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
+- 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
+- 🃏 Loki — JavaScript workbench: transforms, regex tester, and a sandboxed Web-Worker runner
+- 🔖 Accio — read-later shelf with tags and best-effort page-title lookup
+- 🚪 Portkey — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
+- 🧹 Nimbus — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
+- 🌌 Nótt — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
-**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda soon), and **Diagon Alley** (Sigil + a coming-soon utility toolbox). Each tool keeps its own URL.
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 
@@ -117,7 +123,7 @@ Architecture, rules, plans and progress live in [`.agent/`](.agent/). Start with
 Operating & deploying:
 
 - [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
-- [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy stack
+- [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy + Prometheus + Tempo stack
 - [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment

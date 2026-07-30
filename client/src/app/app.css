@@ -106,6 +106,17 @@
 }
 
 /* ── header ─────────────────────────────────────────────────── */
+/* Measured height of the sticky header (62px at every width — its content is
+   fixed). Anything else that sticks parks below it via this var rather than
+   guessing an offset. */
+/* Companion for the bottom nav, which only exists ≤640px (see .nav--bottom):
+   0 on desktop, its measured height below the breakpoint. Anything floating at
+   the bottom of the viewport clears it via this var. */
+:root {
+  --header-h: 3.875rem;
+  --bottomnav-h: 0px;
+}
+
 .shell-header {
   display: flex;
   align-items: center;
@@ -806,78 +817,6 @@
   -webkit-user-select: none;
 }
 
-/* Heimdall — Logs section */
-.log-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3);
-}
-
-.log-controls .field {
-  min-width: 8rem;
-}
-
-.log-view {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 26rem;
-  overflow-y: auto;
-  font-size: var(--text-sm);
-}
-
-.log-row {
-  display: grid;
-  grid-template-columns: auto auto auto 1fr;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-}
-
-.log-row--warn {
-  background: color-mix(in srgb, var(--warn) 8%, transparent);
-}
-
-.log-row--error {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-
-.log-row__time {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-}
-
-.log-row__module {
-  color: var(--accent-2);
-  font-size: var(--text-xs);
-}
-
-.log-row__msg {
-  min-width: 0;
-  word-break: break-word;
-}
-
-.log-row__level {
-  min-width: 3.25rem;
-}
-
-.log-lvl--warn {
-  color: var(--warn);
-}
-
-.log-lvl--error,
-.log-lvl--fatal {
-  color: var(--danger);
-}
-
-.log-lvl--debug,
-.log-lvl--trace {
-  color: var(--text-muted);
-}
-
 /* Heimdall — About section */
 .about-grid {
   display: grid;
@@ -1290,6 +1229,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   overflow: hidden;
+  /* CodeMirror's base theme stacks its own chrome high — .cm-gutters at 200 and
+     .cm-panels (the find/replace bar) at 300 — which it needs internally, since
+     both are sticky and content scrolls under them. Those values leak into the
+     page's stacking context, where they beat the sticky app header (z-index 10)
+     and every popover anchored inside it, so an open find panel painted over
+     the theme menu. `isolation: isolate` traps CM's ordering inside the editor
+     box: the panel still sits above the gutters and the content, but the editor
+     as a whole now stacks as one ordinary element beneath the app chrome. */
+  isolation: isolate;
 }
 
 /* ≥16px on touch screens or iOS zooms the page on focus */
@@ -1472,6 +1420,18 @@
 .rune-tree__value {
   overflow-wrap: anywhere;
   min-width: 0;
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rune-tree__value:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .rune-tree__value--string {
@@ -1626,6 +1586,12 @@
 }
 
 @media (max-width: 640px) {
+  /* Measured height of .nav--bottom (61px — icon + label + its own padding and
+     border). Kept in sync by hand, like --header-h. */
+  :root {
+    --bottomnav-h: 3.8125rem;
+  }
+
   .nav--top {
     display: none;
   }
@@ -3201,4 +3167,402 @@
 .loki-sheet__action:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+/* ── Accio · read-later shelf (PLAN-13) ───────────────────────────────────── */
+
+/* Full-width breakout at ≥1024px (Variant/Runestone/Edda precedent). A shelf
+   is a browsing surface: the 62rem column wasted most of a desktop screen and
+   forced a long scroll through a one-per-row list. */
+@media (min-width: 1024px) {
+  .accio-head,
+  .accio-wrap {
+    --accio-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--accio-w);
+    margin-inline: calc((100% - var(--accio-w)) / 2);
+  }
+}
+
+/* Paste-and-go bar: URL takes the room, tags ride along, button sits on the
+   baseline of both. Stacks on phones so the URL field is never cramped. */
+.shelf-add {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+@media (min-width: 768px) {
+  .shelf-add {
+    grid-template-columns: 2fr 1fr auto;
+  }
+}
+
+.shelf-add__hint {
+  margin-top: var(--space-2);
+}
+
+/* A slim frosted panel, not an opaque slab: the page background is a gradient
+   sky, so filling with --bg painted a black rectangle over it. Same veil +
+   blur the shell header uses, so the two sticky surfaces match. */
+.shelf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--header-veil);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* Sticky only where it is cheap. On a phone the bar wraps to three rows and
+   pinning it would eat a third of the viewport, so it scrolls away there.
+   It parks *below* the shell header, which is itself sticky at top: 0. */
+@media (min-width: 768px) {
+  .shelf-filters {
+    position: sticky;
+    top: var(--header-h);
+    z-index: 6;
+  }
+}
+
+.shelf-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 14rem;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.shelf-search .field__input {
+  flex: 1;
+  min-width: 0;
+}
+
+.shelf-sort,
+.shelf-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.shelf-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Filter/sort/tag pills. `--on` is the selected state; `--tag` is the
+   read-only tag shown on a card (tapping it filters by that tag). */
+.chip {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 2px var(--space-3);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--text);
+}
+
+.chip--on {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.chip--tag {
+  font-family: var(--font-mono);
+}
+
+/* The shelf itself. auto-fill + minmax means the column count follows the
+   viewport with no breakpoints: ~2 on a phone-landscape, 6 on a wide desktop. */
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+
+.shelf-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition: border-color 0.15s ease;
+}
+
+.shelf-card:hover,
+.shelf-card:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+}
+
+.shelf-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.shelf-card__tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ct);
+  background: color-mix(in srgb, var(--ct) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ct) 30%, transparent);
+}
+
+/* Stretched link: the whole card is the click target. Actions and tag chips
+   opt back out via .shelf-card__actions / .chip--tag z-index below. */
+.shelf-card__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  /* Only the first line clears the corner controls; the clamp's second line
+     runs full width. Keeps short titles from wrapping for no reason. */
+  padding-right: 3.5rem;
+}
+
+.shelf-card__title::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* While editing or confirming, the card is a form — not one big link. */
+.shelf-card--busy .shelf-card__title::after {
+  display: none;
+}
+
+.shelf-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  min-width: 0;
+}
+
+.shelf-card__host {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-card__who::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.shelf-card__tags {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Corner controls: out of the way until the card is hovered or tabbed into.
+   Kept in the DOM (not display:none) so they stay focusable. */
+.shelf-card__actions {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.shelf-card__actions .btn {
+  padding: 5px;
+}
+
+.shelf-card:hover .shelf-card__actions,
+.shelf-card:focus-within .shelf-card__actions,
+.shelf-card--busy .shelf-card__actions {
+  opacity: 1;
+}
+
+/* No hover on touch — the controls are always visible there. */
+@media (hover: none) {
+  .shelf-card__actions {
+    opacity: 1;
+  }
+}
+
+.shelf-edit {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.shelf-confirm {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+/* Tag field with suggestions drawn from the tags already on the shelf. The
+   field is the positioning context for the floating list. */
+.tag-field {
+  position: relative;
+}
+
+.tag-suggest {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 12rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+}
+
+.tag-suggest__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.tag-suggest__item:hover,
+.tag-suggest__item.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+/* ── Send: staged file cards (PLAN-17b) ─────────────────────── */
+.staged__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Four controls plus a filename do not fit a phone's width: found in live
+   verification at 390px, where the row squeezed the name to nothing and the
+   Move button sat on top of the file size. The actions take their own line
+   under the name instead of competing with it for the same one. */
+@media (max-width: 640px) {
+  .staged .file-row {
+    flex-wrap: wrap;
+  }
+
+  .staged .file-row__body {
+    /* Full width minus the kind icon and its gap, so the name keeps a line. */
+    flex-basis: calc(100% - 36px - var(--space-3));
+  }
+
+  .staged .file-row__aside {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+  }
+}
+
+.staged__confirm {
+  margin-top: var(--space-2);
+  color: var(--danger);
+}
+
+/* The exit is ONE animation: hold the confirmation long enough to read, then
+   swipe out. The card is removed on its animationend, so nothing can remove it
+   while it is still on screen — or leave it behind after it has gone. */
+.staged--leaving {
+  animation: staged-leave 2.4s var(--ease) forwards;
+}
+
+@keyframes staged-leave {
+  0%,
+  62% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+
+/* Reduced motion still needs *an* animation, and one that still takes time:
+   `animationend` is what removes the card, and the confirmation has to be
+   readable before it goes. This one travels nowhere — it holds, then vanishes
+   — so it is motion-free by construction, which is why it deliberately opts
+   out of the global `animation-duration: 0.01ms !important` reset in base.css.
+   That reset exists to stop movement, and there is none here to stop; obeying
+   it would make the card blink out the instant the move landed. */
+@media (prefers-reduced-motion: reduce) {
+  .staged--leaving {
+    animation: staged-leave-still 2.4s steps(1, end) forwards !important;
+  }
+
+  @keyframes staged-leave-still {
+    0%,
+    99% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
 }

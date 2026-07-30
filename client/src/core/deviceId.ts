@@ -27,7 +27,9 @@ export function getDeviceId(): string {
       localStorage.setItem(KEY, id);
     }
   } catch {
-    // localStorage unavailable (private mode) — fall back to an in-memory id.
+    // Deliberately silent (PLAN-16a audit): localStorage is blocked in private
+    // mode by design, and the in-memory id keeps every caller working. Logging
+    // it would also be circular — the reporter stamps its lines with this id.
     id = id ?? generate();
   }
   cached = id;

@@ -19,11 +19,13 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 ## Client (`client/src/features/<name>/`)
 
 7. Feature slice with route-level code splitting; nav renders from `/api/capabilities`, never hardcoded. The client folder name may be a page codename that differs from the server module name (existing mappings: `clipboard`→`hermes`, `qr-tool`→`sigil`, `presence`→`wardens`) — record the mapping in architecture.md's module registry.
+   - **New top-level route root?** Add its first segment to `RESERVED_ROOTS` in `server/src/core/reserved-roots.ts` (and the assertion list in `reserved-roots.test.ts`) in the same change — otherwise a Portkey go-link slug could shadow the new page (`rules/coding.md` → Routing). Applies to any new server route outside `/api/` too. Nested/param routes under an existing root need no entry.
 8. Styling via tokens only — zero hardcoded colors/sizes (grep for hex before finishing).
 9. Shared logic goes in `client/src/core/`, never imported across feature folders.
 
 ## Finish
 
-10. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
-11. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
-12. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
+10. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
+11. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
+12. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
+13. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.

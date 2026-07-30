@@ -1,4 +1,5 @@
 import { apiGet } from './api';
+import { log } from './log';
 import { bifrostEvents } from './sse';
 
 /**
@@ -38,7 +39,11 @@ export function startDeviceRegistry(): void {
   started = true;
   apiGet<{ devices: PresenceDevice[] }>('/api/presence')
     .then((res) => apply(res.devices))
-    .catch(() => {});
+    // Not fatal — names fall back to raw ids — but every device label in the
+    // app is wrong for the rest of the session, and nothing on screen says why.
+    .catch((error: unknown) =>
+      log.reportError('device registry failed to load', error, { module: 'presence' }),
+    );
   bifrostEvents.on('presence.changed', (payload) => {
     if (payload && typeof payload === 'object' && 'devices' in payload) {
       apply((payload as { devices: PresenceDevice[] }).devices);

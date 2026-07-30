@@ -49,7 +49,12 @@ describe('boot → health → capabilities', () => {
         'variant',
         'edda',
         'loki',
+        'accio',
+        'nimbus',
+        'portkey',
         'screensaver',
+        'client-logs',
+        'metrics',
       ],
     });
   });

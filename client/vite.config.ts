@@ -10,6 +10,15 @@ const mdnsHost = `${process.env.MDNS_NAME || 'bifrost'}.local`;
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // Without maps every stack reported to /api/client-logs reads
+    // `AccioPage-B1aK7NYQ.js:1:48122` — enough to know something broke, useless
+    // for knowing where, which is most of the value. On a LAN-only app there is
+    // no reason to withhold source from your own network, and browsers fetch
+    // maps only when devtools is open. ('hidden' would keep them off the wire
+    // but means resolving every trace by hand — the wrong trade here.)
+    sourcemap: true,
+  },
   server: {
     // Explicit IPv4 wildcard: `host: true` binds an IPv6 socket whose
     // v4-mapped dual-stack accept does not work reliably on macOS, leaving
@@ -22,6 +31,8 @@ export default defineConfig({
       '/runestone/api': { target: `http://localhost:${serverPort}` },
       // public edda raw-markdown endpoint lives outside /api (PLAN-11)
       '/edda/api': { target: `http://localhost:${serverPort}` },
+      // portkey go-link redirects live outside /api (PLAN-15)
+      '/go': { target: `http://localhost:${serverPort}` },
     },
   },
 });
