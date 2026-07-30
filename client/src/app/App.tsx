@@ -8,6 +8,7 @@ import { isDesktopViewport } from '../features/screensaver/isDesktop';
 import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { SkyRelics } from '../core/ui/SkyRelics';
+import { NotificationHost } from '../core/notify';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
@@ -256,6 +257,10 @@ export function App() {
           </Routes>
         </Suspense>
       </main>
+
+      {/* Outside <Routes> on purpose: a notification raised on one page must
+          survive navigating to another, so it cannot live inside the router. */}
+      <NotificationHost />
 
       {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
           Opened by the gesture/shortcut only (≥768px). */}
