@@ -1,6 +1,79 @@
 # Changelog
 
 
+## v1.3.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.2.0...v1.3.0)
+
+### 🚀 Enhancements
+
+- **plan-13:** Accio — read-later / bookmark shelf ([#35](https://github.com/0xSiddhant/bifrost/pull/35))
+- **core:** Add the nimbus_results table ([df70146](https://github.com/0xSiddhant/bifrost/commit/df70146))
+- **core:** Declare nimbus.completed and the test-size cap ([c9039bb](https://github.com/0xSiddhant/bifrost/commit/c9039bb))
+- **nimbus:** Stream, sink and guard the lan speed test ([a3c4bf1](https://github.com/0xSiddhant/bifrost/commit/a3c4bf1))
+- **nimbus:** Register the module and audit completed tests ([e7ee673](https://github.com/0xSiddhant/bifrost/commit/e7ee673))
+- **nimbus:** Run the test from the browser and show it ([358f0ba](https://github.com/0xSiddhant/bifrost/commit/358f0ba))
+- **nimbus:** Open the stall on diagon alley ([9a640e7](https://github.com/0xSiddhant/bifrost/commit/9a640e7))
+- **portkey:** Lan go-links with /go redirect and management ui ([48cd6be](https://github.com/0xSiddhant/bifrost/commit/48cd6be))
+- **loki:** Code folding in the JS editor + editor stacking fix ([#40](https://github.com/0xSiddhant/bifrost/pull/40))
+- **portkey:** Suggest a free slug variant on a duplicate ([2a1775c](https://github.com/0xSiddhant/bifrost/commit/2a1775c))
+- **client:** Copy a tree value by clicking it ([#41](https://github.com/0xSiddhant/bifrost/pull/41))
+- **core:** Make the log file the archive, and log the failures ([5462159](https://github.com/0xSiddhant/bifrost/commit/5462159))
+- **core:** Warn where a swallowed error hid a real failure ([a40ac2a](https://github.com/0xSiddhant/bifrost/commit/a40ac2a))
+- **client-logs:** Relay browser errors into the log archive ([0583210](https://github.com/0xSiddhant/bifrost/commit/0583210))
+- **client:** Report browser errors instead of losing them ([838d552](https://github.com/0xSiddhant/bifrost/commit/838d552))
+- **ops:** Label logs by source and make grafana the log ui ([4001a08](https://github.com/0xSiddhant/bifrost/commit/4001a08))
+- **metrics:** Snapshot the runtime into the log stream, and expose it ([a8fdd6b](https://github.com/0xSiddhant/bifrost/commit/a8fdd6b))
+- **ops:** Trace with opentelemetry, off by default ([2c790e5](https://github.com/0xSiddhant/bifrost/commit/2c790e5))
+- **ops:** Add prometheus and tempo, and alert on the archive ([20d6469](https://github.com/0xSiddhant/bifrost/commit/20d6469))
+- **client:** Add a global notification system ([1c816c0](https://github.com/0xSiddhant/bifrost/commit/1c816c0))
+- **file-transfer:** Surface transfer failures as notifications ([179d04d](https://github.com/0xSiddhant/bifrost/commit/179d04d))
+- **file-transfer:** Keep the name the sender chose ([f73564c](https://github.com/0xSiddhant/bifrost/commit/f73564c))
+- **file-transfer:** Let a sender act on what they just sent ([0b83f72](https://github.com/0xSiddhant/bifrost/commit/0b83f72))
+- **previews:** Inspect staged uploads, not just downloads ([5f5838a](https://github.com/0xSiddhant/bifrost/commit/5f5838a))
+- **client:** Card actions and the published banner on send ([c9ee6b2](https://github.com/0xSiddhant/bifrost/commit/c9ee6b2))
+
+### 🩹 Fixes
+
+- **core:** Patch the fixable npm audit advisories (17 → 6) ([#37](https://github.com/0xSiddhant/bifrost/pull/37))
+- **ops:** Point npm run logs at the current.log symlink ([#39](https://github.com/0xSiddhant/bifrost/pull/39))
+- **core:** Stop serving svg inline, and skip dot-files everywhere ([1110580](https://github.com/0xSiddhant/bifrost/commit/1110580))
+
+### 💅 Refactors
+
+- **heimdall:** Delete the in-app log viewer and level switch ([3e75f52](https://github.com/0xSiddhant/bifrost/commit/3e75f52))
+- **core:** Lift the storage disk walk into core ([08a2778](https://github.com/0xSiddhant/bifrost/commit/08a2778))
+- **heimdall:** Read uploads from disk, count them from audit_events ([b7b5381](https://github.com/0xSiddhant/bifrost/commit/b7b5381))
+- **client:** Give the preview viewers a url instead of an id ([236a78e](https://github.com/0xSiddhant/bifrost/commit/236a78e))
+- **heimdall:** Show staged files, not upload history ([fca9353](https://github.com/0xSiddhant/bifrost/commit/fca9353))
+
+### 📖 Documentation
+
+- **docs:** Record plan-14 and archive its plan file ([5bfa848](https://github.com/0xSiddhant/bifrost/commit/5bfa848))
+- **docs:** Add plan-16 observability plan ([b55a684](https://github.com/0xSiddhant/bifrost/commit/b55a684))
+- **portkey:** Record plan-15 in .agent memory and context ([891d7c7](https://github.com/0xSiddhant/bifrost/commit/891d7c7))
+- **docs:** Tighten plan-16 trace and tempo verification ([430a0b5](https://github.com/0xSiddhant/bifrost/commit/430a0b5))
+- **docs:** Add plan-17 send/receive flow and notifications ([90f762a](https://github.com/0xSiddhant/bifrost/commit/90f762a))
+- **portkey:** Reserved-roots maintenance rule + decisions ([4c13e81](https://github.com/0xSiddhant/bifrost/commit/4c13e81))
+- **docs:** Archive the plan-15 file and unlock plan-16 ([ad3813d](https://github.com/0xSiddhant/bifrost/commit/ad3813d))
+- **docs:** Sync agent context and decisions for plan-16a ([0a68794](https://github.com/0xSiddhant/bifrost/commit/0a68794))
+- **docs:** Record pr #42 for plan-16a ([#42](https://github.com/0xSiddhant/bifrost/issues/42))
+- **docs:** Correct the claim that the numeric level is dropped ([7b3e944](https://github.com/0xSiddhant/bifrost/commit/7b3e944))
+- **docs:** Archive plan-16 and sync context for 16b ([4b41aab](https://github.com/0xSiddhant/bifrost/commit/4b41aab))
+- **docs:** Record the 17a notification decisions ([7cf1432](https://github.com/0xSiddhant/bifrost/commit/7cf1432))
+- **docs:** Archive plan-17 and log the superseded decisions ([a9a5641](https://github.com/0xSiddhant/bifrost/commit/a9a5641))
+- **docs:** Sync agent context with the code before release ([#46](https://github.com/0xSiddhant/bifrost/pull/46))
+
+### 🏡 Chore
+
+- **chore:** Allow the nimbus commit scope ([08c1b0e](https://github.com/0xSiddhant/bifrost/commit/08c1b0e))
+
+### ❤️ Contributors
+
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Claude <noreply@anthropic.com>
+
 ## v1.2.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.1.0...v1.2.0)
