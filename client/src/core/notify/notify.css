@@ -1,0 +1,180 @@
+/* Notification stack (PLAN-17a).
+   Top-right, newest on top, above everything that can be open underneath it:
+   the modal scrim (50), Loki's mobile sheet (60) and the floating toast (70).
+   The host itself never eats a click — only the cards do. */
+.notify-host {
+  position: fixed;
+  top: calc(var(--header-h) + var(--space-3));
+  right: max(var(--space-4), env(safe-area-inset-right));
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(23rem, calc(100vw - var(--space-8)));
+  pointer-events: none;
+}
+
+.notify-host__bulk {
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.notify-host__overflow {
+  text-align: right;
+  color: var(--text-muted);
+}
+
+.notify {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  pointer-events: auto;
+  animation: notify-in var(--dur-2) var(--ease);
+}
+
+.notify--ok {
+  border-left-color: var(--ok);
+}
+
+.notify--ok .notify__icon {
+  color: var(--ok);
+}
+
+.notify--error {
+  border-left-color: var(--danger);
+}
+
+.notify--error .notify__icon {
+  color: var(--danger);
+}
+
+.notify__icon {
+  display: flex;
+  padding-top: 1px;
+}
+
+.notify__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.notify__title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.notify__message {
+  color: var(--text);
+}
+
+/* With a title above it, the message is the secondary line. */
+.notify__title + .notify__message {
+  color: var(--text-muted);
+}
+
+.notify__count {
+  align-self: flex-start;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.notify__close {
+  align-self: flex-start;
+  display: flex;
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.notify__close:hover,
+.notify__close:focus-visible {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* Countdown. The bar is the timer made visible — it pauses with it, so a
+   hovered notification visibly stops running out. */
+.notify__progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--surface-2);
+}
+
+/* Muted on purpose: in a dark theme a full-strength accent bar reads as a
+   loading indicator demanding attention, when it is only a countdown. */
+.notify__progress span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: notify-drain linear forwards;
+}
+
+.notify--ok .notify__progress span {
+  background: color-mix(in srgb, var(--ok) 60%, transparent);
+}
+
+@keyframes notify-in {
+  from {
+    opacity: 0;
+    transform: translateX(var(--space-4));
+  }
+}
+
+@keyframes notify-drain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Reduced motion: nothing slides and nothing drains — the bar becomes a static
+   marker that a timer is running, and the timer itself is unaffected. */
+@media (prefers-reduced-motion: reduce) {
+  .notify {
+    animation: none;
+  }
+
+  .notify__progress span {
+    animation: none;
+  }
+}
+
+/* Phones: the stack spans the width under the header, and clears the notch. */
+@media (max-width: 640px) {
+  .notify-host {
+    left: max(var(--space-3), env(safe-area-inset-left));
+    right: max(var(--space-3), env(safe-area-inset-right));
+    width: auto;
+  }
+}

@@ -4,9 +4,9 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { FileRow } from '../../core/ui/FileRow';
 import { ProgressBar } from '../../core/ui/ProgressBar';
-import { Toast } from '../../core/ui/Toast';
 import { CheckIcon, UploadIcon } from '../../core/ui/icons';
 import { formatBytes } from '../../core/format';
+import { notify } from '../../core/notify';
 import {
   fetchUploadConfig,
   uploadFile,
@@ -26,6 +26,14 @@ interface QueueItem {
 }
 
 const MAX_CONCURRENT_UPLOADS = 3;
+
+/**
+ * One notification per file, not per attempt: a retry that fails again
+ * collapses into the same entry with a counter instead of stacking.
+ */
+const failed = (name: string, reason: string): void => {
+  notify.error(`${name} — ${reason}`, { title: 'Upload failed', dedupeKey: `upload:${name}` });
+};
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
   queued: 'waiting…',
@@ -73,6 +81,9 @@ export function UploadPage() {
           patch(item.key, { status: 'cancelled' });
         } else {
           patch(item.key, { status: 'error', error: error.message });
+          // The row carries the retry; the banner is what reaches someone who
+          // has already scrolled away or moved to another page.
+          failed(item.file.name, error.message);
         }
       })
       .finally(() => tasksRef.current.delete(item.key));
@@ -96,16 +107,14 @@ export function UploadPage() {
       const key = nextKeyRef.current++;
       const ext = `.${file.name.toLowerCase().split('.').pop() ?? ''}`;
       if (maxBytes !== null && file.size > maxBytes) {
-        return {
-          key,
-          file,
-          status: 'error',
-          progress: 0,
-          error: `larger than the ${formatBytes(maxBytes)} limit — not sent`,
-        };
+        const reason = `larger than the ${formatBytes(maxBytes)} limit — not sent`;
+        failed(file.name, reason);
+        return { key, file, status: 'error', progress: 0, error: reason };
       }
       if (config?.blockedExtensions.includes(ext)) {
-        return { key, file, status: 'error', progress: 0, error: 'this file type is blocked' };
+        const reason = 'this file type is blocked';
+        failed(file.name, reason);
+        return { key, file, status: 'error', progress: 0, error: reason };
       }
       return { key, file, status: 'queued', progress: 0 };
     });
@@ -150,7 +159,6 @@ export function UploadPage() {
     }
   };
 
-  const firstError = items.find((item) => item.status === 'error');
   const hasSettled = items.some(
     (item) => item.status === 'done' || item.status === 'error' || item.status === 'cancelled',
   );
@@ -197,12 +205,6 @@ export function UploadPage() {
             tabIndex={-1}
           />
         </div>
-
-        {firstError && (
-          <Toast kind="danger">
-            {firstError.file.name} failed — {firstError.error ?? 'unknown error'}
-          </Toast>
-        )}
 
         {items.length > 0 && (
           <Card>
