@@ -34,7 +34,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 
 **Features**
 
-- 📤 Multi-file upload (streamed, 2 GB configurable limit) into a write-only folder
+- 📤 Multi-file upload (streamed, 2 GB configurable limit) into a staging area — preview, rename or delete what you sent, then move it to Downloads and every device gets a banner
 - 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Hermes — clipboard/text sync across devices
