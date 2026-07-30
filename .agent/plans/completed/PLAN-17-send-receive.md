@@ -112,33 +112,33 @@ All four are **local profile only** — they inherit `file-transfer`'s existing 
 - [x] Unit tests: timer pause/resume, dedupe counter, stack cap, reduced-motion branch
 - [x] `live-verify` + screenshots for the owner checkpoint
 - [x] Update `.agent/memory/progress.md` in the 17a PR (`git.md` step 7)
-- [ ] ⛔ **Stop. Owner approves UI + flow, and picks LAN-trust vs capability-token, before 17b starts**
+- [x] ⛔ **Stop. Owner approves UI + flow, and picks LAN-trust vs capability-token, before 17b starts** — **cleared 2026-07-30: owner said "implement 17b as well"; LAN trust taken as the answer (the plan's recommendation), stated in the PR**
 
 ### 17b — Send/Receive flow
 
-- [ ] Drop the `${now()}-` prefix in `upload-files.ts`; extract `publish()`'s EEXIST dedupe loop into a shared helper used by both upload and move
-- [ ] **Cap the dedupe loop** at 50 attempts → short random suffix beyond it; it is currently unbounded and only safe because of the prefix being removed
-- [ ] **Make name reservation crash-safe** so `open(wx)` + `rename` can no longer strand a zero-byte placeholder (criterion 15 depends on it)
-- [ ] **`.svg` served from uploads must not be `image/svg+xml`** — fix in `core/http/mime.ts` (closes the same hole for `downloads/`) or sandbox the preview frame
-- [ ] `PublishUploadUseCase`: tmp → rename with **EXDEV copy+unlink fallback**, dedupe against `downloads/`, emit `file.published`
-- [ ] Rename / delete / preview usecases + routes; realpath prefix check on every one
-- [ ] `file.published` in `core/bus/events.ts` → SSE broadcast in `file-transfer/module.ts`
-- [ ] Card actions on `UploadPage`: Move · Preview · Rename · Delete, disabled while a move is in flight
-- [ ] Rename modal with sanitisation preview; collision → suffix + local notification
-- [ ] Delete confirm dialog naming the file
-- [ ] Card state machine `moving → moved → dismissing → gone`, removal on `animationend`, reduced-motion path
-- [ ] Client subscribes to `file.published` for the **banner only** — `download.added` stays the sole source for the Downloads listing, and nothing banners on it (or every file notifies twice)
-- [ ] Self-filter suppresses **only when both device ids are non-null and equal**; a `null` origin shows to everyone
-- [ ] Shared `dedupeKey` so a bulk move collapses to one banner
-- [ ] Update the Send page copy — it currently promises a write-only vault
-- [ ] **Drop `upload_audit`** via the `db-migration` skill: delete the table, `DbUploadAuditRepository`, `UploadAuditRepository`, `UploadRecord`, `UploadAuditRecorder`, and `ListUploadsUseCase`. Verify on **both an upgraded and a fresh DB**
-- [ ] Repoint `GetStatsUseCase`'s `uploads.total` / `uploads.today` / `activity[]` at `audit_events`, with a comment that `audit-log` owns the table
-- [ ] Rebuild Heimdall → Uploads as a **filesystem listing** — a new `ListUploadFilesUseCase` over the shared `core` directory walker (PLAN-16 lifts it there), returning name · size · mtime; retitle it away from "everything that has been sent"
-- [ ] **Dot-file filtering belongs in that shared walker, not the listing** — `fs-stats-reader` counts `.DS_Store` toward storage totals too (6.0 KB in the owner's screenshot). One helper, both call sites
-- [ ] Keep the Send page queue in plain component state — it must vanish on refresh; no `sessionStorage`
-- [ ] `.env.example:22`: correct the blocklist comment now that uploads can be served
-- [ ] `architecture.md:20` + `decisions.md`: log the supersession of the write-only and metadata-only decisions with reasoning
-- [ ] `context-sync`; update `.agent/memory/progress.md` (`git.md` step 7); archive this plan file
+- [x] Drop the `${now()}-` prefix in `upload-files.ts`; extract `publish()`'s EEXIST dedupe loop into a shared helper used by both upload and move
+- [x] **Cap the dedupe loop** at 50 attempts → short random suffix beyond it; it is currently unbounded and only safe because of the prefix being removed
+- [x] **Make name reservation crash-safe** so `open(wx)` + `rename` can no longer strand a zero-byte placeholder (criterion 15 depends on it)
+- [x] **`.svg` served from uploads must not be `image/svg+xml`** — fix in `core/http/mime.ts` (closes the same hole for `downloads/`) or sandbox the preview frame
+- [x] `PublishUploadUseCase`: tmp → rename with **EXDEV copy+unlink fallback**, dedupe against `downloads/`, emit `file.published`
+- [x] Rename / delete / preview usecases + routes; realpath prefix check on every one
+- [x] `file.published` in `core/bus/events.ts` → SSE broadcast in `file-transfer/module.ts`
+- [x] Card actions on `UploadPage`: Move · Preview · Rename · Delete, disabled while a move is in flight
+- [x] Rename modal with sanitisation preview; collision → suffix + local notification
+- [x] Delete confirm dialog naming the file
+- [x] Card state machine `moving → moved → dismissing → gone`, removal on `animationend`, reduced-motion path
+- [x] Client subscribes to `file.published` for the **banner only** — `download.added` stays the sole source for the Downloads listing, and nothing banners on it (or every file notifies twice)
+- [x] Self-filter suppresses **only when both device ids are non-null and equal**; a `null` origin shows to everyone
+- [x] Shared `dedupeKey` so a bulk move collapses to one banner
+- [x] Update the Send page copy — it currently promises a write-only vault
+- [x] **Drop `upload_audit`** via the `db-migration` skill: delete the table, `DbUploadAuditRepository`, `UploadAuditRepository`, `UploadRecord`, `UploadAuditRecorder`, and `ListUploadsUseCase`. Verify on **both an upgraded and a fresh DB**
+- [x] Repoint `GetStatsUseCase`'s `uploads.total` / `uploads.today` / `activity[]` at `audit_events`, with a comment that `audit-log` owns the table
+- [x] Rebuild Heimdall → Uploads as a **filesystem listing** — a new `ListUploadFilesUseCase` over the shared `core` directory walker (PLAN-16 lifts it there), returning name · size · mtime; retitle it away from "everything that has been sent"
+- [x] **Dot-file filtering belongs in that shared walker, not the listing** — `fs-stats-reader` counts `.DS_Store` toward storage totals too (6.0 KB in the owner's screenshot). One helper, both call sites
+- [x] Keep the Send page queue in plain component state — it must vanish on refresh; no `sessionStorage`
+- [x] `.env.example:22`: correct the blocklist comment now that uploads can be served
+- [x] `architecture.md:20` + `decisions.md`: log the supersession of the write-only and metadata-only decisions with reasoning
+- [x] `context-sync`; update `.agent/memory/progress.md` (`git.md` step 7); archive this plan file
 
 ## Acceptance criteria
 
@@ -174,15 +174,15 @@ Criteria **6, 7, 11, 21, 22** gate **17a** — they are its definition of done f
 
 ## Tests
 
-- [ ] Unit: dedupe helper (no clash → clean name; clash → `-1`, `-2`; extension preserved), sanitise-on-rename corpus
-- [ ] Unit: notification store — timer pause/resume, dedupe counter, stack cap, dismissal ordering, **per-kind eviction under 4 stacked errors**, **null-deviceId shows rather than suppresses**
-- [ ] Unit: dedupe helper caps its attempts and falls back to a random suffix — assert the loop cannot run unbounded
-- [ ] Integration: `.svg` from uploads is not served as `image/svg+xml`
-- [ ] Integration: publish/rename/delete/preview happy paths + 404/409/422 matrix + traversal rejection
-- [ ] Integration: `EXDEV` forced via a mocked `rename` → copy fallback path
-- [ ] Integration: `file.published` reaches SSE with `originDeviceId` intact
-- [ ] Kill test: `SIGTERM` mid-move, asserted against the "exactly one location" invariant
-- [ ] Client: card state machine transitions; `originDeviceId` self-filter; reduced-motion branch
-- [ ] Migration: upgraded DB (with rows) and fresh DB both end without `upload_audit`; stats usecase returns the same figures from `audit_events` before and after
-- [ ] Integration: Heimdall uploads listing reflects a file deleted from disk out-of-band, and excludes dot-files
-- [ ] Live-verify: two browsers (one phone on the LAN), move a file, confirm the banner appears on one and not the other
+- [x] Unit: dedupe helper (no clash → clean name; clash → `-1`, `-2`; extension preserved), sanitise-on-rename corpus
+- [x] Unit: notification store — timer pause/resume, dedupe counter, stack cap, dismissal ordering, **per-kind eviction under 4 stacked errors**, **null-deviceId shows rather than suppresses**
+- [x] Unit: dedupe helper caps its attempts and falls back to a random suffix — assert the loop cannot run unbounded
+- [x] Integration: `.svg` from uploads is not served as `image/svg+xml`
+- [x] Integration: publish/rename/delete/preview happy paths + 404/409/422 matrix + traversal rejection
+- [x] Integration: `EXDEV` forced via a mocked `rename` → copy fallback path
+- [x] Integration: `file.published` reaches SSE with `originDeviceId` intact
+- [x] Kill test: `SIGTERM` mid-move, asserted against the "exactly one location" invariant
+- [x] Client: card state machine transitions; `originDeviceId` self-filter; reduced-motion branch
+- [x] Migration: upgraded DB (with rows) and fresh DB both end without `upload_audit`; stats usecase returns the same figures from `audit_events` before and after
+- [x] Integration: Heimdall uploads listing reflects a file deleted from disk out-of-band, and excludes dot-files
+- [~] Live-verify: two browsers, move a file, banner on one and not the other — **done with two headless Chrome profiles (different deviceIds); a real phone on the LAN is still owner-manual**

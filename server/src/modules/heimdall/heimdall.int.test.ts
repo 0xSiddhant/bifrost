@@ -7,6 +7,19 @@ import { loadConfig } from '../../core/config/index.js';
 import { createApp, type RunningApp } from '../../app.js';
 
 const PIN = '4321';
+const BOUNDARY = 'BifrostHeimdallBoundary';
+
+function multipartPayload(name: string, content: string): Buffer {
+  return Buffer.concat([
+    Buffer.from(
+      `--${BOUNDARY}\r\n` +
+        `Content-Disposition: form-data; name="files"; filename="${name}"\r\n` +
+        `Content-Type: application/octet-stream\r\n\r\n`,
+    ),
+    Buffer.from(content),
+    Buffer.from(`\r\n--${BOUNDARY}--\r\n`),
+  ]);
+}
 
 async function login(app: RunningApp, pin = PIN): Promise<{ status: number; cookie: string | null }> {
   const res = await app.fastify.inject({
@@ -30,10 +43,13 @@ describe('heimdall auth guard + session', () => {
 
   beforeAll(async () => {
     storageRoot = tmpStorage('bifrost-heimdall-');
-    // Seed an upload as if PLAN-02 testing had left one behind.
+    // Seed uploads/ directly, as Finder or an older Bifrost would have: the
+    // listing reads the directory, so nothing needs to have been "recorded".
     const uploads = path.join(storageRoot, 'uploads');
     fs.mkdirSync(uploads, { recursive: true });
-    fs.writeFileSync(path.join(uploads, '1700000000000-holiday.jpg'), 'x'.repeat(2048));
+    fs.writeFileSync(path.join(uploads, 'holiday.jpg'), 'x'.repeat(2048));
+    // …and one dot-file, which is the OS's, not an upload (criterion 27).
+    fs.writeFileSync(path.join(uploads, '.DS_Store'), 'x'.repeat(6144));
 
     app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
@@ -87,24 +103,63 @@ describe('heimdall auth guard + session', () => {
       headers: { cookie },
     });
     expect(stats.statusCode).toBe(200);
-    const body = stats.json() as { uploads: { total: number }; disk: unknown[] };
-    expect(body.uploads.total).toBeGreaterThanOrEqual(1);
-    expect(Array.isArray(body.disk)).toBe(true);
+    const body = stats.json() as {
+      uploads: { total: number; today: number };
+      disk: { folder: string; bytes: number; files: number }[];
+      activity: number[];
+    };
+    // Counts come from `audit_events` since PLAN-17b, so a file merely sitting
+    // on disk is not an "upload" — nothing was ever sent through this server.
+    expect(body.uploads).toEqual({ total: 0, today: 0 });
+    expect(body.activity).toHaveLength(24);
+    // The 6 KB `.DS_Store` must not be counted as stored data either.
+    const uploadsUsage = body.disk.find((entry) => entry.folder === 'uploads');
+    expect(uploadsUsage).toMatchObject({ files: 1, bytes: 2048 });
   });
 
-  it('shows upload metadata but exposes no content route', async () => {
-    const uploads = await app.fastify.inject({
+  it('counts a real upload in the dashboard figures, sourced from audit_events', async () => {
+    const upload = await app.fastify.inject({
+      method: 'POST',
+      url: '/api/files',
+      headers: { 'content-type': `multipart/form-data; boundary=${BOUNDARY}` },
+      payload: multipartPayload('receipt.pdf', 'pretend pdf'),
+    });
+    expect(upload.statusCode).toBe(201);
+
+    const stats = await app.fastify.inject({
       method: 'GET',
-      url: '/api/heimdall/uploads',
+      url: '/api/heimdall/stats',
       headers: { cookie },
     });
-    expect(uploads.statusCode).toBe(200);
-    const body = uploads.json() as { total: number; items: { name: string }[] };
-    expect(body.items.some((item) => item.name === 'holiday.jpg')).toBe(true);
+    const body = stats.json() as { uploads: { total: number; today: number }; activity: number[] };
+    expect(body.uploads).toEqual({ total: 1, today: 1 });
+    // Current hour is the last bucket of the 24h sparkline.
+    expect(body.activity[23]).toBe(1);
+  });
 
-    // Uploads are write-only by construction — no read route anywhere.
-    const content = await app.fastify.inject({ method: 'GET', url: '/api/uploads' });
-    expect(content.statusCode).toBe(404);
+  it('lists exactly what is in uploads/ right now — no ghosts, no dot-files', async () => {
+    const list = async () => {
+      const res = await app.fastify.inject({
+        method: 'GET',
+        url: '/api/heimdall/uploads',
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      return res.json() as { total: number; items: { name: string; size: number; mtime: number }[] };
+    };
+
+    const before = await list();
+    const holiday = before.items.find((item) => item.name === 'holiday.jpg');
+    expect(holiday).toMatchObject({ size: 2048 });
+    expect(holiday?.mtime).toBeGreaterThan(0);
+    expect(before.items.some((item) => item.name === '.DS_Store')).toBe(false);
+
+    // Criterion 17: delete outside the app, and the very next read reflects it.
+    // A table could not do this — which is exactly why one was removed.
+    fs.rmSync(path.join(storageRoot, 'uploads', 'holiday.jpg'));
+    const after = await list();
+    expect(after.items.some((item) => item.name === 'holiday.jpg')).toBe(false);
+    expect(after.total).toBe(before.total - 1);
   });
 
   it('round-trips a settings change', async () => {

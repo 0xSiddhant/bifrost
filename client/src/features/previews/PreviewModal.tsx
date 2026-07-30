@@ -1,31 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { downloadUrl, type DownloadEntry } from '../../core/api';
 import { formatBytes } from '../../core/format';
 import { Button } from '../../core/ui/Button';
-import { EmptyState } from '../../core/ui/EmptyState';
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  CloseIcon,
-  DownloadIcon,
-  FileIcon,
-} from '../../core/ui/icons';
-import { fetchPreviewMeta, type PreviewMeta } from './api';
-import {
-  AudioViewer,
-  ImageViewer,
-  MarkdownViewer,
-  PdfViewer,
-  TextViewer,
-  VideoViewer,
-} from './viewers';
+import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon } from '../../core/ui/icons';
+import { fetchPreviewMeta } from './api';
+import { PreviewBody, usePreviewMeta } from './PreviewBody';
 
 interface DownloadsContext {
   entries: DownloadEntry[];
 }
-
-type MetaState = { state: 'loading' } | { state: 'missing' } | { state: 'ready'; meta: PreviewMeta };
 
 /**
  * Modal route (/downloads/:id/preview): deep links work, back closes, and
@@ -36,27 +20,12 @@ export function PreviewModal() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { entries } = useOutletContext<DownloadsContext>();
-  const [meta, setMeta] = useState<MetaState>({ state: 'loading' });
+  const meta = usePreviewMeta(id, fetchPreviewMeta);
 
   const index = entries.findIndex((entry) => entry.id === id);
   const previous = index > 0 ? entries[index - 1] : undefined;
   const next = index >= 0 && index < entries.length - 1 ? entries[index + 1] : undefined;
   const fallbackName = index >= 0 ? entries[index]?.name : undefined;
-
-  useEffect(() => {
-    let disposed = false;
-    setMeta({ state: 'loading' });
-    fetchPreviewMeta(id)
-      .then((loaded) => {
-        if (!disposed) setMeta({ state: 'ready', meta: loaded });
-      })
-      .catch(() => {
-        if (!disposed) setMeta({ state: 'missing' });
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [id]);
 
   const close = () => navigate('/downloads');
   const goTo = (entry: DownloadEntry | undefined) => {
@@ -102,7 +71,11 @@ export function PreviewModal() {
         </div>
 
         <div className="preview-body">
-          <PreviewContent id={id} state={meta} />
+          <PreviewBody
+            state={meta}
+            src={downloadUrl(id, { inline: true })}
+            href={downloadUrl(id)}
+          />
         </div>
 
         <div className="preview-footer">
@@ -132,50 +105,4 @@ export function PreviewModal() {
       </div>
     </div>
   );
-}
-
-function PreviewContent({ id, state }: { id: string; state: MetaState }) {
-  if (state.state === 'loading') return <p className="caption">Divining the file kind…</p>;
-  if (state.state === 'missing') {
-    return (
-      <EmptyState
-        icon={<FileIcon size={28} />}
-        title="This file is gone"
-        hint="It may have been moved or deleted on the host."
-      />
-    );
-  }
-  const { meta } = state;
-  if (!meta.previewable) {
-    return (
-      <EmptyState
-        icon={<FileIcon size={28} />}
-        title="No preview for this one"
-        hint={
-          meta.kind === 'none'
-            ? 'This file type can only be downloaded.'
-            : 'Too large to preview — download it instead.'
-        }
-        action={
-          <a className="btn btn--primary" href={downloadUrl(id)} download={meta.name}>
-            Download {formatBytes(meta.size)}
-          </a>
-        }
-      />
-    );
-  }
-  switch (meta.kind) {
-    case 'image':
-      return <ImageViewer id={id} name={meta.name} />;
-    case 'video':
-      return <VideoViewer id={id} />;
-    case 'audio':
-      return <AudioViewer id={id} />;
-    case 'pdf':
-      return <PdfViewer id={id} name={meta.name} />;
-    case 'markdown':
-      return <MarkdownViewer id={id} />;
-    default:
-      return <TextViewer id={id} />;
-  }
 }

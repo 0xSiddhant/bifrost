@@ -51,7 +51,7 @@ import {
   type ManagedTheme,
   type PresenceDevice,
   type Stats,
-  type UploadMeta,
+  type UploadFileEntry,
 } from './api';
 
 /**
@@ -920,7 +920,7 @@ function StorageSection() {
 // ── Uploads ─────────────────────────────────────────────────────
 
 function UploadsSection() {
-  const [uploads, setUploads] = useState<UploadMeta[]>([]);
+  const [uploads, setUploads] = useState<UploadFileEntry[]>([]);
   useEffect(() => {
     let cancelled = false;
     fetchUploads()
@@ -937,16 +937,15 @@ function UploadsSection() {
     <Card>
       <div id={ctlId('uploads-list')}>
         {uploads.length === 0 ? (
-          <p className="caption">No uploads recorded yet.</p>
+          <p className="caption">Nothing is staged on the host right now.</p>
         ) : (
           uploads.slice(0, 30).map((upload) => (
-            <div className="file-row" key={upload.name + upload.uploadedAt}>
+            <div className="file-row" key={upload.name}>
               <div className="file-row__body">
                 <div className="file-row__name">{upload.name}</div>
                 <div className="file-row__meta">
                   <span>{formatBytes(upload.size)}</span>
-                  <span>{upload.uploaderHint ?? 'unknown device'}</span>
-                  <span>{formatTimeAgo(upload.uploadedAt)}</span>
+                  <span>{formatTimeAgo(upload.mtime)}</span>
                 </div>
               </div>
             </div>
@@ -1157,9 +1156,11 @@ export const SECTIONS: HeimdallSection[] = [
     label: 'Uploads',
     group: 'Vault',
     icon: <UploadIcon size={16} />,
-    blurb: 'Metadata for everything that has been sent.',
+    blurb: 'What is sitting in storage/uploads right now.',
     Component: UploadsSection,
-    manifest: [{ controlId: 'uploads-list', label: 'Recent uploads', keywords: ['files', 'sent'] }],
+    manifest: [
+      { controlId: 'uploads-list', label: 'Staged files', keywords: ['files', 'sent', 'uploads'] },
+    ],
   },
   {
     id: 'network',

@@ -8,6 +8,12 @@ export class ApiError extends Error {
     public readonly code?: string,
     /** Human reason from the server (`{message}`), when one was sent. */
     public readonly detail?: string,
+    /**
+     * Machine-readable extras for a refusal the UI can act on — the rename
+     * 422 carries `{ suggestion }`, the cleaned-up name the server would have
+     * used, so the modal can offer it as a button instead of prose.
+     */
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -22,10 +28,18 @@ export class ApiError extends Error {
 async function toApiError(method: string, path: string, response: Response): Promise<ApiError> {
   const fallback = `${method} ${path} failed with ${response.status}`;
   try {
-    const body = (await response.json()) as { error?: unknown; message?: unknown };
+    const body = (await response.json()) as {
+      error?: unknown;
+      message?: unknown;
+      details?: unknown;
+    };
     const code = typeof body.error === 'string' ? body.error : undefined;
     const detail = typeof body.message === 'string' ? body.message : undefined;
-    return new ApiError(response.status, detail ?? fallback, code, detail);
+    const details =
+      body.details && typeof body.details === 'object'
+        ? (body.details as Record<string, unknown>)
+        : undefined;
+    return new ApiError(response.status, detail ?? fallback, code, detail, details);
   } catch {
     return new ApiError(response.status, fallback);
   }

@@ -28,6 +28,35 @@ export interface FileStorageRepository {
   discard(tmpPath: string): Promise<void>;
 }
 
+/** One file sitting in uploads/, as the staging list shows it. */
+export interface UploadFile {
+  name: string;
+  size: number;
+  /** Epoch milliseconds. */
+  mtime: number;
+}
+
+/**
+ * Read/modify access to uploads/ — new in PLAN-17b, which deliberately
+ * supersedes the "write-only, no read route" decision so a sender can preview,
+ * rename, delete, or publish what they just sent. Every method resolves the
+ * name inside uploads/ and refuses anything that escapes it.
+ */
+export interface UploadsStore {
+  stat(name: string): Promise<UploadFile>;
+  open(name: string, slice?: { start: number; end: number }): Promise<DownloadContent>;
+  /** Rename within uploads/. Returns the final name (suffixed on collision). */
+  rename(name: string, desiredName: string): Promise<{ finalName: string; renamed: boolean }>;
+  remove(name: string): Promise<void>;
+  /** Move into downloads/, disambiguating there. The upload is gone afterwards. */
+  publish(name: string): Promise<{ finalName: string; renamed: boolean; size: number }>;
+}
+
+/** Thrown by the store when a name does not resolve to a file inside uploads/. */
+export class UploadNotFoundError extends Error {
+  override name = 'UploadNotFoundError';
+}
+
 /** Downloads-side listing state, owned by the watcher. */
 export interface DownloadRegistry {
   list(): DownloadEntry[];

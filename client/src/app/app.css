@@ -3492,3 +3492,77 @@
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
 }
+
+/* ── Send: staged file cards (PLAN-17b) ─────────────────────── */
+.staged__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Four controls plus a filename do not fit a phone's width: found in live
+   verification at 390px, where the row squeezed the name to nothing and the
+   Move button sat on top of the file size. The actions take their own line
+   under the name instead of competing with it for the same one. */
+@media (max-width: 640px) {
+  .staged .file-row {
+    flex-wrap: wrap;
+  }
+
+  .staged .file-row__body {
+    /* Full width minus the kind icon and its gap, so the name keeps a line. */
+    flex-basis: calc(100% - 36px - var(--space-3));
+  }
+
+  .staged .file-row__aside {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: var(--space-2);
+  }
+}
+
+.staged__confirm {
+  margin-top: var(--space-2);
+  color: var(--danger);
+}
+
+/* The exit is ONE animation: hold the confirmation long enough to read, then
+   swipe out. The card is removed on its animationend, so nothing can remove it
+   while it is still on screen — or leave it behind after it has gone. */
+.staged--leaving {
+  animation: staged-leave 2.4s var(--ease) forwards;
+}
+
+@keyframes staged-leave {
+  0%,
+  62% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+
+/* Reduced motion still needs *an* animation, and one that still takes time:
+   `animationend` is what removes the card, and the confirmation has to be
+   readable before it goes. This one travels nowhere — it holds, then vanishes
+   — so it is motion-free by construction, which is why it deliberately opts
+   out of the global `animation-duration: 0.01ms !important` reset in base.css.
+   That reset exists to stop movement, and there is none here to stop; obeying
+   it would make the card blink out the instant the move landed. */
+@media (prefers-reduced-motion: reduce) {
+  .staged--leaving {
+    animation: staged-leave-still 2.4s steps(1, end) forwards !important;
+  }
+
+  @keyframes staged-leave-still {
+    0%,
+    99% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}

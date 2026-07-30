@@ -50,7 +50,7 @@ bifrost/
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
 │       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
 │       │                      #   notify/ (global notification stack: store + host +
-│       │                      #   imperative `notify` handle, PLAN-17a),
+│       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
 │       │                      #   theme engine, device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
 │       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode

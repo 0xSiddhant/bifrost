@@ -49,7 +49,9 @@ export class UploadFilesUseCase {
 
       try {
         const written = await repo.writeTmp(file.stream, maxBytes);
-        const storedName = await repo.publish(written.tmpPath, `${now()}-${safeName}`);
+        // No timestamp prefix (PLAN-17b): the name a person chose is the name
+        // that lands, and `publish` only disambiguates on a *real* collision.
+        const storedName = await repo.publish(written.tmpPath, safeName);
         result.accepted.push({ name: file.name, storedName, size: written.bytes });
         bus.emit('file.uploaded', {
           originalName: file.name,

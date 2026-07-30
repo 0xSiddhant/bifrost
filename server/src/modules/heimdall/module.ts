@@ -3,12 +3,12 @@ import { registerHeimdallRoutes } from './routes/heimdall.js';
 import { registerAboutRoutes } from './routes/about.js';
 import { LoginThrottle } from './login-throttle.js';
 import { DbSettingsRepository } from './services/db-settings-repository.js';
-import { DbUploadAuditRepository } from './services/db-upload-audit-repository.js';
+import { DbUploadStatsRepository } from './services/db-upload-stats-repository.js';
 import { FsStatsReader } from './services/fs-stats-reader.js';
-import { UploadAuditRecorder } from './services/upload-audit-recorder.js';
+import { FsUploadFilesReader } from './services/fs-upload-files-reader.js';
 import { GetSettingsUseCase, UpdateSettingsUseCase } from './usecases/manage-settings.js';
 import { GetStatsUseCase } from './usecases/get-stats.js';
-import { ListUploadsUseCase } from './usecases/list-uploads.js';
+import { ListUploadFilesUseCase } from './usecases/list-upload-files.js';
 
 /**
  * Heimdall — the hidden, PIN-protected admin panel. Auth itself is core
@@ -21,7 +21,7 @@ export const heimdallModule: FeatureModule = {
     const { config, log, db, bus, sse, auth } = deps;
 
     const settingsRepo = new DbSettingsRepository(db);
-    const auditRepo = new DbUploadAuditRepository(db);
+    const uploadStats = new DbUploadStatsRepository(db);
     const statsReader = new FsStatsReader(
       [
         { folder: 'uploads', dir: config.storage.uploads },
@@ -39,9 +39,6 @@ export const heimdallModule: FeatureModule = {
     };
     const getSettings = new GetSettingsUseCase(settingsRepo, defaults);
 
-    const recorder = new UploadAuditRecorder(auditRepo, config.storage.uploads, bus, log);
-    recorder.start();
-
     // Fan the shortcut/tap-count change out to open clients so they rebind.
     const unsubscribe = bus.on('settings.updated', (payload) =>
       sse.broadcast('settings.updated', payload),
@@ -57,19 +54,20 @@ export const heimdallModule: FeatureModule = {
       // "Devices connected" counts distinct online deviceIds, not raw SSE
       // connections — multiple tabs on one device must not inflate it, so this
       // matches the online count in the Wardens roster.
-      getStats: new GetStatsUseCase(statsReader, auditRepo, () => {
+      getStats: new GetStatsUseCase(statsReader, uploadStats, () => {
         const online = new Set<string>();
         for (const conn of sse.liveConnections()) if (conn.deviceId) online.add(conn.deviceId);
         return online.size;
       }),
-      listUploads: new ListUploadsUseCase(auditRepo),
+      listUploadFiles: new ListUploadFilesUseCase(
+        new FsUploadFilesReader(config.storage.uploads, log),
+      ),
     });
 
     registerAboutRoutes(app, { config });
 
     app.addHook('onClose', () => {
       unsubscribe();
-      recorder.stop();
     });
   },
 };

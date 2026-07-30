@@ -26,16 +26,22 @@ export interface Stats {
   activity: number[];
 }
 
-export interface UploadMeta {
+/**
+ * One file currently in uploads/ — read from the directory (PLAN-17b), so it
+ * cannot list something that has been deleted on the host. History ("what was
+ * sent, by whom, when") is the Activity section's job and comes from
+ * `audit_events`.
+ */
+export interface UploadFileEntry {
   name: string;
   size: number;
-  uploadedAt: number;
-  uploaderHint: string | null;
+  /** Epoch ms — last modified on disk. */
+  mtime: number;
 }
 
-export interface UploadPage {
+export interface UploadFilesPage {
   total: number;
-  items: UploadMeta[];
+  items: UploadFileEntry[];
 }
 
 /** Public — the entry gesture needs the current shortcut + tap count. */
@@ -60,7 +66,8 @@ export const updateSettings = (
 
 export const fetchStats = (): Promise<Stats> => apiGet<Stats>('/api/heimdall/stats');
 
-export const fetchUploads = (): Promise<UploadPage> => apiGet<UploadPage>('/api/heimdall/uploads');
+export const fetchUploads = (): Promise<UploadFilesPage> =>
+  apiGet<UploadFilesPage>('/api/heimdall/uploads');
 
 export interface ManagedTheme {
   id: string;

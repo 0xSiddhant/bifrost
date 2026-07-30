@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Transform, type Readable } from 'node:stream';
 import { FileTooLargeError, type FileStorageRepository, type TmpWrite } from '../ports.js';
+import { placeFile } from './place-file.js';
 
 /**
  * Uploads-side fs implementation: stream → private tmp file → atomic rename
@@ -52,24 +53,14 @@ export class FsFileStorageRepository implements FileStorageRepository {
   }
 
   async publish(tmpPath: string, storedName: string): Promise<string> {
-    // Timestamp prefixes make collisions rare; still, rename() overwrites
-    // silently, so probe with an exclusive create first.
-    let finalName = storedName;
-    for (let attempt = 1; ; attempt += 1) {
-      const target = path.join(this.uploadsDir, finalName);
-      try {
-        const handle = await fsp.open(target, 'wx');
-        await handle.close();
-        break;
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-        const ext = path.extname(storedName);
-        finalName = `${storedName.slice(0, storedName.length - ext.length)}-${attempt}${ext}`;
-      }
-    }
+    // Names are no longer timestamp-prefixed (PLAN-17b), so collisions are
+    // ordinary rather than rare — the shared helper is what makes them cheap
+    // and bounded, and what keeps a crash from stranding a zero-byte file.
+    const { finalName } = await placeFile(this.uploadsDir, tmpPath, storedName);
     const target = path.join(this.uploadsDir, finalName);
-    await fsp.rename(tmpPath, target);
+    // The link inherits the tmp file's private 0600; uploads are 0644.
     await fsp.chmod(target, 0o644);
+    await this.discard(tmpPath);
     return finalName;
   }
 

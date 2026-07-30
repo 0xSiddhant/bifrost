@@ -20,7 +20,11 @@ export interface DownloadEntry {
 export interface FileUploadedEvent {
   /** Name as supplied by the client, pre-sanitization. */
   originalName: string;
-  /** Final `<timestamp>-<sanitized>` name inside uploads/. */
+  /**
+   * Final name inside uploads/. Since PLAN-17b this is the sanitized name
+   * itself — no timestamp prefix — with `-1`, `-2`, … added only when that
+   * name was already taken.
+   */
   storedName: string;
   /** Bytes. */
   size: number;
@@ -28,6 +32,27 @@ export interface FileUploadedEvent {
   uploadedAt: number;
   /** Best-effort uploader identity (request IP) for the Heimdall metadata view; absent when unknown. */
   uploaderHint?: string;
+}
+
+/**
+ * A staged upload was moved into downloads/ and is now on offer to the whole
+ * LAN (PLAN-17b). It exists for the **banner only** — the Downloads listing
+ * still comes from the watcher's `download.added`, which arrives later (after
+ * chokidar's awaitWriteFinish debounce). Anything that banners on both events
+ * announces every published file twice.
+ */
+export interface FilePublishedEvent {
+  /** Final name in downloads/, suffixed if that name was already taken. */
+  name: string;
+  size: number;
+  /** Epoch milliseconds. */
+  publishedAt: number;
+  /**
+   * Device that pressed Move, so its own browser can stay quiet. Null when the
+   * caller sent no device header — and a null origin must be shown to
+   * *everyone*, never suppressed for everyone (see `shouldShowForOrigin`).
+   */
+  originDeviceId: string | null;
 }
 
 /**
@@ -182,6 +207,8 @@ export interface RequestCompletedEvent {
 
 export interface BifrostEventMap {
   'file.uploaded': FileUploadedEvent;
+  /** A staged upload was published to downloads/ — the banner, and only the banner. */
+  'file.published': FilePublishedEvent;
   /**
    * Emitted by core/http for every finished request. It exists because the
    * latency histogram has to see EVERY route, and a Fastify hook added inside a
