@@ -25,6 +25,7 @@ Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see
 | 18    | [Toolbox](PLAN-18-toolbox.md) — Diagon Alley's cards expand in place into pure-client tools                          | PLAN-17 merged. **Declared exception: two PRs** — `feat/plan-18a-toolbox-shell` (grid + routing + 4 tools), then `feat/plan-18b-toolbox-tools` (the remaining 9) |
 | 19    | [Groot](PLAN-19-groot.md) — YAML editor, viewer & library (the JSON/Markdown sibling on Ollivanders)                 | PLAN-18 merged. Single PR                                                                                                |
 | 20    | [Edda: diagrams + print](PLAN-20-edda-diagrams-print.md) — Mermaid in every preview surface, PDF export             | PLAN-19 merged. Single PR, no parts (owner's instruction)                                                                 |
+| 21    | [Pensieve](PLAN-21-pensieve.md) — unified library shell over runestones + eddas + groots                            | PLAN-18 merged. Single PR. **Recommended execution order 18 → 21 → 19 → 20** — running it before PLAN-19 turns Groot's library page into one registry entry |
 | 99    | Future backlog                                                                                                      | Reference only — pull items into new numbered plans when scheduled                                                                            |
 
 Completed plans live in `completed/` — they remain the spec of record and must be consulted when later plans reference them.

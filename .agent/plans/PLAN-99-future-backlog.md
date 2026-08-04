@@ -16,6 +16,8 @@ _(**Utility toolbox page** — PROMOTED 2026-08-02 to **PLAN-18**: Diagon Alley'
 
 _(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — PROMOTED 2026-08-04 to **PLAN-20**, together, because a PDF that omitted the diagrams would be a bug. See `PLAN-20-edda-diagrams-print.md`. Note for the record: both rows claimed the features were "listed in Edda's coming-soon footer" — **no such footer exists** in the Edda UI, so nothing needed removing there.)_
 
+_(**Unified library shell** — PROMOTED 2026-08-04 to **PLAN-21**, as **Pensieve**: one `/pensieve` listing runestones + eddas + groots behind a type filter, client-side fan-out so storage stays uncoupled. It deletes the two near-identical library pages that already both call themselves "Pensieve". See `PLAN-21-pensieve.md`.)_
+
 _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by owner decision. PLAN-17 makes both moot: it puts **Preview** directly on the upload card, which is what thumbnails were for, and turns `uploads/` into a staging area you actively move or delete from rather than a pile needing retention rules. Do not re-add without a new decision.)_
 
 ## Tier B — valuable, larger
@@ -23,7 +25,6 @@ _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by ow
 | Idea                                  | Notes captured during planning                                                                                                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Edda: paste-image upload**          | Paste/drop an image into the editor → stored server-side, markdown link inserted. Needs an image-storage story (folder, cleanup, size caps) — real scope, own design pass. Listed in coming-soon. |
-| **Unified library shell**             | One library UI listing runestones + eddas with a type filter, over the separate per-module tables/APIs (storage stays uncoupled).                                                                 |
 
 | Idea                                                  | Notes                                                                                                                              |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
