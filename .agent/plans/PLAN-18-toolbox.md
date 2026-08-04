@@ -4,7 +4,7 @@
 
 Turn Diagon Alley from a row of doors into the utility toolbox itself. Small, pure-client tools stop being separate pages and open **in place**: tapping a card expands a full-width panel below that card's row, the other cards reflow around it, and the page scrolls so the panel is actually readable. Tools that own real state and a server module (Nimbus, Portkey) keep their own page and their card keeps navigating.
 
-This is the scheduled promotion of PLAN-99's **Utility toolbox page** row (plus its **Iris** row). PLAN-99 is reference-only; this file is the spec. **Both rows are deleted from PLAN-99 when this plan completes** — see "On completion".
+This is the scheduled promotion of PLAN-99's **Utility toolbox page** row (plus its **Iris** row). PLAN-99 is reference-only; this file is the spec. **Both rows were deleted from PLAN-99 on 2026-08-04** when this plan was scheduled — see "On completion".
 
 ## Gate
 
@@ -142,19 +142,13 @@ None. The `toolbox` module registers no routes; every tool is pure client comput
 - [ ] `hash` — `crypto.subtle`, gated by `supported()`; verify the card is absent over LAN http and present on `localhost`
 - [ ] *Stretch:* Iris "export as theme JSON starter" against THEME-SPEC
 - [ ] Docs sync: `architecture.md` module registry + the `toolbox` note, `project-structure.md`, `decisions.md` rows, `progress.md`, `plans/README.md` gate row ticked
-- [ ] **Strip the shipped ideas out of PLAN-99** (see "On completion" below)
-- [ ] Archive this file to `.agent/plans/completed/` **in the Part B PR**
+- [ ] Archive this file to `.agent/plans/completed/` **in the Part B PR** (PLAN-99 is already stripped — see "On completion")
 
 ## On completion
 
-Once Part B merges, the ideas this plan shipped must come **out** of `PLAN-99-future-backlog.md` — a backlog row that has already been built is a trap for the next session, which will read it as still-open work. Two rows go:
+**PLAN-99 is already clean.** Both rows this plan absorbs — Tier A's **Utility toolbox page** and the 2026-07-22 round's **Iris** — were deleted on 2026-08-04 at the owner's instruction, when the plan was scheduled rather than when it completes, so a backlog row for work that already has a numbered plan never sits around to be misread as still-open. A `PROMOTED … to PLAN-18` note points here in their place. *(This supersedes the earlier instruction in this section to strip them in the Part B PR.)*
 
-- Tier A → **Utility toolbox page**
-- Owner-reviewed additions (2026-07-22) → **Iris** (color toolkit)
-
-Delete both rows and leave one italic note in their place, the house style PLAN-99 already uses for the PWA-manifest and dropped-thumbnail entries — something of the form: _(**Utility toolbox page** and **Iris** — DONE 2026-08-XX as PLAN-18: Diagon Alley's cards now expand in place into 13 client-side tools. Removed from the backlog.)_
-
-Do this **in the Part B PR**, alongside archiving this file — the same rule as the plan archive (a plan's own PR closes its own paperwork). Not after Part A: Part A ships four tools and none of them is Iris, so the backlog rows are still partly true until B lands.
+So the remaining paperwork is the docs sync in Part B's task list plus **archiving this file to `.agent/plans/completed/` in the Part B PR** — a plan's own PR closes its own paperwork. Not after Part A: Part A ships four tools and none of them is Iris, so this plan is not done until B lands. Optionally flip the PLAN-99 note from `PROMOTED` to `DONE` then.
 
 ## Acceptance criteria
 

@@ -7,11 +7,14 @@ Ideas we deliberately deferred. When one is scheduled, promote it into a new num
 | Idea                      | Notes captured during planning                                                                                                                                                                                                                                               |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Shared markdown notes** | 2–3 persistent scratch notes, editable from any device, autosave + live SSE sync ("LAN Apple Notes"). Cloud-profile candidate. Reuses MarkdownViewer (PLAN-03) + clipboard patterns (PLAN-06). Conflict strategy: last-write-wins with edit lock indicator — keep it simple. |
-| **Utility toolbox page**  | Base64 encode/decode, UUID gen, timestamp converter. 100% client-side, zero backend. Prime cloud-profile candidate. One `toolbox` module, each tool lazy-loaded. _(JSON formatter/validator pulled into PLAN-07 Runestone, diff viewer into PLAN-08 — 2026-07-14.)_ **The category shell already exists** as the **Diagon Alley** page (2026-07-21 nav reorg): the QR maker (Sigil) is the one live stall; Base64/UUID/timestamp render as coming-soon cards awaiting this plan. |
 | **Send-to-device push**   | Pick a live device from presence → push a file/text directly to it; target shows a toast via its SSE connection. Builds on deviceId + presence (PLAN-06).                                                                                                                    |
 | **Download-all-as-zip**   | If not done as PLAN-02 stretch: `archiver` streamed, selection UI on downloads page.                                                                                                                                                                                         |
 
 _(**PWA manifest + icons** — DONE 2026-07-22: `client/public/` manifest + favicon/apple-touch/maskable icons, add-to-home-screen works; no service worker. Removed from the backlog.)_
+
+_(**Utility toolbox page** — PROMOTED 2026-08-02 to **PLAN-18**: Diagon Alley's cards expand in place into ~13 client-side tools. **Iris** (below) was folded into the same plan. See `PLAN-18-toolbox.md`; do not re-add here.)_
+
+_(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — PROMOTED 2026-08-04 to **PLAN-20**, together, because a PDF that omitted the diagrams would be a bug. See `PLAN-20-edda-diagrams-print.md`. Note for the record: both rows claimed the features were "listed in Edda's coming-soon footer" — **no such footer exists** in the Edda UI, so nothing needed removing there.)_
 
 _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by owner decision. PLAN-17 makes both moot: it puts **Preview** directly on the upload card, which is what thumbnails were for, and turns `uploads/` into a staging area you actively move or delete from rather than a pile needing retention rules. Do not re-add without a new decision.)_
 
@@ -19,9 +22,7 @@ _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by ow
 
 | Idea                                  | Notes captured during planning                                                                                                                                                                    |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Edda: Mermaid diagrams in preview** | Fenced ```mermaid blocks rendered client-side. Heavy dependency (~1 MB) — lazy-load only when a mermaid fence exists. Listed in Edda's coming-soon footer.                                        |
 | **Edda: paste-image upload**          | Paste/drop an image into the editor → stored server-side, markdown link inserted. Needs an image-storage story (folder, cleanup, size caps) — real scope, own design pass. Listed in coming-soon. |
-| **Edda: PDF export**                  | Print-stylesheet + browser print pipeline first; dedicated renderer only if that disappoints. Listed in coming-soon.                                                                              |
 | **Unified library shell**             | One library UI listing runestones + eddas with a type filter, over the separate per-module tables/APIs (storage stays uncoupled).                                                                 |
 
 | Idea                                                  | Notes                                                                                                                              |
@@ -58,7 +59,6 @@ Ideas surfaced in the 2026-07-22 review. **Accio · Nimbus · Portkey** from the
 | **Howler** (webhook/request catcher) | Anything hitting `/hook/<id>` logged (method/headers/body) and streamed live via the SSE hub; the self-hosted webhook.site. JSON bodies render via existing viewers. Small-medium. |
 | **Time-Turner** (shared timers) | Start a timer on one device, it rings on all via SSE; countdowns-to-date. Domestic delight on existing infrastructure. Small. |
 | **Echo** (voice memos) | MediaRecorder in-browser → library/downloads, playable anywhere via the PLAN-03 range-request audio path. Small-medium. |
-| **Iris** (color toolkit) | Palette extraction from an image, hex/rgb/hsl converter, contrast checker reusing the theme WCAG util; "export palette as theme JSON starter" feeds the theming engine. Small. |
 | **Skald** (Edda slideshow mode) | Render a saved edda as fullscreen slides (`---` breaks, arrow/tap nav) — a presentation tool as a view over PLAN-11. Small. |
 | **Argus** (home services status page) | Ping/HTTP-check a configurable list (router, NAS, printer), up/down tiles + history sparkline. Heimdall watches the bridge; Argus watches the realm. Medium. |
 
