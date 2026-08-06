@@ -40,7 +40,7 @@ bifrost/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
 │               │              #   variant, edda, loki, accio, nimbus, portkey,
-│               │              #   screensaver, client-logs, metrics
+│               │              #   screensaver, client-logs, metrics, toolbox
 │               ├── routes/
 │               ├── usecases/
 │               ├── services/  # concrete repo/service implementations
@@ -55,6 +55,8 @@ bifrost/
 │       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
 │       │                      #   theme engine, device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
+│       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
+│       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
 │       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode
 │       │                      #   +in-editor search, TreeView +bulk collapse),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
@@ -62,11 +64,15 @@ bifrost/
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
-│                              #   wardens→presence, sigil→qr-tool (server ids unchanged);
+│                              #   wardens→presence (server ids unchanged; sigil/ was deleted in
+│                              #   PLAN-18 — the QR page became a toolbox tool, module untouched);
 │                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11;
 │                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
 │                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14;
-│                              #   portkey (LAN go-links — own portkey.css) in PLAN-15
+│                              #   portkey (LAN go-links — own portkey.css) in PLAN-15;
+│                              #   toolbox (registry + lib/ pure utils + tools/ bodies in ONE lazy
+│                              #     chunk + own toolbox.css) in PLAN-18 — no route of its own,
+│                              #     the cards expand inside /diagon-alley/:toolId
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
 │                              #   start-pm2.sh, start-launchd.sh, observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files

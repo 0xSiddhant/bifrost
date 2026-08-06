@@ -137,12 +137,12 @@ None. The `toolbox` module registers no routes; every tool is pure client comput
 
 ### Part B — `feat/plan-18b-toolbox-tools`
 
-- [ ] `url`, `bytes`, `jwt`, `case`, `cidr`, `secret`, `cron`
-- [ ] `iris` — conversions + client WCAG contrast (own implementation, PLAN-99's note corrected) + image palette extraction
-- [ ] `hash` — `crypto.subtle`, gated by `supported()`; verify the card is absent over LAN http and present on `localhost`
-- [ ] *Stretch:* Iris "export as theme JSON starter" against THEME-SPEC
-- [ ] Docs sync: `architecture.md` module registry + the `toolbox` note, `project-structure.md`, `decisions.md` rows, `progress.md`, `plans/README.md` gate row ticked
-- [ ] Archive this file to `.agent/plans/completed/` **in the Part B PR** (PLAN-99 is already stripped — see "On completion")
+- [x] `url`, `bytes`, `jwt`, `case`, `cidr`, `secret`, `cron`
+- [x] `iris` — conversions + client WCAG contrast (own implementation, PLAN-99's note corrected) + image palette extraction
+- [x] `hash` — `crypto.subtle`, gated by `supported()`; verify the card is absent over LAN http and present on `localhost`
+- [x] *Stretch:* Iris "export as theme JSON starter" against THEME-SPEC
+- [x] Docs sync: `architecture.md` module registry + the `toolbox` note, `project-structure.md`, `decisions.md` rows, `progress.md`, `plans/README.md` gate row ticked
+- [x] Archive this file to `.agent/plans/completed/` **in the Part B PR** (PLAN-99 is already stripped — see "On completion")
 
 ## On completion
 
@@ -174,8 +174,8 @@ So the remaining paperwork is the docs sync in Part B's task list plus **archivi
 ## Tests
 
 - [x] Unit: `panelInsertIndex` across column counts and the last-row boundary; `scrollPlan` for all three branches incl. both insets; column-string parsing incl. `none`
-- [ ] Unit: Base64 UTF-8 round-trip corpus, UUID v4/v7 shape + variant/version bits, epoch conversions across DST and negative timestamps, URL parse/encode corpus, byte/base conversions, JWT decode (valid, malformed, unpadded base64url, missing `exp`), CIDR maths incl. `/31` and `/32`, case conversions, cron field parsing + next-fire times, WCAG `contrastRatio` against the `themes` test vectors
+- [x] Unit: Base64 UTF-8 round-trip corpus, UUID v4/v7 shape + variant/version bits, epoch conversions across DST and negative timestamps, URL parse/encode corpus, byte/base conversions, JWT decode (valid, malformed, unpadded base64url, missing `exp`), CIDR maths incl. `/31` and `/32`, case conversions, cron field parsing + next-fire times, WCAG `contrastRatio` against the `themes` test vectors
 - [x] Component: card renders `aria-expanded`, Escape closes and restores focus, unsupported tool is not rendered
 - [x] Server: capabilities integration test lists `toolbox` in both profiles
-- [ ] Live-verify (`live-verify` skill): expansion at 4 viewport widths with measured panel/card geometry, the three scroll branches, tool-switch scrolling once, the `/sigil` redirect, the two-origin `crypto.subtle` gate, Midgard/Ollivanders before-and-after screenshots, zero console errors
+- [x] Live-verify (`live-verify` skill): expansion at 4 viewport widths with measured panel/card geometry, the three scroll branches, tool-switch scrolling once, the `/sigil` redirect, the two-origin `crypto.subtle` gate, Midgard/Ollivanders before-and-after screenshots, zero console errors
 - [ ] Manual: a real phone on the LAN — panel readability, the bottom-nav inset, and that the SHA-256 card is genuinely absent there
