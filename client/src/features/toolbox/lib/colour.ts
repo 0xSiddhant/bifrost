@@ -274,6 +274,12 @@ export function extractPalette(pixels: Uint8ClampedArray, count = 6): string[] {
  * Only the 14 required roles plus the ten card slots are emitted — everything
  * else in the spec is derived when omitted, and a starter that listed every
  * optional token would be a wall to edit rather than a beginning.
+ *
+ * The palette drives the **decorative** roles only: the two accents and the ten
+ * positional card hues. `--ok`/`--danger`/`--warn` keep their semantic
+ * defaults, because a photo has no opinion about which of its colours means
+ * "this failed" — taking them by position produced a navy warning and a sandy
+ * danger the first time this ran. Those are the ones to hand-pick afterwards.
  */
 export function paletteToThemeJson(
   palette: string[],
@@ -301,11 +307,11 @@ export function paletteToThemeJson(
         '--border': dark ? '#2a2a3d' : '#d8dae4',
         '--accent': accent,
         '--accent-2': accent2,
-        '--ok': palette[2] ?? '#4ade80',
-        '--danger': palette[3] ?? '#f87171',
-        '--warn': palette[4] ?? '#fbbf24',
+        '--ok': dark ? '#4ade80' : '#15803d',
+        '--danger': dark ? '#f87171' : '#b91c1c',
+        '--warn': dark ? '#fbbf24' : '#b45309',
         '--accent-soft': `${accent}1f`,
-        '--danger-soft': dark ? 'rgba(248, 113, 113, 0.14)' : 'rgba(220, 38, 38, 0.1)',
+        '--danger-soft': dark ? 'rgba(248, 113, 113, 0.14)' : 'rgba(185, 28, 28, 0.1)',
         '--scrim': dark ? 'rgba(4, 4, 10, 0.66)' : 'rgba(20, 20, 30, 0.38)',
         ...cards,
       },

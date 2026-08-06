@@ -212,6 +212,21 @@ describe('paletteToThemeJson', () => {
     expect(json.tokens['--bg']).toBe('#f7f7fb');
   });
 
+  it('keeps the semantic roles semantic — a photo has no opinion on "danger"', () => {
+    // The palette here is all blues; taking ok/danger/warn by position would
+    // make every status colour the same blue.
+    const palette = ['#2b6cb0', '#3d5a80', '#4a6fa5', '#5b8fc9', '#1e3a5f'];
+    const json = JSON.parse(paletteToThemeJson(palette, { id: 'x', name: 'X', mode: 'dark' }));
+    for (const role of ['--ok', '--danger', '--warn']) {
+      expect(palette).not.toContain(json.tokens[role]);
+    }
+    expect(json.tokens['--ok']).toBe('#4ade80');
+    expect(json.tokens['--danger']).toBe('#f87171');
+    // …while the decorative slots do come from the palette.
+    expect(json.tokens['--card-1']).toBe('#2b6cb0');
+    expect(json.tokens['--accent']).toBe('#2b6cb0');
+  });
+
   it('still produces a valid starter from a single-colour palette', () => {
     const json = JSON.parse(
       paletteToThemeJson(['#112233'], { id: 'x', name: 'X', mode: 'dark' }),

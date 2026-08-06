@@ -32,6 +32,11 @@ describe('splitWords', () => {
     expect(splitWords('')).toEqual([]);
     expect(splitWords('---')).toEqual([]);
   });
+
+  it('does not split a word on its own accent', () => {
+    expect(splitWords('Crème Brûlée')).toEqual(['Crème', 'Brûlée']);
+    expect(splitWords('naïveApproach')).toEqual(['naïve', 'Approach']);
+  });
 });
 
 describe('convertCase', () => {
@@ -70,6 +75,17 @@ describe('slugify', () => {
   it('folds diacritics to ASCII instead of dropping the letters', () => {
     expect(slugify('Crème Brûlée')).toBe('creme-brulee');
     expect(slugify('naïve café')).toBe('naive-cafe');
+  });
+
+  it('uses the same word split as every other form', () => {
+    // Slugging the raw string would give "httpresponsecode" — there are no
+    // separators in a camelCase input to slug on.
+    expect(slugify('HTTPResponseCode')).toBe('http-response-code');
+    expect(slugify('userIdToken')).toBe('user-id-token');
+  });
+
+  it('returns empty for a script that has no ASCII form', () => {
+    expect(slugify('日本語')).toBe('');
   });
 
   it('collapses runs and trims the ends', () => {
