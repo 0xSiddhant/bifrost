@@ -141,17 +141,30 @@ export function ExpandingGrid({
    * Scroll the panel into view — on open and on tool-switch only. Deliberately
    * NOT on resize or on a column re-measure: yanking the page while someone
    * drags a window is the behaviour this dependency list exists to prevent.
-   * One rAF so the panel has its final height before we measure it.
+   *
+   * Two passes, not one. The first runs after a frame, which is enough when the
+   * body is already in the bundle. But the first tool opened arrives as a lazy
+   * chunk, so that frame holds the *skeleton* — measuring it plans against a
+   * panel a third of its final height and picks the wrong branch entirely (a
+   * tall tool then lands with its own controls above the fold, the exact bug
+   * branch 3 exists to prevent). So a ResizeObserver watches the panel and
+   * re-plans **once**, the first time its height actually changes, then
+   * disconnects: at most two scrolls per open, and a window resize after the
+   * panel has settled can no longer move the page.
    */
   useLayoutEffect(() => {
     if (!openId) return;
-    const frame = requestAnimationFrame(() => {
+    let observer: ResizeObserver | null = null;
+    let lastHeight = -1;
+
+    const plan = () => {
       const panel = panelRef.current;
       const card = cardRefs.current.get(openId);
       if (!panel || !card) return;
       const scrollY = window.scrollY;
       const panelRect = panel.getBoundingClientRect();
       const cardRect = card.getBoundingClientRect();
+      lastHeight = panelRect.height;
       const target = scrollPlan({
         cardTop: cardRect.top + scrollY,
         panelTop: panelRect.top + scrollY,
@@ -163,8 +176,27 @@ export function ExpandingGrid({
       });
       if (target === null) return;
       window.scrollTo({ top: target, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    };
+
+    const frame = requestAnimationFrame(() => {
+      plan();
+      const panel = panelRef.current;
+      if (!panel || typeof ResizeObserver === 'undefined') return;
+      observer = new ResizeObserver(() => {
+        // Ignore the observer's own first callback, which reports the height we
+        // just planned against.
+        if (Math.abs(panel.getBoundingClientRect().height - lastHeight) < 1) return;
+        observer?.disconnect();
+        observer = null;
+        plan();
+      });
+      observer.observe(panel);
     });
-    return () => cancelAnimationFrame(frame);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
   }, [openId]);
 
   /** Focus moves into the panel on open, without the browser scrolling for us. */
