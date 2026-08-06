@@ -210,6 +210,16 @@
   padding: var(--space-8) var(--space-6) var(--space-12);
 }
 
+/* Full-window pages. 62rem is a *reading* measure — right for prose, an editor
+   or a form, and wrong for a grid of small cards, which just gets fewer columns
+   and more wrapped titles the narrower it is. The toolbox opts out and takes
+   the same gutters as the sticky header, so the two line up. */
+.shell-main--wide {
+  max-width: none;
+  padding-left: max(var(--space-6), env(safe-area-inset-left));
+  padding-right: max(var(--space-6), env(safe-area-inset-right));
+}
+
 .page-loading {
   text-align: center;
   padding: var(--space-12);

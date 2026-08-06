@@ -10,7 +10,16 @@
   min-width: 0;
 }
 
-/* Right column of a `split` panel: the live output. */
+/* Right column of a `split` panel: the live output.
+   A container, so the tables below flow into more columns when the *panel*
+   gives them room. Keyed on the container rather than the viewport because the
+   same output sits in a full-width panel, in a split panel's right column, and
+   in half of the URL parser — three different widths at one viewport size. */
+.tool-output,
+.tool-panel__body {
+  container-type: inline-size;
+}
+
 .tool-output {
   display: flex;
   flex-direction: column;
@@ -70,8 +79,8 @@
   list-style: none;
   margin: 0;
   padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   max-height: 18rem;
   overflow: auto;
@@ -80,14 +89,45 @@
   border-radius: var(--radius-md);
   background: var(--surface-2);
   overflow-wrap: anywhere;
+  max-width: 44rem;
 }
 
-/* Label / value / copy rows (Epoch). The value column takes the slack. */
+/* Same rule as the tables: a hundred UUIDs in four columns beats a hundred in
+   one, and the fixed max-height means the extra columns actually shorten the
+   scroll rather than just widening it. */
+@container (min-width: 56rem) {
+  .tool-list {
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 26rem));
+    justify-content: start;
+    gap: var(--space-1) var(--space-6);
+    max-width: none;
+  }
+}
+
+/* Label / value / copy rows (Epoch, CIDR, Iris, bytes).
+   Capped: the panel spans the whole window now, and a row that stretched with
+   it put the Copy button a thousand pixels from the value it copies. The cap
+   is above the column width at 1280, so nothing below a large desktop moves. */
 .tool-rows {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   margin: 0;
+  max-width: 44rem;
+}
+
+/* Given room, the table flows into more columns instead of one tall list
+   beside an empty half-panel. Columns are **bounded** (`minmax`, not `1fr`) so
+   extra width buys another column rather than stretching the existing ones —
+   stretching is what put Copy a screen away from its value in the first
+   place. */
+@container (min-width: 56rem) {
+  .tool-rows {
+    grid-template-columns: repeat(auto-fit, minmax(21rem, 26rem));
+    justify-content: start;
+    gap: var(--space-1) var(--space-6);
+    max-width: none;
+  }
 }
 
 .tool-rows__row {
@@ -288,6 +328,13 @@
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* A digest or a password read left-to-right; past a point extra width is just
+   distance for the eye to travel. */
+.tool-secret,
+.tool-meter {
+  max-width: 44rem;
 }
 
 /* A generated value that deserves to be read at a glance. */
