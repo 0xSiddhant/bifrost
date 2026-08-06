@@ -222,7 +222,10 @@ export function App() {
         </div>
       )}
 
-      <main className="shell-main">
+      {/* Diagon Alley is a grid of small cards, not a reading column: it takes
+          the full window so the toolbox gets as many columns as the screen can
+          hold (PLAN-18). Every other page keeps the 62rem measure. */}
+      <main className={pathname.startsWith('/diagon-alley') ? 'shell-main shell-main--wide' : 'shell-main'}>
         <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
           <Routes>
             <Route path="/" element={<MidgardPage />} />

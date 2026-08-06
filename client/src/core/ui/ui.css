@@ -221,9 +221,13 @@ a.portal:hover .portal__go {
    expanding-row behaviour stays out of Midgard and Ollivanders, which do not
    want it. The open panel spans every column at the end of its source card's
    row, so no card ever changes column when one opens. */
+/* The track is sized so a two-word title and its one-line hint fit without
+   wrapping to three lines — at 14rem "ASCII / Hex / Binary" broke its own
+   title. `auto-fit` then adds columns as the window grows, which is the whole
+   reason the page opts out of the 62rem reading measure. */
 .toolbox-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: var(--space-4);
   /* Stretch, so a two-line hint doesn't leave its neighbours short — cards in a
      row share a height the way .portals cards do. */
@@ -233,8 +237,8 @@ a.portal:hover .portal__go {
 .tool-card {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-5);
   text-align: left;
   font: inherit;
   cursor: pointer;
@@ -242,8 +246,8 @@ a.portal:hover .portal__go {
 }
 
 .tool-card__icon {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
   flex: none;
 }
 

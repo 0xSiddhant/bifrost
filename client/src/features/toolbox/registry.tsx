@@ -1,6 +1,22 @@
 import type { ReactNode } from 'react';
 import type { PanelLayout } from '../../core/ui/ExpandingGrid';
-import { ClockIcon, CodeIcon, GaugeIcon, KeyIcon, QrIcon, WandIcon } from '../../core/ui/icons';
+import {
+  BinaryIcon,
+  CalendarIcon,
+  ClockIcon,
+  CodeIcon,
+  DropletIcon,
+  FingerprintIcon,
+  GaugeIcon,
+  KeyIcon,
+  LinkIcon,
+  LockIcon,
+  NetworkIcon,
+  QrIcon,
+  TicketIcon,
+  TypeIcon,
+  WandIcon,
+} from '../../core/ui/icons';
 
 export interface ToolCard {
   id: string;
@@ -81,6 +97,84 @@ export const TOOLS: ToolCard[] = [
     icon: <ClockIcon size={22} />,
     module: 'toolbox',
     layout: 'split',
+  },
+  {
+    id: 'url',
+    title: 'URL',
+    hint: 'Encode, decode, and take a URL apart',
+    icon: <LinkIcon size={22} />,
+    module: 'toolbox',
+    layout: 'full',
+  },
+  {
+    id: 'bytes',
+    title: 'ASCII / Hex / Binary',
+    hint: 'Text ⇄ bytes, number bases, and counts',
+    icon: <BinaryIcon size={22} />,
+    module: 'toolbox',
+    layout: 'full',
+  },
+  {
+    id: 'jwt',
+    title: 'JWT',
+    hint: 'Read a token — decode only, never verify',
+    icon: <TicketIcon size={22} />,
+    module: 'toolbox',
+    layout: 'full',
+  },
+  {
+    id: 'iris',
+    title: 'Iris',
+    hint: 'Colour conversion, contrast, palettes',
+    icon: <DropletIcon size={22} />,
+    module: 'toolbox',
+    layout: 'split',
+  },
+  {
+    id: 'cidr',
+    title: 'CIDR',
+    hint: 'A block → mask, range, and host count',
+    icon: <NetworkIcon size={22} />,
+    module: 'toolbox',
+    layout: 'split',
+  },
+  {
+    id: 'case',
+    title: 'Case',
+    hint: 'camelCase, snake_case, kebab-case, slugs',
+    icon: <TypeIcon size={22} />,
+    module: 'toolbox',
+    layout: 'full',
+  },
+  {
+    id: 'secret',
+    title: 'Password',
+    hint: 'Random, with an honest entropy figure',
+    icon: <LockIcon size={22} />,
+    module: 'toolbox',
+    layout: 'split',
+  },
+  {
+    id: 'cron',
+    title: 'Cron',
+    hint: 'What it means, and when it next runs',
+    icon: <CalendarIcon size={22} />,
+    module: 'toolbox',
+    layout: 'split',
+  },
+  {
+    id: 'hash',
+    title: 'SHA-256',
+    hint: 'Digest text with Web Crypto',
+    icon: <FingerprintIcon size={22} />,
+    module: 'toolbox',
+    layout: 'split',
+    /**
+     * `crypto.subtle` is secure-context-only, so on the plain-http LAN origin
+     * every device except the host Mac at localhost has no such API. Hiding the
+     * card beats bundling a JS SHA-256 to paper over it.
+     */
+    supported: () => Boolean(globalThis.crypto?.subtle),
   },
 ];
 

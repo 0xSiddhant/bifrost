@@ -12,7 +12,7 @@ Ideas we deliberately deferred. When one is scheduled, promote it into a new num
 
 _(**PWA manifest + icons** — DONE 2026-07-22: `client/public/` manifest + favicon/apple-touch/maskable icons, add-to-home-screen works; no service worker. Removed from the backlog.)_
 
-_(**Utility toolbox page** — PROMOTED 2026-08-02 to **PLAN-18**: Diagon Alley's cards expand in place into ~13 client-side tools. **Iris** (below) was folded into the same plan. See `PLAN-18-toolbox.md`; do not re-add here.)_
+_(**Utility toolbox page** — DONE, shipped 2026-08-06 as **PLAN-18**: Diagon Alley's cards expand in place into ~13 client-side tools. **Iris** (below) was folded into the same plan. See `PLAN-18-toolbox.md`; do not re-add here.)_
 
 _(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — PROMOTED 2026-08-04 to **PLAN-20**, together, because a PDF that omitted the diagrams would be a bug. See `PLAN-20-edda-diagrams-print.md`. Note for the record: both rows claimed the features were "listed in Edda's coming-soon footer" — **no such footer exists** in the Edda UI, so nothing needed removing there.)_
 
