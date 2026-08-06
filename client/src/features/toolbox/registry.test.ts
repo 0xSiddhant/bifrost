@@ -31,6 +31,45 @@ describe('TOOLS', () => {
     expect(byId.get('nimbus')?.module).toBe('nimbus');
     expect(byId.get('portkey')?.module).toBe('portkey');
   });
+
+  it('holds every tool both parts of PLAN-18 specified, in the plan order', () => {
+    expect(TOOLS.map((tool) => tool.id)).toEqual([
+      'nimbus', 'portkey',
+      'qr', 'base64', 'uuid', 'epoch',
+      'url', 'bytes', 'jwt', 'iris', 'cidr', 'case', 'secret', 'cron', 'hash',
+    ]);
+  });
+
+  it('gates SHA-256 on crypto.subtle, and nothing else', () => {
+    const gated = TOOLS.filter((tool) => tool.supported);
+    expect(gated.map((tool) => tool.id)).toEqual(['hash']);
+    // UUID and the password generator deliberately do NOT need the hook:
+    // getRandomValues is available on a plain-http origin.
+    expect(TOOLS.find((tool) => tool.id === 'uuid')?.supported).toBeUndefined();
+    expect(TOOLS.find((tool) => tool.id === 'secret')?.supported).toBeUndefined();
+  });
+
+  it('hides SHA-256 exactly when crypto.subtle is missing', () => {
+    const hash = TOOLS.find((tool) => tool.id === 'hash');
+    if (!hash?.supported) throw new Error('expected a gated hash tool');
+    // `subtle` is a prototype getter, not an own property — so restoring means
+    // deleting the shadow we define, not re-defining a descriptor that was
+    // never there.
+    const own = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+
+    expect(hash.supported()).toBe(true); // Node is a secure context
+    Object.defineProperty(globalThis.crypto, 'subtle', { configurable: true, value: undefined });
+    try {
+      resetSupportCache();
+      expect(hash.supported()).toBe(false);
+      expect(availableTools(TOOLS, () => true).some((tool) => tool.id === 'hash')).toBe(false);
+    } finally {
+      if (own) Object.defineProperty(globalThis.crypto, 'subtle', own);
+      else Reflect.deleteProperty(globalThis.crypto, 'subtle');
+      resetSupportCache();
+    }
+    expect(availableTools(TOOLS, () => true).some((tool) => tool.id === 'hash')).toBe(true);
+  });
 });
 
 describe('availableTools', () => {

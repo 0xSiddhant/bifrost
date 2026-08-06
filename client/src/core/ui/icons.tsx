@@ -285,3 +285,70 @@ export const SwapIcon = (p: IconProps) => (
     <path d="M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5" />
   </svg>
 );
+
+export const LinkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.6 1.6" />
+    <path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.6-1.6" />
+  </svg>
+);
+
+export const BinaryIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="4" width="6" height="7" rx="2" />
+    <rect x="14.5" y="13" width="6" height="7" rx="2" />
+    <path d="M15 4h3v7M14 11h6M6 20h6M9 13v7" />
+  </svg>
+);
+
+export const TicketIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a2.5 2.5 0 0 0 0 5v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a2.5 2.5 0 0 0 0-5Z" />
+    <path d="M13 6v2M13 11v2M13 16v2" />
+  </svg>
+);
+
+export const DropletIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3.5c3 3.6 5.5 6.4 5.5 9.3a5.5 5.5 0 0 1-11 0c0-2.9 2.5-5.7 5.5-9.3Z" />
+  </svg>
+);
+
+export const NetworkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="9" y="3" width="6" height="5" rx="1.2" />
+    <rect x="2.5" y="16" width="6" height="5" rx="1.2" />
+    <rect x="15.5" y="16" width="6" height="5" rx="1.2" />
+    <path d="M12 8v4M5.5 16v-2h13v2M12 12v2" />
+  </svg>
+);
+
+export const TypeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 6.5V5h9v1.5M8.5 5v14M6.5 19h4" />
+    <path d="M14 12.5V11h6v1.5M17 11v8M15.5 19h3" />
+  </svg>
+);
+
+export const LockIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="4.5" y="10" width="15" height="10" rx="2" />
+    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+  </svg>
+);
+
+export const CalendarIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+
+export const FingerprintIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 11a7 7 0 0 1 14 0v1" />
+    <path d="M8.5 11a3.5 3.5 0 0 1 7 0v3a6 6 0 0 1-.8 3" />
+    <path d="M12 11v4a9 9 0 0 1-1.2 4.5" />
+    <path d="M7.2 15.5A8 8 0 0 1 7 14v-3" />
+  </svg>
+);

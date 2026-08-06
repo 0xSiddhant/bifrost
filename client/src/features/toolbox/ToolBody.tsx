@@ -1,6 +1,15 @@
 import { Base64Tool } from './tools/Base64Tool';
+import { BytesTool } from './tools/BytesTool';
+import { CaseTool } from './tools/CaseTool';
+import { CidrTool } from './tools/CidrTool';
+import { CronTool } from './tools/CronTool';
 import { EpochTool } from './tools/EpochTool';
+import { HashTool } from './tools/HashTool';
+import { IrisTool } from './tools/IrisTool';
+import { JwtTool } from './tools/JwtTool';
 import { QrTool } from './tools/QrTool';
+import { SecretTool } from './tools/SecretTool';
+import { UrlTool } from './tools/UrlTool';
 import { UuidTool } from './tools/UuidTool';
 
 /**
@@ -20,6 +29,24 @@ export function ToolBody({ toolId }: { toolId: string }) {
       return <UuidTool />;
     case 'epoch':
       return <EpochTool />;
+    case 'url':
+      return <UrlTool />;
+    case 'bytes':
+      return <BytesTool />;
+    case 'jwt':
+      return <JwtTool />;
+    case 'iris':
+      return <IrisTool />;
+    case 'cidr':
+      return <CidrTool />;
+    case 'case':
+      return <CaseTool />;
+    case 'secret':
+      return <SecretTool />;
+    case 'cron':
+      return <CronTool />;
+    case 'hash':
+      return <HashTool />;
     default:
       // Unreachable: the caller only opens ids that are in the registry, and
       // an unknown :toolId is redirected to the hub before we get here.
