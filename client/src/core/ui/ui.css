@@ -78,15 +78,15 @@
   box-shadow: var(--shadow-1);
 }
 
-/* Portal — the one card used on every hub. A doorway to a tool or destination:
-   tone-lit corner, icon chip, title, description, and a footer tagline naming
-   where it leads. Renders as a <Link> normally, a dimmed <div> when `soon`.
+/* ── Tone-lit surface ───────────────────────────────────────────
+   The shared recipe behind every card whose colour follows its position in a
+   grid: a corner radial wash in the card's own hue, the sheen, and — for the
+   interactive ones — a lift, a tone-coloured border/glow, and the bridge accent
+   bar at the foot. `.portal` (hub doors) and `.tool-card` (the Diagon Alley
+   toolbox, PLAN-18) both compose it, so the two cannot drift apart.
    Colour comes from a .card-tone-N class (position-driven); --ct is that hue. */
-.portal {
+.tone-surface {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   --ct: transparent;
   background:
     radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--ct) 15%, transparent), transparent 55%),
@@ -94,7 +94,6 @@
     var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
   color: var(--text);
   text-decoration: none;
   overflow: hidden;
@@ -104,17 +103,8 @@
     box-shadow var(--dur-2) var(--ease);
 }
 
-.portal[class*='card-tone-'] .portal__icon {
-  background: color-mix(in srgb, var(--ct) 16%, transparent);
-  color: var(--ct);
-}
-
-.portal[class*='card-tone-'] .portal__go {
-  color: var(--ct);
-}
-
 /* The bridge accent bar slides in at the foot on hover — only for real doors. */
-.portal::after {
+.tone-surface::after {
   content: '';
   position: absolute;
   inset: auto 0 0 0;
@@ -124,32 +114,27 @@
   transition: opacity var(--dur-2) var(--ease);
 }
 
-a.portal:hover {
+/* Opt-in: a surface that actually leads somewhere or opens something. A
+   coming-soon portal deliberately never gets it. */
+.tone-surface--interactive:hover {
   text-decoration: none;
   transform: translateY(-3px);
   box-shadow: var(--shadow-2);
 }
 
-a.portal:hover::after {
+.tone-surface--interactive:hover::after {
   opacity: 1;
 }
 
-a.portal[class*='card-tone-']:hover {
+.tone-surface--interactive[class*='card-tone-']:hover {
   border-color: var(--ct);
   box-shadow:
     var(--shadow-2),
     0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
 }
 
-a.portal[class*='card-tone-']:hover .portal__icon {
-  box-shadow: 0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
-}
-
-a.portal:hover .portal__go {
-  transform: translateX(4px);
-}
-
-.portal__icon {
+/* The icon chip every tone surface carries, tinted by the card's own hue. */
+.tone-chip {
   width: 3rem;
   height: 3rem;
   display: grid;
@@ -158,6 +143,34 @@ a.portal:hover .portal__go {
   background: var(--accent-soft);
   color: var(--accent);
   transition: box-shadow var(--dur-2) var(--ease);
+}
+
+.tone-surface[class*='card-tone-'] .tone-chip {
+  background: color-mix(in srgb, var(--ct) 16%, transparent);
+  color: var(--ct);
+}
+
+.tone-surface--interactive[class*='card-tone-']:hover .tone-chip {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
+}
+
+/* Portal — the hub card. A doorway to a tool or destination: tone-lit corner
+   (from .tone-surface), icon chip, title, description, and a footer tagline
+   naming where it leads. Renders as a <Link> normally, a dimmed <div> when
+   `soon`. */
+.portal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+
+.portal[class*='card-tone-'] .portal__go {
+  color: var(--ct);
+}
+
+a.portal:hover .portal__go {
+  transform: translateX(4px);
 }
 
 .portal__title {

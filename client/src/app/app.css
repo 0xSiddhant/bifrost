@@ -429,7 +429,8 @@
 }
 
 /* Card-tone slots — map each card's position to one hue of the 10-tone palette
-   (--card-1..10). The .portal card component (core/ui/ui.css) reads --ct. */
+   (--card-1..10). The .tone-surface base (core/ui/ui.css), which .portal and
+   .tool-card both compose, reads --ct. */
 .card-tone-1 {
   --ct: var(--card-1);
 }
