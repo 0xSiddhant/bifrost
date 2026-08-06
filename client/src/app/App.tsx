@@ -35,9 +35,6 @@ const UploadPreviewModal = lazy(() =>
 const HermesPage = lazy(() =>
   import('../features/hermes/HermesPage').then((m) => ({ default: m.HermesPage })),
 );
-const SigilPage = lazy(() =>
-  import('../features/sigil/SigilPage').then((m) => ({ default: m.SigilPage })),
-);
 const HeimdallModal = lazy(() =>
   import('../features/heimdall/HeimdallModal').then((m) => ({ default: m.HeimdallModal })),
 );
@@ -84,7 +81,8 @@ const Screensaver = lazy(() =>
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
  * Each tab is a hub page whose tools live as cards there and keep their own
  * routes: Midgard (Send/Receive/Hermes/Join Bifrost), Ollivanders (Runestone/
- * Variant/Edda), Diagon Alley (the QR tool + the coming-soon toolbox). A tab
+ * Variant/Edda), Diagon Alley (Nimbus and Portkey, plus the tools that expand
+ * in place at /diagon-alley/:toolId rather than owning a route). A tab
  * appears only when at least one of its modules is loaded in the active deploy
  * profile. Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
@@ -111,7 +109,7 @@ const NAV: NavCategory[] = [
     to: '/diagon-alley',
     label: 'Diagon Alley',
     icon: <SparklesIcon size={18} />,
-    match: ['/sigil', '/nimbus', '/portkey'],
+    match: ['/nimbus', '/portkey'],
     modules: ['qr-tool', 'nimbus', 'portkey'],
   },
 ];
@@ -231,6 +229,9 @@ export function App() {
             {/* Category hubs — the tools they list keep their own routes below. */}
             <Route path="/ollivanders" element={<OllivandersPage />} />
             <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
+            {/* The open tool lives in the URL: back closes the panel, refresh
+                reopens it, and a tool is linkable (PLAN-18). */}
+            <Route path="/diagon-alley/:toolId" element={<DiagonAlleyPage />} />
             <Route path="/upload" element={<UploadPage />}>
               {/* Preview a staged file before publishing it; back closes it. */}
               <Route path=":name/preview" element={<UploadPreviewModal />} />
@@ -260,7 +261,10 @@ export function App() {
             <Route path="/edda/:slug" element={<EddaPage />} />
             <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
-            <Route path="/sigil" element={<SigilPage />} />
+            {/* The QR page became a toolbox tool (PLAN-18). The root stays in
+                RESERVED_ROOTS: this redirect is a real route, and a /go/sigil
+                slug shadowing it would be confusing. */}
+            <Route path="/sigil" element={<Navigate replace to="/diagon-alley/qr" />} />
             <Route path="/nimbus" element={<NimbusPage />} />
             <Route path="/portkey" element={<PortkeyPage />} />
             <Route path="*" element={<NotFoundPage />} />
