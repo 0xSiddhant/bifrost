@@ -1,80 +1,46 @@
-import type { ReactNode } from 'react';
+import { Suspense, useEffect, useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useCapabilities } from '../../core/useCapabilities';
-import { Portal } from '../../core/ui/Portal';
-import { GaugeIcon, QrIcon, SparklesIcon, WandIcon } from '../../core/ui/icons';
+import { ExpandingGrid } from '../../core/ui/ExpandingGrid';
+import { LazyToolBody, TOOLS, availableTools } from '../../features/toolbox';
 
 /**
- * Diagon Alley — the utility toolbox category. A row of small, self-contained
- * tools. "Make a QR" (Sigil) is the one open stall today; the rest are the
- * PLAN-99 toolbox utilities, advertised as coming soon.
+ * Diagon Alley — the utility toolbox itself, not a row of doors to one (PLAN-18).
+ * Small pure-client tools open **in place**: a full-width panel at the end of
+ * the source card's row. Nimbus and Portkey own real state and a server module,
+ * so their cards still navigate to their own pages.
  *
- * Card colour follows **position** in this list (see cardToneClass): reorder the
- * tools and the colours reorder with them — nothing hardcodes a per-card colour.
+ * The open tool lives in the URL (`/diagon-alley/:toolId`), which makes Back
+ * close the panel, refresh reopen it, and a tool linkable.
+ *
+ * Card colour follows **position** in the registry (see cardToneClass): reorder
+ * TOOLS and the colours reorder with them — nothing hardcodes a per-card hue.
  */
-interface Stall {
-  title: string;
-  description: string;
-  go: string;
-  icon: ReactNode;
-  to?: string;
-  module?: string;
-  soon?: boolean;
-}
-
-const STALLS: Stall[] = [
-  {
-    title: 'Make a QR',
-    description: 'Turn any text or URL into a scannable code you can size and download.',
-    go: 'text → scannable',
-    icon: <QrIcon size={24} />,
-    to: '/sigil',
-    module: 'qr-tool',
-  },
-  {
-    title: 'Nimbus',
-    description:
-      'Measure the Wi-Fi between this device and the bridge: download, upload, latency — with a trend per device.',
-    go: 'how fast is your air',
-    icon: <GaugeIcon size={24} />,
-    to: '/nimbus',
-    module: 'nimbus',
-  },
-  {
-    title: 'Portkey',
-    description:
-      'Short, memorable go-links for the whole network: bifrost.local/go/router, /go/nas — instant redirects with a QR each.',
-    go: 'a word → anywhere',
-    icon: <WandIcon size={24} />,
-    to: '/portkey',
-    module: 'portkey',
-  },
-  {
-    title: 'Base64',
-    description: 'Encode and decode Base64 text, entirely in the browser.',
-    go: 'encode ⇄ decode',
-    icon: <SparklesIcon size={24} />,
-    soon: true,
-  },
-  {
-    title: 'UUID',
-    description: 'Generate v4 UUIDs on demand, one or many at a time.',
-    go: 'unique every time',
-    icon: <SparklesIcon size={24} />,
-    soon: true,
-  },
-  {
-    title: 'Timestamp',
-    description: 'Convert between Unix time and human-readable dates, both ways.',
-    go: 'unix ⇄ human',
-    icon: <SparklesIcon size={24} />,
-    soon: true,
-  },
-];
-
 export function DiagonAlleyPage() {
   const { capabilities } = useCapabilities();
-  const has = (module?: string) => !module || !capabilities || capabilities.modules.includes(module);
-  const stalls = STALLS.filter((stall) => has(stall.module));
+  const { toolId } = useParams();
+  const navigate = useNavigate();
+
+  const tools = useMemo(
+    () =>
+      availableTools(TOOLS, (module) => !capabilities || capabilities.modules.includes(module)),
+    [capabilities],
+  );
+
+  const openTool = tools.find((tool) => tool.id === toolId && !tool.to) ?? null;
+
+  /**
+   * An unknown, unavailable or unsupported :toolId renders the hub with nothing
+   * open and rewrites the URL — never a 404, never a dead panel. Replaced, not
+   * pushed, so Back doesn't bounce straight back into the bad URL. Waits for
+   * capabilities: until they land every tool looks available, and redirecting
+   * on a half-loaded page would close a panel the user legitimately deep-linked.
+   */
+  useEffect(() => {
+    if (!toolId || !capabilities) return;
+    if (openTool) return;
+    navigate('/diagon-alley', { replace: true });
+  }, [toolId, capabilities, openTool, navigate]);
 
   return (
     <>
@@ -82,22 +48,37 @@ export function DiagonAlleyPage() {
         <div>
           <span className="eyebrow eyebrow--violet">diagon alley · little shops of handy magic</span>
           <h2>Diagon Alley</h2>
-          <p>A row of small, self-contained tools. More stalls are opening soon.</p>
+          <p>
+            Small, self-contained tools that run entirely in this browser. Tap one and it opens
+            right here.
+          </p>
         </div>
       </div>
 
-      <div className="portals">
-        {stalls.map((stall, index) => (
-          <Portal key={stall.title} tone={index + 1} {...stall} />
-        ))}
-      </div>
-
-      <div className="hub-soon-note">
-        <p>
-          🪄 The shutters are still up on a few storefronts. Base64, UUID, and timestamp conjuring
-          are being stocked — check back soon.
-        </p>
-      </div>
+      <ExpandingGrid
+        label="Toolbox"
+        items={tools}
+        openId={openTool?.id ?? null}
+        onOpen={(id) => navigate(`/diagon-alley/${id}`)}
+        onClose={() => navigate('/diagon-alley')}
+      >
+        {openTool && (
+          <Suspense fallback={<ToolSkeleton />}>
+            <LazyToolBody toolId={openTool.id} />
+          </Suspense>
+        )}
+      </ExpandingGrid>
     </>
+  );
+}
+
+/** A visible shape while the tool chunk arrives — never a blank panel. */
+function ToolSkeleton() {
+  return (
+    <div className="tool-skeleton" role="status" aria-label="Opening the tool">
+      <span className="tool-skeleton__bar" />
+      <span className="tool-skeleton__bar" />
+      <span className="tool-skeleton__bar" />
+    </div>
   );
 }

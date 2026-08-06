@@ -262,3 +262,26 @@ export const PencilIcon = (p: IconProps) => (
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </svg>
 );
+
+// Diagon Alley toolbox (PLAN-18).
+export const KeyIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="8" cy="12" r="4" />
+    <path d="M12 12h9" />
+    <path d="M17 12v3.5M20 12v2.5" />
+  </svg>
+);
+
+export const ClockIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </svg>
+);
+
+export const SwapIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 8h13m0 0-3.5-3.5M17 8l-3.5 3.5" />
+    <path d="M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5" />
+  </svg>
+);

@@ -40,6 +40,7 @@ import { portkeyModule } from './modules/portkey/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 import { clientLogsModule } from './modules/client-logs/module.js';
 import { metricsModule } from './modules/metrics/module.js';
+import { toolboxModule } from './modules/toolbox/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -77,6 +78,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Both profiles: the snapshot is the durable runtime record, and it has to
     // exist whether or not any container is running (PLAN-16b).
     metricsModule,
+    // Capability-only, both profiles: the toolbox is pure client compute, so
+    // this entry is purely the on/off switch for the Diagon Alley tools.
+    toolboxModule,
   ],
   cloud: [
     healthModule,
@@ -90,6 +94,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     screensaverModule,
     clientLogsModule,
     metricsModule,
+    toolboxModule,
   ],
 };
 

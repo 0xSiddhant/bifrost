@@ -124,16 +124,16 @@ None. The `toolbox` module registers no routes; every tool is pure client comput
 
 ### Part A — `feat/plan-18a-toolbox-shell`
 
-- [ ] Capability-only `toolbox` server module (`variant` precedent); added to both profile manifests in `app.ts`; capabilities test updated
-- [ ] Extract `.tone-surface` from `.portal` in `core/ui/ui.css`; `.portal` recomposed on it with **no visual change** to Midgard/Ollivanders
-- [ ] `core/ui/ExpandingGrid` — `.tool-card` presentation, column measurement + `ResizeObserver`, `panelInsertIndex`, panel placement, caret, tone inheritance
-- [ ] `scrollPlan` + the layout-effect/rAF application; header + bottom-nav insets read from the existing tokens
-- [ ] A11y: `aria-expanded`/`aria-controls`/`role="region"`, focus on open, Escape closes and restores focus
-- [ ] Route `/diagon-alley/:toolId` + unknown-id fallback (replace to `/diagon-alley`); `/sigil` → `<Navigate replace>`; delete `SigilPage.tsx`; drop `/sigil` from the nav match list
-- [ ] `features/toolbox/` registry (`kind`, `inner`, `supported`, lazy body) + `useToolState`
-- [ ] Rebuild `DiagonAlleyPage` on the registry: Nimbus/Portkey as `route` cards, the rest as `tool` cards; delete the `hub-soon-note`
-- [ ] Tools: `qr` (migrated), `base64`, `uuid`, `epoch`
-- [ ] Responsive pass at 375 / 768 / 1280 / 1600 for both inner layouts
+- [x] Capability-only `toolbox` server module (`variant` precedent); added to both profile manifests in `app.ts`; capabilities test updated
+- [x] Extract `.tone-surface` from `.portal` in `core/ui/ui.css`; `.portal` recomposed on it with **no visual change** to Midgard/Ollivanders
+- [x] `core/ui/ExpandingGrid` — `.tool-card` presentation, column measurement + `ResizeObserver`, `panelInsertIndex`, panel placement, caret, tone inheritance
+- [x] `scrollPlan` + the layout-effect/rAF application; header + bottom-nav insets read from the existing tokens
+- [x] A11y: `aria-expanded`/`aria-controls`/`role="region"`, focus on open, Escape closes and restores focus
+- [x] Route `/diagon-alley/:toolId` + unknown-id fallback (replace to `/diagon-alley`); `/sigil` → `<Navigate replace>`; delete `SigilPage.tsx`; drop `/sigil` from the nav match list
+- [x] `features/toolbox/` registry (`kind`, `inner`, `supported`, lazy body) + `useToolState`
+- [x] Rebuild `DiagonAlleyPage` on the registry: Nimbus/Portkey as `route` cards, the rest as `tool` cards; delete the `hub-soon-note`
+- [x] Tools: `qr` (migrated), `base64`, `uuid`, `epoch`
+- [x] Responsive pass at 375 / 768 / 1280 / 1600 for both inner layouts
 
 ### Part B — `feat/plan-18b-toolbox-tools`
 
@@ -173,9 +173,9 @@ So the remaining paperwork is the docs sync in Part B's task list plus **archivi
 
 ## Tests
 
-- [ ] Unit: `panelInsertIndex` across column counts and the last-row boundary; `scrollPlan` for all three branches incl. both insets; column-string parsing incl. `none`
+- [x] Unit: `panelInsertIndex` across column counts and the last-row boundary; `scrollPlan` for all three branches incl. both insets; column-string parsing incl. `none`
 - [ ] Unit: Base64 UTF-8 round-trip corpus, UUID v4/v7 shape + variant/version bits, epoch conversions across DST and negative timestamps, URL parse/encode corpus, byte/base conversions, JWT decode (valid, malformed, unpadded base64url, missing `exp`), CIDR maths incl. `/31` and `/32`, case conversions, cron field parsing + next-fire times, WCAG `contrastRatio` against the `themes` test vectors
-- [ ] Component: card renders `aria-expanded`, Escape closes and restores focus, unsupported tool is not rendered
-- [ ] Server: capabilities integration test lists `toolbox` in both profiles
+- [x] Component: card renders `aria-expanded`, Escape closes and restores focus, unsupported tool is not rendered
+- [x] Server: capabilities integration test lists `toolbox` in both profiles
 - [ ] Live-verify (`live-verify` skill): expansion at 4 viewport widths with measured panel/card geometry, the three scroll branches, tool-switch scrolling once, the `/sigil` redirect, the two-origin `crypto.subtle` gate, Midgard/Ollivanders before-and-after screenshots, zero console errors
 - [ ] Manual: a real phone on the LAN — panel readability, the bottom-nav inset, and that the SHA-256 card is genuinely absent there

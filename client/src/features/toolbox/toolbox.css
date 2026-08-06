@@ -1,0 +1,165 @@
+/* Tool bodies (PLAN-18). The panel shell — grid, card, caret, the split/full
+   inner layouts — lives in core/ui/ui.css with ExpandingGrid; this file is only
+   what goes *inside* a panel. Every value is a token. */
+
+/* Left column of a `split` panel: the controls. */
+.tool-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+/* Right column of a `split` panel: the live output. */
+.tool-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* A row of small toggles/actions that wraps rather than overflowing. */
+.tool-chiprow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Toolbar above a `full` panel's content. */
+.tool-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.tool-bar__spacer {
+  flex: 1 1 auto;
+}
+
+/* Paired input/output areas — side by side, each taking half the width, so a
+   full-width panel is actually used. */
+.tool-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.tool-pair .field__input {
+  width: 100%;
+  resize: vertical;
+}
+
+@media (max-width: 768px) {
+  .tool-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tool-error {
+  color: var(--danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+/* Generated lists (UUIDs): scrolls itself rather than growing the panel past
+   the viewport when someone asks for a hundred. */
+.tool-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 18rem;
+  overflow: auto;
+  font-size: var(--text-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow-wrap: anywhere;
+}
+
+/* Label / value / copy rows (Epoch). The value column takes the slack. */
+.tool-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.tool-rows__row {
+  display: grid;
+  grid-template-columns: minmax(6rem, auto) 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: background var(--dur-1) var(--ease);
+}
+
+.tool-rows__row:hover {
+  background: var(--surface-2);
+}
+
+.tool-rows__row dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tool-rows__row dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.tool-now {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--border);
+}
+
+/* QR output: the code beside what it encodes, so the column is used rather
+   than holding one centred fixed-width square in a lake of space. */
+.tool-qr {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.tool-qr__detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.tool-qr__value {
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+  /* Long URLs are common here; show enough to recognise, not a wall. */
+  max-height: 7.5rem;
+  overflow: auto;
+}
+
+@media (max-width: 560px) {
+  .tool-rows__row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .tool-rows__row dt {
+    grid-column: 1 / -1;
+  }
+
+  .tool-qr {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+}

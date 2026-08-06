@@ -28,6 +28,7 @@ export default {
         'screensaver',
         'client-logs',
         'metrics',
+        'toolbox',
         // core areas
         'core',
         'client',

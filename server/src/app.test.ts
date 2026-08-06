@@ -55,6 +55,7 @@ describe('boot → health → capabilities', () => {
         'screensaver',
         'client-logs',
         'metrics',
+        'toolbox',
       ],
     });
   });
@@ -68,5 +69,45 @@ describe('boot → health → capabilities', () => {
   it('boots with WAL journal mode and the settings table migrated', () => {
     const db = fs.existsSync(path.join(storageRoot, 'data', 'app.db'));
     expect(db).toBe(true);
+  });
+});
+
+/**
+ * The toolbox is capability-only (PLAN-18): the tools are pure client compute,
+ * so this list is the *only* thing standing between a deploy profile and the
+ * Diagon Alley tools rendering. Both profiles are asserted because a cloud
+ * build that silently lost the entry would show an empty hub, not an error.
+ */
+describe('capabilities in the cloud profile', () => {
+  let app: RunningApp;
+  let storageRoot: string;
+
+  beforeAll(async () => {
+    storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-cloud-'));
+    const config = loadConfig({
+      HEIMDALL_PIN: '4321',
+      STORAGE_ROOT: storageRoot,
+      DEPLOY_PROFILE: 'cloud',
+    });
+    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+  });
+
+  afterAll(async () => {
+    await app.shutdown();
+    fs.rmSync(storageRoot, { recursive: true, force: true });
+  });
+
+  it('lists toolbox alongside the other internet-safe modules', async () => {
+    const response = await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.profile).toBe('cloud');
+    expect(body.modules).toContain('toolbox');
+    // qr-tool stays loaded in both profiles — /sigil became a tool, but
+    // GET /api/qr/server-url is still what Midgard's Join card reads.
+    expect(body.modules).toContain('qr-tool');
+    // Local-only modules must not leak into the cloud manifest.
+    expect(body.modules).not.toContain('file-transfer');
+    expect(body.modules).not.toContain('portkey');
   });
 });
