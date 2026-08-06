@@ -223,9 +223,11 @@ a.portal:hover .portal__go {
    row, so no card ever changes column when one opens. */
 .toolbox-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: var(--space-4);
-  align-items: start;
+  /* Stretch, so a two-line hint doesn't leave its neighbours short — cards in a
+     row share a height the way .portals cards do. */
+  align-items: stretch;
 }
 
 .tool-card {
@@ -301,19 +303,34 @@ a.portal:hover .portal__go {
 
 /* A triangle on the top edge pointing back at the card that opened the panel.
    --caret-x is measured; when it cannot be, the element is not rendered at all
-   rather than drawn at a wrong position. */
+   rather than drawn at a wrong position.
+
+   Two stacked border-triangles rather than a rotated square: a square sitting
+   half outside a panel whose background is a gradient shows its own lower edges
+   wherever the two do not match, which reads as a floating diamond (visible in
+   the dark themes). A triangle has no lower half to give itself away. */
 .tool-panel__caret {
   position: absolute;
-  top: -7px;
+  top: -8px;
   left: var(--caret-x, 50%);
-  width: 14px;
-  height: 14px;
-  margin-left: -7px;
-  background: var(--surface);
-  border-left: 1px solid color-mix(in srgb, var(--ct) 45%, var(--border));
-  border-top: 1px solid color-mix(in srgb, var(--ct) 45%, var(--border));
-  transform: rotate(45deg);
-  border-top-left-radius: 3px;
+  width: 0;
+  height: 0;
+  margin-left: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid color-mix(in srgb, var(--ct) 45%, var(--border));
+}
+
+.tool-panel__caret::after {
+  content: '';
+  position: absolute;
+  top: 1.5px;
+  left: -7px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--surface);
 }
 
 .tool-panel__head {

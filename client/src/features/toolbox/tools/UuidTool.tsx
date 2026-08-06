@@ -56,7 +56,7 @@ export function UuidTool() {
           <p className="caption">
             {version === 'v4'
               ? '122 random bits. No ordering, no information about when it was made.'
-              : 'A millisecond timestamp then randomness, so a list of them sorts by creation time.'}
+              : 'A millisecond timestamp then randomness, so they sort by creation time to the millisecond.'}
           </p>
         </div>
 
