@@ -59,6 +59,9 @@ const EddaPage = lazy(() =>
 const EddaPreviewPage = lazy(() =>
   import('../features/edda/EddaPreviewPage').then((m) => ({ default: m.EddaPreviewPage })),
 );
+const GrootPage = lazy(() =>
+  import('../features/groot/GrootPage').then((m) => ({ default: m.GrootPage })),
+);
 const LokiPage = lazy(() =>
   import('../features/loki/LokiPage').then((m) => ({ default: m.LokiPage })),
 );
@@ -102,8 +105,8 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda', '/loki', '/pensieve'],
-    modules: ['runestone', 'variant', 'edda', 'loki'],
+    match: ['/runestone', '/variant', '/edda', '/groot', '/loki', '/pensieve'],
+    modules: ['runestone', 'variant', 'edda', 'groot', 'loki'],
   },
   {
     to: '/diagon-alley',
@@ -266,6 +269,13 @@ export function App() {
             <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
             <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
             <Route path="/edda/:slug" element={<EddaPage />} />
+            {/* literal segments beat the :slug param — declared first */}
+            <Route path="/groot" element={<GrootPage />} />
+            {/* PLAN-21 shipped first, so Groot never had a library page of its
+                own: both aliases point straight at the one Pensieve. */}
+            <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
+            <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
+            <Route path="/groot/:slug" element={<GrootPage />} />
             <Route path="/loki" element={<LokiPage />} />
             <Route path="/wardens" element={<WardensPage />} />
             {/* The QR page became a toolbox tool (PLAN-18). The root stays in

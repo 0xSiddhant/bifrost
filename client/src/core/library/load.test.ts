@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { log } from '../log';
 import { loadLibrary } from './load';
-import { availableKinds, entryFor } from './registry';
+import { LIBRARY_REGISTRY, availableKinds, entryFor } from './registry';
 import { filterItems, sortItems } from './select';
 import type { LibraryEntry, LibraryItem, LibraryKind, LibraryQuery } from './types';
 
@@ -194,5 +194,47 @@ describe('a fourth kind is one registry entry', () => {
   it('is gated by its own capability, like every other kind', () => {
     const kinds = availableKinds(registry, (module) => module === 'scroll');
     expect(kinds.map((entry) => entry.kind)).toEqual(['scroll']);
+  });
+});
+
+/**
+ * The real registry, not a fake one. PLAN-21 predicted that a fourth document
+ * type would be one entry and no page change; PLAN-19 then added Groot and this
+ * is the evidence it held — every per-kind behaviour the page uses is reachable
+ * through the entry alone.
+ */
+describe('the shipped registry', () => {
+  it('carries one entry per document kind', () => {
+    expect(LIBRARY_REGISTRY.map((entry) => entry.kind)).toEqual(['runestone', 'edda', 'groot']);
+  });
+
+  it('gives every kind a distinct label, capability and badge colour', () => {
+    const labels = LIBRARY_REGISTRY.map((entry) => entry.label);
+    const modules = LIBRARY_REGISTRY.map((entry) => entry.module);
+    const tones = LIBRARY_REGISTRY.map((entry) => entry.tone);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(new Set(modules).size).toBe(modules.length);
+    // The badge is only recognisable at a glance if no two kinds share a hue.
+    expect(new Set(tones).size).toBe(tones.length);
+  });
+
+  it('wires every kind end to end', () => {
+    for (const entry of LIBRARY_REGISTRY) {
+      const item = {
+        kind: entry.kind,
+        id: 'abc123',
+        name: 'Doc',
+        slug: `doc-abc123`,
+        authorDeviceId: null,
+        sizeBytes: 1,
+        createdAt: 0,
+        modifiedAt: 0,
+      };
+      expect(entry.events).toEqual([`${entry.kind}.saved`, `${entry.kind}.deleted`]);
+      expect(entry.editorRoute(item)).toContain('doc-abc123');
+      expect(entry.newRoute.startsWith('/')).toBe(true);
+      expect(typeof entry.list).toBe('function');
+      expect(typeof entry.remove).toBe('function');
+    }
   });
 });

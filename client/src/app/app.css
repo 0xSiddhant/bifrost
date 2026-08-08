@@ -3692,3 +3692,68 @@
     }
   }
 }
+
+/* ── Groot · YAML workspace (PLAN-19) ──────────────────────────────────────── */
+
+/* The editor chrome (.rune-workspace / .rune-toolbar / .rune-body / .rune-stats)
+   is shared with Runestone rather than duplicated: Groot's layout is the same
+   editor-plus-tree, and the Pensieve's rune-lib-* rules were already shared by
+   two pages before PLAN-21 made that official. Only the two surfaces Groot adds
+   need rules of their own. */
+
+/* Document switcher for a `---` stream. */
+.groot-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+/* Advisories: valid YAML that probably means something else than it looks
+   like. Warning-toned, never danger — nothing here blocks a save. */
+.groot-advisories {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.groot-advisory {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--warn, var(--accent)) 30%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn, var(--accent)) 8%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.groot-advisory:hover,
+.groot-advisory:focus-visible {
+  border-color: color-mix(in srgb, var(--warn, var(--accent)) 55%, var(--border));
+}
+
+.groot-advisory > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+
+.groot-advisory__count {
+  color: var(--text-muted);
+}
+
+/* The line number is the actionable part on a phone, so it never wraps away. */
+.groot-advisory__line {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}

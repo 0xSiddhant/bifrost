@@ -210,6 +210,18 @@ export const BracesIcon = (p: IconProps) => (
   </svg>
 );
 
+/** Groot (YAML) — one trunk, branches splitting off it. */
+export const TreeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 21V6" />
+    <path d="M12 13H7a2 2 0 0 1-2-2V8" />
+    <path d="M12 9h5a2 2 0 0 0 2-2V4" />
+    <circle cx="12" cy="4" r="2" />
+    <circle cx="5" cy="6" r="2" />
+    <circle cx="19" cy="2.5" r="1.5" />
+  </svg>
+);
+
 export const CodeIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="m8 7-5 5 5 5" />
