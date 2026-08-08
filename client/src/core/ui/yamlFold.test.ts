@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
-import { foldable, indentUnit } from '@codemirror/language';
+import { ensureSyntaxTree, foldable, indentUnit } from '@codemirror/language';
 import { indentWithTab } from '@codemirror/commands';
 import { EditorView, keymap } from '@codemirror/view';
 import { yamlModeExtensions } from './JsonEditor';
@@ -21,6 +21,12 @@ const stateFor = (doc: string): EditorState =>
 
 function foldOnLineWith(doc: string, marker: string): { from: number; to: number } | null {
   const state = stateFor(doc);
+  // CodeMirror parses incrementally against a time budget, so `syntaxTree` can
+  // return a *partial* tree and `foldable` then finds no range — which showed
+  // up as this suite passing alone and failing occasionally in the full run,
+  // under parallel worker load. Waiting for a complete parse fixes the flake at
+  // its cause instead of retrying around it.
+  ensureSyntaxTree(state, state.doc.length, 5000);
   const at = doc.indexOf(marker);
   expect(at, `marker ${marker} not found in fixture`).toBeGreaterThanOrEqual(0);
   const line = state.doc.lineAt(at);
