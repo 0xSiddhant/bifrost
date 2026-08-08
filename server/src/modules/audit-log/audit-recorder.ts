@@ -72,6 +72,12 @@ export class AuditRecorder {
       this.bus.on('edda.deleted', (event) =>
         push('edda.deleted', null, null, `edda "${event.name}" deleted`),
       ),
+      this.bus.on('groot.saved', ({ groot }) =>
+        push('groot.saved', groot.authorDeviceId, null, `grew "${groot.name}" (${fmtBytes(groot.sizeBytes)})`),
+      ),
+      this.bus.on('groot.deleted', (event) =>
+        push('groot.deleted', null, null, `groot "${event.name}" deleted`),
+      ),
       this.bus.on('accio.saved', ({ link }) =>
         push('accio.saved', link.authorDeviceId, null, `summoned ${link.title ?? link.url}`),
       ),

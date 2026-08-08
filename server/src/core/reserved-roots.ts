@@ -20,6 +20,7 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   // Public data/preview routes that escape the SPA fallback.
   'runestone',
   'edda',
+  'groot',
   'variant',
   'loki',
   'accio',

@@ -138,6 +138,18 @@ export interface RunestoneSummary {
 }
 
 /** A saved Markdown document as the Edda library lists it (PLAN-11). */
+export interface GrootSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
 export interface EddaSummary {
   id: string;
   name: string;
@@ -234,6 +246,8 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  'groot.saved': { groot: GrootSummary };
+  'groot.deleted': { id: string; name: string };
   /** A link was added to the read-later shelf — open shelves add the row live. */
   'accio.saved': { link: AccioLink };
   /**

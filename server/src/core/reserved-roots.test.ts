@@ -14,6 +14,7 @@ describe('reserved roots', () => {
       'metrics',
       'runestone',
       'edda',
+      'groot',
       'variant',
       'loki',
       'accio',

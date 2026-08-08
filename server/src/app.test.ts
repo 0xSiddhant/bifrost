@@ -48,6 +48,7 @@ describe('boot → health → capabilities', () => {
         'runestone',
         'variant',
         'edda',
+        'groot',
         'loki',
         'accio',
         'nimbus',
