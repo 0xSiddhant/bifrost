@@ -46,6 +46,7 @@ import {
 import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
+import { yaml } from '@codemirror/lang-yaml';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -56,6 +57,7 @@ import {
 } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { validateJson } from '../json';
+import { validateYaml } from '../yaml';
 
 /**
  * Reusable CodeMirror 6 JSON editor (PLAN-07). Runestone mounts one; PLAN-08's
@@ -75,7 +77,7 @@ export interface DiffHighlight {
   level: 'line' | 'char';
 }
 
-export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain';
+export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain' | 'yaml';
 
 export interface JsonEditorProps {
   value: string;
@@ -97,6 +99,7 @@ export interface JsonEditorProps {
    * - `json` (default, Runestone/Variant) — lint + fold + bracket pairing
    * - `markdown` (Edda) — lang-markdown tinting via `--syn-*`, no lint/fold
    * - `javascript` (Loki) — lang-javascript tinting, bracket pairing, folding
+   * - `yaml` (Groot) — lang-yaml tinting, lint + fold, two-space indent
    * - `plain` (Variant's text panes) — nothing at all; typing costs nothing
    */
   mode?: EditorMode;
@@ -225,6 +228,29 @@ const jsHighlight = HighlightStyle.define([
   { tag: tags.variableName, color: 'var(--text)' },
   { tag: tags.typeName, color: 'var(--syn-bool)' },
   { tag: [tags.punctuation, tags.bracket, tags.separator, tags.operator], color: 'var(--syn-punct)' },
+  { tag: tags.invalid, color: 'var(--danger)' },
+]);
+
+/** YAML token colors (Groot) — every value is a theme token, no hex here. */
+const yamlHighlight = HighlightStyle.define([
+  // In YAML a mapping key is the structure, so it takes the key colour that
+  // JSON's property names take — the two editors read the same at a glance.
+  { tag: tags.definition(tags.propertyName), color: 'var(--syn-key)' },
+  { tag: tags.propertyName, color: 'var(--syn-key)' },
+  { tag: tags.atom, color: 'var(--syn-bool)' },
+  { tag: tags.bool, color: 'var(--syn-bool)' },
+  { tag: tags.null, color: 'var(--syn-null)' },
+  { tag: tags.number, color: 'var(--syn-number)' },
+  { tag: tags.string, color: 'var(--syn-string)' },
+  { tag: tags.special(tags.string), color: 'var(--syn-string)' },
+  { tag: tags.comment, color: 'var(--syn-null)', fontStyle: 'italic' },
+  // Anchors and aliases are references, not values — the type colour keeps
+  // them visibly distinct from the string beside them.
+  { tag: tags.labelName, color: 'var(--syn-bool)' },
+  { tag: tags.typeName, color: 'var(--syn-bool)' },
+  { tag: tags.meta, color: 'var(--syn-punct)' },
+  { tag: [tags.punctuation, tags.bracket, tags.separator, tags.operator], color: 'var(--syn-punct)' },
+  { tag: tags.contentSeparator, color: 'var(--syn-punct)' },
   { tag: tags.invalid, color: 'var(--danger)' },
 ]);
 
@@ -537,6 +563,40 @@ export function markdownModeExtensions(): Extension[] {
 }
 
 /**
+ * YAML mode (Groot). Exported so the fold test can assert against the real
+ * editor configuration rather than a hand-rolled copy of it.
+ *
+ * Folding comes from lang-yaml's own `foldNodeProp`, which covers `Pair`,
+ * `Item` and `BlockLiteral` in block style (folding from the end of the first
+ * line to the node's end) and `FlowMapping`/`FlowSequence` in flow style. **No
+ * custom `foldService` is needed** — Loki needed one because lang-javascript
+ * genuinely omits `ObjectPattern`, and the temptation is to assume every
+ * language has an equivalent gap. This one does not; a single-line `name: foo`
+ * yields `from >= to` and correctly offers no arrow.
+ *
+ * `indentUnit.of('  ')` is load-bearing rather than cosmetic. A tab character
+ * in YAML indentation is a **hard syntax error**, and the editor binds
+ * `indentWithTab` for every mode — which is `{ key: 'Tab', run: indentMore }`,
+ * and `indentMore` inserts whatever this facet says. Set it to a tab and the
+ * Tab key would produce documents that cannot parse; `yamlFold.test.ts` pins
+ * both halves of that.
+ */
+export function yamlModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    closeBrackets(),
+    yaml(),
+    syntaxHighlighting(yamlHighlight),
+    linter(yamlDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
+
+/**
  * One table per mode, replacing the nested ternary the boolean props needed.
  * A new language adds a row here and a member to `EditorMode`; the component
  * body does not change, and `Record` makes a forgotten row a type error rather
@@ -546,13 +606,26 @@ const MODE_EXTENSIONS: Record<EditorMode, () => Extension[]> = {
   json: jsonModeExtensions,
   markdown: markdownModeExtensions,
   javascript: javascriptModeExtensions,
+  yaml: yamlModeExtensions,
   // Variant's text panes: no parsing, linting, folding, highlighting or
   // bracket pairing, so typing in a large buffer costs nothing.
   plain: () => [],
 };
 
-const CLOSE_BRACKET_MODES: ReadonlySet<EditorMode> = new Set(['json', 'javascript']);
-const FOLD_MODES: ReadonlySet<EditorMode> = new Set(['json', 'javascript']);
+const CLOSE_BRACKET_MODES: ReadonlySet<EditorMode> = new Set(['json', 'javascript', 'yaml']);
+const FOLD_MODES: ReadonlySet<EditorMode> = new Set(['json', 'javascript', 'yaml']);
+
+/** YAML syntax errors as CM diagnostics, from the shared `core/yaml` validator. */
+function yamlDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  if (text.trim() === '') return [];
+  return validateYaml(text).map((issue) => ({
+    from: Math.min(issue.offset, text.length),
+    to: Math.min(issue.offset + issue.length, text.length),
+    severity: 'error',
+    message: issue.message,
+  }));
+}
 
 /** All strict-JSON errors as CM diagnostics; an empty doc is "empty", not broken. */
 function jsonDiagnostics(view: EditorView): Diagnostic[] {
