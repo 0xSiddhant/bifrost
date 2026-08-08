@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
-import { BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
+import { BookmarkIcon, BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
 
 /**
  * Ollivanders — the developer tools category ("the tool chooses the maker").
@@ -12,7 +12,9 @@ import { BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons
  * reorder with it — no per-card colour is hardcoded.
  */
 interface Tool {
-  module: string;
+  /** Shows when **any** of these modules is loaded. Most tools name one; the
+   *  Pensieve is a shell over several, so it appears if any kind exists. */
+  modules: string[];
   to: string;
   icon: ReactNode;
   title: string;
@@ -22,7 +24,7 @@ interface Tool {
 
 const TOOLS: Tool[] = [
   {
-    module: 'runestone',
+    modules: ['runestone'],
     to: '/runestone',
     icon: <BracesIcon size={24} />,
     title: 'Runestone',
@@ -30,7 +32,7 @@ const TOOLS: Tool[] = [
     go: 'carve the runes',
   },
   {
-    module: 'variant',
+    modules: ['variant'],
     to: '/variant',
     icon: <DiffIcon size={24} />,
     title: 'Variant',
@@ -38,7 +40,7 @@ const TOOLS: Tool[] = [
     go: 'find the divergence',
   },
   {
-    module: 'edda',
+    modules: ['edda'],
     to: '/edda',
     icon: <DocFileIcon size={24} />,
     title: 'Edda',
@@ -46,19 +48,30 @@ const TOOLS: Tool[] = [
     go: 'tell the saga',
   },
   {
-    module: 'loki',
+    modules: ['loki'],
     to: '/loki',
     icon: <CodeIcon size={24} />,
     title: 'Loki',
     description: 'A JavaScript shapeshifter — beautify, minify, and transform code, test regex, and run snippets in a sandbox.',
     go: 'change the shape',
   },
+  {
+    // The one library over every document kind (PLAN-21). It owns no module of
+    // its own — it is a shell over the tools above, so it appears whenever any
+    // of them does, and the registry decides which types it can list.
+    modules: ['runestone', 'edda', 'groot'],
+    to: '/pensieve',
+    icon: <BookmarkIcon size={24} />,
+    title: 'Pensieve',
+    description: 'Every saved document in one basin — JSON, Markdown and more, searchable across all of them.',
+    go: 'surface a memory',
+  },
 ];
 
 export function OllivandersPage() {
   const { capabilities } = useCapabilities();
   const has = (module: string) => !capabilities || capabilities.modules.includes(module);
-  const tools = TOOLS.filter((tool) => has(tool.module));
+  const tools = TOOLS.filter((tool) => tool.modules.some(has));
 
   return (
     <>
@@ -72,7 +85,7 @@ export function OllivandersPage() {
 
       <div className="portals">
         {tools.map((tool, index) => (
-          <Portal key={tool.module} tone={index + 1} {...tool} />
+          <Portal key={tool.to} tone={index + 1} {...tool} />
         ))}
       </div>
     </>

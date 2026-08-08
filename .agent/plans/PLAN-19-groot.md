@@ -21,6 +21,8 @@ Card copy: eyebrow `groot · one trunk, many branches`, `go: 'branch by branch'`
 PLAN-18 merged. **Single PR** — `feat/plan-19-groot`.
 
 > **⚠️ Check PLAN-21 first.** PLAN-21 (Pensieve, the unified library shell) **deletes** the per-tool library pages and replaces them with one registry. If it has already shipped, this plan's `GrootLibraryPage` task collapses to **one registry entry** in `core/library/` plus a `/groot/pensieve` redirect — do not build a third library page. If it has not, building one here means it is deleted in PLAN-21's PR; the recommended execution order is **18 → 21 → 19 → 20** for exactly this reason.
+>
+> **PLAN-21 HAS SHIPPED (2026-08-08), so the first branch applies: there is no `GrootLibraryPage`.** `LibraryKind` in `client/src/core/library/types.ts` already names `groot`; add one entry to the `LIBRARY_REGISTRY` array (label `YAML`, module `groot`, tone `3`, events `groot.saved`/`groot.deleted`, `list`/`remove` adapting `core/groot.ts`, editor and API routes) and redirect `/groot/pensieve` → `/pensieve?type=groot`. The chip, the badge, the merge, the filters, the SSE subscription and the delete all follow with no page change — pinned by the fake-kind test in `core/library/load.test.ts`. Note also that **Ollivanders now holds five cards** (the Pensieve card was added in PLAN-21), so Groot is the **6th**, not the 5th.
 
 The plans are independent (different hubs, no shared files beyond `JsonEditor`), so the owner may reorder them; the gate is the standing "implement in order" rule, not a real dependency. Single PR follows the PLAN-11 (Edda) precedent, which shipped editor + preview + library + public routes in one — every pattern this plan needs already exists. If it grows past that, split at the library boundary.
 
@@ -137,8 +139,8 @@ Reserved first segments in slug resolution: `api`, `pensieve`, `library`.
 - [ ] `groot` → `RESERVED_ROOTS` **and** the `reserved-roots.test.ts` assertion list (same change, per `rules/coding.md`)
 - [ ] `GROOT_MAX_DOC_KB` in the config schema + `.env.example`
 - [ ] Client `features/groot/`: `GrootPage` (editor · tree · advisories · convert), `draft.ts`, `core/groot.ts` API client
-- [ ] **Library — depends on PLAN-21 (see Gate).** If PLAN-21 has shipped: register `groot` as a kind in `core/library/` and redirect `/groot/pensieve` → `/pensieve?type=groot`, *no page*. If not: build `GrootLibraryPage` as a third copy, knowing PLAN-21 deletes it
-- [ ] Routes `/groot`, `/groot/:slug`; `/groot/library` → `<Navigate replace>`; Ollivanders 5th card (positional tone) + a new `TreeIcon`
+- [ ] **Library — resolved: PLAN-21 shipped 2026-08-08.** Register `groot` as a kind in `core/library/` (one `LIBRARY_REGISTRY` entry) and redirect `/groot/pensieve` → `/pensieve?type=groot`. **No page.**
+- [ ] Routes `/groot`, `/groot/:slug`; `/groot/library` → `<Navigate replace>`; Ollivanders **6th** card (positional tone — PLAN-21 added the Pensieve card as the 5th) + a new `TreeIcon`
 - [ ] Convert handoffs: → Runestone (as JSON), → Variant (via `core/variantSeed`)
 - [ ] Failure paths logged per `rules/coding.md` — a plan is not done until they are
 - [ ] Docs sync (`architecture.md` registry + data flow, `project-structure.md`, `decisions.md`, `progress.md`, `plans/README.md`) + archive this file **in this PR**

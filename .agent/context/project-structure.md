@@ -49,6 +49,8 @@ bifrost/
 │   └── src/
 │       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
+│       │                      #   + PensievePage (PLAN-21) — a shell ACROSS features, so it lives
+│       │                      #     here rather than in features/; its logic is in core/library/
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
 │       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
 │       │                      #   notify/ (global notification stack: store + host +
@@ -60,13 +62,17 @@ bifrost/
 │       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode
 │       │                      #   +in-editor search, TreeView +bulk collapse),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
+│       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
+│       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry),
 │       │                      #   textNormalize, runestone + edda + accio clients, relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence (server ids unchanged; sigil/ was deleted in
 │                              #   PLAN-18 — the QR page became a toolbox tool, module untouched);
-│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11;
+│                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
+│                              #     (PLAN-21 deleted BOTH their library pages — runestone/PensievePage
+│                              #      and edda/EddaLibraryPage — for the one shell above);
 │                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
 │                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14;
 │                              #   portkey (LAN go-links — own portkey.css) in PLAN-15;

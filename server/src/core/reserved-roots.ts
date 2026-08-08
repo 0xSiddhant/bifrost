@@ -26,6 +26,9 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'nimbus',
   'heimdall',
   // Client route roots (App.tsx) — a slug must never collide with a real page.
+  // `pensieve` became a first segment in PLAN-21 (it was only ever nested
+  // under /runestone and /edda before the two libraries became one page).
+  'pensieve',
   'portkey',
   'upload',
   'downloads',

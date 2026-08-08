@@ -18,6 +18,8 @@ describe('reserved roots', () => {
       'loki',
       'accio',
       'nimbus',
+      // PLAN-21 promoted the Pensieve from a nested segment to a first one.
+      'pensieve',
       'portkey',
       'upload',
       'downloads',
