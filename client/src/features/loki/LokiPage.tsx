@@ -547,7 +547,7 @@ export function LokiPage() {
                     ref={editorRef}
                     value={code}
                     onChange={setCode}
-                    javascript
+                    mode="javascript"
                     height="var(--loki-editor-h, 56vh)"
                     placeholder={EDITOR_PLACEHOLDER}
                   />
@@ -640,7 +640,7 @@ export function LokiPage() {
               <JsonEditor
                 value={rxSubject}
                 onChange={setRxSubject}
-                plain
+                mode="plain"
                 highlights={rxHighlights}
                 height="var(--loki-editor-h, 40vh)"
                 placeholder={REGEX_PLACEHOLDER}
