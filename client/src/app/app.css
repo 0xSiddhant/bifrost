@@ -1507,7 +1507,26 @@
   margin: 0;
 }
 
-.rune-lib-filters {
+/* ── Pensieve · the one document library (PLAN-21) ───────────────────────── */
+
+/* These rules were `rune-lib-*`: Runestone's library styles, which Edda's page
+   reused verbatim — the codebase admitting the two pages were one page twice.
+   Both pages are gone; the shell that replaced them owns the family outright,
+   so the runestone prefix would now be a lie. */
+
+/* Full-width breakout at ≥1024px (Variant/Runestone/Edda/Accio precedent). A
+   document row is long — name, size, two timestamps, a device and its actions —
+   and the 62rem column wrapped every one of them. */
+@media (min-width: 1024px) {
+  .lib-head,
+  .lib-wrap {
+    --lib-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--lib-w);
+    margin-inline: calc((100% - var(--lib-w)) / 2);
+  }
+}
+
+.lib-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1516,7 +1535,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rune-lib-search {
+.lib-search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -1525,11 +1544,11 @@
   color: var(--text-muted);
 }
 
-.rune-lib-search .field__input {
+.lib-search .field__input {
   flex: 1;
 }
 
-.rune-lib-select {
+.lib-select {
   width: auto;
   max-width: 12rem;
   padding: var(--space-2) var(--space-3);
@@ -1537,23 +1556,85 @@
 }
 
 @media (max-width: 640px) {
-  .rune-lib-search {
+  .lib-search {
     flex-basis: 100%;
   }
 
-  .rune-lib-select {
+  .lib-select {
     flex: 1;
     min-width: 0;
     max-width: none;
   }
 }
 
-.rune-lib-rows {
+/* Type chips. They scroll rather than wrap on a phone: a filter row that grows
+   to three lines pushes the first row off a 375px screen. */
+.lib-chips {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.lib-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.lib-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lib-chip:hover:not(:disabled) {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--ct, var(--accent)) 45%, var(--border));
+}
+
+.lib-chip--on {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--ct, var(--accent)) 60%, var(--border));
+  background: color-mix(in srgb, var(--ct, var(--accent)) 14%, transparent);
+}
+
+/* A kind whose endpoint is down: the chip stays visible so the type is still
+   accounted for, but it cannot be selected onto an empty list. */
+.lib-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Non-blocking: the kinds that answered are rendered underneath this. */
+.lib-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  font-size: var(--text-sm);
+}
+
+.lib-rows {
   display: flex;
   flex-direction: column;
 }
 
-.rune-lib-row {
+.lib-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1561,27 +1642,61 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rune-lib-row:last-child {
+.lib-row:last-child {
   border-bottom: none;
 }
 
-.rune-lib-row__body {
+/* The badge takes its colour from the kind, not the row's position — a scoped
+   exception to the positional-palette rule (see LibraryEntry.tone). It is what
+   makes a type recognisable while the list is being re-sorted under it. */
+.lib-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--ct, var(--accent)) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ct, var(--accent)) 14%, transparent);
+  color: color-mix(in srgb, var(--ct, var(--accent)) 75%, var(--text));
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.lib-row__body {
   flex: 1;
   min-width: 0;
 }
 
-.rune-lib-row__name {
+.lib-row__name {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.rune-lib-row__meta {
+.lib-row__meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   margin-top: 2px;
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+/* Below 640px the badge keeps its icon and drops its word: four actions plus a
+   long name plus a spelled-out type is what squeezes the name to nothing. */
+@media (max-width: 640px) {
+  .lib-badge__label {
+    display: none;
+  }
+
+  .lib-row {
+    flex-wrap: wrap;
+  }
+
+  .lib-row__body {
+    flex-basis: calc(100% - 5rem);
+  }
 }
 
 /* ── responsive ─────────────────────────────────────────────── */

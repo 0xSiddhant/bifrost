@@ -407,7 +407,7 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -437,7 +437,7 @@ export function RunestonePage() {
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
             Pensieve
           </Button>
         </div>

@@ -44,17 +44,17 @@ const WardensPage = lazy(() =>
 const RunestonePage = lazy(() =>
   import('../features/runestone/RunestonePage').then((m) => ({ default: m.RunestonePage })),
 );
+// One library over every document kind (PLAN-21). It is a shell across several
+// features, not a feature, so it lives in app/pages — and stays lazy, as the
+// two per-tool pages it replaces were.
 const PensievePage = lazy(() =>
-  import('../features/runestone/PensievePage').then((m) => ({ default: m.PensievePage })),
+  import('./pages/PensievePage').then((m) => ({ default: m.PensievePage })),
 );
 const VariantPage = lazy(() =>
   import('../features/variant/VariantPage').then((m) => ({ default: m.VariantPage })),
 );
 const EddaPage = lazy(() =>
   import('../features/edda/EddaPage').then((m) => ({ default: m.EddaPage })),
-);
-const EddaLibraryPage = lazy(() =>
-  import('../features/edda/EddaLibraryPage').then((m) => ({ default: m.EddaLibraryPage })),
 );
 const EddaPreviewPage = lazy(() =>
   import('../features/edda/EddaPreviewPage').then((m) => ({ default: m.EddaPreviewPage })),
@@ -102,7 +102,7 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda', '/loki'],
+    match: ['/runestone', '/variant', '/edda', '/loki', '/pensieve'],
     modules: ['runestone', 'variant', 'edda', 'loki'],
   },
   {
@@ -247,19 +247,23 @@ export function App() {
             <Route path="/accio" element={<AccioPage />} />
             {/* pre-rename URL (shipped as "muninn") */}
             <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
+            {/* The one library, over every document kind (PLAN-21). */}
+            <Route path="/pensieve" element={<PensievePage />} />
             <Route path="/runestone" element={<RunestonePage />} />
-            {/* literal segments beat the :slug param — declared first for clarity */}
-            <Route path="/runestone/pensieve" element={<PensievePage />} />
+            {/* literal segments beat the :slug param — declared first for clarity.
+                Every legacy library URL points straight at the unified page, so
+                none of them double-redirects through another old one. */}
+            <Route path="/runestone/pensieve" element={<Navigate to="/pensieve?type=runestone" replace />} />
             {/* pre-rename URLs (shipped as "library", then "mimir") */}
-            <Route path="/runestone/library" element={<Navigate to="/runestone/pensieve" replace />} />
-            <Route path="/runestone/mimir" element={<Navigate to="/runestone/pensieve" replace />} />
+            <Route path="/runestone/library" element={<Navigate to="/pensieve?type=runestone" replace />} />
+            <Route path="/runestone/mimir" element={<Navigate to="/pensieve?type=runestone" replace />} />
             <Route path="/runestone/:slug" element={<RunestonePage />} />
             <Route path="/variant" element={<VariantPage />} />
             {/* literal segments beat the :slug param — declared first */}
             <Route path="/edda" element={<EddaPage />} />
-            <Route path="/edda/pensieve" element={<EddaLibraryPage />} />
+            <Route path="/edda/pensieve" element={<Navigate to="/pensieve?type=edda" replace />} />
             {/* pre-rename URL (development-only "library") */}
-            <Route path="/edda/library" element={<Navigate to="/edda/pensieve" replace />} />
+            <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
             <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
             <Route path="/edda/:slug" element={<EddaPage />} />
             <Route path="/loki" element={<LokiPage />} />
