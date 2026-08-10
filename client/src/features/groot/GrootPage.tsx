@@ -21,6 +21,7 @@ import {
   type YamlIssue,
 } from '../../core/yaml';
 import { relicTitle } from '../../core/relicNames';
+import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { ApiError } from '../../core/api';
@@ -42,6 +43,9 @@ import {
 import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .yaml file — one trunk, many branches…';
+
+/** Identifies this editor's buffer to `core/draftReturn`. */
+const DRAFT_ID = 'groot';
 
 /** Debounce heavy derived work (parse/advise on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -168,12 +172,41 @@ export function GrootPage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // Offer to restore a cached draft once, on arriving at the scratch editor.
+  // What is on screen right now, for the leave handler below — it has to flush
+  // the current buffer on unmount, not the one that existed when it registered.
+  const bufferRef = useRef({ title, text, isScratch });
+  bufferRef.current = { title, text, isScratch };
+
+  // On arriving at the scratch editor: a buffer left open by a navigation
+  // inside this page's lifetime comes straight back, because jumping to
+  // Runestone to see the same document as JSON and returning is one task, not
+  // two visits. A draft from an *earlier* page load is still only offered —
+  // opening the tool fresh must not silently refill it with something old.
   useEffect(() => {
     if (!isScratch) return;
     const draft = loadDraft();
-    if (draft && draft.text.trim() !== '') setRestorable(draft);
+    if (!draft || draft.text.trim() === '') return;
+    if (takeLeftOpen(DRAFT_ID)) {
+      setTitle((current) => draft.title || current);
+      setText(draft.text);
+    } else {
+      setRestorable(draft);
+    }
   }, [isScratch]);
+
+  // Leaving flushes the buffer and records that it was still open. Flushing
+  // here rather than trusting the debounce below closes the window where
+  // clicking "Runestone" within half a second of typing loses the last
+  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
+  // before this runs, so the guard keeps a saved document from resurrecting it.
+  useEffect(() => {
+    return () => {
+      const left = bufferRef.current;
+      if (!left.isScratch || left.text.trim() === '') return;
+      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
+      markLeftOpen(DRAFT_ID);
+    };
+  }, []);
 
   // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
   // nothing. Saved documents live on the server instead.

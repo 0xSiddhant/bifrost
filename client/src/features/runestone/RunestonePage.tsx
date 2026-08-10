@@ -22,6 +22,7 @@ import {
 } from '../../core/json';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
+import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { ApiError } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
@@ -42,6 +43,9 @@ import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
+
+/** Identifies this editor's buffer to `core/draftReturn`. */
+const DRAFT_ID = 'runestone';
 
 /** Debounce heavy derived work (validate/stats on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -155,10 +159,19 @@ export function RunestonePage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // On arriving at the scratch editor: a hand-off from another tool (Groot's
-  // "Open in Runestone") beats the draft prompt and applies immediately — it is
-  // a document the person just asked for, so it opens rather than offering to.
-  // Only with no seed does the cached draft offer itself, once.
+  // What is on screen right now, for the leave handler below — it has to flush
+  // the current buffer on unmount, not the one that existed when it registered.
+  const bufferRef = useRef({ title, text, isScratch });
+  bufferRef.current = { title, text, isScratch };
+
+  // On arriving at the scratch editor, in order of how directly the person
+  // asked for it:
+  //   1. a hand-off from another tool (Groot's "Open in Runestone") — a
+  //      document they just asked for, so it opens rather than offering to;
+  //   2. a buffer left open by a navigation inside this page's lifetime —
+  //      leaving to convert something in Groot and coming back is one task;
+  //   3. a draft from an earlier page load, which is still only *offered*,
+  //      because opening the tool fresh must not silently refill it.
   useEffect(() => {
     if (!isScratch) return;
     const seed = takeRunestoneSeed();
@@ -170,8 +183,27 @@ export function RunestonePage() {
       return;
     }
     const draft = loadDraft();
-    if (draft && draft.text.trim() !== '') setRestorable(draft);
+    if (!draft || draft.text.trim() === '') return;
+    if (takeLeftOpen(DRAFT_ID)) {
+      setTitle((current) => draft.title || current);
+      setText(draft.text);
+    } else {
+      setRestorable(draft);
+    }
   }, [isScratch]);
+
+  // Leaving flushes the buffer and records that it was still open, closing the
+  // window where clicking away within half a second of typing loses the last
+  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
+  // before this runs, so the guard keeps a saved document from resurrecting it.
+  useEffect(() => {
+    return () => {
+      const left = bufferRef.current;
+      if (!left.isScratch || left.text.trim() === '') return;
+      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
+      markLeftOpen(DRAFT_ID);
+    };
+  }, []);
 
   // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
   // nothing. Saved documents live on the server instead.
