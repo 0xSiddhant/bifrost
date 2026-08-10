@@ -21,6 +21,7 @@ export default {
         'runestone',
         'variant',
         'edda',
+        'groot',
         'loki',
         'accio',
         'nimbus',
