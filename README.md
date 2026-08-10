@@ -43,6 +43,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
+- 🌳 Groot — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
 - 🃏 Loki — JavaScript workbench: transforms, regex tester, and a sandboxed Web-Worker runner
 - 🔖 Accio — read-later shelf with tags and best-effort page-title lookup
 - 🚪 Portkey — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
@@ -52,7 +53,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
-**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki / Pensieve / Groot), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 

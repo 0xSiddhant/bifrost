@@ -39,7 +39,7 @@ bifrost/
 │       └── modules/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
-│               │              #   variant, edda, loki, accio, nimbus, portkey,
+│               │              #   variant, edda, groot, loki, accio, nimbus, portkey,
 │               │              #   screensaver, client-logs, metrics, toolbox
 │               ├── routes/
 │               ├── usecases/
@@ -59,12 +59,17 @@ bifrost/
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
 │       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
-│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor +markdown mode
-│       │                      #   +in-editor search, TreeView +bulk collapse),
+│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor (one `mode`
+│       │                      #   prop: json|markdown|javascript|yaml|plain, PLAN-19)
+│       │                      #   +in-editor search, TreeView +bulk collapse +alias annotation),
 │       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
+│       │                      #   yaml/ (PLAN-19 — analyze/format/flow⇄block/⇄json + the advisory
+│       │                      #     rail; format-named not tool-named, so Variant can share it),
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
-│       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry),
-│       │                      #   textNormalize, runestone + edda + accio clients, relicNames name-bank
+│       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
+│       │                      #     PLAN-19's groot proved it, one array element and no page change),
+│       │                      #   textNormalize, runestone + edda + groot + accio clients,
+│       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
@@ -73,6 +78,8 @@ bifrost/
 │                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
 │                              #     (PLAN-21 deleted BOTH their library pages — runestone/PensievePage
 │                              #      and edda/EddaLibraryPage — for the one shell above);
+│                              #   groot (YAML workspace — editor · tree · advisory rail,
+│                              #     reusing the rune-* editor chrome) in PLAN-19;
 │                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
 │                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14;
 │                              #   portkey (LAN go-links — own portkey.css) in PLAN-15;
