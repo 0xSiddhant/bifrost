@@ -75,6 +75,18 @@ export interface DiffHighlight {
   level: 'line' | 'char';
 }
 
+/**
+ * What the editor is editing. One prop rather than a set of booleans: the modes
+ * are mutually exclusive by nature, and as booleans that was enforced only by a
+ * doc comment and a nested ternary that grew a branch per language.
+ *
+ * - `json` (default) — Runestone/Variant: lint, fold, bracket pairing.
+ * - `markdown` — Edda: syntax tinting only.
+ * - `javascript` — Loki: tinting, folding, bracket pairing, no lint.
+ * - `plain` — Variant's text panes: nothing, so typing costs nothing.
+ */
+export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain';
+
 export interface JsonEditorProps {
   value: string;
   onChange?: (value: string) => void;
@@ -86,23 +98,8 @@ export interface JsonEditorProps {
   placeholder?: string;
   /** Diff decorations bound to the --diff-* theme tokens. */
   highlights?: DiffHighlight[];
-  /**
-   * Plain-text mode (Variant's text panes): no JSON parsing, linting,
-   * folding, highlighting, or bracket pairing — typing costs nothing.
-   */
-  plain?: boolean;
-  /**
-   * Markdown mode (Edda): lang-markdown syntax tinting via --syn-* tokens, no
-   * JSON lint/fold/bracket-pairing. Mutually exclusive with `plain`.
-   */
-  markdown?: boolean;
-  /**
-   * JavaScript mode (Loki): lang-javascript syntax tinting via --syn-* tokens,
-   * bracket matching + auto-close, and code folding (no JSON lint). Mutually
-   * exclusive with `plain`/`markdown`. Loki drives transforms through
-   * `applyEdit`.
-   */
-  javascript?: boolean;
+  /** Which language the buffer holds; defaults to JSON. */
+  mode?: EditorMode;
   /**
    * Fires when the in-editor find widget lands on a match (the matched text).
    * Variant uses it to reveal the same string in the opposite pane.
@@ -529,6 +526,45 @@ function jsonDiagnostics(view: EditorView): Diagnostic[] {
   }));
 }
 
+/**
+ * JSON mode (Runestone, Variant's structured panes). Exported alongside the
+ * JavaScript one so a test can assert against the real configuration.
+ */
+export function jsonModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    // Typing {[" inserts the closing pair; backspacing an empty pair removes
+    // both (closeBracketsKeymap precedes defaultKeymap).
+    closeBrackets(),
+    json(),
+    syntaxHighlighting(jsonHighlight),
+    linter(jsonDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
+/** Markdown mode (Edda) — syntax tinting only, no lint/fold/bracket pairing. */
+function markdownModeExtensions(): Extension[] {
+  return [markdownLang(), syntaxHighlighting(markdownHighlight)];
+}
+
+function modeExtensionsFor(mode: EditorMode): Extension[] {
+  switch (mode) {
+    case 'markdown':
+      return markdownModeExtensions();
+    case 'javascript':
+      return javascriptModeExtensions();
+    // Variant's text panes: no language, no analysis — typing costs nothing.
+    case 'plain':
+      return [];
+    case 'json':
+      return jsonModeExtensions();
+  }
+}
+
 export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function JsonEditor(
   {
     value,
@@ -538,9 +574,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     height = '60vh',
     placeholder,
     highlights,
-    plain = false,
-    markdown = false,
-    javascript: javascriptMode = false,
+    mode = 'json',
     onSearchMatch,
   },
   ref,
@@ -560,31 +594,10 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
-    // Four modes: markdown (Edda), javascript (Loki), plain (Variant text
-    // panes), or JSON (Runestone/Variant).
-    const modeExtensions = markdown
-      ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
-      : javascriptMode
-        ? javascriptModeExtensions()
-        : plain
-          ? []
-          : [
-              foldGutter(),
-              indentOnInput(),
-              indentUnit.of('  '),
-              bracketMatching(),
-              // Typing {[" inserts the closing pair; backspacing an empty pair
-              // removes both (closeBracketsKeymap precedes defaultKeymap).
-              closeBrackets(),
-              json(),
-              syntaxHighlighting(jsonHighlight),
-              linter(jsonDiagnostics, { delay: 300 }),
-              lintGutter(),
-            ];
-    const jsonOnly = !markdown && !plain && !javascriptMode;
+    const modeExtensions = modeExtensionsFor(mode);
     // Bracket auto-close and folding both apply to JSON and JS; markdown and
     // plain get neither.
-    const closeBracketsMode = jsonOnly || javascriptMode;
+    const closeBracketsMode = mode === 'json' || mode === 'javascript';
     const foldMode = closeBracketsMode;
     const state = EditorState.create({
       doc: value,
@@ -654,7 +667,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, plain, markdown, javascriptMode]);
+  }, [readOnly, height, placeholder, mode]);
 
   useEffect(() => {
     const view = viewRef.current;
