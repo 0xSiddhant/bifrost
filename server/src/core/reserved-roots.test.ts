@@ -14,6 +14,8 @@ describe('reserved roots', () => {
       'metrics',
       'runestone',
       'edda',
+      // PLAN-19: the YAML workspace, its SPA route and its raw data endpoint.
+      'groot',
       'variant',
       'loki',
       'accio',

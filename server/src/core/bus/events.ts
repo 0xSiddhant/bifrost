@@ -150,6 +150,19 @@ export interface EddaSummary {
   modifiedAt: number;
 }
 
+/** A saved YAML document as the Pensieve lists it (PLAN-19). */
+export interface GrootSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
 /** A saved link as the Accio shelf lists it (PLAN-13). */
 export interface AccioLink {
   id: string;
@@ -234,6 +247,9 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  /** Create or update of a saved YAML document — the Pensieve live-refreshes. */
+  'groot.saved': { groot: GrootSummary };
+  'groot.deleted': { id: string; name: string };
   /** A link was added to the read-later shelf — open shelves add the row live. */
   'accio.saved': { link: AccioLink };
   /**

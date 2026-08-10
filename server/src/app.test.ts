@@ -48,6 +48,7 @@ describe('boot → health → capabilities', () => {
         'runestone',
         'variant',
         'edda',
+        'groot',
         'loki',
         'accio',
         'nimbus',
@@ -106,6 +107,8 @@ describe('capabilities in the cloud profile', () => {
     // qr-tool stays loaded in both profiles — /sigil became a tool, but
     // GET /api/qr/server-url is still what Midgard's Join card reads.
     expect(body.modules).toContain('qr-tool');
+    // The three structured-text workspaces ship in both profiles (PLAN-19).
+    expect(body.modules).toContain('groot');
     // Local-only modules must not leak into the cloud manifest.
     expect(body.modules).not.toContain('file-transfer');
     expect(body.modules).not.toContain('portkey');

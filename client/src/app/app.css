@@ -1575,6 +1575,12 @@
   padding: var(--space-3) 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* The strip scrolls sideways, and its scrollbar is hidden, so an off-screen
+     chip has nothing pointing at it. With two kinds it always fitted; PLAN-19's
+     third one pushed YAML past the right edge at 375, where the only affordance
+     was guessing there was more. Wrapping costs one line of height on a phone
+     and keeps every kind reachable without a swipe. */
+  flex-wrap: wrap;
 }
 
 .lib-chips::-webkit-scrollbar {
@@ -3691,4 +3697,119 @@
       opacity: 0;
     }
   }
+}
+
+/* ── Groot (PLAN-19) — YAML workspace ────────────────────────────────────────
+   Reuses the rune-* editor chrome (the Edda precedent: two editors that do the
+   same job should not drift apart in CSS). These are the parts YAML has and
+   JSON does not — a stream of documents, and a rail of advisories. */
+
+/* The convert group says what a JSON conversion costs before it is clicked,
+   because after the click the comments are already gone from the output. */
+.groot-convert__note {
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* Document switcher for a `---` separated stream. */
+.groot-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.groot-docs__tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-3);
+  cursor: pointer;
+}
+
+.groot-docs__tab:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.groot-docs__tab.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The advisory rail. Deliberately NOT styled as an error list: every row here
+   is a valid document that will read differently somewhere else, and colouring
+   it like a failure would teach people to "fix" documents that are correct. */
+.groot-rail {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.groot-rail__head {
+  margin: 0 0 var(--space-2);
+}
+
+.groot-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 13rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.groot-rail__list button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.groot-rail__list button:hover {
+  color: var(--text);
+}
+
+.groot-rail__line {
+  flex: none;
+  color: var(--warn);
+}
+
+.groot-rail__kind {
+  flex: none;
+  font-size: var(--text-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+}
+
+.groot-rail__message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Alias badge in the tree (`*base`). The tree shows resolved values, so this is
+   the only thing distinguishing an alias from a duplicated branch. */
+.rune-tree__note {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--syn-bool);
 }

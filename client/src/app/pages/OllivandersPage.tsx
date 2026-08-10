@@ -1,7 +1,14 @@
 import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
-import { BookmarkIcon, BracesIcon, CodeIcon, DiffIcon, DocFileIcon } from '../../core/ui/icons';
+import {
+  BookmarkIcon,
+  BracesIcon,
+  CodeIcon,
+  DiffIcon,
+  DocFileIcon,
+  TreeIcon,
+} from '../../core/ui/icons';
 
 /**
  * Ollivanders — the developer tools category ("the tool chooses the maker").
@@ -65,6 +72,18 @@ const TOOLS: Tool[] = [
     title: 'Pensieve',
     description: 'Every saved document in one basin — JSON, Markdown and more, searchable across all of them.',
     go: 'surface a memory',
+  },
+  {
+    // Appended, not slotted in beside the other editors: colour follows
+    // position, so inserting Groot mid-list would silently recolour Loki and
+    // the Pensieve on a page people already know by its colours.
+    modules: ['groot'],
+    to: '/groot',
+    icon: <TreeIcon size={24} />,
+    title: 'Groot',
+    description:
+      'A YAML workspace — folding, comment-preserving formatting, a tree view, and advisories for the traps YAML hides in plain sight.',
+    go: 'branch by branch',
   },
 ];
 

@@ -30,6 +30,7 @@ const envSchema = z.object({
   AUDIT_RETENTION_DAYS: z.coerce.number().int().positive().default(90),
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
+  GROOT_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
   // Accio (PLAN-13) — best-effort title enrichment. Both bound an outbound
   // request to a user-pasted address, so neither may be hardcoded.
@@ -141,6 +142,9 @@ export interface AppConfig {
     maxDocKb: number;
     /** Above this, live preview auto-degrades to a manual "Refresh preview" button. */
     livePreviewMaxKb: number;
+  };
+  groot: {
+    maxDocKb: number;
   };
   accio: {
     /** Per-attempt timeout for the post-save `<title>` lookup. */
@@ -315,6 +319,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
     edda: {
       maxDocKb: raw.EDDA_MAX_DOC_KB,
       livePreviewMaxKb: raw.EDDA_LIVE_PREVIEW_MAX_KB,
+    },
+    groot: {
+      maxDocKb: raw.GROOT_MAX_DOC_KB,
     },
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,

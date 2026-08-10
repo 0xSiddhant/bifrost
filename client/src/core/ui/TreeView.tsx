@@ -14,6 +14,14 @@ interface TreeViewProps {
   value: unknown;
   onCopyPath: (path: string) => void;
   onCopyValue: (value: string) => void;
+  /**
+   * Optional per-node label, looked up by the node's own path string. Groot uses
+   * it to badge an alias (`*base`): the tree renders **resolved** values, as
+   * every YAML consumer sees them, so without a badge an aliased subtree is
+   * indistinguishable from a hand-written copy of another one. Undefined for
+   * every consumer that has nothing to say, which is all of them but Groot.
+   */
+  annotationAt?: (path: string) => string | undefined;
 }
 
 const MAX_STRING_PREVIEW = 160;
@@ -65,24 +73,39 @@ interface TreeNodeProps {
   openMode: OpenMode;
   onCopyPath: (path: string) => void;
   onCopyValue: (value: string) => void;
+  annotationAt?: (path: string) => string | undefined;
 }
 
-function TreeNode({ name, value, path, depth, openMode, onCopyPath, onCopyValue }: TreeNodeProps) {
+function TreeNode({
+  name,
+  value,
+  path,
+  depth,
+  openMode,
+  onCopyPath,
+  onCopyValue,
+  annotationAt,
+}: TreeNodeProps) {
   const kind = kindOf(value);
   const container = kind === 'object' || kind === 'array';
   // Initialised once per mount; a bulk action bumps the tree key to remount,
   // which re-reads openMode here (and for every descendant).
   const [open, setOpen] = useState(() => defaultOpen(openMode, depth));
+  const pathString = formatJsonPath(path);
+  const annotation = annotationAt?.(pathString);
 
   const keyButton = (
-    <button
-      type="button"
-      className="rune-tree__key"
-      title="Copy JSON path"
-      onClick={() => onCopyPath(formatJsonPath(path))}
-    >
-      {name === null ? '$' : typeof name === 'number' ? `[${name}]` : name}
-    </button>
+    <>
+      <button
+        type="button"
+        className="rune-tree__key"
+        title="Copy JSON path"
+        onClick={() => onCopyPath(pathString)}
+      >
+        {name === null ? '$' : typeof name === 'number' ? `[${name}]` : name}
+      </button>
+      {annotation && <span className="rune-tree__note">{annotation}</span>}
+    </>
   );
 
   if (!container) {
@@ -134,13 +157,14 @@ function TreeNode({ name, value, path, depth, openMode, onCopyPath, onCopyValue 
             openMode={openMode}
             onCopyPath={onCopyPath}
             onCopyValue={onCopyValue}
+            annotationAt={annotationAt}
           />
         ))}
     </div>
   );
 }
 
-export function TreeView({ value, onCopyPath, onCopyValue }: TreeViewProps) {
+export function TreeView({ value, onCopyPath, onCopyValue, annotationAt }: TreeViewProps) {
   const [openMode, setOpenMode] = useState<OpenMode>('auto');
   // Bumped on every bulk action so the node subtree remounts and every node
   // re-initialises its open state from the new mode — no per-node effects.
@@ -170,6 +194,7 @@ export function TreeView({ value, onCopyPath, onCopyValue }: TreeViewProps) {
         openMode={openMode}
         onCopyPath={onCopyPath}
         onCopyValue={onCopyValue}
+        annotationAt={annotationAt}
       />
     </div>
   );

@@ -785,7 +785,7 @@ export function VariantPage() {
             <div className="variant-textedit">
               <JsonEditor
                 ref={textLeftRef}
-                plain
+                mode="plain"
                 value={left.text}
                 onChange={onPaneEdit('left')}
                 onSearchMatch={(text) => revealAcross('left', text)}
@@ -795,7 +795,7 @@ export function VariantPage() {
               />
               <JsonEditor
                 ref={textRightRef}
-                plain
+                mode="plain"
                 value={right.text}
                 onChange={onPaneEdit('right')}
                 onSearchMatch={(text) => revealAcross('right', text)}
