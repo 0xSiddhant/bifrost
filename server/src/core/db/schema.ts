@@ -93,6 +93,32 @@ export const eddas = sqliteTable('eddas', {
 });
 
 /**
+ * Saved YAML documents (PLAN-19). Owned by the `groot` module — a third table
+ * rather than a shared one, for the same reason `eddas` is not `runestones`:
+ * the formats have different semantics and each module owns its own storage.
+ *
+ * Named `groot_docs` on the `accio_links` precedent (module name + generic
+ * noun): pluralising the tool's name works for "runestones" and "eddas", which
+ * are the documents, and not for Groot, which is the tree the documents grow on.
+ *
+ * Columns mirror `eddas` exactly: `id` is a short random handle anchoring share
+ * URLs, `slug` is `<kebab-name>-<id>` and regenerates on rename (stale slugs
+ * with a valid id still resolve), `author_device_id` is the PLAN-06 device id
+ * and display names resolve client-side. The server stores the text and never
+ * parses it — see the module doc comment.
+ */
+export const grootDocs = sqliteTable('groot_docs', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  content: text('content').notNull(),
+  authorDeviceId: text('author_device_id'),
+  sizeBytes: integer('size_bytes').notNull(),
+  createdAt: integer('created_at').notNull(),
+  modifiedAt: integer('modified_at').notNull(),
+});
+
+/**
  * Read-later shelf ("accio links", PLAN-13). Owned by the `accio` module.
  * `id` is a short random handle (no slug — links are never shared by URL, the
  * shelf is the surface). `url` is the normalized absolute URL; `title` is
