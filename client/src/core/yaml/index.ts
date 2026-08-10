@@ -54,6 +54,25 @@ const PARSE_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
   prettyErrors: false,
 };
 
+/**
+ * Formatting parses with `intAsBigInt` and analysis does not, and the split is
+ * the whole reason both exist.
+ *
+ * Re-emitting a document goes through the parsed value, so an integer past
+ * 2^53 comes back rounded: `buildId: 9007199254740993` formatted to
+ * `…992` — Format silently editing a value it was only asked to re-indent.
+ * A BigInt round-trips exactly, so the restyle path uses one.
+ *
+ * The analysis path deliberately does not: `toJS()` would then hand BigInts to
+ * `JSON.stringify` (which throws on them) and to the tree view. Losing the
+ * digits *there* is honest — it is what JSON does, and the `unsafe-integer`
+ * advisory says so before anyone converts.
+ */
+const RESTYLE_OPTIONS: ParseOptions & DocumentOptions & SchemaOptions = {
+  ...PARSE_OPTIONS,
+  intAsBigInt: true,
+};
+
 const TO_JS_OPTIONS: ToJSOptions = { maxAliasCount: MAX_ALIAS_COUNT };
 
 /** Byte-offset issue, the shape `core/json` already uses so the lint gutter is shared. */
@@ -103,8 +122,11 @@ export interface YamlAnalysis {
 type ParsedDoc = Document.Parsed;
 
 /** `parseAllDocuments` returns an `EmptyStream` marker object for empty input. */
-function parseStream(text: string): ParsedDoc[] {
-  const docs = parseAllDocuments(text, PARSE_OPTIONS);
+function parseStream(
+  text: string,
+  options: ParseOptions & DocumentOptions & SchemaOptions = PARSE_OPTIONS,
+): ParsedDoc[] {
+  const docs = parseAllDocuments(text, options);
   return 'empty' in docs ? [] : docs;
 }
 
@@ -298,7 +320,7 @@ export function toFlow(text: string, indent = 2): string {
 
 function restyle(text: string, options: Parameters<ParsedDoc['toString']>[0]): string {
   if (text.trim() === '') return text;
-  const docs = parseStream(text);
+  const docs = parseStream(text, RESTYLE_OPTIONS);
   if (docs.length === 0 || docs.some((doc) => doc.errors.length > 0)) return text;
   // Each parsed document knows whether it needs its own `---` marker, so the
   // stream reassembles by concatenation (every `toString` ends with a newline).

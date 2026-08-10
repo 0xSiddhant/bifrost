@@ -1575,6 +1575,12 @@
   padding: var(--space-3) 0;
   overflow-x: auto;
   scrollbar-width: none;
+  /* The strip scrolls sideways, and its scrollbar is hidden, so an off-screen
+     chip has nothing pointing at it. With two kinds it always fitted; PLAN-19's
+     third one pushed YAML past the right edge at 375, where the only affordance
+     was guessing there was more. Wrapping costs one line of height on a phone
+     and keeps every kind reachable without a swipe. */
+  flex-wrap: wrap;
 }
 
 .lib-chips::-webkit-scrollbar {

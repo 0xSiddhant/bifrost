@@ -144,6 +144,21 @@ describe('formatYaml', () => {
     const long = `note: ${'x'.repeat(200)}\n`;
     expect(formatYaml(long)).toBe(long);
   });
+
+  it('keeps an integer past 2^53 exact', () => {
+    // Found by formatting a real manifest and reading the result: re-emitting
+    // goes through the parsed value, so without a BigInt parse `…993` comes
+    // back as `…992` — Format editing a value it was asked only to re-indent.
+    const source = ['buildId: 9007199254740993', 'big: 12345678901234567890', 'neg: -9007199254740993', ''].join(
+      '\n',
+    );
+    expect(formatYaml(source)).toBe(source);
+    expect(toBlock(source)).toBe(source);
+  });
+
+  it('keeps a version-like decimal exactly as written', () => {
+    expect(formatYaml('version: 1.10\nratio: 1.50\n')).toBe('version: 1.10\nratio: 1.50\n');
+  });
 });
 
 describe('toFlow / toBlock', () => {
