@@ -11,39 +11,39 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
 import {
-  formatJson,
-  jsonStats,
-  minifyJson,
-  pathAt,
-  sortKeysDeep,
-  unescapeEmbedded,
-  validateJson,
-  type JsonIssue,
-} from '../../core/json';
-import { jsonToJs } from '../../core/js';
+  analyzeYaml,
+  formatYaml,
+  jsonToYaml,
+  toBlock,
+  toFlow,
+  yamlToJson,
+  type YamlAdvisory,
+  type YamlIssue,
+} from '../../core/yaml';
 import { relicTitle } from '../../core/relicNames';
-import { takeRunestoneSeed } from '../../core/runestoneSeed';
+import { putRunestoneSeed } from '../../core/runestoneSeed';
+import { putVariantTextSeed } from '../../core/variantSeed';
 import { ApiError } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
+import { TreeView } from '../../core/ui/TreeView';
 import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
-  fetchRunestone,
-  fetchRunestoneConfig,
-  saveRunestone,
-  updateRunestone,
-  type RunestoneConfig,
-} from '../../core/runestone';
-import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
-import { TreeView } from '../../core/ui/TreeView';
+  fetchGroot,
+  fetchGrootConfig,
+  saveGroot,
+  updateGroot,
+  type GrootConfig,
+} from '../../core/groot';
+import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
 
-const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
+const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .yaml file — one trunk, many branches…';
 
-/** Debounce heavy derived work (validate/stats on up-to-2MB docs) off the keystroke path. */
+/** Debounce heavy derived work (parse/advise on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);
   useEffect(() => {
@@ -69,19 +69,31 @@ function lineColAt(text: string, offset: number): { line: number; col: number } 
 function exportFilename(title: string): string {
   // eslint-disable-next-line no-control-regex
   const safe = title.replace(/[/\\:*?"<>|\u0000-\u001f]/g, '').trim();
-  return `${safe || 'runestone'}.json`;
+  return `${safe || 'groot'}.yaml`;
 }
 
-/** "gleaming-gungnir-abc123" → "Gleaming Gungnir" (drops an id-shaped tail). */
+/** "deploy-values-abc123" → "Deploy Values" (drops an id-shaped tail). */
 function titleFromSlug(slug: string): string {
   const parts = slug.split('-').filter(Boolean);
   if (parts.length > 1 && /^[a-z0-9]{6}$/.test(parts[parts.length - 1] ?? '')) parts.pop();
   return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
+/** What the rail calls each advisory, so a person can tell them apart at a glance. */
+const ADVISORY_LABEL: Record<YamlAdvisory['kind'], string> = {
+  boolish: 'reads as a boolean elsewhere',
+  'duplicate-key': 'duplicate key',
+  'tab-indent': 'tab in indentation',
+  'lossy-number': 'number, not text',
+  'unsafe-integer': 'loses digits',
+  anchor: 'anchor',
+  'merge-key': 'merge key',
+  'parser-warning': 'parser note',
+};
+
 type Phase = 'new' | 'loading' | 'saved' | 'notfound';
 
-export function RunestonePage() {
+export function GrootPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const font = usePanelFont();
@@ -95,16 +107,17 @@ export function RunestonePage() {
   const [view, setView] = useState<'code' | 'tree'>(() =>
     window.innerWidth < 768 ? 'tree' : 'code',
   );
-  const [config, setConfig] = useState<RunestoneConfig | null>(null);
+  const [docIndex, setDocIndex] = useState(0);
+  const [config, setConfig] = useState<GrootConfig | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
-  const [restorable, setRestorable] = useState<RunestoneDraft | null>(null);
+  const [restorable, setRestorable] = useState<GrootDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchRunestoneConfig()
+    fetchGrootConfig()
       .then((cfg) => {
         if (!cancelled) setConfig(cfg);
       })
@@ -126,7 +139,7 @@ export function RunestonePage() {
     }
     let cancelled = false;
     setPhase('loading');
-    fetchRunestone(slug)
+    fetchGroot(slug)
       .then((doc) => {
         if (cancelled) return;
         if (!doc) {
@@ -139,12 +152,12 @@ export function RunestonePage() {
         setSnapshot({ title: doc.name, text: doc.content });
         setPhase('saved');
         // The API 301s stale slugs; fix the address bar to the canonical one.
-        if (doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
+        if (doc.slug !== slug) navigate(`/groot/${doc.slug}`, { replace: true });
       })
       .catch(() => {
         if (!cancelled) {
           setPhase('new');
-          setNotice({ kind: 'danger', message: 'Could not load that runestone.' });
+          setNotice({ kind: 'danger', message: 'Could not load that document.' });
         }
       });
     return () => {
@@ -155,20 +168,9 @@ export function RunestonePage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // On arriving at the scratch editor: a hand-off from another tool (Groot's
-  // "Open in Runestone") beats the draft prompt and applies immediately — it is
-  // a document the person just asked for, so it opens rather than offering to.
-  // Only with no seed does the cached draft offer itself, once.
+  // Offer to restore a cached draft once, on arriving at the scratch editor.
   useEffect(() => {
     if (!isScratch) return;
-    const seed = takeRunestoneSeed();
-    if (seed) {
-      setText(seed.text);
-      if (seed.title) setTitle(seed.title);
-      setView('code');
-      setRestorable(null);
-      return;
-    }
     const draft = loadDraft();
     if (draft && draft.text.trim() !== '') setRestorable(draft);
   }, [isScratch]);
@@ -188,33 +190,28 @@ export function RunestonePage() {
   }, [notice]);
 
   const debouncedText = useDebounced(text, 300);
-  const issues: JsonIssue[] = useMemo(
-    () => (debouncedText.trim() === '' ? [] : validateJson(debouncedText)),
-    [debouncedText],
-  );
-  const stats = useMemo(() => jsonStats(debouncedText), [debouncedText]);
+  // One parse per tick feeds the issue list, the rail, the tree and the stats —
+  // a 2 MB document is not worth parsing four times over.
+  const analysis = useMemo(() => analyzeYaml(debouncedText), [debouncedText]);
+  const issues: YamlIssue[] = analysis.issues;
+  const stats = analysis.stats;
   const empty = debouncedText.trim() === '';
   const valid = !empty && issues.length === 0;
-  const parsed: unknown = useMemo(() => {
-    if (view !== 'tree' || !valid) return undefined;
-    try {
-      return JSON.parse(debouncedText) as unknown;
-    } catch {
-      return undefined;
-    }
-  }, [view, valid, debouncedText]);
+
+  // A multi-document stream keeps a tab per document. The index is clamped on
+  // read rather than reset in an effect, so deleting a `---` while looking at
+  // the last document shows the one that is left instead of flashing empty.
+  const docCount = analysis.documents.length;
+  const activeIndex = docCount === 0 ? 0 : Math.min(docIndex, docCount - 1);
+  const activeDoc = analysis.documents[activeIndex];
 
   const maxBytes = config ? config.maxDocKb * 1024 : null;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
-  const debouncedCursor = useDebounced(cursor, 150);
-  const cursorPath = useMemo(() => {
-    if (view !== 'code' || empty) return null;
-    return pathAt(debouncedText, Math.min(debouncedCursor, debouncedText.length));
-  }, [view, empty, debouncedText, debouncedCursor]);
-
-  const dirty = snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
+  const dirty =
+    snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
   const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
+  const canTransform = valid && !overCap;
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
@@ -224,20 +221,20 @@ export function RunestonePage() {
     setSaving(true);
     try {
       if (docId === null) {
-        const doc = await saveRunestone({ name: title, content: text });
+        const doc = await saveGroot({ name: title, content: text });
         setDocId(doc.id);
         setTitle(doc.name);
         setSnapshot({ title: doc.name, text: doc.content });
         setPhase('saved');
         clearDraft();
         setRestorable(null);
-        navigate(`/runestone/${doc.slug}`, { replace: true });
-        ok('Runestone carved');
+        navigate(`/groot/${doc.slug}`, { replace: true });
+        ok('Grown into the Pensieve');
       } else {
-        const doc = await updateRunestone(docId, { name: title, content: text });
+        const doc = await updateGroot(docId, { name: title, content: text });
         setTitle(doc.name);
         setSnapshot({ title: doc.name, text: doc.content });
-        if (slug && doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
+        if (slug && doc.slug !== slug) navigate(`/groot/${doc.slug}`, { replace: true });
         ok('Saved');
       }
     } catch (error) {
@@ -251,45 +248,49 @@ export function RunestonePage() {
     }
   };
 
-  const applyFormat = () => setText((current) => formatJson(current));
-  const applyMinify = () => setText((current) => minifyJson(current));
-
-  const applySortKeys = () => {
-    try {
-      const sorted = sortKeysDeep(JSON.parse(text));
-      setText(JSON.stringify(sorted, null, 2));
-      ok('Keys sorted A→Z');
-    } catch {
-      fail('Fix the errors first — sorting needs valid JSON.');
-    }
-  };
-
-  const applyUnescape = () => {
-    const inner = unescapeEmbedded(text.trim());
-    if (inner === null) {
-      fail('No embedded JSON found in this document.');
-    } else {
-      setText(formatJson(inner));
-      ok('Embedded JSON unescaped');
-    }
-  };
+  const applyFormat = () => setText((current) => formatYaml(current));
+  const applyCompact = () => setText((current) => toFlow(current));
+  const applyExpand = () => setText((current) => toBlock(current));
 
   const copyDocument = async () => {
     if (await copyText(text)) ok('Document copied');
     else fail('Copy was blocked by the browser.');
   };
 
-  // Loki's jsonToJs (PLAN-12): valid JSON → a JS object literal (identifier
-  // keys unquoted, single-quoted strings), copied to the clipboard. Enabled
-  // only on Valid JSON ✓, so it's safe by construction.
-  const copyAsJs = async () => {
+  const copyAsJson = async () => {
     try {
-      const js = jsonToJs(text);
-      if (await copyText(js)) ok('Copied as a JS object literal');
+      if (await copyText(yamlToJson(text))) ok('Copied as JSON');
       else fail('Copy was blocked by the browser.');
     } catch {
-      fail('Fix the errors first — Copy as JS needs valid JSON.');
+      fail('Fix the errors first — converting needs valid YAML.');
     }
+  };
+
+  // Hand-off, not an import: Runestone reads the seed once on mount, so no
+  // feature imports another (the Loki→Variant bridge, in the other direction).
+  const openInRunestone = () => {
+    try {
+      putRunestoneSeed({ title, text: yamlToJson(text) });
+      void navigate('/runestone');
+    } catch {
+      fail('Fix the errors first — converting needs valid YAML.');
+    }
+  };
+
+  /** JSON is valid YAML, so this replaces the buffer in place and stays parseable. */
+  const convertFromJson = () => {
+    try {
+      setText(jsonToYaml(text));
+      ok('Converted from JSON');
+    } catch {
+      fail('That is not valid JSON — nothing was changed.');
+    }
+  };
+
+  const diffAgainstSaved = () => {
+    if (!snapshot) return;
+    putVariantTextSeed({ left: snapshot.text, right: text });
+    void navigate('/variant');
   };
 
   const clearDocument = () => {
@@ -320,9 +321,9 @@ export function RunestonePage() {
     }
   }, [view, pendingJump]);
 
-  const gotoIssue = (issue: JsonIssue) => {
+  const gotoOffset = (offset: number) => {
     setView('code');
-    setPendingJump(issue.offset);
+    setPendingJump(offset);
   };
 
   const gotoNextIssue = (direction: 1 | -1) => {
@@ -333,7 +334,7 @@ export function RunestonePage() {
       direction === 1
         ? (after[0] ?? issues[0])
         : (before[before.length - 1] ?? issues[issues.length - 1]);
-    if (target) gotoIssue(target);
+    if (target) gotoOffset(target.offset);
   };
 
   const importText = (name: string, content: string, sizeBytes: number) => {
@@ -342,7 +343,7 @@ export function RunestonePage() {
       return;
     }
     setText(content);
-    const base = name.replace(/\.json$/i, '').trim();
+    const base = name.replace(/\.(ya?ml)$/i, '').trim();
     if (base) setTitle(base);
     ok(`Imported ${name}`);
   };
@@ -357,15 +358,15 @@ export function RunestonePage() {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (!file) return;
-    if (!/\.json$/i.test(file.name) && file.type !== 'application/json') {
-      fail('Only .json files can be dropped here.');
+    if (!/\.(ya?ml)$/i.test(file.name)) {
+      fail('Only .yaml or .yml files can be dropped here.');
       return;
     }
     importText(file.name, await file.text(), file.size);
   };
 
   const exportDocument = () => {
-    const blob = new Blob([text], { type: 'application/json' });
+    const blob = new Blob([text], { type: 'application/yaml' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -387,19 +388,17 @@ export function RunestonePage() {
     setRestorable(null);
   };
 
-  const carveFromSlug = () => {
+  const growFromSlug = () => {
     setPhase('new');
     setDocId(null);
     setSnapshot(null);
     setText('');
     setTitle(slug ? titleFromSlug(slug) || relicTitle() : relicTitle());
-    navigate('/runestone', { replace: true });
+    navigate('/groot', { replace: true });
   };
 
-  const canTransform = valid && !overCap;
-
   if (phase === 'loading') {
-    return <div className="page-loading caption">Reading the stone…</div>;
+    return <div className="page-loading caption">Reading the rings…</div>;
   }
 
   if (phase === 'notfound') {
@@ -407,19 +406,19 @@ export function RunestonePage() {
       <>
         <div className="page-head">
           <div>
-            <span className="eyebrow eyebrow--violet">the runes · carved to be read later</span>
-            <h2>This runestone was never carved</h2>
-            <p>…or it has crumbled to dust. The Pensieve keeps no memory of “{slug}”.</p>
+            <span className="eyebrow eyebrow--violet">groot · one trunk, many branches</span>
+            <h2>Nothing grew here</h2>
+            <p>…or this branch was pruned. The Pensieve holds no “{slug}”.</p>
           </div>
         </div>
         <Card>
           <div className="rune-404">
             <p className="rune-404__glyph" aria-hidden="true">
-              ᚱᚢᚾᛖ᛫ᛚᛟᛊᛏ
+              I&nbsp;AM&nbsp;GROOT
             </p>
             <div className="row">
-              <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+              <Button onClick={growFromSlug}>Grow it now</Button>
+              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -433,7 +432,7 @@ export function RunestonePage() {
     <>
       <div className="page-head rune-head">
         <div>
-          <span className="eyebrow eyebrow--violet">the runes · carved to be read later</span>
+          <span className="eyebrow eyebrow--violet">groot · one trunk, many branches</span>
           <h2>
             <input
               className="rune-title"
@@ -443,13 +442,13 @@ export function RunestonePage() {
               onChange={(event) => setTitle(event.target.value)}
             />
           </h2>
-          <p>Validate, explore, and shape JSON. The title names your export.</p>
+          <p>Write, fold and check YAML. Comments survive every format.</p>
         </div>
         <div className="rune-head-actions">
           <Button onClick={() => void save()} disabled={!canSave}>
-            {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
+            {saving ? 'Growing…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
             Pensieve
           </Button>
         </div>
@@ -486,23 +485,54 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applyFormat}>
                 Format
               </Button>
-              <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applyMinify}>
-                Minify
-              </Button>
-              <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applySortKeys}>
-                Sort keys
-              </Button>
-              <Button size="sm" variant="ghost" disabled={empty} onClick={applyUnescape}>
-                Unescape
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!canTransform}
+                title="Flow style — YAML's compact form"
+                onClick={applyCompact}
+              >
+                Compact
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={!canTransform}
-                title="Copy as a JavaScript object literal"
-                onClick={() => void copyAsJs()}
+                title="Block style — one key per line"
+                onClick={applyExpand}
               >
-                Copy as JS
+                Expand
+              </Button>
+            </div>
+            <div className="rune-toolbar__group groot-convert">
+              {/* Said before the click, not after: JSON has nowhere to put a
+                  comment or an anchor, so the conversion is lossy by nature. */}
+              <span className="caption groot-convert__note">to JSON (drops comments):</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!canTransform}
+                onClick={() => void copyAsJson()}
+              >
+                Copy
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!canTransform}
+                title="Convert and open the result in Runestone"
+                onClick={openInRunestone}
+              >
+                Runestone
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                title="Replace the buffer with the YAML form of the JSON in it"
+                onClick={convertFromJson}
+              >
+                From JSON
               </Button>
             </div>
             <div className="rune-toolbar__group">
@@ -561,6 +591,19 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
                 Copy
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={!snapshot || !dirty}
+                title={
+                  snapshot
+                    ? 'Compare the saved document with your edits in Variant'
+                    : 'Available once the document has been saved'
+                }
+                onClick={diffAgainstSaved}
+              >
+                Diff
+              </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={clearDocument}>
                 Clear
               </Button>
@@ -595,6 +638,7 @@ export function RunestonePage() {
             {view === 'code' ? (
               <JsonEditor
                 ref={editorRef}
+                mode="yaml"
                 value={text}
                 onChange={setText}
                 onCursor={setCursor}
@@ -603,17 +647,41 @@ export function RunestonePage() {
               />
             ) : empty ? (
               <p className="rune-tree-empty caption">
-                Nothing carved yet — switch to Code and paste some JSON.
+                Nothing planted yet — switch to Code and paste some YAML.
               </p>
-            ) : valid && parsed !== undefined ? (
-              <TreeView
-                value={parsed}
-                onCopyPath={(path) => void copyPath(path)}
-                onCopyValue={(value) => void copyValue(value)}
-              />
+            ) : valid && activeDoc ? (
+              <>
+                {docCount > 1 && (
+                  <div className="groot-docs" role="tablist" aria-label="Documents in this stream">
+                    {analysis.documents.map((doc, index) => (
+                      <button
+                        key={doc.index}
+                        type="button"
+                        role="tab"
+                        aria-selected={index === activeIndex}
+                        className={`groot-docs__tab${index === activeIndex ? ' is-active' : ''}`}
+                        onClick={() => setDocIndex(index)}
+                      >
+                        Doc {index + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <TreeView
+                  value={activeDoc.value}
+                  onCopyPath={(path) => void copyPath(path)}
+                  onCopyValue={(value) => void copyValue(value)}
+                  // Aliases resolve to their anchor's value, so without this an
+                  // aliased branch looks like a hand-written duplicate.
+                  annotationAt={(path) => {
+                    const anchor = activeDoc.aliasPaths.get(path);
+                    return anchor ? `*${anchor}` : undefined;
+                  }}
+                />
+              </>
             ) : (
               <p className="rune-tree-empty caption">
-                The tree appears once the JSON is valid — {issues.length}{' '}
+                The tree appears once the YAML parses — {issues.length}{' '}
                 {issues.length === 1 ? 'error remains' : 'errors remain'}.
               </p>
             )}
@@ -621,10 +689,10 @@ export function RunestonePage() {
 
           <div className="rune-status" aria-live="polite">
             {empty ? (
-              <span className="rune-status__state caption">Empty — paste or import JSON</span>
+              <span className="rune-status__state caption">Empty — paste or import YAML</span>
             ) : valid ? (
               <span className="rune-status__state rune-status__state--ok">
-                <CheckIcon size={14} /> Valid JSON
+                <CheckIcon size={14} /> Valid YAML
               </span>
             ) : (
               <span className="rune-status__state rune-status__state--bad">
@@ -634,24 +702,9 @@ export function RunestonePage() {
             {docId !== null && (
               <span className="caption">{dirty ? 'Unsaved changes' : 'Kept in the Pensieve'}</span>
             )}
-            {cursorPath && (
-              <button
-                type="button"
-                className="rune-status__path mono"
-                title="Copy JSON path at cursor"
-                onClick={() => void copyPath(cursorPath)}
-              >
-                {cursorPath}
-              </button>
-            )}
             <span className="rune-stats caption">
               {formatBytes(stats.bytes)} · {stats.lines} {stats.lines === 1 ? 'line' : 'lines'}
-              {stats.nodes > 0 && (
-                <>
-                  {' '}
-                  · {stats.nodes} {stats.nodes === 1 ? 'node' : 'nodes'} · depth {stats.depth}
-                </>
-              )}
+              {stats.documents > 1 && <> · {stats.documents} documents</>}
             </span>
           </div>
 
@@ -661,7 +714,7 @@ export function RunestonePage() {
                 const { line, col } = lineColAt(debouncedText, issue.offset);
                 return (
                   <li key={`${issue.offset}-${index}`}>
-                    <button type="button" onClick={() => gotoIssue(issue)}>
+                    <button type="button" onClick={() => gotoOffset(issue.offset)}>
                       <span className="mono">
                         {line}:{col}
                       </span>{' '}
@@ -670,10 +723,32 @@ export function RunestonePage() {
                   </li>
                 );
               })}
-              {issues.length > 20 && (
-                <li className="caption">…and {issues.length - 20} more</li>
-              )}
+              {issues.length > 20 && <li className="caption">…and {issues.length - 20} more</li>}
             </ul>
+          )}
+
+          {analysis.advisories.length > 0 && (
+            <section className="groot-rail" aria-label="Advisories">
+              <p className="groot-rail__head caption">
+                {analysis.advisories.length}{' '}
+                {analysis.advisories.length === 1 ? 'advisory' : 'advisories'} — nothing here blocks
+                a save, and nothing is changed for you.
+              </p>
+              <ul className="groot-rail__list">
+                {analysis.advisories.slice(0, 30).map((advisory, index) => (
+                  <li key={`${advisory.offset}-${advisory.kind}-${index}`}>
+                    <button type="button" onClick={() => gotoOffset(advisory.offset)}>
+                      <span className="mono groot-rail__line">line {advisory.line}</span>
+                      <span className="groot-rail__kind">{ADVISORY_LABEL[advisory.kind]}</span>
+                      <span className="groot-rail__message">{advisory.message}</span>
+                    </button>
+                  </li>
+                ))}
+                {analysis.advisories.length > 30 && (
+                  <li className="caption">…and {analysis.advisories.length - 30} more</li>
+                )}
+              </ul>
+            </section>
           )}
         </Card>
 
@@ -687,7 +762,7 @@ export function RunestonePage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".json,application/json"
+        accept=".yaml,.yml,application/yaml,text/yaml"
         hidden
         onChange={(event) => void onPickFile(event)}
       />

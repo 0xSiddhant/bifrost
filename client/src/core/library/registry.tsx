@@ -1,6 +1,7 @@
 import { deleteEdda, listEddas } from '../edda';
+import { deleteGroot, listGroots } from '../groot';
 import { deleteRunestone, listRunestones } from '../runestone';
-import { BracesIcon, DocFileIcon } from '../ui/icons';
+import { BracesIcon, DocFileIcon, TreeIcon } from '../ui/icons';
 import type { LibraryEntry, LibraryItem, LibraryKind, LibraryQuery } from './types';
 
 /**
@@ -64,17 +65,33 @@ const eddaEntry: LibraryEntry = {
   readRoute: (item) => `/edda/preview/${item.slug}`,
 };
 
+const grootEntry: LibraryEntry = {
+  kind: 'groot',
+  label: 'YAML',
+  module: 'groot',
+  tone: 3,
+  icon: <TreeIcon size={14} />,
+  events: ['groot.saved', 'groot.deleted'],
+  noun: 'document',
+  newRoute: '/groot',
+  newLabel: 'Grow a new one',
+  list: (query: LibraryQuery) => listGroots(query).then((rows) => tag('groot', rows)),
+  remove: (id: string) => deleteGroot(id),
+  editorRoute: (item) => `/groot/${item.slug}`,
+  apiRoute: (item) => `/groot/api/${item.slug}`,
+};
+
 /**
  * Order decides the chip order and the pre-sort merge order, nothing else —
  * badge colour comes from each entry's own `tone`, deliberately not from
  * position (see `LibraryEntry.tone`).
  *
- * **Groot (YAML) is absent because PLAN-19 has not shipped yet.** Its arrival
- * is one entry appended here: `LibraryKind` already names it, and the fake-kind
- * test pins that a kind the page has never heard of lists, filters, sorts and
- * deletes with no change to the page.
+ * **Groot's arrival (PLAN-19) was the return on this registry**: it is the one
+ * element below, and the page, the chips, the filters, the SSE subscriptions
+ * and the delete flow needed no change at all — which is what the fake-kind
+ * test in `load.test.ts` had been pinning all along.
  */
-export const LIBRARY_REGISTRY: readonly LibraryEntry[] = [runestoneEntry, eddaEntry];
+export const LIBRARY_REGISTRY: readonly LibraryEntry[] = [runestoneEntry, eddaEntry, grootEntry];
 
 /** The kinds this deploy profile actually serves. */
 export function availableKinds(

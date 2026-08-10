@@ -187,6 +187,16 @@ function collectRefs(
  * parsing a 2 MB document four times over.
  */
 export function analyzeYaml(text: string): YamlAnalysis {
+  return analyze(text, true);
+}
+
+/**
+ * `withAdvisories` is off for the callers that only need to know whether the
+ * document parses — the editor's linter runs on every keystroke's debounce and
+ * has no rail to fill, and the advisory pass is a second walk of the tree plus
+ * a character scan of the source.
+ */
+function analyze(text: string, withAdvisories: boolean): YamlAnalysis {
   const bytes = new TextEncoder().encode(text).length;
   const lines = text.length === 0 ? 0 : text.split('\n').length;
 
@@ -229,9 +239,11 @@ export function analyzeYaml(text: string): YamlAnalysis {
 
   // Tabs are found by scanning the text, not the tree: a tab in indentation is
   // a hard syntax error, so by the time it matters there may be no tree left.
-  const advisories = [...tabIndentAdvisories(text), ...advisoriesFor(parsed, text)].sort(
-    (a, b) => a.offset - b.offset,
-  );
+  const advisories = withAdvisories
+    ? [...tabIndentAdvisories(text), ...advisoriesFor(parsed, text)].sort(
+        (a, b) => a.offset - b.offset,
+      )
+    : [];
 
   return {
     documents,
@@ -243,7 +255,7 @@ export function analyzeYaml(text: string): YamlAnalysis {
 
 /** Every blocking problem in the stream, in source order (feeds the lint gutter). */
 export function validateYaml(text: string): YamlIssue[] {
-  return analyzeYaml(text).issues;
+  return analyze(text, false).issues;
 }
 
 /** Non-blocking warnings about documents that are valid but ambiguous. */
@@ -253,11 +265,11 @@ export function advisories(text: string): YamlAdvisory[] {
 
 /** The stream's documents with their resolved values, anchors and alias paths. */
 export function parseDocuments(text: string): YamlDocument[] {
-  return analyzeYaml(text).documents;
+  return analyze(text, false).documents;
 }
 
 export function yamlStats(text: string): YamlStats {
-  return analyzeYaml(text).stats;
+  return analyze(text, false).stats;
 }
 
 /**

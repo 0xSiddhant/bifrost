@@ -352,3 +352,12 @@ export const FingerprintIcon = (p: IconProps) => (
     <path d="M7.2 15.5A8 8 0 0 1 7 14v-3" />
   </svg>
 );
+
+/** Groot (PLAN-19) — one trunk, many branches: a literal tree for YAML. */
+export const TreeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 21v-7" />
+    <path d="M12 14 7.5 9.5M12 11l4.5-4.5" />
+    <path d="M9.5 4.5a3 3 0 0 0-2.6 4.4 3 3 0 0 0 1.6 5.1 3 3 0 0 0 5.6 1.4 3 3 0 0 0 4.6-3.6 3 3 0 0 0-1.6-4.8A3 3 0 0 0 12 3.6a3 3 0 0 0-2.5.9Z" />
+  </svg>
+);
