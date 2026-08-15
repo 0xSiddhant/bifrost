@@ -62,7 +62,10 @@ bifrost/
 │       │                      #   ErrorBoundary (app-wide crash net), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|plain, PLAN-19)
 │       │                      #   +in-editor search, TreeView +bulk collapse +alias annotation),
-│       │                      #   json/ (parse/format/diff), markdown/ (renderMarkdown/outline/stats/commands),
+│       │                      #   json/ (parse/format/diff),
+│       │                      #   markdown/ (renderMarkdown/outline/stats/commands + PLAN-20's
+│       │                      #     mermaid.ts + useMermaid.ts — the async diagram pass sits BESIDE
+│       │                      #     the pure renderer, and in core so features/previews/ can reach it),
 │       │                      #   yaml/ (PLAN-19 — analyze/format/flow⇄block/⇄json + the advisory
 │       │                      #     rail; format-named not tool-named, so Variant can share it),
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
@@ -77,7 +80,9 @@ bifrost/
 │                              #   PLAN-18 — the QR page became a toolbox tool, module untouched);
 │                              #   runestone + variant added in PLAN-07/08; edda in PLAN-11
 │                              #     (PLAN-21 deleted BOTH their library pages — runestone/PensievePage
-│                              #      and edda/EddaLibraryPage — for the one shell above);
+│                              #      and edda/EddaLibraryPage — for the one shell above;
+│                              #      PLAN-20 added exportHtml.ts's print twin, print.ts — the hidden
+│                              #      srcdoc iframe behind the .pdf button);
 │                              #   groot (YAML workspace — editor · tree · advisory rail,
 │                              #     reusing the rune-* editor chrome) in PLAN-19;
 │                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
