@@ -124,7 +124,11 @@ describe('renderMermaidIn', () => {
     await expect(renderMermaidIn(div)).resolves.toBe(1);
 
     const figure = div.querySelector('figure.mermaid--error');
-    expect(figure?.querySelector('figcaption')?.textContent).toContain('Parse error on line 2:');
+    // Named, and the trailing colon is trimmed — what follows it in mermaid's
+    // message is the source excerpt, which the block already shows below.
+    expect(figure?.querySelector('figcaption')?.textContent).toBe(
+      'This diagram could not be drawn — Parse error on line 2',
+    );
     expect(figure?.querySelector('pre')?.textContent).toBe('graph TD\n  A-->B');
     expect(div.querySelector('svg')).toBeNull();
   });
