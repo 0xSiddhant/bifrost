@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import DOMPurify from 'dompurify';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { marked } from 'marked';
+import { renderMarkdown, useMermaidDiagrams } from '../../core/markdown';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { FileIcon } from '../../core/ui/icons';
 
@@ -77,13 +76,27 @@ function TextStates({ content }: { content: TextState }) {
   );
 }
 
+/**
+ * A `.md` file from downloads/ or uploads/, rendered through the **shared**
+ * `renderMarkdown` since PLAN-20 rather than a bare `marked.parse` of its own.
+ * That closes a real drift — this modal now gets GFM, highlighted code and
+ * heading ids like every other markdown surface — and is what lets it show
+ * mermaid diagrams for one hook call. A file with no fence loads no mermaid.
+ *
+ * Sanitizing stays non-negotiable (renderMarkdown does it): anyone on the LAN
+ * can drop a file into these folders.
+ */
 export function MarkdownViewer({ src }: { src: string }) {
   const content = useTextContent(src);
+  const ref = useRef<HTMLDivElement>(null);
+  const text = content.state === 'ready' ? content.text : '';
+  const html = useMemo(() => (text ? renderMarkdown(text) : ''), [text]);
+  // Identity-compared by React, so memoizing it is what keeps a re-render from
+  // wiping the diagrams the pass just swapped in — see MarkdownPreview.
+  const markup = useMemo(() => ({ __html: html }), [html]);
+  useMermaidDiagrams(ref, html, 'previews');
   if (content.state !== 'ready') return <TextStates content={content} />;
-  // Folder contents are the owner's own files, but sanitizing is free —
-  // acceptance criterion: embedded <script> renders inert.
-  const html = DOMPurify.sanitize(marked.parse(content.text, { async: false }));
-  return <div className="preview-markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+  return <div ref={ref} className="preview-markdown" dangerouslySetInnerHTML={markup} />;
 }
 
 export function TextViewer({ src }: { src: string }) {
