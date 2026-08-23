@@ -14,7 +14,7 @@ _(**PWA manifest + icons** — DONE 2026-07-22: `client/public/` manifest + favi
 
 _(**Utility toolbox page** — DONE, shipped 2026-08-06 as **PLAN-18**: Diagon Alley's cards expand in place into ~13 client-side tools. **Iris** (below) was folded into the same plan. See `PLAN-18-toolbox.md`; do not re-add here.)_
 
-_(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — PROMOTED 2026-08-04 to **PLAN-20**, together, because a PDF that omitted the diagrams would be a bug. See `PLAN-20-edda-diagrams-print.md`. Note for the record: both rows claimed the features were "listed in Edda's coming-soon footer" — **no such footer exists** in the Edda UI, so nothing needed removing there.)_
+_(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — **DONE 2026-08-15** in **PLAN-20**, promoted 2026-08-04 and shipped together, because a PDF that omitted the diagrams would be a bug. See `completed/PLAN-20-edda-diagrams-print.md`. Note for the record, now corrected twice: both rows claimed the features were "listed in Edda's coming-soon footer", and PLAN-20 in turn claimed **no such footer exists** — it does (`.edda-soon`), it listed exactly these two plus "Image paste", and PLAN-20's own PR removed the two it delivered. The original backlog note was right and the correction was wrong.)_
 
 _(**Unified library shell** — PROMOTED 2026-08-04 to **PLAN-21**, as **Pensieve**: one `/pensieve` listing runestones + eddas + groots behind a type filter, client-side fan-out so storage stays uncoupled. It deletes the two near-identical library pages that already both call themselves "Pensieve". See `PLAN-21-pensieve.md`.)_
 

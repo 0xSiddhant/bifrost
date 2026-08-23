@@ -794,6 +794,64 @@ a.portal:hover .portal__go {
   padding: var(--space-1) var(--space-2);
 }
 
+/* Since PLAN-20 this surface uses the shared renderer, which also emits links,
+   rules, task checkboxes and anchored headings. */
+.preview-markdown a {
+  color: var(--accent);
+}
+
+.preview-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-4) 0;
+}
+
+.preview-markdown input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin-right: 0.4em;
+}
+
+/* ── Mermaid diagrams (PLAN-20) ─────────────────────────────
+   One rule for both rendered-markdown surfaces — the Edda preview and the
+   file-preview modal — and mirrored in the HTML/PDF export template, since
+   that file carries no Bifrost stylesheet. `max-width` is !important because
+   mermaid writes its own inline max-width in pixels; without this a diagram
+   wider than the pane is clipped rather than scaled. */
+:is(.md-preview, .preview-markdown) figure.mermaid {
+  margin: var(--space-4) 0;
+  text-align: center;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid svg {
+  max-width: 100% !important;
+  height: auto;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  padding: var(--space-3);
+  text-align: left;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error figcaption {
+  color: var(--danger);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The export's print-only twin never shows in the app. */
+:is(.md-preview, .preview-markdown) figure.mermaid--print {
+  display: none;
+}
+
 .preview-footer {
   display: flex;
   align-items: center;
@@ -801,41 +859,32 @@ a.portal:hover .portal__go {
   gap: var(--space-3);
 }
 
-/* highlight.js token colors from design tokens — theme-aware for free. */
-.preview-text .hljs-comment,
-.preview-text .hljs-quote,
-.preview-text .hljs-meta {
+/* highlight.js token colors from design tokens — theme-aware for free. Since
+   PLAN-20 the markdown viewer renders through the shared renderMarkdown, so its
+   fenced code carries hljs classes too and shares this palette. */
+:is(.preview-markdown, .preview-text) :is(.hljs-comment, .hljs-quote, .hljs-meta) {
   color: var(--text-muted);
 }
 
-.preview-text .hljs-keyword,
-.preview-text .hljs-selector-tag,
-.preview-text .hljs-built_in,
-.preview-text .hljs-tag {
+:is(.preview-markdown, .preview-text)
+  :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-tag) {
   color: var(--accent);
 }
 
-.preview-text .hljs-string,
-.preview-text .hljs-regexp,
-.preview-text .hljs-addition {
+:is(.preview-markdown, .preview-text) :is(.hljs-string, .hljs-regexp, .hljs-addition) {
   color: var(--ok);
 }
 
-.preview-text .hljs-number,
-.preview-text .hljs-literal,
-.preview-text .hljs-symbol,
-.preview-text .hljs-attribute,
-.preview-text .hljs-attr {
+:is(.preview-markdown, .preview-text)
+  :is(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-attribute, .hljs-attr) {
   color: var(--tone-violet);
 }
 
-.preview-text .hljs-title,
-.preview-text .hljs-name,
-.preview-text .hljs-section {
+:is(.preview-markdown, .preview-text) :is(.hljs-title, .hljs-name, .hljs-section) {
   color: var(--warn);
 }
 
-.preview-text .hljs-deletion {
+:is(.preview-markdown, .preview-text) .hljs-deletion {
   color: var(--danger);
 }
 
