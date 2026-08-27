@@ -84,6 +84,24 @@ export interface ScreensaverSettings {
   quoteRotateSeconds: number;
 }
 
+/** One warmable page in the offline-mode registry (PLAN-22) — code-owned. */
+export interface OfflineModeTarget {
+  /** Stable id the client maps to its own `import()` loader. */
+  id: string;
+  label: string;
+}
+
+/**
+ * Offline-mode policy as the public config and the SSE payload carry it: the
+ * whole code-owned registry, plus the ids an admin has currently disabled.
+ * Sent whole (rather than as a delta) so a client can replace its copy without
+ * merging.
+ */
+export interface OfflineModeConfig {
+  targets: OfflineModeTarget[];
+  disabled: string[];
+}
+
 /** One validated theme as the listing/SSE payload shows it. */
 export interface ThemeSummary {
   id: string;
@@ -273,6 +291,8 @@ export interface BifrostEventMap {
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */
   'screensaver.settingsUpdated': ScreensaverSettings;
+  /** Offline-mode registry policy changed in Heimdall — open tabs warm the new set. */
+  'offlineMode.settingsUpdated': OfflineModeConfig;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

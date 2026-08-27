@@ -57,6 +57,7 @@ describe('boot → health → capabilities', () => {
         'client-logs',
         'metrics',
         'toolbox',
+        'offline-mode',
       ],
     });
   });
@@ -109,6 +110,9 @@ describe('capabilities in the cloud profile', () => {
     expect(body.modules).toContain('qr-tool');
     // The three structured-text workspaces ship in both profiles (PLAN-19).
     expect(body.modules).toContain('groot');
+    // Warm-load policy is harmless client mechanism, so it ships in both
+    // profiles too — a cloud build that lost it would show a dead toggle.
+    expect(body.modules).toContain('offline-mode');
     // Local-only modules must not leak into the cloud manifest.
     expect(body.modules).not.toContain('file-transfer');
     expect(body.modules).not.toContain('portkey');
