@@ -1,0 +1,156 @@
+# Offline mode — warm-loading the pure-client pages
+
+Offline mode is a switch in the header that, while the LAN is still reachable,
+fetches the JavaScript for the pages that compute entirely in the browser —
+Diagon Alley's toolbox and Ollivanders' four editors plus the diff view. Once
+that code is in the tab, walking out of Wi-Fi range does not stop you opening
+those pages: client-side routing mounts them from memory, with no request.
+
+It is worth being precise about what that is **not**. It does not survive a
+reload, a new tab, or a closed-and-reopened browser — the first thing any of
+those does is ask the network for `index.html`. It is not a downloadable
+standalone file. And it does nothing for anything that needs the server:
+opening a saved document by slug, or the Pensieve, still fails offline exactly
+as before. The unit of the promise is **the tab you already have open**.
+
+## Why no Service Worker
+
+A Service Worker is the standard way to survive a reload offline, and it is
+unavailable here. Service Workers only register in a browser "secure context":
+HTTPS, or the literal hostname `localhost`. Bifrost serves plain HTTP on the
+LAN — a deliberate, logged choice (`tech-stack.md`: HTTPS/HTTP2 avoided since
+it's LAN-only) — so a Service Worker would function only when the host Mac
+opens `http://localhost:4646` in its own browser, and never from
+`bifrost.local` or a LAN IP on a phone or laptop.
+
+This is the same browser restriction that already hides the SHA-256 tool on
+LAN devices: `crypto.subtle` is secure-context-only, which is why that tool
+declares a `supported()` gate (PLAN-18b). A hard browser limitation, not an
+engineering gap.
+
+So offline mode builds only the part that works on every device: eagerly
+resolving the module imports while the network is there.
+
+## Mechanism
+
+Six warmable targets, all page-level:
+
+| id | What it warms |
+|---|---|
+| `toolbox` | `features/toolbox/ToolBody` — the one lazy chunk behind all thirteen Diagon Alley tools |
+| `runestone` | `features/runestone/RunestonePage` |
+| `groot` | `features/groot/GrootPage` |
+| `edda` | `features/edda/EddaPage` |
+| `variant` | `features/variant/VariantPage` |
+| `loki` | `features/loki/LokiPage` |
+
+A click reads the currently enabled subset and fires those loaders together
+through `Promise.allSettled`. `allSettled`, not `all`: one chunk failing must
+not cancel the rest, and the failures are needed **by name** so the status pill
+can say *Partly ready — Loki (JS workbench) failed* rather than a false
+*Ready offline*.
+
+Calling `import()` here, beside the `lazy()` wrappers in `App.tsx`, does not
+double-fetch. ES modules are singletons per resolved URL within a document's
+module graph: the loader resolves the same module record `React.lazy` reads
+when the route later mounts, so the second consumer gets the already-resolved
+module and no request.
+
+Warming is only ever triggered by a real click. The switch always mounts Off
+and is never re-armed from a remembered preference. Switching it back off
+resets the pill; it cannot un-import anything, because nothing can.
+
+The status lives in `App.tsx`'s persistent shell rather than in a page. The
+warmed modules belong to the tab, so navigating from Ollivanders to Diagon
+Alley must not reset the pill to Off.
+
+## Registry and Heimdall policy
+
+The registry — which pages exist and what they are called — is **code-owned**,
+because pages arrive through code changes, not admin typing. What an admin
+controls is which of them are enabled, and that is **DB-stored**: one
+comma-separated `settings` row under `offlineMode.disabledTargets`, the same
+overlay shape `themes.disabled` uses. No new table, no migration.
+
+| Route | Access | Purpose |
+|---|---|---|
+| `GET /api/offline-mode/config` | public | the whole registry (`{ id, label }`) plus the currently disabled ids |
+| `PATCH /api/offline-mode/settings` | admin (`requireAdmin`) | `{ id, enabled }` — flips one target; a `404 UNKNOWN_TARGET` for an id the registry doesn't have |
+| `offlineMode.settingsUpdated` | SSE | the full config, so an already-open tab warms the new set without a reload |
+
+Loaders cannot travel over the wire, which is why the split exists at all: the
+registry ships as **data** and the `id → () => import(...)` map stays code-only
+on the client. The two lists are joined by id at runtime, so adding a page
+means an entry in each.
+
+Granularity is page-level on purpose. Diagon Alley's thirteen tools ship in one
+chunk (PLAN-18), so a per-tool toggle would fetch exactly the same file — only
+page-level entries are real toggles.
+
+There is no "keep at least one enabled" guard, unlike themes' `LAST_THEME` 409.
+Disabling everything means the switch warms nothing, which is a valid state,
+not a broken one — the pill says *Nothing enabled*.
+
+The module is registered in **both** deploy profiles. Warming client chunks is
+harmless mechanism, not a LAN-trust concern, so it sits beside `toolbox`,
+`variant` and `screensaver` in the manifest.
+
+## Where the code lives
+
+| File | What it owns |
+|---|---|
+| `server/src/modules/offline-mode/module.ts` | the registry constants, both routes, the `offlineMode.settingsUpdated` emit and its SSE fan-out |
+| `server/src/core/bus/events.ts` | `OfflineModeTarget` / `OfflineModeConfig` and the event name |
+| `server/src/app.ts` | `MANIFEST` entry, both profiles |
+| `client/src/core/offlineMode.ts` | config types, the public GET and admin PATCH, `enabledTargets`/`targetLabel`, and the `WarmLoadStatus` shape |
+| `client/src/app/offlineWarmLoad.ts` | the `id → () => import(...)` loader map and `runWarmLoad` |
+| `client/src/core/ui/OfflineModeToggle.tsx` | the presentational switch and status pill |
+| `client/src/app/App.tsx` | the route gate, the config fetch + SSE subscription, and the `warmStatus` state |
+| `client/src/features/heimdall/sections.tsx` | `OfflineModeSection` — the admin checkbox list |
+
+The loader map is in `app/` and not `core/` for a boundary reason, enforced by
+`eslint-plugin-boundaries`: `core/` may not import from `features/` any more
+than one feature may import another. Only the composition-root tier reaches
+across every feature, so that is where the loaders live and where the
+registry's data is joined to them.
+
+The switch renders in the header immediately before the theme switcher, and
+only on `/ollivanders`, `/diagon-alley` and `/diagon-alley/:toolId`. It is a
+page-scoped control, not a global one.
+
+## Storage and lifecycle
+
+`import()` fetches each chunk over the network once, then registers the module
+in the JS engine's **in-memory module registry** for that tab's execution
+context. Not localStorage, not the Cache API, not IndexedDB.
+
+That is the whole lifecycle story, and it needs no code: the module registry
+dies with the tab. Closing it, hard-reloading, or navigating cross-origin
+discards everything, so there is nothing to evict and no "clear cache" button
+to build — which a Service Worker's Cache API would have required.
+
+One honest caveat: the browser's ordinary HTTP disk cache may still hold copies
+of those `.js` files afterwards, exactly as it does for every asset on the site
+under its normal `Cache-Control` headers. That is not specific to this feature,
+and it does not help a closed-and-reopened tab anyway — a fresh navigation
+still needs the network for the document itself.
+
+The registry **policy** is the one thing that does persist, and correctly so:
+it is an admin setting in the `settings` table, and it survives restarts like
+any other.
+
+## Deliberately out of scope
+
+- **Service Worker / offline reload** — considered, not built: secure-context
+  only, so it would work on the host Mac and no other device (see above).
+- **A standalone downloadable HTML export** — considered, not built: it solves
+  a different problem ("a copy I can keep") than "the tab I already have open".
+- **Variant draft persistence** — Variant has no draft storage of its own, so
+  typed content is lost on any remount, online or offline. A pre-existing gap,
+  flagged and explicitly left alone by this work.
+- **Persisting the switch's own on/off state** — considered, not built:
+  warming is a network action, and an auto re-arm on every page load would run
+  it without anyone asking. The registry persists; the click does not.
+- **Loading saved documents by slug, and the Pensieve** — these genuinely need
+  the server. Offline they fail; that is correct behaviour, not a gap this
+  feature closes.

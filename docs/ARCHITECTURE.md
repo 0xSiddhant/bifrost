@@ -15,3 +15,4 @@ Related references:
 - Tech choices & rationale — [`.agent/context/tech-stack.md`](../.agent/context/tech-stack.md)
 - Design system & tokens — [`DESIGN.md`](DESIGN.md)
 - User-theme schema — [`THEME-SPEC.md`](THEME-SPEC.md)
+- Offline mode (warm-load) — [`offline-mode.md`](offline-mode.md)

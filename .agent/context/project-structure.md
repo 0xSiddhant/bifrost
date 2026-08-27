@@ -24,6 +24,7 @@ bifrost/
 │   ├── observability.md       # the optional Grafana stack
 │   ├── cloud-profile.md       # internet-deployment checklist
 │   ├── releasing.md           # automated release flow
+│   ├── offline-mode.md        # warm-load for the pure-client pages (PLAN-22)
 │   └── assets/                # screenshots for README
 ├── server/
 │   ├── drizzle/               # generated migrations
@@ -40,7 +41,8 @@ bifrost/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
 │               │              #   variant, edda, groot, loki, accio, nimbus, portkey,
-│               │              #   screensaver, client-logs, metrics, toolbox
+│               │              #   screensaver, client-logs, metrics, toolbox,
+│               │              #   offline-mode
 │               ├── routes/
 │               ├── usecases/
 │               ├── services/  # concrete repo/service implementations
@@ -51,6 +53,9 @@ bifrost/
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       │                      #   + PensievePage (PLAN-21) — a shell ACROSS features, so it lives
 │       │                      #     here rather than in features/; its logic is in core/library/
+│       │                      #   offlineWarmLoad.ts (PLAN-22 — the id → import() loader map; it
+│       │                      #     lives here, not core/, because only the composition root may
+│       │                      #     reach across features)
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
 │       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
 │       │                      #   notify/ (global notification stack: store + host +
@@ -71,6 +76,7 @@ bifrost/
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
 │       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
 │       │                      #     PLAN-19's groot proved it, one array element and no page change),
+│       │                      #   offlineMode.ts (PLAN-22 — warm-load policy client + status shape),
 │       │                      #   textNormalize, runestone + edda + groot + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
