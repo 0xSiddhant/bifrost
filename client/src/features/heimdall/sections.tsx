@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ApiError, apiGet } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceLabel, deviceName } from '../../core/devices';
+import { log } from '../../core/log';
 import { bifrostEvents } from '../../core/sse';
 import { eventToShortcut, prettyShortcut } from '../../core/shortcut';
 import { Button } from '../../core/ui/Button';
@@ -16,6 +17,7 @@ import {
   QrIcon,
   ShieldIcon,
   UploadIcon,
+  WifiOffIcon,
 } from '../../core/ui/icons';
 import {
   fetchLokiConfig,
@@ -29,6 +31,11 @@ import {
   type ScreensaverConfig,
   type ScreensaverSettingsPatch,
 } from '../../core/screensaver';
+import {
+  fetchOfflineModeConfig,
+  setOfflineModeTargetEnabled,
+  type OfflineModeConfig,
+} from '../../core/offlineMode';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
 import {
@@ -1046,6 +1053,73 @@ function AboutSection() {
   );
 }
 
+// ── Offline mode (warm-load policy, PLAN-22) ────────────────────
+
+function OfflineModeSection() {
+  const [config, setConfig] = useState<OfflineModeConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOfflineModeConfig()
+      .then((res) => {
+        if (!cancelled) setConfig(res);
+      })
+      .catch(() => {
+        // Same as every other section: the card renders empty and the admin
+        // sees no list rather than a broken modal. The fetch itself is logged
+        // by the shell, which reads the same endpoint on every page load.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggle = async (id: string, enabled: boolean) => {
+    setError(null);
+    try {
+      setConfig(await setOfflineModeTargetEnabled(id, enabled));
+    } catch (err) {
+      // The checkbox snaps back to the server's answer, so without this line
+      // the only symptom is a switch that refuses to move.
+      log.reportError('offline mode: could not update target', err, { module: 'offline-mode' });
+      setError('Could not update that page.');
+    }
+  };
+
+  return (
+    <Card>
+      <div className="stack">
+        <p className="caption">
+          Which pages the Offline switch warms. It appears on Ollivanders and Diagon Alley, and
+          loads the enabled pages&apos; code into the open tab so they keep working after the
+          bridge drops. Unchecking one leaves it out of the warm load; it does not hide the page.
+        </p>
+        <div className="stack" role="group" aria-label="Offline targets" id={ctlId('offline-targets')}>
+          {config?.targets.map((target) => {
+            const enabled = !config.disabled.includes(target.id);
+            return (
+              <label key={target.id} className="check-row">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={() => void toggle(target.id, !enabled)}
+                />
+                <span>{target.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        {error && (
+          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
+            {error}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 // ── Registry ────────────────────────────────────────────────────
 
 export const SECTIONS: HeimdallSection[] = [
@@ -1140,6 +1214,21 @@ export const SECTIONS: HeimdallSection[] = [
       { controlId: 'nott-mouse', label: 'Cursor reactivity', keywords: ['screensaver', 'mouse', 'cursor', 'parallax'] },
       { controlId: 'nott-quotes', label: 'Show quotes', keywords: ['screensaver', 'quote', 'quotes'] },
       { controlId: 'nott-rotate', label: 'Quote rotation', keywords: ['screensaver', 'quote', 'rotate', 'interval'] },
+    ],
+  },
+  {
+    id: 'offline-mode',
+    label: 'Offline mode',
+    group: 'Realm',
+    icon: <WifiOffIcon size={16} />,
+    blurb: 'Which pages the Offline switch warms for a no-bridge tab.',
+    Component: OfflineModeSection,
+    manifest: [
+      {
+        controlId: 'offline-targets',
+        label: 'Warm-loaded pages',
+        keywords: ['offline', 'warm', 'preload', 'lan', 'toolbox', 'ollivanders'],
+      },
     ],
   },
   {

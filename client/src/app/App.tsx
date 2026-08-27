@@ -3,13 +3,24 @@ import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-route
 import { useCapabilities } from '../core/useCapabilities';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
+import { log } from '../core/log';
 import { fetchScreensaverConfig, type ScreensaverConfig } from '../core/screensaver';
+import {
+  fetchOfflineModeConfig,
+  enabledTargets,
+  targetLabel,
+  OFF_STATUS,
+  type OfflineModeConfig,
+  type WarmLoadStatus,
+} from '../core/offlineMode';
 import { isDesktopViewport } from '../features/screensaver/isDesktop';
 import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
+import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
 import { usePublishedBanner } from './usePublishedBanner';
+import { runWarmLoad } from './offlineWarmLoad';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
 import { MidgardPage } from './pages/MidgardPage';
@@ -154,6 +165,60 @@ export function App() {
     };
   }, [isDesktop]);
 
+  // Offline mode (PLAN-22). The warmed chunks belong to the tab, not to a page,
+  // so both the policy and the status live here in the persistent shell —
+  // navigating between the two gated pages must not reset the pill to Off.
+  const [offlineConfig, setOfflineConfig] = useState<OfflineModeConfig | null>(null);
+  const [warmStatus, setWarmStatus] = useState<WarmLoadStatus>(OFF_STATUS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOfflineModeConfig()
+      .then((cfg) => {
+        if (!cancelled) setOfflineConfig(cfg);
+      })
+      .catch((error: unknown) => {
+        // The toggle stays disabled without this, so a silent failure would
+        // read as a dead control with no explanation anywhere.
+        log.reportError('offline mode: could not read policy config', error, {
+          module: 'offline-mode',
+        });
+      });
+    // An admin narrowing the registry must reach tabs that are already open.
+    const off = bifrostEvents.on('offlineMode.settingsUpdated', (payload) => {
+      setOfflineConfig(payload as OfflineModeConfig);
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, []);
+
+  const armOffline = useCallback(
+    (on: boolean) => {
+      if (!on) {
+        // Nothing to un-import: the switch arms the load, it does not hold it.
+        setWarmStatus(OFF_STATUS);
+        return;
+      }
+      if (!offlineConfig) return;
+      const targets = enabledTargets(offlineConfig);
+      setWarmStatus({ state: 'warming', loaded: 0, failed: [] });
+      void runWarmLoad(targets.map((target) => target.id)).then(({ loaded, failed }) => {
+        setWarmStatus(
+          failed.length === 0
+            ? { state: 'ready', loaded: loaded.length, failed: [] }
+            : {
+                state: 'partial',
+                loaded: loaded.length,
+                failed: failed.map((id) => targetLabel(offlineConfig, id)),
+              },
+        );
+      });
+    },
+    [offlineConfig],
+  );
+
   useIdle({
     enabled: isDesktop && Boolean(screensaverConfig?.enabled) && !screensaverActive,
     idleMs: (screensaverConfig?.idleSeconds ?? 60) * 1000,
@@ -169,6 +234,14 @@ export function App() {
       (module) => module === null || !capabilities || capabilities.modules.includes(module),
     ),
   );
+  // Page-scoped, not a global control (PLAN-22): only the two hubs whose pages
+  // compute locally offer it — Ollivanders, and Diagon Alley with or without an
+  // open tool.
+  const showOfflineToggle =
+    pathname === '/ollivanders' ||
+    pathname === '/diagon-alley' ||
+    pathname.startsWith('/diagon-alley/');
+
   // A category tab is active on its own page and on any of its tools' pages.
   const isActive = (category: NavCategory) => {
     if (category.to === '/') return pathname === '/';
@@ -215,6 +288,13 @@ export function App() {
         <nav className="nav nav--top" aria-label="Main">
           {navItems()}
         </nav>
+        {showOfflineToggle && (
+          <OfflineModeToggle
+            status={warmStatus}
+            ready={offlineConfig !== null}
+            onChange={armOffline}
+          />
+        )}
         <ThemeSwitcher />
       </header>
 
