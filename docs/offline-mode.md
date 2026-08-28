@@ -107,9 +107,10 @@ harmless mechanism, not a LAN-trust concern, so it sits beside `toolbox`,
 | `client/src/core/ui/OfflineModeToggle.tsx` | the presentational switch and status pill |
 | `client/src/app/App.tsx` | the route gate, the config fetch + SSE subscription, and the `warmStatus` state |
 | `client/src/features/heimdall/sections.tsx` | `OfflineModeSection` — the admin checkbox list |
-| `client/src/core/chunkError.ts` | recognises a failed dynamic import across all four engine spellings |
+| `client/src/core/chunkError.ts` | recognises a failed dynamic import across every engine spelling, and bounds the wait |
 | `client/src/core/ui/RouteBoundary.tsx` | the boundary that turns a missing chunk into a message instead of a crash |
-| `server/src/core/mdns/index.ts` | keeps a multicast send failure from taking the process down with it |
+| `client/src/app/lazyPages.tsx` | every route's `lazy` page, rebuildable so a retry is a real second attempt |
+| `server/src/core/mdns/index.ts` | keeps a send failure from taking the process down, and rebuilds the responder when the LAN changes |
 
 The loader map is in `app/` and not `core/` for a boundary reason, enforced by
 `eslint-plugin-boundaries`: `core/` may not import from `features/` any more
@@ -133,11 +134,9 @@ the tab, including the pages they *had* warmed.
 `core/ui/RouteBoundary` sits between the shell and the routed pages and exists
 for exactly that failure. It identifies a missing chunk by message — the
 engines each word it differently and none give it a type or a code, so
-`core/chunkError.ts` matches all four spellings — and then:
+`core/chunkError.ts` matches every spelling — and then:
 
-- raises one notification: *Not available offline — that page's code hasn't
-  been loaded into this tab, and the bridge can't be reached*;
-- renders an inline panel in the page area, with **Try again** and **Go back**,
+- raises one notification and renders an inline panel in the page area,
   leaving the header, nav and every warmed page exactly where they were;
 - logs a `warn` (not an `error`): an unreachable server is a condition, not a
   defect, and the line is what separates "the hub was down" from "the hub was
@@ -153,6 +152,53 @@ log line and one toast.
 The URL still changes. That is deliberate: the route stays linkable, and a
 reload once the bridge is back opens the page normally.
 
+### Bounding the wait
+
+A refused connection fails instantly. A *vanished host* does not: the SYN goes
+nowhere, nothing answers, and the browser waits out its own connect timeout —
+measured at **45s and still counting** — during which the click looks like it
+simply did nothing. That is the commonest failure here: a laptop that walked
+out of Wi-Fi range with the tab open.
+
+So every route loader is wrapped in `withChunkTimeout` (8s), as is each warm
+target and the offline-mode config read. 8s is far above any real LAN chunk
+load and far below the browser's patience, so a hung fetch becomes an answer
+while a slow one still succeeds. Measured: **45s+ → 8.4s**, and 0.1s when the
+device is properly offline and the browser fails fast on its own.
+
+### Why recovery needs a reload
+
+A module URL whose fetch fails is recorded as **failed in the document's module
+map**, and every later `import()` of that same URL rejects from the map without
+touching the network. Verified in Chromium: a second import after a blocked one
+produces no request at all, while the same file under `?retry=1` — a different
+map entry — loads fine. `React.lazy` caches its own rejection on top of that.
+
+Two consequences, and the panel says which one applies:
+
+- **Bridge still unreachable** → *Not available offline*, with **Try again**.
+  The retry rebuilds the `lazy` payloads (`createLazyPages`), which recovers the
+  case where our 8s timeout fired but the fetch landed a moment later — the map
+  then holds a *fulfilled* entry and the retry resolves with no request. That is
+  what a slow bridge looks like.
+- **Bridge answering again** → *This page needs a reload*, with **Reload the
+  page**. A genuine fetch failure is cached for the life of the document, so
+  only a new document can load that chunk. Offering a retry here would be
+  offering a button that provably cannot work.
+
+Which of the two is showing is **measured, not inferred**: on a failure the
+boundary asks `GET /api/health` directly (3s timeout) and, while the answer is
+"down", keeps asking every 5s. The obvious signal — the SSE reconnecting — is
+both indirect and slow: its backoff runs to 15s, and an EventSource keeps
+reporting `open` for seconds after the network has gone, which had the panel
+telling a freshly-offline user to reload — the one action that would cost them
+the tab and every page they had warmed. When the probe flips to "up" the
+boundary spends one free retry before settling on the reload wording.
+
+The same module-map rule applies to warming: a target whose chunk hard-fails
+cannot be warmed again in that tab, so the pill keeps reporting it as failed
+until a reload.
+
 ## The server going down is a first-class case
 
 "Offline" here means *the bridge is unreachable*, which is not the same as
@@ -167,15 +213,30 @@ cases it has to survive are:
 `import()` rejects identically either way, the warmed modules are unaffected in
 both, and the message names both possibilities rather than guessing.
 
-One server-side consequence belongs here, because it is the commonest way the
-second row happens: `core/mdns` used to take the whole process down when the
-Wi-Fi it was advertising on went away. bonjour-service's default error callback
-is `throw err`, invoked from a dgram *send* callback, so
-`EADDRNOTAVAIL 224.0.0.251:5353` arrived as an `uncaughtException` and the
-fatal handler exited. Losing the advertisement costs `bifrost.local`; every LAN
-IP still serves — so it is a `warn` now, and `multicast-dns` re-joins the group
-on its own 5s interval when the interface returns. A hub that dies on a network
-blip is a hub that cannot honour any offline promise.
+Two server-side consequences belong here, because between them they are the
+commonest way the second row happens. A hub that dies on a network blip — or
+comes back unreachable by name — cannot honour any offline promise.
+
+**It used to exit.** bonjour-service's default error callback is `throw err`,
+invoked from a dgram *send* callback, so `EADDRNOTAVAIL 224.0.0.251:5353`
+arrived as an `uncaughtException` and the fatal handler took the process with
+it. Losing the advertisement costs `bifrost.local`; every LAN IP still serves —
+so it is a `warn` now.
+
+**It used to come back deaf.** `multicast-dns` re-joins multicast groups on a 5s
+interval, but its `update()` loop skips any address already in its `memberships`
+map — a map only ever cleared on `destroy()` — while the OS silently drops the
+membership when the interface goes down. So an interface that leaves and returns
+on the *same* address is never re-joined: the socket is joined in bookkeeping
+and deaf in fact, and the responder answers nothing until the process restarts.
+A new DHCP lease recovers by itself; an unchanged address never does, which is
+exactly why returning to the same network looked like it "takes forever".
+
+`watchNetworkChanges` polls `lanIPv4Addresses()` every 5s and rebuilds the
+responder whenever the set changes. That fixes both directions and re-announces
+the service, so other devices' caches refresh instead of ageing out. It is
+silent on a stable network — measured over 10 minutes of polling, zero
+rebuilds.
 
 ## Storage and lifecycle
 
