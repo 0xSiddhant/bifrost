@@ -77,6 +77,9 @@ bifrost/
 │       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
 │       │                      #     PLAN-19's groot proved it, one array element and no page change),
 │       │                      #   offlineMode.ts (PLAN-22 — warm-load policy client + status shape),
+│       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
+│       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
+│       │                      #     cold route with no bridge off the app-wide crash card),
 │       │                      #   textNormalize, runestone + edda + groot + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)

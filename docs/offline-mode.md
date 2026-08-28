@@ -107,6 +107,9 @@ harmless mechanism, not a LAN-trust concern, so it sits beside `toolbox`,
 | `client/src/core/ui/OfflineModeToggle.tsx` | the presentational switch and status pill |
 | `client/src/app/App.tsx` | the route gate, the config fetch + SSE subscription, and the `warmStatus` state |
 | `client/src/features/heimdall/sections.tsx` | `OfflineModeSection` — the admin checkbox list |
+| `client/src/core/chunkError.ts` | recognises a failed dynamic import across all four engine spellings |
+| `client/src/core/ui/RouteBoundary.tsx` | the boundary that turns a missing chunk into a message instead of a crash |
+| `server/src/core/mdns/index.ts` | keeps a multicast send failure from taking the process down with it |
 
 The loader map is in `app/` and not `core/` for a boundary reason, enforced by
 `eslint-plugin-boundaries`: `core/` may not import from `features/` any more
@@ -117,6 +120,62 @@ registry's data is joined to them.
 The switch renders in the header immediately before the theme switcher, and
 only on `/ollivanders`, `/diagon-alley` and `/diagon-alley/:toolId`. It is a
 page-scoped control, not a global one.
+
+## When a page is not warmed
+
+Every page below the shell is `React.lazy`, so opening one this tab has not
+loaded is a network request — and offline, or with the bridge down, that
+request cannot be served. Before PLAN-22 the rejection reached the app-wide
+`ErrorBoundary` and replaced the whole shell with "The bridge wavered",
+offering a reload the browser could not perform. One wrong click cost the user
+the tab, including the pages they *had* warmed.
+
+`core/ui/RouteBoundary` sits between the shell and the routed pages and exists
+for exactly that failure. It identifies a missing chunk by message — the
+engines each word it differently and none give it a type or a code, so
+`core/chunkError.ts` matches all four spellings — and then:
+
+- raises one notification: *Not available offline — that page's code hasn't
+  been loaded into this tab, and the bridge can't be reached*;
+- renders an inline panel in the page area, with **Try again** and **Go back**,
+  leaving the header, nav and every warmed page exactly where they were;
+- logs a `warn` (not an `error`): an unreachable server is a condition, not a
+  defect, and the line is what separates "the hub was down" from "the hub was
+  up and the page was broken".
+
+Anything that is *not* a missing chunk is re-thrown, so the app-wide boundary
+still owns real bugs and their crash card. The failure clears on navigation, so
+returning to a route later re-tries the import rather than showing a stale
+panel. React re-renders synchronously after an error thrown during a concurrent
+render, so the boundary de-duplicates by message — one unreachable chunk is one
+log line and one toast.
+
+The URL still changes. That is deliberate: the route stays linkable, and a
+reload once the bridge is back opens the page normally.
+
+## The server going down is a first-class case
+
+"Offline" here means *the bridge is unreachable*, which is not the same as
+`navigator.onLine === false`. Nothing in this feature reads that flag. The two
+cases it has to survive are:
+
+| Case | What the browser sees |
+|---|---|
+| The device leaves the LAN | `ERR_INTERNET_DISCONNECTED` |
+| The device stays online, the server stops | `ERR_CONNECTION_REFUSED` |
+
+`import()` rejects identically either way, the warmed modules are unaffected in
+both, and the message names both possibilities rather than guessing.
+
+One server-side consequence belongs here, because it is the commonest way the
+second row happens: `core/mdns` used to take the whole process down when the
+Wi-Fi it was advertising on went away. bonjour-service's default error callback
+is `throw err`, invoked from a dgram *send* callback, so
+`EADDRNOTAVAIL 224.0.0.251:5353` arrived as an `uncaughtException` and the
+fatal handler exited. Losing the advertisement costs `bifrost.local`; every LAN
+IP still serves — so it is a `warn` now, and `multicast-dns` re-joins the group
+on its own 5s interval when the interface returns. A hub that dies on a network
+blip is a hub that cannot honour any offline promise.
 
 ## Storage and lifecycle
 
@@ -152,5 +211,9 @@ any other.
   warming is a network action, and an auto re-arm on every page load would run
   it without anyone asking. The registry persists; the click does not.
 - **Loading saved documents by slug, and the Pensieve** — these genuinely need
-  the server. Offline they fail; that is correct behaviour, not a gap this
-  feature closes.
+  the server. Offline they fail; what this feature owns is that they fail
+  *legibly* (see "When a page is not warmed"), not that they succeed.
+- **Blocking the click instead of the navigation** — considered, not built:
+  intercepting every link into a cold route means a route→chunk map and an
+  app-wide click handler that programmatic navigation, Back/Forward and typed
+  URLs would all walk straight past. The boundary catches every path in.
