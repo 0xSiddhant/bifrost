@@ -28,15 +28,15 @@ export function lanIPv4Addresses(): string[] {
  * advertisement costs `bifrost.local`; every LAN IP still serves. Killing the
  * process over it costs everything — including, since PLAN-22, the warmed tabs
  * that were the whole point of surviving a network drop. So this is a `warn`
- * and the process keeps running: `multicast-dns` re-joins the group on its own
- * 5s interval, so the advertisement comes back by itself when the interface
- * does.
+ * and the process keeps running.
  */
 export function mdnsErrorHandler(log: Logger): (error: unknown) => void {
   return (error: unknown) => {
     log.warn({ err: error }, 'mdns responder error — advertisement degraded, http unaffected');
   };
 }
+
+type Responder = { on(event: string, listener: (error: unknown) => void): unknown };
 
 /**
  * Second guard, for the errors the callback above never sees: the responder's
@@ -47,8 +47,6 @@ export function mdnsErrorHandler(log: Logger): (error: unknown) => void {
  * a future version of the library may rename it; if that happens we lose this
  * second guard and keep the first, rather than failing to start.
  */
-type Responder = { on(event: string, listener: (error: unknown) => void): unknown };
-
 export function attachResponderGuards(bonjour: unknown, log: Logger): boolean {
   const responder =
     typeof bonjour === 'object' && bonjour !== null
@@ -69,25 +67,131 @@ export function attachResponderGuards(bonjour: unknown, log: Logger): boolean {
   return true;
 }
 
-/** Advertise the hub over Bonjour so Apple devices resolve http://<name>.local. */
-export function advertiseMdns(name: string, port: number, log: Logger): MdnsHandle {
-  // The second argument replaces bonjour-service's `throw err` default — see
-  // mdnsErrorHandler. Without it a send failure is a fatal, not a warning.
-  const bonjour = new Bonjour(undefined, mdnsErrorHandler(log));
-  attachResponderGuards(bonjour, log);
+/** How often to look for an interface coming or going. `os` reads, not I/O. */
+const NETWORK_POLL_MS = 5_000;
+/** A goodbye packet on a dead interface must not wedge the rebuild behind it. */
+const TEARDOWN_TIMEOUT_MS = 2_000;
 
-  // host is what makes the responder answer A/AAAA queries for <name>.local —
-  // advertising the service alone only registers PTR/SRV/TXT, and the browser
-  // resolves the hostname, not the service.
-  bonjour.publish({ name, type: 'http', port, host: `${name}.local` });
-  log.info({ name: `${name}.local`, port }, 'mdns advertisement up');
-  return {
-    stop: () =>
+/** The LAN's identity, as a value that can be compared between polls. */
+export const networkSignature = (addresses: string[]): string => [...addresses].sort().join(',');
+
+export interface NetworkWatchOptions {
+  addresses: () => string[];
+  onChange: (from: string, to: string) => Promise<void> | void;
+  pollMs?: number;
+  log: Logger;
+}
+
+/**
+ * Call `onChange` whenever the set of LAN addresses changes.
+ *
+ * This exists because `multicast-dns` cannot recover from an interface that
+ * leaves and comes back on the *same* address. Its `update()` loop skips any
+ * address already in its `memberships` map — a map only ever cleared on
+ * `destroy()` — while the OS silently drops the group membership when the
+ * interface goes down. So the socket stays joined in bookkeeping and deaf in
+ * fact, and the responder answers nothing until the process restarts. A new
+ * DHCP lease recovers by itself, an unchanged address never does, which is why
+ * coming back to the same network looks like it "takes forever".
+ *
+ * Rebuilding the responder on any change fixes both directions and re-announces
+ * the service, so other devices' caches refresh instead of ageing out.
+ */
+export function watchNetworkChanges(options: NetworkWatchOptions): () => void {
+  const { addresses, onChange, pollMs = NETWORK_POLL_MS, log } = options;
+  let current = networkSignature(addresses());
+  let busy = false;
+
+  const tick = async (): Promise<void> => {
+    // A rebuild outlasting a poll must not start a second one on top of it.
+    if (busy) return;
+    const next = networkSignature(addresses());
+    if (next === current) return;
+    busy = true;
+    const from = current;
+    current = next;
+    try {
+      await onChange(from, next);
+    } catch (error) {
+      log.warn({ err: error, from, to: next }, 'mdns re-advertise failed after a network change');
+    } finally {
+      busy = false;
+    }
+  };
+
+  const timer = setInterval(() => void tick(), pollMs);
+  // Never a reason to hold the process open.
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+export interface AdvertiseOptions {
+  /** Test seam: where the LAN addresses come from, and how often to look. */
+  addresses?: () => string[];
+  pollMs?: number;
+}
+
+/** Advertise the hub over Bonjour so Apple devices resolve http://<name>.local. */
+export function advertiseMdns(
+  name: string,
+  port: number,
+  log: Logger,
+  options: AdvertiseOptions = {},
+): MdnsHandle {
+  let responder: InstanceType<typeof Bonjour> | null = null;
+
+  const publish = (): void => {
+    // The second argument replaces bonjour-service's `throw err` default — see
+    // mdnsErrorHandler. Without it a send failure is a fatal, not a warning.
+    const bonjour = new Bonjour(undefined, mdnsErrorHandler(log));
+    attachResponderGuards(bonjour, log);
+    // host is what makes the responder answer A/AAAA queries for <name>.local —
+    // advertising the service alone only registers PTR/SRV/TXT, and the browser
+    // resolves the hostname, not the service.
+    bonjour.publish({ name, type: 'http', port, host: `${name}.local` });
+    responder = bonjour;
+    log.info({ name: `${name}.local`, port }, 'mdns advertisement up');
+  };
+
+  const teardown = async (bonjour: InstanceType<typeof Bonjour>): Promise<void> => {
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
       new Promise<void>((resolve) => {
         bonjour.unpublishAll(() => {
           bonjour.destroy();
           resolve();
         });
       }),
+      // The goodbye packets go out over the interface that just disappeared, so
+      // "did they send" is not a question worth blocking a rebuild on.
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, TEARDOWN_TIMEOUT_MS);
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+  };
+
+  publish();
+
+  const stopWatching = watchNetworkChanges({
+    addresses: options.addresses ?? lanIPv4Addresses,
+    pollMs: options.pollMs,
+    log,
+    onChange: async (from, to) => {
+      log.info({ from, to }, 'network changed — rebuilding mdns advertisement');
+      const previous = responder;
+      responder = null;
+      if (previous) await teardown(previous);
+      publish();
+    },
+  });
+
+  return {
+    stop: async () => {
+      stopWatching();
+      const previous = responder;
+      responder = null;
+      if (previous) await teardown(previous);
+    },
   };
 }
