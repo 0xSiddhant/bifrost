@@ -23,8 +23,16 @@ export interface OfflineModeConfig {
   disabled: string[];
 }
 
+/**
+ * Bounded, unlike most reads: the toggle stays disabled until this answers, and
+ * a host that has gone away leaves the request hanging rather than refusing it
+ * — so without a timeout the switch is dead for as long as the browser is
+ * willing to wait. Failing fast at least lets a retry happen.
+ */
+const CONFIG_TIMEOUT_MS = 8_000;
+
 export const fetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
-  apiGet<OfflineModeConfig>('/api/offline-mode/config');
+  apiGet<OfflineModeConfig>('/api/offline-mode/config', { timeoutMs: CONFIG_TIMEOUT_MS });
 
 export const setOfflineModeTargetEnabled = (
   id: string,

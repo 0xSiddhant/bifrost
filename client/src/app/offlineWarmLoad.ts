@@ -1,3 +1,4 @@
+import { withChunkTimeout } from '../core/chunkError';
 import { log } from '../core/log';
 
 /**
@@ -55,7 +56,11 @@ export async function runWarmLoad(
     }
   }
 
-  const settled = await Promise.allSettled(known.map((id) => loaders[id]?.()));
+  // Timed out, not merely raced: a host that has gone away leaves each request
+  // hanging, and without a bound the pill sits on "Warming…" indefinitely.
+  const settled = await Promise.allSettled(
+    known.map((id) => withChunkTimeout(loaders[id]?.() ?? Promise.resolve())),
+  );
   const result: WarmLoadResult = { loaded: [], failed: [] };
   settled.forEach((outcome, index) => {
     const id = known[index] ?? '';
