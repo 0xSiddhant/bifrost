@@ -26,7 +26,11 @@ function pillText(status: WarmLoadStatus): string {
       // say so rather than claiming a ready-for-offline that warmed nothing.
       return status.loaded === 0 ? 'Nothing enabled' : `Ready offline · ${status.loaded}`;
     case 'partial':
-      return `Partly ready — ${status.failed.join(', ')} failed`;
+      // Nothing at all arrived: the bridge went down between the page load and
+      // the click. Naming all six as "failed" would bury that one fact.
+      return status.loaded === 0
+        ? 'Bridge unreachable'
+        : `Partly ready — ${status.failed.join(', ')} failed`;
     default:
       return 'Off';
   }

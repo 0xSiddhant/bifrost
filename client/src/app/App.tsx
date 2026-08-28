@@ -17,6 +17,7 @@ import { isDesktopViewport } from '../features/screensaver/isDesktop';
 import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
+import { RouteBoundary } from '../core/ui/RouteBoundary';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
 import { usePublishedBanner } from './usePublishedBanner';
@@ -309,62 +310,67 @@ export function App() {
           the full window so the toolbox gets as many columns as the screen can
           hold (PLAN-18). Every other page keeps the 62rem measure. */}
       <main className={pathname.startsWith('/diagon-alley') ? 'shell-main shell-main--wide' : 'shell-main'}>
-        <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
-          <Routes>
-            <Route path="/" element={<MidgardPage />} />
-            {/* Category hubs — the tools they list keep their own routes below. */}
-            <Route path="/ollivanders" element={<OllivandersPage />} />
-            <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
-            {/* The open tool lives in the URL: back closes the panel, refresh
-                reopens it, and a tool is linkable (PLAN-18). */}
-            <Route path="/diagon-alley/:toolId" element={<DiagonAlleyPage />} />
-            <Route path="/upload" element={<UploadPage />}>
-              {/* Preview a staged file before publishing it; back closes it. */}
-              <Route path=":name/preview" element={<UploadPreviewModal />} />
-            </Route>
-            <Route path="/downloads" element={<DownloadsPage />}>
-              {/* Modal route: deep-linkable, back button closes the preview. */}
-              <Route path=":id/preview" element={<PreviewModal />} />
-            </Route>
-            <Route path="/hermes" element={<HermesPage />} />
-            <Route path="/accio" element={<AccioPage />} />
-            {/* pre-rename URL (shipped as "muninn") */}
-            <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
-            {/* The one library, over every document kind (PLAN-21). */}
-            <Route path="/pensieve" element={<PensievePage />} />
-            <Route path="/runestone" element={<RunestonePage />} />
-            {/* literal segments beat the :slug param — declared first for clarity.
-                Every legacy library URL points straight at the unified page, so
-                none of them double-redirects through another old one. */}
-            <Route path="/runestone/pensieve" element={<Navigate to="/pensieve?type=runestone" replace />} />
-            {/* pre-rename URLs (shipped as "library", then "mimir") */}
-            <Route path="/runestone/library" element={<Navigate to="/pensieve?type=runestone" replace />} />
-            <Route path="/runestone/mimir" element={<Navigate to="/pensieve?type=runestone" replace />} />
-            <Route path="/runestone/:slug" element={<RunestonePage />} />
-            <Route path="/variant" element={<VariantPage />} />
-            {/* literal segments beat the :slug param — declared first */}
-            <Route path="/edda" element={<EddaPage />} />
-            <Route path="/edda/pensieve" element={<Navigate to="/pensieve?type=edda" replace />} />
-            {/* pre-rename URL (development-only "library") */}
-            <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
-            <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
-            <Route path="/edda/:slug" element={<EddaPage />} />
-            {/* literal segments beat the :slug param — declared first */}
-            <Route path="/groot" element={<GrootPage />} />
-            <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
-            <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
-            <Route path="/groot/:slug" element={<GrootPage />} />
-            <Route path="/loki" element={<LokiPage />} />
-            <Route path="/wardens" element={<WardensPage />} />
-            {/* The QR page became a toolbox tool (PLAN-18). The root stays in
-                RESERVED_ROOTS: this redirect is a real route, and a /go/sigil
-                slug shadowing it would be confusing. */}
-            <Route path="/sigil" element={<Navigate replace to="/diagon-alley/qr" />} />
-            <Route path="/nimbus" element={<NimbusPage />} />
-            <Route path="/portkey" element={<PortkeyPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </Suspense>
+        {/* Between the shell and the pages: a route whose chunk cannot be
+            fetched (offline, or the bridge is down) shows a message here
+            instead of taking the whole app down with it. */}
+        <RouteBoundary pathname={pathname}>
+          <Suspense fallback={<div className="page-loading caption">Crossing the bridge…</div>}>
+            <Routes>
+              <Route path="/" element={<MidgardPage />} />
+              {/* Category hubs — the tools they list keep their own routes below. */}
+              <Route path="/ollivanders" element={<OllivandersPage />} />
+              <Route path="/diagon-alley" element={<DiagonAlleyPage />} />
+              {/* The open tool lives in the URL: back closes the panel, refresh
+                  reopens it, and a tool is linkable (PLAN-18). */}
+              <Route path="/diagon-alley/:toolId" element={<DiagonAlleyPage />} />
+              <Route path="/upload" element={<UploadPage />}>
+                {/* Preview a staged file before publishing it; back closes it. */}
+                <Route path=":name/preview" element={<UploadPreviewModal />} />
+              </Route>
+              <Route path="/downloads" element={<DownloadsPage />}>
+                {/* Modal route: deep-linkable, back button closes the preview. */}
+                <Route path=":id/preview" element={<PreviewModal />} />
+              </Route>
+              <Route path="/hermes" element={<HermesPage />} />
+              <Route path="/accio" element={<AccioPage />} />
+              {/* pre-rename URL (shipped as "muninn") */}
+              <Route path="/muninn" element={<Navigate to="/hermes" replace />} />
+              {/* The one library, over every document kind (PLAN-21). */}
+              <Route path="/pensieve" element={<PensievePage />} />
+              <Route path="/runestone" element={<RunestonePage />} />
+              {/* literal segments beat the :slug param — declared first for clarity.
+                  Every legacy library URL points straight at the unified page, so
+                  none of them double-redirects through another old one. */}
+              <Route path="/runestone/pensieve" element={<Navigate to="/pensieve?type=runestone" replace />} />
+              {/* pre-rename URLs (shipped as "library", then "mimir") */}
+              <Route path="/runestone/library" element={<Navigate to="/pensieve?type=runestone" replace />} />
+              <Route path="/runestone/mimir" element={<Navigate to="/pensieve?type=runestone" replace />} />
+              <Route path="/runestone/:slug" element={<RunestonePage />} />
+              <Route path="/variant" element={<VariantPage />} />
+              {/* literal segments beat the :slug param — declared first */}
+              <Route path="/edda" element={<EddaPage />} />
+              <Route path="/edda/pensieve" element={<Navigate to="/pensieve?type=edda" replace />} />
+              {/* pre-rename URL (development-only "library") */}
+              <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
+              <Route path="/edda/preview/:slug" element={<EddaPreviewPage />} />
+              <Route path="/edda/:slug" element={<EddaPage />} />
+              {/* literal segments beat the :slug param — declared first */}
+              <Route path="/groot" element={<GrootPage />} />
+              <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
+              <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
+              <Route path="/groot/:slug" element={<GrootPage />} />
+              <Route path="/loki" element={<LokiPage />} />
+              <Route path="/wardens" element={<WardensPage />} />
+              {/* The QR page became a toolbox tool (PLAN-18). The root stays in
+                  RESERVED_ROOTS: this redirect is a real route, and a /go/sigil
+                  slug shadowing it would be confusing. */}
+              <Route path="/sigil" element={<Navigate replace to="/diagon-alley/qr" />} />
+              <Route path="/nimbus" element={<NimbusPage />} />
+              <Route path="/portkey" element={<PortkeyPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Routes>
+          </Suspense>
+        </RouteBoundary>
       </main>
 
       {/* Outside <Routes> on purpose: a notification raised on one page must

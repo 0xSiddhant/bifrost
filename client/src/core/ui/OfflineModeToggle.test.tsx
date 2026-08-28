@@ -59,6 +59,11 @@ describe('OfflineModeToggle', () => {
     expect(pill()).toContain('Loki (JS workbench)');
   });
 
+  it('says the bridge is unreachable when nothing arrived at all', () => {
+    render({ state: 'partial', loaded: 0, failed: ['a', 'b', 'c', 'd', 'e', 'f'] });
+    expect(pill()).toBe('Bridge unreachable');
+  });
+
   it('is disabled until the policy config has arrived', () => {
     render(OFF_STATUS, false);
     expect(input().disabled).toBe(true);
