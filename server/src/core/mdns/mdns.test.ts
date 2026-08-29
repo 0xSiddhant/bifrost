@@ -130,13 +130,16 @@ describe('watchNetworkChanges', () => {
     vi.useFakeTimers();
     let addresses = ['192.168.1.5'];
     let started = 0;
-    let release: (() => void) | null = null;
+    // Held on an object, not in a local: assigning inside the promise executor
+    // is invisible to control-flow analysis, which then narrows a `let` to
+    // `never` and refuses the call below.
+    const pending = { release: (): void => {} };
     const stop = watchNetworkChanges({
       addresses: () => addresses,
       onChange: () => {
         started += 1;
         return new Promise<void>((resolve) => {
-          release = resolve;
+          pending.release = resolve;
         });
       },
       pollMs: 1_000,
@@ -149,7 +152,7 @@ describe('watchNetworkChanges', () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(started).toBe(1);
 
-    release?.();
+    pending.release();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(started).toBe(2);
     stop();
