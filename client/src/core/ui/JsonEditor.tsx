@@ -50,6 +50,7 @@ import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import { xml as xmlLang } from '@codemirror/lang-xml';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -61,6 +62,7 @@ import {
 import { tags } from '@lezer/highlight';
 import { validateJson } from '../json';
 import { validateYaml } from '../yaml';
+import { validateXml } from '../xml';
 
 /**
  * Reusable CodeMirror 6 JSON editor (PLAN-07). Runestone mounts one; PLAN-08's
@@ -89,9 +91,10 @@ export interface DiffHighlight {
  * - `markdown` — Edda: syntax tinting only.
  * - `javascript` — Loki: tinting, folding, bracket pairing, no lint.
  * - `yaml` — Groot: tinting, folding, bracket pairing, YAML lint.
+ * - `xml` — Atlas: tinting, tag folding, bracket pairing, well-formedness lint.
  * - `plain` — Variant's text panes: nothing, so typing costs nothing.
  */
-export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain' | 'yaml';
+export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain' | 'yaml' | 'xml';
 
 export interface JsonEditorProps {
   value: string;
@@ -133,6 +136,17 @@ export interface JsonEditorHandle {
     from: number;
     to: number;
   }): void;
+  /**
+   * Replace a source range (PLAN-23, Atlas's plist table). The table edits the
+   * same buffer the code pane shows, and dispatching a real CodeMirror
+   * transaction is what makes that work with no second source of truth: the
+   * existing Undo/Redo control then covers table edits and typed edits alike,
+   * through one history.
+   *
+   * Each call is its own undo step — a table edit is one action to the person
+   * who made it, however many characters it moved.
+   */
+  replaceRange(from: number, to: number, insert: string): void;
   /** Move the cursor to a doc offset, scroll it into view, and focus. */
   gotoOffset(offset: number): void;
   /** Scroll a doc offset into view without stealing focus (pane sync jumps). */
@@ -259,6 +273,22 @@ const yamlHighlight = HighlightStyle.define([
     tag: [tags.separator, tags.punctuation, tags.squareBracket, tags.brace],
     color: 'var(--syn-punct)',
   },
+  { tag: tags.invalid, color: 'var(--danger)' },
+]);
+
+const xmlHighlight = HighlightStyle.define([
+  // Tag names carry the structure, so they read as keys do in JSON/YAML;
+  // attribute names and their values are deliberately distinct, because in a
+  // plist `version="1.0"` is metadata and the element name is the type.
+  { tag: [tags.tagName, tags.standard(tags.tagName)], color: 'var(--syn-key)' },
+  { tag: tags.attributeName, color: 'var(--syn-number)' },
+  { tag: [tags.attributeValue, tags.string], color: 'var(--syn-string)' },
+  { tag: tags.content, color: 'var(--text)' },
+  { tag: tags.comment, color: 'var(--syn-null)', fontStyle: 'italic' },
+  // The XML declaration, DOCTYPE and processing instructions: present, and not
+  // the thing being read.
+  { tag: [tags.meta, tags.processingInstruction, tags.documentMeta], color: 'var(--syn-punct)' },
+  { tag: [tags.angleBracket, tags.punctuation, tags.definitionOperator], color: 'var(--syn-punct)' },
   { tag: tags.invalid, color: 'var(--danger)' },
 ]);
 
@@ -637,6 +667,51 @@ export function yamlModeExtensions(): Extension[] {
   ];
 }
 
+/** Well-formedness as a CM diagnostic; an empty doc is "empty", not broken. */
+function xmlDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  if (text.trim() === '') return [];
+  return validateXml(text).map((issue) => ({
+    from: Math.min(issue.offset, text.length),
+    to: Math.min(issue.offset + issue.length, text.length),
+    severity: 'error',
+    message: issue.message,
+  }));
+}
+
+/**
+ * XML mode (Atlas). Exported alongside the other four so a test can assert
+ * against the real configuration rather than a hand-rolled copy.
+ *
+ * Folding needs **no custom `foldService`**: lang-xml's own `foldNodeProp`
+ * folds an `Element` from the end of its start tag, which is exactly the
+ * behaviour a nested `<dict>` wants. Written down for the same reason the YAML
+ * one is — Loki needed a custom one for a real lang-javascript gap, and the
+ * next reader should not build a speculative XML equivalent for a gap that is
+ * not there.
+ *
+ * `@codemirror/lang-xml`'s upstream repository was archived in April 2026. It
+ * is still published and functionally complete — XML's grammar does not move —
+ * but there is nowhere to file a bug, which is worth knowing before leaning on
+ * it for anything beyond highlighting and folding.
+ */
+export function xmlModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    // Apple writes plists with tabs, but a fresh document has to pick
+    // something; `detectIndentUnit` is what follows the document for the
+    // table's own edits, and this only affects what the Tab key inserts.
+    indentUnit.of('  '),
+    bracketMatching(),
+    closeBrackets(),
+    xmlLang(),
+    syntaxHighlighting(xmlHighlight),
+    linter(xmlDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
 function modeExtensionsFor(mode: EditorMode): Extension[] {
   switch (mode) {
     case 'markdown':
@@ -645,6 +720,8 @@ function modeExtensionsFor(mode: EditorMode): Extension[] {
       return javascriptModeExtensions();
     case 'yaml':
       return yamlModeExtensions();
+    case 'xml':
+      return xmlModeExtensions();
     // Variant's text panes: no language, no analysis — typing costs nothing.
     case 'plain':
       return [];
@@ -683,9 +760,10 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     if (!parent) return;
 
     const modeExtensions = modeExtensionsFor(mode);
-    // Bracket auto-close and folding both apply to JSON, JS and YAML; markdown
-    // and plain get neither.
-    const closeBracketsMode = mode === 'json' || mode === 'javascript' || mode === 'yaml';
+    // Bracket auto-close and folding both apply to JSON, JS, YAML and XML;
+    // markdown and plain get neither.
+    const closeBracketsMode =
+      mode === 'json' || mode === 'javascript' || mode === 'yaml' || mode === 'xml';
     const foldMode = closeBracketsMode;
     const state = EditorState.create({
       doc: value,
@@ -824,6 +902,22 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         annotations: isolateHistory.of('full'),
       });
       view.focus();
+    },
+    replaceRange(from: number, to: number, insert: string) {
+      const view = viewRef.current;
+      if (!view) return;
+      const length = view.state.doc.length;
+      // Clamped because the offsets come from an analysis of a *previous*
+      // buffer: a keystroke landing between the parse and the click would
+      // otherwise throw out of CodeMirror rather than simply miss.
+      const start = Math.max(0, Math.min(from, length));
+      const end = Math.max(start, Math.min(to, length));
+      view.dispatch({
+        changes: { from: start, to: end, insert },
+        // Isolated so a table edit never merges into the typing before it —
+        // one edit, one undo.
+        annotations: isolateHistory.of('full'),
+      });
     },
     gotoOffset(offset: number) {
       const view = viewRef.current;
