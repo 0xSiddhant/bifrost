@@ -45,8 +45,21 @@ async function toApiError(method: string, path: string, response: Response): Pro
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(path, { headers: { accept: 'application/json' } });
+export interface ApiGetOptions {
+  /**
+   * Abort after this many ms. Off by default: most reads are behind a UI that
+   * can wait, and a few (Nimbus) are long by design. Pass it where a hung
+   * request leaves a control permanently dead — a vanished host never refuses
+   * the connection, it just never answers.
+   */
+  timeoutMs?: number;
+}
+
+export async function apiGet<T>(path: string, options: ApiGetOptions = {}): Promise<T> {
+  const response = await fetch(path, {
+    headers: { accept: 'application/json' },
+    signal: options.timeoutMs === undefined ? undefined : AbortSignal.timeout(options.timeoutMs),
+  });
   if (!response.ok) {
     throw await toApiError('GET', path, response);
   }

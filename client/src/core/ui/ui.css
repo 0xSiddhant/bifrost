@@ -638,6 +638,75 @@ a.portal:hover .portal__go {
   gap: var(--space-3);
 }
 
+/* ── Offline mode toggle (shell, PLAN-22) ───────────────────── */
+.offline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.offline-toggle__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
+}
+
+.offline-toggle__switch:hover {
+  color: var(--text);
+}
+
+.offline-toggle__switch:has(input:checked) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.offline-toggle__switch:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.offline-toggle__switch input {
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+
+.offline-toggle__pill {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18rem;
+}
+
+.offline-toggle__pill.is-ready {
+  color: var(--ok);
+}
+
+.offline-toggle__pill.is-partial {
+  color: var(--warn);
+}
+
+/* The pill is the least load-bearing thing in the header: on a narrow screen
+   the switch matters more than the wording. The label stays — a bare checkbox
+   next to a wifi-off glyph reads as nothing at all. */
+@media (max-width: 900px) {
+  .offline-toggle__pill {
+    display: none;
+  }
+}
+
 /* ── Theme switcher (shell) ─────────────────────────────────── */
 .theme-switcher {
   position: relative;
