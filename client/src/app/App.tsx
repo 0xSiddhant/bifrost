@@ -55,8 +55,8 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda', '/groot', '/loki', '/pensieve'],
-    modules: ['runestone', 'variant', 'edda', 'groot', 'loki'],
+    match: ['/runestone', '/variant', '/edda', '/groot', '/atlas', '/loki', '/pensieve'],
+    modules: ['runestone', 'variant', 'edda', 'groot', 'atlas', 'loki'],
   },
   {
     to: '/diagon-alley',
@@ -184,6 +184,9 @@ export function App() {
   // Page-scoped, not a global control (PLAN-22): only the two hubs whose pages
   // compute locally offer it — Ollivanders, and Diagon Alley with or without an
   // open tool.
+  // The two card-grid hubs drop the 62rem measure (see the <main> below).
+  const hubGrid = pathname === '/ollivanders' || pathname.startsWith('/diagon-alley');
+
   const showOfflineToggle =
     pathname === '/ollivanders' ||
     pathname === '/diagon-alley' ||
@@ -252,10 +255,12 @@ export function App() {
         </div>
       )}
 
-      {/* Diagon Alley is a grid of small cards, not a reading column: it takes
-          the full window so the toolbox gets as many columns as the screen can
-          hold (PLAN-18). Every other page keeps the 62rem measure. */}
-      <main className={pathname.startsWith('/diagon-alley') ? 'shell-main shell-main--wide' : 'shell-main'}>
+      {/* Diagon Alley and Ollivanders are grids of cards, not reading columns:
+          they take the full window so the grid gets as many columns as the
+          screen can hold (PLAN-18, and PLAN-23 when a seventh card pushed
+          Ollivanders onto a third row). Every other page keeps the 62rem
+          measure. */}
+      <main className={hubGrid ? 'shell-main shell-main--wide' : 'shell-main'}>
         {/* Between the shell and the pages: a route whose chunk cannot be
             fetched (offline, or the bridge is down) shows a message here
             instead of taking the whole app down with it. */}
@@ -305,6 +310,10 @@ export function App() {
               <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
               <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
               <Route path="/groot/:slug" element={<pages.GrootPage />} />
+              <Route path="/atlas" element={<pages.AtlasPage />} />
+              <Route path="/atlas/pensieve" element={<Navigate to="/pensieve?type=atlas" replace />} />
+              <Route path="/atlas/library" element={<Navigate to="/pensieve?type=atlas" replace />} />
+              <Route path="/atlas/:slug" element={<pages.AtlasPage />} />
               <Route path="/loki" element={<pages.LokiPage />} />
               <Route path="/wardens" element={<pages.WardensPage />} />
               {/* The QR page became a toolbox tool (PLAN-18). The root stays in

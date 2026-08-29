@@ -26,6 +26,7 @@ export const WARM_LOADERS: WarmLoaders = {
   toolbox: () => import('../features/toolbox/ToolBody'),
   runestone: () => import('../features/runestone/RunestonePage'),
   groot: () => import('../features/groot/GrootPage'),
+  atlas: () => import('../features/atlas/AtlasPage'),
   edda: () => import('../features/edda/EddaPage'),
   variant: () => import('../features/variant/VariantPage'),
   loki: () => import('../features/loki/LokiPage'),

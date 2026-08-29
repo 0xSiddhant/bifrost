@@ -34,16 +34,27 @@ import { DisclosureIcon, GripIcon, MinusIcon, PlusIcon, StepperIcon } from './ic
  * would not read as the Xcode editor, which was the ask.
  */
 
+/**
+ * One edit, as an *intent* rather than a computed replacement.
+ *
+ * The table renders from a debounced analysis, so its spans describe the buffer
+ * as it was up to 300ms ago. Handing the page a ready-made `{from, to}` would
+ * mean a click landing just after a keystroke wrote bytes at the wrong offsets.
+ * Instead the page re-parses when the buffer has moved, finds the node again by
+ * `path`, and calls `apply` — so the offsets are always the live ones.
+ */
+export interface PlistEdit {
+  /** The node this applies to — the *container* for an add or a reorder. */
+  path: readonly number[];
+  apply: (node: PlistNode, text: string, indentUnit: string) => XmlChange | null;
+}
+
 export interface PlistTableProps {
   root: PlistNode;
   /** Shown on the root group row, where Xcode shows the file's name. */
   title: string;
-  /** The buffer every change is computed against. */
-  text: string;
-  /** Indent unit detected from the document, for inserted rows. */
-  indentUnit: string;
-  /** Commit one replacement. The page turns this into an editor transaction. */
-  onChange: (change: XmlChange) => void;
+  /** Commit one edit. The page turns it into an editor transaction. */
+  onEdit: (edit: PlistEdit) => void;
   /** Reveal a node's source in the code pane (click-to-jump). */
   onReveal: (offset: number) => void;
 }
@@ -164,7 +175,7 @@ interface Dragging {
   to: number;
 }
 
-export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }: PlistTableProps) {
+export function PlistTable({ root, title, onEdit, onReveal }: PlistTableProps) {
   // Root open, nested containers closed — Xcode's own opening state.
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set(['']));
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -185,31 +196,30 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
     });
   };
 
-  const commit = (change: XmlChange | null) => {
-    if (change) onChange(change);
-  };
+  const emit = (path: readonly number[], apply: PlistEdit['apply']) => onEdit({ path, apply });
 
   const commitEdit = () => {
     if (!editing) return;
-    const node = nodeAtPath(root, editing.key === '' ? [] : editing.key.split('.').map(Number));
+    const path = editing.key === '' ? [] : editing.key.split('.').map(Number);
+    const node = nodeAtPath(root, path);
+    const { field, draft } = editing;
     setEditing(null);
     if (!node) return;
-    if (editing.field === 'key') {
+    if (field === 'key') {
       // A rename that collides is allowed through: XML does not forbid a
       // duplicate <key>, every reader takes the last one, and the advisory rail
       // already says so. A blocking dialog here would be a second, worse copy
       // of that rule.
-      if ((node.key ?? '') !== editing.draft) commit(keyChange(node, editing.draft));
-    } else if (node.value !== editing.draft) {
-      commit(valueChange(node, editing.draft));
+      if ((node.key ?? '') !== draft) emit(path, (fresh) => keyChange(fresh, draft));
+    } else if (node.value !== draft) {
+      emit(path, (fresh) => valueChange(fresh, draft));
     }
   };
 
   const onDataFile = async (file: File, path: readonly number[]) => {
-    const node = nodeAtPath(root, path);
-    if (!node) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
-    commit(valueChange(node, encodeBase64(bytes)));
+    const encoded = encodeBase64(bytes);
+    emit(path, (fresh) => valueChange(fresh, encoded));
   };
 
   // Pointer-based drag, the split-panel divider's mechanism rather than native
@@ -241,7 +251,10 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (dragging) commit(reorderChange(dragging.parent, dragging.from, dragging.to, text));
+    if (dragging) {
+      const { parent, from, to } = dragging;
+      emit(parent.path, (fresh, source) => reorderChange(fresh, from, to, source));
+    }
     setDragging(null);
   };
 
@@ -259,7 +272,7 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
         <button
           type="button"
           className="plist-bool"
-          onClick={() => commit(valueChange(node, String(node.value !== 'true')))}
+          onClick={() => emit(node.path, (fresh) => valueChange(fresh, String(fresh.value !== 'true')))}
           title="Toggle"
         >
           {node.value === 'true' ? 'YES' : 'NO'}
@@ -305,7 +318,7 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
             if (!isEditing) return;
             const iso = localInputToPlistDate(editing.draft);
             setEditing(null);
-            if (iso && iso !== node.value) commit(valueChange(node, iso));
+            if (iso && iso !== node.value) emit(node.path, (fresh) => valueChange(fresh, iso));
           }}
         />
       );
@@ -376,14 +389,18 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
   };
 
   const stepType = (row: Row, direction: 1 | -1) => {
-    const at = PLIST_TYPES.indexOf(row.node.type);
-    const next = PLIST_TYPES[(at + direction + PLIST_TYPES.length) % PLIST_TYPES.length];
-    if (next && next !== row.node.type) commit(typeChange(row.node, next));
+    emit(row.node.path, (fresh) => {
+      const at = PLIST_TYPES.indexOf(fresh.type);
+      const next = PLIST_TYPES[(at + direction + PLIST_TYPES.length) % PLIST_TYPES.length];
+      return next && next !== fresh.type ? typeChange(fresh, next) : null;
+    });
   };
 
   const stepValueBy = (row: Row, direction: 1 | -1) => {
-    const next = stepValue(row.node.type, row.node.value, direction);
-    if (next !== null) commit(valueChange(row.node, next));
+    emit(row.node.path, (fresh) => {
+      const next = stepValue(fresh.type, fresh.value, direction);
+      return next === null ? null : valueChange(fresh, next);
+    });
   };
 
   return (
@@ -496,7 +513,7 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
                   title="Add an entry"
                   onClick={() => {
                     setExpanded((current) => new Set(current).add(row.key));
-                    commit(addEntryChange(node, text, indentUnit));
+                    emit(node.path, (fresh, source, unit) => addEntryChange(fresh, source, unit));
                   }}
                 >
                   <PlusIcon size={13} />
@@ -509,7 +526,7 @@ export function PlistTable({ root, title, text, indentUnit, onChange, onReveal }
                     className="plist-action"
                     aria-label="Delete this entry"
                     title="Delete this entry"
-                    onClick={() => commit(removeEntryChange(node, text))}
+                    onClick={() => emit(node.path, (fresh, source) => removeEntryChange(fresh, source))}
                   >
                     <MinusIcon size={13} />
                   </button>

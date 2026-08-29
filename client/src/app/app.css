@@ -3813,3 +3813,87 @@
   font-size: var(--text-xs);
   color: var(--syn-bool);
 }
+
+/* -------------------------------------------------------------------------
+   Atlas (PLAN-23) — code and plist table side by side.
+
+   The same two-panel split Edda uses (core/ui/useSplitPanel owns the ratio,
+   the drag and the breakpoints); these are the widths and heights that hang
+   off it. Non-plist XML gets no second panel at all, so `--codeonly` lets the
+   editor take the full measure rather than leaving an empty half.
+   ------------------------------------------------------------------------- */
+
+.atlas-workspace {
+  --atlas-h: 60vh;
+  display: flex;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .atlas-workspace {
+    --atlas-h: max(30rem, calc(100vh - 22rem));
+  }
+}
+
+.atlas-panes {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+  height: var(--atlas-h);
+}
+
+.atlas-workspace--stacked .atlas-panes {
+  flex-direction: column;
+  gap: var(--space-3);
+  height: auto;
+}
+
+.atlas-code {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+}
+
+.atlas-code .json-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Split mode: the code pane's width comes from the draggable ratio, the table
+   takes the rest. */
+.atlas-workspace--split:not(.atlas-workspace--codeonly) .atlas-code {
+  flex: 0 0 calc(var(--atlas-ratio, 0.5) * 100% - 0.5 * var(--space-3));
+}
+
+.atlas-workspace--stacked:not(.atlas-workspace--codeonly) .atlas-code {
+  height: 50vh;
+}
+
+.atlas-divider {
+  flex: 0 0 6px;
+  align-self: stretch;
+  margin: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.atlas-divider:hover {
+  background: var(--accent);
+}
+
+.atlas-tablewrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-workspace--stacked .atlas-tablewrap {
+  height: 50vh;
+}

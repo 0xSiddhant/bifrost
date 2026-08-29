@@ -33,6 +33,8 @@ export default defineConfig({
       '/edda/api': { target: `http://localhost:${serverPort}` },
       // public groot raw-yaml endpoint lives outside /api (PLAN-19)
       '/groot/api': { target: `http://localhost:${serverPort}` },
+      // public atlas raw-xml endpoint lives outside /api (PLAN-23)
+      '/atlas/api': { target: `http://localhost:${serverPort}` },
       // portkey go-link redirects live outside /api (PLAN-15)
       '/go': { target: `http://localhost:${serverPort}` },
     },

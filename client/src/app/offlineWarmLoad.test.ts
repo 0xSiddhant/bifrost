@@ -37,10 +37,12 @@ describe('runWarmLoad (PLAN-22)', () => {
   });
 
   it('reports an id this build has no loader for instead of silently skipping', async () => {
+    // A deliberately fictional id: `atlas` stood here until PLAN-23 shipped it
+    // and turned this into a test of a real page.
     const warn = vi.spyOn(log, 'warn').mockImplementation(() => {});
-    const result = await runWarmLoad(['toolbox', 'atlas'], loaders());
+    const result = await runWarmLoad(['toolbox', 'mimir'], loaders());
     expect(result).toEqual({ loaded: ['toolbox'], failed: [] });
-    expect((warn.mock.calls[0] as [string])[0]).toContain('atlas');
+    expect((warn.mock.calls[0] as [string])[0]).toContain('mimir');
     warn.mockRestore();
   });
 
@@ -51,7 +53,7 @@ describe('runWarmLoad (PLAN-22)', () => {
   it('ships a loader for every id the server registry advertises', () => {
     // The two lists are joined by id at runtime; nothing else checks they agree.
     expect(Object.keys(WARM_LOADERS).sort()).toEqual(
-      ['edda', 'groot', 'loki', 'runestone', 'toolbox', 'variant'].sort(),
+      ['atlas', 'edda', 'groot', 'loki', 'runestone', 'toolbox', 'variant'].sort(),
     );
   });
 });

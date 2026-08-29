@@ -2,8 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { analyzeXml } from '../xml';
-import type { XmlChange } from '../xml/plist';
+import { analyzeXml, detectIndentUnit } from '../xml';
+import { nodeAtPath, type XmlChange } from '../xml/plist';
 import {
   base64Bytes,
   localInputToPlistDate,
@@ -58,9 +58,14 @@ describe('PlistTable', () => {
         <PlistTable
           root={tree}
           title="Bundle Info"
-          text={source}
-          indentUnit="\t"
-          onChange={(change) => changes.push(change)}
+          onEdit={(edit) => {
+            // Exactly what AtlasPage does: re-parse the live buffer, find the
+            // node again by path, and let the edit compute against fresh spans.
+            const live = analyzeXml(text);
+            const node = live.plist && nodeAtPath(live.plist, edit.path);
+            const change = node ? edit.apply(node, text, detectIndentUnit(text)) : null;
+            if (change) changes.push(change);
+          }}
           onReveal={(offset) => revealed.push(offset)}
         />,
       );
@@ -334,6 +339,25 @@ describe('PlistTable', () => {
       'Nested',
       'Seeds',
     ]);
+  });
+
+  it('uses the live buffer’s offsets when the document moved since the parse', () => {
+    render();
+    // A keystroke in the code pane lands before the table's debounced analysis
+    // catches up: every offset the table is holding is now short by the length
+    // of the inserted comment. (After the declaration, not before it — an XML
+    // declaration has to be the very first thing in the document.)
+    text = PLIST.replace(
+      '<plist version="1.0">',
+      '<!-- typed while the table was open -->\n<plist version="1.0">',
+    );
+
+    click(rowWith('Hidden').querySelector('.plist-bool'));
+    const next = applied();
+    expect(next).toBe(text.replace('<true/>', '<false/>'));
+    expect(next).toContain('<!-- typed while the table was open -->');
+    // The stale offsets would have landed inside the <dict> tag instead.
+    expect(analyzeXml(next).stats.valid).toBe(true);
   });
 
   it('shows a <data> value as a byte count with an import, never as raw base64', () => {

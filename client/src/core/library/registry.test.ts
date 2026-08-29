@@ -22,7 +22,12 @@ const item = (kind: LibraryKind, slug: string): LibraryItem => ({
 
 describe('the shipped registry', () => {
   it('holds one entry per document kind, each gated on its own module', () => {
-    expect(LIBRARY_REGISTRY.map((entry) => entry.kind)).toEqual(['runestone', 'edda', 'groot']);
+    expect(LIBRARY_REGISTRY.map((entry) => entry.kind)).toEqual([
+      'runestone',
+      'edda',
+      'groot',
+      'atlas',
+    ]);
     for (const entry of LIBRARY_REGISTRY) {
       expect(entry.module).toBe(entry.kind);
     }
@@ -34,7 +39,12 @@ describe('the shipped registry', () => {
   });
 
   it('labels kinds by format rather than by tool name', () => {
-    expect(LIBRARY_REGISTRY.map((entry) => entry.label)).toEqual(['JSON', 'Markdown', 'YAML']);
+    expect(LIBRARY_REGISTRY.map((entry) => entry.label)).toEqual([
+      'JSON',
+      'Markdown',
+      'YAML',
+      'XML',
+    ]);
   });
 
   it('routes groot rows to the editor and to the public data URL', () => {
@@ -51,8 +61,26 @@ describe('the shipped registry', () => {
     expect(entryFor(LIBRARY_REGISTRY, 'groot')!.events).toEqual(['groot.saved', 'groot.deleted']);
   });
 
-  it('drops groot entirely from a profile that does not serve it', () => {
-    const kinds = availableKinds(LIBRARY_REGISTRY, (module) => module !== 'groot');
-    expect(kinds.map((entry) => entry.kind)).toEqual(['runestone', 'edda']);
+  it('routes atlas rows to the editor and to the public data URL', () => {
+    const atlas = entryFor(LIBRARY_REGISTRY, 'atlas');
+    expect(atlas).toBeDefined();
+    const row = item('atlas', 'bundle-info-abc123');
+    expect(atlas!.editorRoute(row)).toBe('/atlas/bundle-info-abc123');
+    expect(atlas!.apiRoute?.(row)).toBe('/atlas/api/bundle-info-abc123');
+    // XML has no rendered read-only page the way Edda's preview does.
+    expect(atlas!.readRoute).toBeUndefined();
+  });
+
+  it('subscribes to the events the atlas module actually emits', () => {
+    expect(entryFor(LIBRARY_REGISTRY, 'atlas')!.events).toEqual(['atlas.saved', 'atlas.deleted']);
+  });
+
+  it('drops a kind entirely from a profile that does not serve it', () => {
+    expect(
+      availableKinds(LIBRARY_REGISTRY, (module) => module !== 'groot').map((entry) => entry.kind),
+    ).toEqual(['runestone', 'edda', 'atlas']);
+    expect(
+      availableKinds(LIBRARY_REGISTRY, (module) => module !== 'atlas').map((entry) => entry.kind),
+    ).toEqual(['runestone', 'edda', 'groot']);
   });
 });
