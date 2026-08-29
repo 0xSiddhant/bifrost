@@ -240,6 +240,24 @@ describe('PlistTable', () => {
     expect(changes).toEqual([]);
   });
 
+  it('puts the chevron inside the type control, not beside it', () => {
+    render();
+    const wrap = rowWith('Build').querySelector('.plist-typeselect');
+    const select = wrap?.querySelector('.plist-typeselect__input');
+    const chevron = wrap?.querySelector('.plist-typeselect__chevron');
+    // The glyph is the part that reads as the affordance, so it has to open
+    // the menu too. The CSS lays it over the select and makes it
+    // click-through; this pins the markup that arrangement depends on, since
+    // jsdom loads no stylesheet and cannot see `pointer-events` itself. That
+    // a tap at the glyph's own coordinates lands on the select is proven live.
+    expect(select).toBeTruthy();
+    expect(chevron).toBeTruthy();
+    expect(chevron?.closest('.plist-typeselect')).toBe(wrap);
+    // Decorative only — it must never become a second, separate control.
+    expect(chevron?.tagName).toBe('svg');
+    expect(wrap?.querySelectorAll('button')).toHaveLength(0);
+  });
+
   it('leaves the root’s type unchangeable', () => {
     render();
     const rootRow = container.querySelector('.plist-row--root');

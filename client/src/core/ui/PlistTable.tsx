@@ -487,7 +487,11 @@ export function PlistTable({ root, title, onEdit, onReveal }: PlistTableProps) {
                       </option>
                     ))}
                   </select>
-                  <StepperIcon size={16} />
+                  {/* Decorative: it sits *over* the select rather than beside
+                      it (pointer-events: none), so a tap on the chevron — the
+                      part that looks like the affordance — opens the menu just
+                      as a tap on the type name does. */}
+                  <StepperIcon size={16} className="plist-typeselect__chevron" />
                 </span>
               )}
             </span>
