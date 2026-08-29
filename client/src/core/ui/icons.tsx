@@ -361,3 +361,50 @@ export const TreeIcon = (p: IconProps) => (
     <path d="M9.5 4.5a3 3 0 0 0-2.6 4.4 3 3 0 0 0 1.6 5.1 3 3 0 0 0 5.6 1.4 3 3 0 0 0 4.6-3.6 3 3 0 0 0-1.6-4.8A3 3 0 0 0 12 3.6a3 3 0 0 0-2.5.9Z" />
   </svg>
 );
+
+/** Atlas (PLAN-23) — the titan holding the structure up: a globe on a shoulder. */
+export const GlobeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="10" r="7" />
+    <path d="M5 10h14M12 3c2 2.2 3 4.6 3 7s-1 4.8-3 7c-2-2.2-3-4.6-3-7s1-4.8 3-7Z" />
+    <path d="M4 21c1.6-1.6 3.4-2.4 5.4-2.4" />
+  </svg>
+);
+
+export const PlusIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+export const MinusIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 12h14" />
+  </svg>
+);
+
+/** Drag handle for a reorderable row — the usual two columns of dots. */
+export const GripIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01" strokeWidth="2.6" />
+  </svg>
+);
+
+/**
+ * Xcode's stepper: a chevron pair stacked in one control. Drawn as one icon
+ * rather than two buttons stacked, so the halves stay pinned together at any
+ * font size — the halves are separate hit targets in the markup.
+ */
+export const StepperIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m8 10 4-3.5 4 3.5" />
+    <path d="m8 14 4 3.5 4-3.5" />
+  </svg>
+);
+
+/** Filled disclosure triangle; CSS rotates it 90° when the row is open. */
+export const DisclosureIcon = (p: IconProps) => (
+  <svg {...base(p)} fill="currentColor" stroke="none">
+    <path d="M9 5.5 16.5 12 9 18.5Z" />
+  </svg>
+);
