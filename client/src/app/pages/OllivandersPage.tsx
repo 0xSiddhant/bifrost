@@ -95,7 +95,7 @@ const TOOLS: Tool[] = [
     icon: <GlobeIcon size={24} />,
     title: 'Atlas',
     description:
-      'An XML workspace — format, minify and fold any document, and open an Apple property list as an editable Key/Type/Value table beside the markup.',
+      'An XML workspace — format, minify and fold any document; an Apple property list also opens as an editable, Xcode-shaped table.',
     go: 'hold the structure',
   },
 ];
