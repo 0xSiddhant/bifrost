@@ -58,6 +58,7 @@ describe('offline-mode module', () => {
       'toolbox',
       'runestone',
       'groot',
+      'atlas',
       'edda',
       'variant',
       'loki',

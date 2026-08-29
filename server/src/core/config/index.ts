@@ -31,6 +31,7 @@ const envSchema = z.object({
   RUNESTONE_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   GROOT_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
+  ATLAS_MAX_DOC_KB: z.coerce.number().int().positive().default(2048),
   EDDA_LIVE_PREVIEW_MAX_KB: z.coerce.number().int().positive().default(300),
   // Accio (PLAN-13) — best-effort title enrichment. Both bound an outbound
   // request to a user-pasted address, so neither may be hardcoded.
@@ -144,6 +145,9 @@ export interface AppConfig {
     livePreviewMaxKb: number;
   };
   groot: {
+    maxDocKb: number;
+  };
+  atlas: {
     maxDocKb: number;
   };
   accio: {
@@ -322,6 +326,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     groot: {
       maxDocKb: raw.GROOT_MAX_DOC_KB,
+    },
+    atlas: {
+      maxDocKb: raw.ATLAS_MAX_DOC_KB,
     },
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,

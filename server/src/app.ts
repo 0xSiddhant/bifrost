@@ -34,6 +34,7 @@ import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { grootModule } from './modules/groot/module.js';
+import { atlasModule } from './modules/atlas/module.js';
 import { lokiModule } from './modules/loki/module.js';
 import { accioModule } from './modules/accio/module.js';
 import { nimbusModule } from './modules/nimbus/module.js';
@@ -64,6 +65,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     grootModule,
+    atlasModule,
     lokiModule,
     // Local only: a household bookmark shelf has no auth story of its own
     // (PLAN-13 decision) — revisit for cloud when real accounts exist.
@@ -97,6 +99,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     variantModule,
     eddaModule,
     grootModule,
+    atlasModule,
     lokiModule,
     screensaverModule,
     clientLogsModule,

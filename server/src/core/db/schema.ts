@@ -119,6 +119,32 @@ export const grootDocs = sqliteTable('groot_docs', {
 });
 
 /**
+ * Saved XML documents (PLAN-23). Owned by the `atlas` module — a fourth table,
+ * for the same reason `groot_docs` is not `eddas`: each module owns its own
+ * storage and the formats have different semantics.
+ *
+ * Named `atlas_docs` on the `groot_docs`/`accio_links` precedent (module name +
+ * generic noun): pluralising the tool's name works for "runestones" and
+ * "eddas", and not for Atlas, which holds the documents up rather than being
+ * one.
+ *
+ * Columns mirror `groot_docs` exactly. The server stores the text and **never
+ * parses XML** — a plist is only a plist to the browser that opens it — so
+ * there is no column for "is this a plist": that is a property of the bytes,
+ * read fresh on every load.
+ */
+export const atlasDocs = sqliteTable('atlas_docs', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  content: text('content').notNull(),
+  authorDeviceId: text('author_device_id'),
+  sizeBytes: integer('size_bytes').notNull(),
+  createdAt: integer('created_at').notNull(),
+  modifiedAt: integer('modified_at').notNull(),
+});
+
+/**
  * Read-later shelf ("accio links", PLAN-13). Owned by the `accio` module.
  * `id` is a short random handle (no slug — links are never shared by URL, the
  * shelf is the surface). `url` is the normalized absolute URL; `title` is

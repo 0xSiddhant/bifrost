@@ -22,6 +22,7 @@ export default {
         'variant',
         'edda',
         'groot',
+        'atlas',
         'loki',
         'accio',
         'nimbus',
