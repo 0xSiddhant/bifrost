@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { EditorState } from '@codemirror/state';
 import { foldable } from '@codemirror/language';
+import { CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
 import { xmlModeExtensions } from './JsonEditor';
 
 /**
@@ -87,5 +88,65 @@ describe('xml lint', () => {
     // A cheap structural assertion: the mode is meant to bring more than
     // highlighting, and an accidental `return [xmlLang()]` would still tint.
     expect(xmlModeExtensions().length).toBeGreaterThan(5);
+  });
+});
+
+/**
+ * Completion is offered for **property lists only** — Atlas knows Apple's
+ * vocabulary and nothing about anyone's own schema, so proposing `<dict>`
+ * inside someone's `<config>` would be inventing a document shape for them.
+ *
+ * Driven through the real language-data facet rather than a hand-held source,
+ * so a mis-registered extension fails here.
+ */
+function completionsAt(doc: string, marker: string): string[] {
+  const state = EditorState.create({ doc, extensions: xmlModeExtensions() });
+  const at = doc.indexOf(marker) + marker.length;
+  expect(at, `marker ${marker} not found`).toBeGreaterThan(marker.length - 1);
+  const context = new CompletionContext(state, at, true);
+  // Every source, not the first that answers: `xml()` registers its own
+  // empty-schema source alongside ours, and CodeMirror merges them all — so a
+  // helper that stopped at the first result would only ever see the empty one.
+  return state
+    .languageDataAt<CompletionSource>('autocomplete', at)
+    .flatMap((source) => {
+      const result = source(context);
+      return result && 'options' in result ? (result.options ?? []) : [];
+    })
+    .map((option) => option.label);
+}
+
+describe('xml completion', () => {
+  const PLIST = '<plist version="1.0">\n<dict>\n\t<key>a</key>\n\t<st\n</dict>\n</plist>';
+
+  it('offers the whole plist vocabulary, each element exactly once', () => {
+    const labels = completionsAt(PLIST, '\t<st');
+    expect([...labels].sort()).toEqual([
+      'array',
+      'data',
+      'date',
+      'dict',
+      'false',
+      'integer',
+      'key',
+      'plist',
+      'real',
+      'string',
+      'true',
+    ]);
+    // The schema is flat on purpose — see the note on PLIST_SCHEMA. A nested
+    // one listed dict and array twice, which is what this pins.
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('offers nothing at all for XML that is not a property list', () => {
+    // The same line the table draws: this document's shape is its author's,
+    // and proposing <dict> inside someone's <config> would be inventing one.
+    expect(completionsAt('<config>\n  <na\n</config>', '  <na')).toEqual([]);
+  });
+
+  it('completes the version attribute value on the root element', () => {
+    const labels = completionsAt('<plist version="', '<plist version="');
+    expect(labels).toContain('"1.0"');
   });
 });

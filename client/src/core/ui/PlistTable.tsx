@@ -388,12 +388,8 @@ export function PlistTable({ root, title, onEdit, onReveal }: PlistTableProps) {
     );
   };
 
-  const stepType = (row: Row, direction: 1 | -1) => {
-    emit(row.node.path, (fresh) => {
-      const at = PLIST_TYPES.indexOf(fresh.type);
-      const next = PLIST_TYPES[(at + direction + PLIST_TYPES.length) % PLIST_TYPES.length];
-      return next && next !== fresh.type ? typeChange(fresh, next) : null;
-    });
+  const changeType = (row: Row, next: PlistType) => {
+    emit(row.node.path, (fresh) => (next === fresh.type ? null : typeChange(fresh, next)));
   };
 
   const stepValueBy = (row: Row, direction: 1 | -1) => {
@@ -472,20 +468,27 @@ export function PlistTable({ root, title, onEdit, onReveal }: PlistTableProps) {
                 // whatever it is, and Xcode disables the control too.
                 <span className="plist-typelabel is-disabled">{PLIST_TYPE_LABEL[node.type]}</span>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className="plist-typelabel"
-                    onClick={() => onReveal(node.span.start)}
-                    title="Click to find it in the code"
+                // A popup, not a stepper. Xcode's own Type control wears the
+                // ⌃⌄ glyph and opens a menu, and stepping eight types one
+                // chevron-click at a time is slow enough to be the wrong
+                // control however right it looks. A native `<select>` keeps
+                // the glyph, and brings keyboard navigation, type-ahead and a
+                // real picker on a phone with it.
+                <span className="plist-typeselect">
+                  <select
+                    className="plist-typeselect__input"
+                    aria-label={`Type of ${node.key ?? `item ${row.index}`}`}
+                    value={node.type}
+                    onChange={(event) => changeType(row, event.target.value as PlistType)}
                   >
-                    {PLIST_TYPE_LABEL[node.type]}
-                  </button>
-                  <Stepper
-                    label={`Change the type of ${node.key ?? `item ${row.index}`}`}
-                    onStep={(direction) => stepType(row, direction)}
-                  />
-                </>
+                    {PLIST_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {PLIST_TYPE_LABEL[type]}
+                      </option>
+                    ))}
+                  </select>
+                  <StepperIcon size={16} />
+                </span>
               )}
             </span>
 

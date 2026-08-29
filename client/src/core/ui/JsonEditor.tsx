@@ -31,7 +31,12 @@ import {
   redo,
   undo,
 } from '@codemirror/commands';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  type CompletionContext,
+} from '@codemirror/autocomplete';
 import {
   HighlightStyle,
   bracketMatching,
@@ -50,7 +55,12 @@ import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
-import { xml as xmlLang } from '@codemirror/lang-xml';
+import {
+  completeFromSchema,
+  xml as xmlLang,
+  xmlLanguage,
+  type ElementSpec,
+} from '@codemirror/lang-xml';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -680,6 +690,53 @@ function xmlDiagnostics(view: EditorView): Diagnostic[] {
 }
 
 /**
+ * The plist vocabulary, as an XML schema for completion.
+ *
+ * Deliberately **flat**, though `ElementSpec` offers a `children` field and
+ * Apple's DTD would fill it in exactly. Measured against the real extension
+ * list: at the moment you are actually typing, the tag is incomplete, which
+ * breaks `completeFromSchema`'s walk up to the parent element — so the scoping
+ * never applied, and listing `dict` and `array` both as top-level elements and
+ * as children of `<plist>` put each of them in the menu **twice**. A flat list
+ * offers every element once, which is what the menu should show.
+ */
+const PLIST_SCHEMA: readonly ElementSpec[] = [
+  { name: 'plist', top: true, attributes: [{ name: 'version', values: ['1.0'] }] },
+  { name: 'dict' },
+  { name: 'array' },
+  { name: 'key' },
+  { name: 'string' },
+  { name: 'integer' },
+  { name: 'real' },
+  { name: 'date' },
+  { name: 'data' },
+  { name: 'true' },
+  { name: 'false' },
+];
+
+const completePlist = completeFromSchema(PLIST_SCHEMA, []);
+
+/** Enough of the head to see the root element without reading a 2 MB buffer. */
+const PLIST_SNIFF_CHARS = 4096;
+
+/**
+ * Completion is offered **only for property lists**, which is the same line the
+ * rest of Atlas draws: this editor knows Apple's vocabulary and knows nothing
+ * about anyone's own schema, so proposing `<dict>` inside someone's
+ * `<config>` would be inventing a document shape for them. Non-plist XML keeps
+ * auto-close and folding and gets no menu.
+ */
+const plistCompletion = xmlLanguage.data.of({
+  autocomplete: (context: CompletionContext) => {
+    const head = context.state.doc.sliceString(
+      0,
+      Math.min(PLIST_SNIFF_CHARS, context.state.doc.length),
+    );
+    return /<plist[\s>]/.test(head) ? completePlist(context) : null;
+  },
+});
+
+/**
  * XML mode (Atlas). Exported alongside the other four so a test can assert
  * against the real configuration rather than a hand-rolled copy.
  *
@@ -705,7 +762,11 @@ export function xmlModeExtensions(): Extension[] {
     indentUnit.of('  '),
     bracketMatching(),
     closeBrackets(),
+    // `xml()` brings `autoCloseTags` with it by default: typing the `>` of
+    // `<dict>` inserts `</dict>` and leaves the cursor between the two.
     xmlLang(),
+    plistCompletion,
+    autocompletion(),
     syntaxHighlighting(xmlHighlight),
     linter(xmlDiagnostics, { delay: 300 }),
     lintGutter(),

@@ -111,6 +111,16 @@ describe('PlistTable', () => {
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
 
+  /** Drive a native <select> the way React's onChange sees it. */
+  const choose = (select: HTMLSelectElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set?.call(
+        select,
+        value,
+      );
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
   // React delegates onBlur from `focusout`, not `blur` — a bubbling `blur`
   // reaches nothing.
   const blur = (input: HTMLInputElement) =>
@@ -156,10 +166,12 @@ describe('PlistTable', () => {
     render(
       '<plist version="1.0"><dict><key>a</key><integer>1</integer><key>b</key><real>1</real></dict></plist>',
     );
-    const labels = [...container.querySelectorAll('.plist-typelabel')].map(
-      (element) => element.textContent,
+    // The root keeps a plain, unchangeable label; every other row is a popup.
+    expect(container.querySelector('.plist-typelabel')?.textContent).toBe('Dictionary');
+    const chosen = [...container.querySelectorAll('.plist-typeselect__input')].map(
+      (element) => (element as HTMLSelectElement).value,
     );
-    expect(labels).toEqual(['Dictionary', 'Integer', 'Real']);
+    expect(chosen).toEqual(['integer', 'real']);
   });
 
   it('expands and collapses a nested dict', () => {
@@ -198,12 +210,41 @@ describe('PlistTable', () => {
     expect(next.slice(0, at)).toBe(PLIST.slice(0, at));
   });
 
-  it('changes a row’s type from the stepper, converting sensibly', () => {
+  it('changes a row’s type from the dropdown, converting sensibly', () => {
     render();
-    // Integer → Real is one step down the type list.
-    const stepper = rowWith('Build').querySelectorAll('.plist-stepper')[0];
-    click(stepper?.querySelector('.plist-stepper__half--down'));
+    const select = rowWith('Build').querySelector(
+      '.plist-typeselect__input',
+    ) as HTMLSelectElement;
+    // Every type is one selection away — the whole reason this is a popup and
+    // not a stepper.
+    expect([...select.options].map((option) => option.value)).toEqual([
+      'array',
+      'boolean',
+      'data',
+      'date',
+      'dict',
+      'integer',
+      'real',
+      'string',
+    ]);
+    choose(select, 'real');
     expect(applied()).toBe(PLIST.replace('<integer>3</integer>', '<real>3</real>'));
+  });
+
+  it('emits nothing when the type picked is the one already set', () => {
+    render();
+    const select = rowWith('Build').querySelector(
+      '.plist-typeselect__input',
+    ) as HTMLSelectElement;
+    choose(select, 'integer');
+    expect(changes).toEqual([]);
+  });
+
+  it('leaves the root’s type unchangeable', () => {
+    render();
+    const rootRow = container.querySelector('.plist-row--root');
+    expect(rootRow?.querySelector('.plist-typeselect__input')).toBeNull();
+    expect(rootRow?.querySelector('.plist-typelabel')?.classList).toContain('is-disabled');
   });
 
   it('adds an entry to the container whose "+" was pressed', () => {
@@ -252,7 +293,9 @@ describe('PlistTable', () => {
     expect(revealed).toEqual([PLIST.indexOf('<string>Bifrost</string>')]);
     expect(rowWith('Name').querySelector('.plist-input--key')).toBeNull();
 
-    click(rowWith('Build').querySelector('.plist-typelabel'));
+    // Array items jump from their position label too, having no key to click.
+    click(rowWith('Seeds').querySelector('.plist-disclosure'));
+    click(rowWith('Item 1').querySelector('.plist-keybtn'));
     expect(revealed).toHaveLength(2);
     expect(changes).toEqual([]);
   });
@@ -368,12 +411,15 @@ describe('PlistTable', () => {
     expect(cell?.querySelector('.plist-linkbtn')?.textContent).toBe('Import…');
   });
 
-  it('disables the value stepper where stepping means nothing', () => {
+  it('keeps a stepper on the value only, and disables it where stepping means nothing', () => {
     render();
-    const steppers = (label: string) => rowWith(label).querySelectorAll('.plist-stepper');
-    expect(steppers('Name')[1]?.classList).toContain('is-disabled');
-    expect(steppers('Build')[1]?.classList).not.toContain('is-disabled');
-    expect(steppers('Hidden')[1]?.classList).not.toContain('is-disabled');
+    // One stepper per row now: Type became a popup, Value stayed a stepper
+    // because stepping a boolean or a number is genuinely what you want.
+    const stepper = (label: string) => rowWith(label).querySelectorAll('.plist-stepper');
+    expect(stepper('Name')).toHaveLength(1);
+    expect(stepper('Name')[0]?.classList).toContain('is-disabled');
+    expect(stepper('Build')[0]?.classList).not.toContain('is-disabled');
+    expect(stepper('Hidden')[0]?.classList).not.toContain('is-disabled');
   });
 });
 

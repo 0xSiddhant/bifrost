@@ -377,8 +377,19 @@
    Alley stalls). Cards are equal-height by nature; footers align via margin. */
 .portals {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  /* 18rem, not 15: on a wide hub the old minimum let `auto-fit` run to six,
+     seven, nine columns, and a card narrower than it is tall reads as squeezed
+     rather than as a card. This keeps four on a 1280 screen and five on
+     anything wider. */
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: var(--space-4);
+  /* The cap is on the **grid**, not the page: `.shell-main--wide` deliberately
+     drops the 62rem reading measure so a hub can use the window, and without a
+     stop of its own the grid keeps adding columns forever. Centring what is
+     left is where a wide window's side margins come from. */
+  width: 100%;
+  max-width: 108rem;
+  margin-inline: auto;
 }
 
 /* Wide onboarding band: the QR sits beside its details instead of stacking a

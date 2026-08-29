@@ -1299,6 +1299,49 @@ a.portal:hover .portal__go {
   cursor: default;
 }
 
+/* Xcode's Type control: the ⌃⌄ glyph, but a real popup behind it. Stepping
+   eight types one click at a time was the right *look* and the wrong control. */
+.plist-typeselect {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.plist-typeselect__input {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  padding: 2px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plist-typeselect__input:hover {
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.plist-typeselect__input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* The open menu is painted by the OS, which does not read our custom
+   properties — without these the options come back white-on-white in every
+   dark theme. */
+.plist-typeselect__input option {
+  background: var(--surface);
+  color: var(--text);
+}
+
 .plist-input {
   width: 100%;
   min-width: 0;
