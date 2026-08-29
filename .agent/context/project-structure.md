@@ -40,7 +40,7 @@ bifrost/
 │       └── modules/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
-│               │              #   variant, edda, groot, loki, accio, nimbus, portkey,
+│               │              #   variant, edda, groot, atlas, loki, accio, nimbus, portkey,
 │               │              #   screensaver, client-logs, metrics, toolbox,
 │               │              #   offline-mode
 │               ├── routes/
@@ -65,7 +65,14 @@ bifrost/
 │       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
 │       │                      #   ErrorBoundary (app-wide crash net), JsonEditor (one `mode`
-│       │                      #   prop: json|markdown|javascript|yaml|plain, PLAN-19)
+│       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
+│       │                      #   +replaceRange for table-originated transactions (PLAN-23),
+│       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
+│       │                      #     table; it lives here, not in features/atlas, because it is not
+│       │                      #     Atlas-shaped, it is plist-shaped),
+│       │                      #   useSplitPanel (PLAN-23 — Edda's divider/ratio/breakpoints,
+│       │                      #     extracted at its second consumer, as JsonEditor and TreeView
+│       │                      #     both were at theirs),
 │       │                      #   +in-editor search, TreeView +bulk collapse +alias annotation),
 │       │                      #   json/ (parse/format/diff),
 │       │                      #   markdown/ (renderMarkdown/outline/stats/commands + PLAN-20's
@@ -73,14 +80,20 @@ bifrost/
 │       │                      #     the pure renderer, and in core so features/previews/ can reach it),
 │       │                      #   yaml/ (PLAN-19 — analyze/format/flow⇄block/⇄json + the advisory
 │       │                      #     rail; format-named not tool-named, so Variant can share it),
+│       │                      #   xml/ (PLAN-23 — analyze/validate/format/minify, plus the
+│       │                      #     element-span scanner that gives DOMParser the source offsets it
+│       │                      #     reports none of; plist.ts keeps each value's DECLARED type — the
+│       │                      #     one thing every plist library throws away — and owns the pure
+│       │                      #     edit computations; advisories.ts is three, not padded to Groot's),
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
 │       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
-│       │                      #     PLAN-19's groot proved it, one array element and no page change),
+│       │                      #     PLAN-19's groot proved it and PLAN-23's atlas proved it again,
+│       │                      #     one array element and no page change),
 │       │                      #   offlineMode.ts (PLAN-22 — warm-load policy client + status shape),
 │       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
 │       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
 │       │                      #     cold route with no bridge off the app-wide crash card),
-│       │                      #   textNormalize, runestone + edda + groot + accio clients,
+│       │                      #   textNormalize, runestone + edda + groot + atlas + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting
@@ -97,6 +110,9 @@ bifrost/
 │                              #   loki in PLAN-12; accio (read-later shelf) in PLAN-13;
 │                              #   nimbus (LAN speed test — orchestrator + own nimbus.css) in PLAN-14;
 │                              #   portkey (LAN go-links — own portkey.css) in PLAN-15;
+│                              #   atlas (XML workspace — the code pane always, the plist table only
+│                              #     when the document is one; no multi-document tabs, since
+│                              #     XML has exactly one root) in PLAN-23;
 │                              #   toolbox (registry + lib/ pure utils + tools/ bodies in ONE lazy
 │                              #     chunk + own toolbox.css) in PLAN-18 — no route of its own,
 │                              #     the cards expand inside /diagon-alley/:toolId

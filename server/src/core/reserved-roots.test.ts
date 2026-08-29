@@ -16,6 +16,7 @@ describe('reserved roots', () => {
       'edda',
       // PLAN-19: the YAML workspace, its SPA route and its raw data endpoint.
       'groot',
+      'atlas',
       'variant',
       'loki',
       'accio',

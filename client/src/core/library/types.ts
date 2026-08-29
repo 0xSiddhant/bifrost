@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
 
 /**
- * The document kinds the Pensieve can list (PLAN-21). `groot` is named here
- * before PLAN-19 ships it: the type is the contract the registry is written
- * against, and naming it now is what makes Groot's arrival one array entry
- * rather than a type change plus a page.
+ * The document kinds the Pensieve can list (PLAN-21). `groot` was named here
+ * before PLAN-19 shipped it: the type is the contract the registry is written
+ * against, and naming it ahead is what made Groot's arrival one array entry
+ * rather than a type change plus a page. `atlas` (PLAN-23) is the fourth, and
+ * cost exactly that — this line and one registry element.
  */
-export type LibraryKind = 'runestone' | 'edda' | 'groot';
+export type LibraryKind = 'runestone' | 'edda' | 'groot' | 'atlas';
 
 /**
  * One saved document, whatever tool wrote it. The per-tool summaries

@@ -181,6 +181,19 @@ export interface GrootSummary {
   modifiedAt: number;
 }
 
+/** A saved XML document as the Pensieve lists it (PLAN-23). */
+export interface AtlasSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
 /** A saved link as the Accio shelf lists it (PLAN-13). */
 export interface AccioLink {
   id: string;
@@ -268,6 +281,9 @@ export interface BifrostEventMap {
   /** Create or update of a saved YAML document — the Pensieve live-refreshes. */
   'groot.saved': { groot: GrootSummary };
   'groot.deleted': { id: string; name: string };
+  /** Create or update of a saved XML document — the Pensieve live-refreshes. */
+  'atlas.saved': { atlas: AtlasSummary };
+  'atlas.deleted': { id: string; name: string };
   /** A link was added to the read-later shelf — open shelves add the row live. */
   'accio.saved': { link: AccioLink };
   /**

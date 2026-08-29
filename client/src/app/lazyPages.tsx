@@ -83,6 +83,10 @@ export function createLazyPages() {
       () => import('../features/groot/GrootPage'),
       (m) => m.GrootPage,
     ),
+    AtlasPage: page(
+      () => import('../features/atlas/AtlasPage'),
+      (m) => m.AtlasPage,
+    ),
     LokiPage: page(
       () => import('../features/loki/LokiPage'),
       (m) => m.LokiPage,

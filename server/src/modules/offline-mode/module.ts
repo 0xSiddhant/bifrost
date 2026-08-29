@@ -38,6 +38,7 @@ const TARGETS: readonly OfflineModeTarget[] = [
   { id: 'toolbox', label: 'Diagon Alley toolbox' },
   { id: 'runestone', label: 'Runestone (JSON)' },
   { id: 'groot', label: 'Groot (YAML)' },
+  { id: 'atlas', label: 'Atlas (XML)' },
   { id: 'edda', label: 'Edda (Markdown)' },
   { id: 'variant', label: 'Variant (diff)' },
   { id: 'loki', label: 'Loki (JS workbench)' },

@@ -49,6 +49,7 @@ describe('boot → health → capabilities', () => {
         'variant',
         'edda',
         'groot',
+        'atlas',
         'loki',
         'accio',
         'nimbus',
@@ -108,8 +109,9 @@ describe('capabilities in the cloud profile', () => {
     // qr-tool stays loaded in both profiles — /sigil became a tool, but
     // GET /api/qr/server-url is still what Midgard's Join card reads.
     expect(body.modules).toContain('qr-tool');
-    // The three structured-text workspaces ship in both profiles (PLAN-19).
+    // The four structured-document workspaces ship in both profiles (PLAN-23).
     expect(body.modules).toContain('groot');
+    expect(body.modules).toContain('atlas');
     // Warm-load policy is harmless client mechanism, so it ships in both
     // profiles too — a cloud build that lost it would show a dead toggle.
     expect(body.modules).toContain('offline-mode');

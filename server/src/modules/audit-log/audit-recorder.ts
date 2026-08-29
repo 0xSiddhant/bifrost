@@ -78,6 +78,12 @@ export class AuditRecorder {
       this.bus.on('groot.deleted', (event) =>
         push('groot.deleted', null, null, `yaml document "${event.name}" deleted`),
       ),
+      this.bus.on('atlas.saved', ({ atlas }) =>
+        push('atlas.saved', atlas.authorDeviceId, null, `charted "${atlas.name}" (${fmtBytes(atlas.sizeBytes)})`),
+      ),
+      this.bus.on('atlas.deleted', (event) =>
+        push('atlas.deleted', null, null, `xml document "${event.name}" deleted`),
+      ),
       this.bus.on('accio.saved', ({ link }) =>
         push('accio.saved', link.authorDeviceId, null, `summoned ${link.title ?? link.url}`),
       ),

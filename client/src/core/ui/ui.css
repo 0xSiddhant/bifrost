@@ -1134,3 +1134,361 @@ a.portal:hover .portal__go {
   font-size: var(--text-sm);
   word-break: break-word;
 }
+
+/* -------------------------------------------------------------------------
+   Atlas's property-list table (PLAN-23).
+
+   Shaped from the owner's Xcode reference screenshot: a Key/Type/Value header
+   with a thin rule under it and no gridlines anywhere else, a shaded root group
+   row, plain indented leaf rows, and the stepper chevrons pinned to the right
+   edge of the Type and Value cells.
+   ------------------------------------------------------------------------- */
+
+.plist-table {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--panel-font, var(--text-sm));
+}
+
+.plist-row {
+  display: grid;
+  /* Type is fixed so the steppers line up down the page, and sized to its
+     longest label ("Dictionary") rather than generously — real plist keys are
+     long (`CFBundleShortVersionString`) and every pixel Type does not need is
+     a pixel Key does. */
+  grid-template-columns: minmax(10rem, 2fr) 7.5rem minmax(6rem, 1.2fr) 4.4rem;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid transparent;
+}
+
+.plist-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plist-row--root {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.plist-row:not(.plist-row--head):hover {
+  background: var(--surface-2);
+}
+
+.plist-row.is-dragging {
+  opacity: 0.45;
+}
+
+.plist-row.is-drop-target {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 1px 0 0 var(--accent);
+}
+
+.plist-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.plist-cell--type,
+.plist-cell--value {
+  justify-content: space-between;
+}
+
+.plist-cell--actions {
+  justify-content: flex-end;
+  gap: 0;
+  /* The row actions are quiet until the row is under the pointer — Xcode's
+     own behaviour, and it keeps a long plist from reading as a wall of icons. */
+  opacity: 0;
+}
+
+.plist-row:hover .plist-cell--actions,
+.plist-cell--actions:focus-within {
+  opacity: 1;
+}
+
+.plist-disclosure {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.plist-disclosure.is-open {
+  transform: rotate(90deg);
+}
+
+.plist-disclosure--empty {
+  cursor: default;
+}
+
+.plist-keybtn {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.plist-keybtn:hover {
+  color: var(--accent);
+}
+
+.plist-rootname {
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.plist-itemname {
+  color: var(--text-muted);
+}
+
+.plist-typelabel {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.plist-typelabel:hover {
+  color: var(--accent);
+}
+
+.plist-typelabel.is-disabled {
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Xcode's Type control: the ⌃⌄ glyph, but a real popup behind it. Stepping
+   eight types one click at a time was the right *look* and the wrong control. */
+.plist-typeselect {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+/* The chevron is the part that *looks* like the control, so it has to be part
+   of the control: it is laid over the select and made click-through, which
+   makes the whole cell — name and glyph alike — one hit target. */
+.plist-typeselect__chevron {
+  position: absolute;
+  right: 0;
+  pointer-events: none;
+}
+
+.plist-typeselect__input {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  /* Right padding keeps the longest label ("Dictionary") clear of the chevron
+     it now sits underneath. */
+  padding: 2px 1.25rem 2px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plist-typeselect__input:hover {
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.plist-typeselect__input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* The open menu is painted by the OS, which does not read our custom
+   properties — without these the options come back white-on-white in every
+   dark theme. */
+.plist-typeselect__input option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.plist-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+
+.plist-input:hover {
+  border-color: var(--border);
+}
+
+.plist-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  outline: none;
+}
+
+.plist-input--key {
+  font-weight: inherit;
+}
+
+/* Apple's convention: <true/> and <false/> are the words YES and NO here,
+   never a checkbox and never a switch. */
+.plist-bool {
+  padding: 0 var(--space-1);
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.plist-bool:hover {
+  color: var(--accent);
+}
+
+.plist-count {
+  color: var(--text-muted);
+}
+
+.plist-data {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.plist-linkbtn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plist-stepper {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.plist-stepper.is-disabled {
+  opacity: 0.25;
+}
+
+/* The chevron pair is one glyph so the halves cannot drift apart at any font
+   size; the two buttons above it are the hit targets. */
+.plist-stepper__half {
+  position: absolute;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.plist-stepper__half:disabled {
+  cursor: default;
+}
+
+.plist-stepper__half--up {
+  top: 0;
+}
+
+.plist-stepper__half--down {
+  bottom: 0;
+}
+
+.plist-stepper:hover:not(.is-disabled) {
+  color: var(--accent);
+}
+
+.plist-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.plist-action:hover {
+  color: var(--accent);
+}
+
+.plist-grip {
+  cursor: grab;
+  touch-action: none;
+}
+
+.plist-grip:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 767px) {
+  .plist-row {
+    /* Below the split breakpoint the Type column loses its fixed width and the
+       row actions stay visible, since there is no hover on a phone. */
+    grid-template-columns: minmax(6rem, 1.6fr) minmax(4.5rem, 0.8fr) minmax(5rem, 1.2fr) 4rem;
+  }
+
+  .plist-cell--actions {
+    opacity: 1;
+  }
+}

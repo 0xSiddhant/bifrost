@@ -7,6 +7,7 @@ import {
   CodeIcon,
   DiffIcon,
   DocFileIcon,
+  GlobeIcon,
   TreeIcon,
 } from '../../core/ui/icons';
 
@@ -66,7 +67,7 @@ const TOOLS: Tool[] = [
     // The one library over every document kind (PLAN-21). It owns no module of
     // its own — it is a shell over the tools above, so it appears whenever any
     // of them does, and the registry decides which types it can list.
-    modules: ['runestone', 'edda', 'groot'],
+    modules: ['runestone', 'edda', 'groot', 'atlas'],
     to: '/pensieve',
     icon: <BookmarkIcon size={24} />,
     title: 'Pensieve',
@@ -84,6 +85,18 @@ const TOOLS: Tool[] = [
     description:
       'A YAML workspace — folding, comment-preserving formatting, a tree view, and advisories for the traps YAML hides in plain sight.',
     go: 'branch by branch',
+  },
+  {
+    // Appended for the same reason Groot was: colour follows position, so
+    // slotting Atlas in beside the other editors would silently recolour every
+    // card after it on a page people already know by its colours.
+    modules: ['atlas'],
+    to: '/atlas',
+    icon: <GlobeIcon size={24} />,
+    title: 'Atlas',
+    description:
+      'An XML workspace — format, minify and fold any document; an Apple property list also opens as an editable, Xcode-shaped table.',
+    go: 'hold the structure',
   },
 ];
 

@@ -21,6 +21,7 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'runestone',
   'edda',
   'groot',
+  'atlas',
   'variant',
   'loki',
   'accio',
