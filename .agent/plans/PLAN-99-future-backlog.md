@@ -38,9 +38,10 @@ _(**Variant: JSON Patch export (RFC 6902)** and **Variant: unified `.diff`/`.pat
 | Idea                                 | Notes                                                                                                                                                    |
 | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **WebRTC device-to-device transfer** | Server signals only; bytes go peer-to-peer (huge files without touching the Mac's disk). Significant complexity jump — own plan, own spike first.        |
-| **Bifrost CLI**                      | `bifrost push <file>` / `bifrost clip "text"` from any terminal on the LAN. Pairs with owner's Swift/CLI interests — could be the Swift sibling project. |
 | **E2E tests (Playwright)**           | Multi-device flows are currently manual; automate the top 5 journeys.                                                                                    |
 | **i18n**                             | Only if the household needs it.                                                                                                                          |
+
+_(**Bifrost CLI** — PROMOTED 2026-09-04 to **PLAN-27**: `npm install -g`, TypeScript, a third workspace at `cli/`, built on the API surface that already exists (push/pull, clipboard, the four documents' public data endpoints, portkey, presence, nimbus) — none of it new server code. The Swift-sibling-project alternative this row originally named was considered and decided against in favor of reusing the existing TS/Node monorepo. See `PLAN-27-cli.md`.)_
 
 ## Owner-reviewed additions (2026-07-22 idea round)
 
