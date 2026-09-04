@@ -5,8 +5,9 @@ import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { FileRow, kindOf } from '../../core/ui/FileRow';
 import { Input, Select } from '../../core/ui/Field';
-import { DownloadIcon, EyeIcon, FolderIcon } from '../../core/ui/icons';
+import { ArchiveFileIcon, DownloadIcon, EyeIcon, FolderIcon } from '../../core/ui/icons';
 import { formatBytes, formatTimeAgo } from '../../core/format';
+import { folderArchiveUrl } from './api';
 import { useDownloads } from './useDownloads';
 
 type SortKey = 'newest' | 'name' | 'size';
@@ -25,13 +26,31 @@ export function DownloadsPage() {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('newest');
 
+  // One feed, two views (PLAN-24): the root shows what has no parent, and the
+  // folder page filters the very same list by its own name.
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = (entries ?? []).filter(
-      (entry) => needle === '' || entry.name.toLowerCase().includes(needle),
+      (entry) =>
+        entry.parent === null && (needle === '' || entry.name.toLowerCase().includes(needle)),
     );
     return filtered.sort(SORTERS[sortKey]);
   }, [entries, query, sortKey]);
+
+  // Folder totals are derived from the same entries rather than sent by the
+  // server, so the figure cannot drift from the rows it is counting.
+  const folderTotals = useMemo(() => {
+    const totals = new Map<string, { files: number; bytes: number }>();
+    for (const entry of entries ?? []) {
+      if (entry.type !== 'file' || entry.parent === null) continue;
+      const running = totals.get(entry.parent) ?? { files: 0, bytes: 0 };
+      totals.set(entry.parent, { files: running.files + 1, bytes: running.bytes + entry.size });
+    }
+    return totals;
+  }, [entries]);
+
+  // Only files can be stepped through in the preview modal.
+  const previewable = useMemo(() => visible.filter((entry) => entry.type === 'file'), [visible]);
 
   return (
     <>
@@ -87,42 +106,82 @@ export function DownloadsPage() {
         </Card>
       ) : (
         <Card>
-          {visible.map((entry) => (
-            <FileRow
-              key={entry.id}
-              name={entry.name}
-              size={formatBytes(entry.size)}
-              time={formatTimeAgo(entry.mtime)}
-              aside={
-                <span className="row">
-                  {mayPreview(entry.name) && (
-                    <Link
+          {visible.map((entry) =>
+            entry.type === 'folder' ? (
+              <FolderRow
+                key={entry.id}
+                entry={entry}
+                totals={folderTotals.get(entry.name) ?? { files: 0, bytes: 0 }}
+              />
+            ) : (
+              <FileRow
+                key={entry.id}
+                name={entry.name}
+                size={formatBytes(entry.size)}
+                time={formatTimeAgo(entry.mtime)}
+                aside={
+                  <span className="row">
+                    {mayPreview(entry.name) && (
+                      <Link
+                        className="btn btn--ghost btn--icon"
+                        to={`${entry.id}/preview`}
+                        aria-label={`Preview ${entry.name}`}
+                      >
+                        <EyeIcon size={18} />
+                      </Link>
+                    )}
+                    <a
                       className="btn btn--ghost btn--icon"
-                      to={`${entry.id}/preview`}
-                      aria-label={`Preview ${entry.name}`}
+                      href={downloadUrl(entry.id)}
+                      download={entry.name}
+                      aria-label={`Download ${entry.name}`}
                     >
-                      <EyeIcon size={18} />
-                    </Link>
-                  )}
-                  <a
-                    className="btn btn--ghost btn--icon"
-                    href={downloadUrl(entry.id)}
-                    download={entry.name}
-                    aria-label={`Download ${entry.name}`}
-                  >
-                    <DownloadIcon size={18} />
-                  </a>
-                </span>
-              }
-            />
-          ))}
+                      <DownloadIcon size={18} />
+                    </a>
+                  </span>
+                }
+              />
+            ),
+          )}
         </Card>
       )}
 
       {/* Preview modal route (/downloads/:id/preview) renders here. */}
       <Suspense fallback={null}>
-        <Outlet context={{ entries: visible }} />
+        <Outlet context={{ entries: previewable, basePath: '/downloads' }} />
       </Suspense>
     </>
+  );
+}
+
+/**
+ * Two unambiguous actions, not one icon doing double duty: the name opens the
+ * folder, the icon downloads it as a zip without navigating anywhere.
+ */
+function FolderRow({
+  entry,
+  totals,
+}: {
+  entry: DownloadEntry;
+  totals: { files: number; bytes: number };
+}) {
+  return (
+    <FileRow
+      name={entry.name}
+      kind="folder"
+      to={`/downloads/folder/${entry.id}`}
+      size={`${totals.files} ${totals.files === 1 ? 'file' : 'files'} · ${formatBytes(totals.bytes)}`}
+      time={formatTimeAgo(entry.mtime)}
+      aside={
+        <a
+          className="btn btn--ghost btn--icon"
+          href={folderArchiveUrl(entry.id)}
+          download={`${entry.name}.zip`}
+          aria-label={`Download ${entry.name} as a zip`}
+        >
+          <ArchiveFileIcon size={18} />
+        </a>
+      }
+    />
   );
 }
