@@ -74,6 +74,13 @@ export interface LibraryEntry {
   editorRoute(item: LibraryItem): string;
   /** The tool's public raw-data URL, if it publishes one (it opens in a tab). */
   apiRoute?(item: LibraryItem): string;
+  /**
+   * The exact media type `apiRoute` serves (bare, no `charset` parameter —
+   * this is for a request's `Accept` header, not a response's `Content-Type`).
+   * Paired with `apiRoute`: present whenever it is, used to build a copyable
+   * `curl` command for the raw data URL.
+   */
+  mimeType?: string;
   /** A rendered read-only view, if the tool has one (Edda's preview page). */
   readRoute?(item: LibraryItem): string;
 }

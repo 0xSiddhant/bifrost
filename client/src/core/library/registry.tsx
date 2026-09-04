@@ -47,6 +47,7 @@ const runestoneEntry: LibraryEntry = {
   remove: (id: string) => deleteRunestone(id),
   editorRoute: (item) => `/runestone/${item.slug}`,
   apiRoute: (item) => `/runestone/api/${item.slug}`,
+  mimeType: 'application/json',
 };
 
 const eddaEntry: LibraryEntry = {
@@ -63,6 +64,7 @@ const eddaEntry: LibraryEntry = {
   remove: (id: string) => deleteEdda(id),
   editorRoute: (item) => `/edda/${item.slug}`,
   apiRoute: (item) => `/edda/api/${item.slug}`,
+  mimeType: 'text/markdown',
   readRoute: (item) => `/edda/preview/${item.slug}`,
 };
 
@@ -80,6 +82,7 @@ const grootEntry: LibraryEntry = {
   remove: (id: string) => deleteGroot(id),
   editorRoute: (item) => `/groot/${item.slug}`,
   apiRoute: (item) => `/groot/api/${item.slug}`,
+  mimeType: 'application/yaml',
 };
 
 const atlasEntry: LibraryEntry = {
@@ -99,6 +102,7 @@ const atlasEntry: LibraryEntry = {
   remove: (id: string) => deleteAtlas(id),
   editorRoute: (item) => `/atlas/${item.slug}`,
   apiRoute: (item) => `/atlas/api/${item.slug}`,
+  mimeType: 'application/xml',
 };
 
 /**
