@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { bifrostEvents } from '../../core/sse';
+import { copyText } from '../../core/copy';
 import { deviceName, onDevicesChange } from '../../core/devices';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { useCapabilities } from '../../core/useCapabilities';
@@ -8,10 +9,11 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { cardToneClass } from '../../core/ui/cardTone';
-import { BookmarkIcon, CloseIcon, EyeIcon, SearchIcon } from '../../core/ui/icons';
+import { BookmarkIcon, CheckIcon, ClipboardIcon, CloseIcon, EyeIcon, SearchIcon } from '../../core/ui/icons';
 import {
   LIBRARY_REGISTRY,
   availableKinds,
+  buildCurlCommand,
   entryFor,
   filterItems,
   loadLibrary,
@@ -55,6 +57,20 @@ export function PensievePage() {
   // Author options survive filtering: the union of every device seen.
   const authorsRef = useRef(new Map<string, true>());
   const [, forceRender] = useState(0);
+  // Which row's curl command was just copied — same shape as Portkey's own
+  // copy-link feedback (an icon swap, not a global toast: this is a routine,
+  // per-row affordance, not an event worth a notification).
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyCurl = async (entry: LibraryEntry, item: LibraryItem) => {
+    const command = buildCurlCommand(entry, item, window.location.origin);
+    if (!command) return;
+    const key = `${item.kind}:${item.id}`;
+    if (await copyText(command)) {
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((current) => (current === key ? null : current)), 1500);
+    }
+  };
 
   // Capabilities arrive a tick after mount; until then we know of no kinds, so
   // the first load waits rather than firing a fan-out over an empty registry.
@@ -330,6 +346,29 @@ export function PensievePage() {
                       >
                         <EyeIcon size={15} /> Read
                       </Link>
+                    )}
+                    {entry.apiRoute && entry.mimeType && (
+                      /* A ready-to-run curl for the same raw data URL the API
+                         link opens — so it can be tested outside the browser
+                         (a terminal, Postman) without assembling the URL and
+                         the right Accept header by hand. */
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm lib-row__link mono"
+                        onClick={() => void copyCurl(entry, item)}
+                        aria-label={
+                          copiedKey === `${item.kind}:${item.id}`
+                            ? 'Copied'
+                            : `Copy curl command for ${item.name}`
+                        }
+                      >
+                        {copiedKey === `${item.kind}:${item.id}` ? (
+                          <CheckIcon size={15} />
+                        ) : (
+                          <ClipboardIcon size={15} />
+                        )}{' '}
+                        curl
+                      </button>
                     )}
                     {entry.apiRoute && (
                       /* the same document as its tool's raw data URL */
