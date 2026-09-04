@@ -21,7 +21,9 @@ export class GetPreviewMetaUseCase {
         probablyText,
         size,
       });
-      return { previewable, kind, mime, name, size };
+      // The base name, never the folder-qualified one a nested download
+      // resolves to: this is what the modal titles and the save dialog use.
+      return { previewable, kind, mime, name: path.basename(name), size };
     } catch (error) {
       if (error instanceof AppError) throw error;
       // Deleted mid-request or confinement failure — same opaque 404.
