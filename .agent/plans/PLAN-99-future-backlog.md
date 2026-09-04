@@ -53,8 +53,9 @@ Ideas surfaced in the 2026-07-22 review. **Accio · Nimbus · Portkey** from the
 | **Howler** (webhook/request catcher) | Anything hitting `/hook/<id>` logged (method/headers/body) and streamed live via the SSE hub; the self-hosted webhook.site. JSON bodies render via existing viewers. Small-medium. |
 | **Time-Turner** (shared timers) | Start a timer on one device, it rings on all via SSE; countdowns-to-date. Domestic delight on existing infrastructure. Small. |
 | **Echo** (voice memos) | MediaRecorder in-browser → library/downloads, playable anywhere via the PLAN-03 range-request audio path. Small-medium. |
-| **Skald** (Edda slideshow mode) | Render a saved edda as fullscreen slides (`---` breaks, arrow/tap nav) — a presentation tool as a view over PLAN-11. Small. |
 | **Argus** (home services status page) | Ping/HTTP-check a configurable list (router, NAS, printer), up/down tiles + history sparkline. Heimdall watches the bridge; Argus watches the realm. Medium. |
+
+_(**Skald** — PROMOTED 2026-09-04 to **PLAN-28**, renamed **Saga** after a same-session naming discussion: fullscreen slideshow over a saved Edda or a dropped `.md` file, `---` breaks (refined so the document's first line never splits), keyboard/touch/WASD nav, fullscreen, presenter notes, a `bifrost saga <file>` CLI command. Deckrun (`arpitbbhayani/deckrun`) was reviewed for inspiration at the owner's request; incremental reveals (`{reveal}`) were deliberately cut, not deferred — they need new per-slide state nothing in this codebase's current standard already does. PDF-as-a-slide-source split out into its own **PLAN-29** rather than folded in, since it reuses none of Saga's markdown pipeline. See `PLAN-28-saga.md` and `PLAN-29-saga-pdf.md`.)_
 
 ## Explicitly rejected (do not resurrect without a new decision)
 
