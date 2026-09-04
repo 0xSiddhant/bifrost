@@ -105,10 +105,16 @@ export function fetchCapabilities(): Promise<Capabilities> {
  */
 export interface DownloadEntry {
   id: string;
+  /** Base name — `parent` carries the folder, so this is never path-qualified. */
   name: string;
+  /** Folders report 0; a folder's size is summed from its children in this feed. */
   size: number;
   mtime: number;
   ext: string;
+  /** PLAN-24: the listing is one level deep, so an entry is a file or a folder. */
+  type: 'file' | 'folder';
+  /** Folder this entry lives in, or null at the root. Folders are always root. */
+  parent: string | null;
 }
 
 export const listDownloads = (): Promise<DownloadEntry[]> =>

@@ -467,6 +467,11 @@ a.portal:hover .portal__go {
   background: var(--surface-2);
 }
 
+.file-row__icon--folder {
+  color: var(--accent-2);
+  background: var(--accent-soft);
+}
+
 .file-row__body {
   flex: 1;
   min-width: 0;
@@ -478,6 +483,18 @@ a.portal:hover .portal__go {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A row whose name opens something reads as a link on sight: hover is not an
+   affordance on a phone, which is where this app mostly lives. */
+.file-row__link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.file-row__link:hover,
+.file-row__link:focus-visible {
+  text-decoration: underline;
 }
 
 .file-row__meta {
