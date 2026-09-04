@@ -6,15 +6,27 @@
 
 /** One entry of the downloads listing — also the SSE payload for download.* events. */
 export interface DownloadEntry {
-  /** Opaque id derived by the server; the only handle clients may use to fetch content. */
+  /**
+   * Opaque id derived by the server from the path *relative to downloads/*, so
+   * a file inside a folder and a root file of the same name are different
+   * entries. The only handle clients may use to fetch content.
+   */
   id: string;
+  /** Base name — never folder-qualified; `parent` carries the folder. */
   name: string;
-  /** Bytes. */
+  /** Bytes. Folders report 0: the client sums their children from this same feed. */
   size: number;
-  /** Epoch milliseconds. */
+  /** Epoch milliseconds. Folders report the directory's own mtime. */
   mtime: number;
-  /** Lowercased extension including the dot, or '' when the name has none. */
+  /** Lowercased extension including the dot, '' when the name has none or for a folder. */
   ext: string;
+  /** PLAN-24: the listing is one level deep, so an entry is a file or a folder. */
+  type: 'file' | 'folder';
+  /**
+   * Folder this entry lives in, or null at the root. Folders are always at the
+   * root — one level of nesting only, so a folder's own `parent` is never set.
+   */
+  parent: string | null;
 }
 
 export interface FileUploadedEvent {
@@ -53,6 +65,12 @@ export interface FilePublishedEvent {
    * *everyone*, never suppressed for everyone (see `shouldShowForOrigin`).
    */
   originDeviceId: string | null;
+  /**
+   * PLAN-24: set when the file was uploaded straight into `downloads/<folder>/`
+   * rather than moved out of staging. The banner names the folder, and dedupes
+   * per folder so a folder wave and a plain Move don't collapse into one count.
+   */
+  folder?: string;
 }
 
 /**
