@@ -8,15 +8,7 @@ Ideas we deliberately deferred. When one is scheduled, promote it into a new num
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Shared markdown notes** | 2–3 persistent scratch notes, editable from any device, autosave + live SSE sync ("LAN Apple Notes"). Cloud-profile candidate. Reuses MarkdownViewer (PLAN-03) + clipboard patterns (PLAN-06). Conflict strategy: last-write-wins with edit lock indicator — keep it simple. |
 | **Send-to-device push**   | Pick a live device from presence → push a file/text directly to it; target shows a toast via its SSE connection. Builds on deviceId + presence (PLAN-06).                                                                                                                    |
-| **Download-all-as-zip**   | If not done as PLAN-02 stretch: `archiver` streamed, selection UI on downloads page.                                                                                                                                                                                         |
-
-_(**PWA manifest + icons** — DONE 2026-07-22: `client/public/` manifest + favicon/apple-touch/maskable icons, add-to-home-screen works; no service worker. Removed from the backlog.)_
-
-_(**Utility toolbox page** — DONE, shipped 2026-08-06 as **PLAN-18**: Diagon Alley's cards expand in place into ~13 client-side tools. **Iris** (below) was folded into the same plan. See `PLAN-18-toolbox.md`; do not re-add here.)_
-
-_(**Edda: Mermaid diagrams in preview** and **Edda: PDF export** — **DONE 2026-08-15** in **PLAN-20**, promoted 2026-08-04 and shipped together, because a PDF that omitted the diagrams would be a bug. See `completed/PLAN-20-edda-diagrams-print.md`. Note for the record, now corrected twice: both rows claimed the features were "listed in Edda's coming-soon footer", and PLAN-20 in turn claimed **no such footer exists** — it does (`.edda-soon`), it listed exactly these two plus "Image paste", and PLAN-20's own PR removed the two it delivered. The original backlog note was right and the correction was wrong.)_
-
-_(**Unified library shell** — PROMOTED 2026-08-04 to **PLAN-21**, as **Pensieve**: one `/pensieve` listing runestones + eddas + groots behind a type filter, client-side fan-out so storage stays uncoupled. It deletes the two near-identical library pages that already both call themselves "Pensieve". See `PLAN-21-pensieve.md`.)_
+| **Download-all-as-zip (whole-library / multi-select)** | **Partially delivered by PLAN-24** (Download folders, 2026-09-04): a single folder's contents can be downloaded as one `.zip`, streamed via `archiver`, from two places — a direct icon on the folder's root row and an explicit button inside the folder. What's still open is the broader idea this row originally named: selecting an arbitrary set of root-level items (files and/or folders) across the whole Receive listing and zipping that selection — PLAN-24 explicitly scoped that out as "the broader backlog item stays open." |
 
 _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by owner decision. PLAN-17 makes both moot: it puts **Preview** directly on the upload card, which is what thumbnails were for, and turns `uploads/` into a staging area you actively move or delete from rather than a pile needing retention rules. Do not re-add without a new decision.)_
 
@@ -28,12 +20,12 @@ _(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by ow
 
 | Idea                                                  | Notes                                                                                                                              |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Variant: JSON Patch export (RFC 6902)**             | Structural diff records map ~1:1 onto patch ops; one button turns Variant into a pipeline tool. Cheap once the walker exists.      |
-| **Variant: unified `.diff`/`.patch` file export**     | Text-mode sibling of JSON Patch export.                                                                                            |
 | **Variant: three-way merge**                          | Base + left + right with conflict detection and take-left/take-right resolution. Big complexity jump — needs its own spike + plan. |
 | **Variant: language-aware highlighting in text mode** | Auto-detect + lazy-load CM language packages. Deferred as scope creep; plain text + diff colors covers the core job.               |
-| **Variant: diff-annotated tree view**                 | If not done as the PLAN-08 stretch task: tree nodes tinted by op with badge counts on collapsed branches.                          |
+| **Variant: diff-annotated tree view**                 | Confirmed still undone (PLAN-08's own `[ ] *(stretch)* Diff-annotated tree view` task is unchecked, and `core/ui/TreeView.tsx` has no diff-tinting code) — not done as the PLAN-08 stretch task after all. Tree nodes tinted by op with badge counts on collapsed branches.  |
 | **Runestone version history**                         | Store diff records per save; reuses the Variant walker output shape.                                                               |
+
+_(**Variant: JSON Patch export (RFC 6902)** and **Variant: unified `.diff`/`.patch` file export** — PROMOTED 2026-09-04 to **PLAN-26**, combined into one plan since the second is explicitly the text-mode sibling of the first. See `PLAN-26-variant-diff-export.md`.)_
 
 | Idea                      | Notes                                                                                                                                                                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
