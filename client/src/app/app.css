@@ -325,6 +325,15 @@
   min-width: 12rem;
 }
 
+/* The Send page's folder destination: the field, then the sentence that says
+   what choosing one actually does — a row would put the two side by side. */
+.upload-destination {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 32rem;
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
