@@ -3,7 +3,13 @@ import { Readable } from 'node:stream';
 import pino from 'pino';
 import { EventBus } from '../../../core/bus/index.js';
 import type { Logger } from '../../../core/logger/index.js';
-import { FileTooLargeError, type FileStorageRepository, type IncomingFile } from '../ports.js';
+import {
+  FileTooLargeError,
+  FolderConflictError,
+  type FileStorageRepository,
+  type FolderPublisher,
+  type IncomingFile,
+} from '../ports.js';
 import { UploadFilesUseCase } from './upload-files.js';
 
 const log: Logger = pino({ level: 'silent' });
@@ -25,13 +31,28 @@ function incoming(name: string, content = 'data'): IncomingFile {
   return { name, stream: Readable.from([Buffer.from(content)]) };
 }
 
-function makeUseCase(repo: FileStorageRepository, bus = new EventBus()) {
+function folderPublisherMock(overrides: Partial<FolderPublisher> = {}): FolderPublisher {
+  return {
+    publish: vi.fn(async (_tmpPath: string, folder: string, desiredName: string) => ({
+      finalName: desiredName,
+      folder,
+    })),
+    ...overrides,
+  };
+}
+
+function makeUseCase(
+  repo: FileStorageRepository,
+  bus = new EventBus(),
+  folderPublisher: FolderPublisher = folderPublisherMock(),
+) {
   return new UploadFilesUseCase({
     repo,
     bus,
     log,
     maxBytes: 1024,
     blockedExtensions: ['.exe', '.bat'],
+    folderPublisher,
     now: () => 1_752_000_000_000,
   });
 }
@@ -109,6 +130,104 @@ describe('UploadFilesUseCase', () => {
     expect(result.rejected).toEqual([{ name: 'flaky.bin', reason: 'upload-failed' }]);
     expect(result.accepted).toHaveLength(1);
     expect(result.accepted[0]?.name).toBe('fine.txt');
+  });
+});
+
+describe('UploadFilesUseCase in folder mode (PLAN-24)', () => {
+  it('skips uploads/ entirely and emits both file.uploaded and file.published', async () => {
+    const repo = repoMock();
+    const bus = new EventBus();
+    const publisher = folderPublisherMock();
+    const uploaded = vi.fn();
+    const published = vi.fn();
+    bus.on('file.uploaded', uploaded);
+    bus.on('file.published', published);
+
+    const result = await makeUseCase(repo, bus, publisher).execute(
+      toAsync([incoming('a.jpg', 'abcd')]),
+      { folder: 'Trip photos', originDeviceId: 'device-a' },
+    );
+
+    expect(result.accepted).toEqual([
+      { name: 'a.jpg', storedName: 'a.jpg', size: 4, folder: 'Trip photos' },
+    ]);
+    expect(publisher.publish).toHaveBeenCalledWith('/tmp/fake', 'Trip photos', 'a.jpg');
+    // Criterion 1: the staging path is never touched in folder mode.
+    expect(repo.publish).not.toHaveBeenCalled();
+    // The audit line still fires — the file *was* uploaded — and the banner
+    // event carries the destination and the origin device.
+    expect(uploaded).toHaveBeenCalledTimes(1);
+    expect(published).toHaveBeenCalledWith({
+      name: 'a.jpg',
+      size: 4,
+      publishedAt: 1_752_000_000_000,
+      originDeviceId: 'device-a',
+      folder: 'Trip photos',
+    });
+  });
+
+  /** Criterion 4: silently sanitized, and the folder actually used is reported. */
+  it('sanitizes the folder name silently and reports what it used', async () => {
+    const publisher = folderPublisherMock();
+
+    const result = await makeUseCase(repoMock(), new EventBus(), publisher).execute(
+      toAsync([incoming('a.jpg')]),
+      { folder: '../Trip photos' },
+    );
+
+    expect(publisher.publish).toHaveBeenCalledWith('/tmp/fake', 'Trip photos', 'a.jpg');
+    expect(result.accepted[0]?.folder).toBe('Trip photos');
+    expect(result.rejected).toEqual([]);
+  });
+
+  it('carries a null origin when the client sent no device header', async () => {
+    const bus = new EventBus();
+    const published = vi.fn();
+    bus.on('file.published', published);
+
+    await makeUseCase(repoMock(), bus).execute(toAsync([incoming('a.jpg')]), { folder: 'Box' });
+
+    expect(published).toHaveBeenCalledWith(expect.objectContaining({ originDeviceId: null }));
+  });
+
+  /** Criterion 5: a destination that is really a file is its own rejection. */
+  it('rejects every file with folder-conflict when the name is a file, not a folder', async () => {
+    const bus = new EventBus();
+    const published = vi.fn();
+    bus.on('file.published', published);
+    const publisher = folderPublisherMock({
+      publish: vi.fn(async () => {
+        throw new FolderConflictError('"Photos" is already a file, not a folder');
+      }),
+    });
+
+    const result = await makeUseCase(repoMock(), bus, publisher).execute(
+      toAsync([incoming('a.jpg'), incoming('b.jpg')]),
+      { folder: 'Photos' },
+    );
+
+    expect(result.accepted).toEqual([]);
+    expect(result.rejected).toEqual([
+      { name: 'a.jpg', reason: 'folder-conflict' },
+      { name: 'b.jpg', reason: 'folder-conflict' },
+    ]);
+    expect(published).not.toHaveBeenCalled();
+  });
+
+  it('leaves the plain staging path byte-for-byte unchanged when no folder is chosen', async () => {
+    const repo = repoMock();
+    const publisher = folderPublisherMock();
+    const bus = new EventBus();
+    const published = vi.fn();
+    bus.on('file.published', published);
+
+    const result = await makeUseCase(repo, bus, publisher).execute(toAsync([incoming('a.jpg')]));
+
+    expect(repo.publish).toHaveBeenCalledWith('/tmp/fake', 'a.jpg');
+    expect(publisher.publish).not.toHaveBeenCalled();
+    // No banner: a staged file is announced by Move, not by the upload.
+    expect(published).not.toHaveBeenCalled();
+    expect(result.accepted[0]).not.toHaveProperty('folder');
   });
 });
 
