@@ -526,12 +526,13 @@ a.portal:hover .portal__go {
      describes and a hint that eats its own click is worse than no hint.
    - It opens to the **left**: these controls sit at the right edge of a row,
      so a bubble growing rightwards would run off the screen.
-   - It is **not** gated on `@media (hover: …)`. Gating was tried both ways and
-     dropped: a touch tap does leave :hover set until the next tap, which
-     parks a bubble over the row for a moment, but that is self-correcting and
-     harmless next to the failure the gate causes — any environment that
-     under-reports its pointer (headless Chromium reports `hover: none`
-     outright) shows no hint at all, which is the bug this exists to fix. */
+   - There is **no hover state on a phone at all** — the bubble is a pointer
+     affordance, and the rule below turns it off for genuine touch devices.
+     How that gate is written matters more than it looks: `hover: none` on
+     its own also matches anything that merely fails to report a pointer
+     (headless Chromium reports exactly that), and gating on it alone is how
+     a hover hint silently becomes no hint anywhere. Pairing it with
+     `pointer: coarse` names real touch hardware instead. */
 .tip {
   position: relative;
 }
