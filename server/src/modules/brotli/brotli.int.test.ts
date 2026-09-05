@@ -45,7 +45,10 @@ describe('brotli module', () => {
     fs.rmSync(storageRoot, { recursive: true, force: true });
   });
 
-  const post = (url: string, body: BodyInit, init: RequestInit = {}) =>
+  // `RequestInit['body']`, not the DOM's `BodyInit`: this workspace's lib is
+  // ES2022 + node, so the only fetch types available are the ones @types/node
+  // itself exports.
+  const post = (url: string, body: RequestInit['body'], init: RequestInit = {}) =>
     fetch(`${origin}${url}`, {
       method: 'POST',
       body,
@@ -54,6 +57,8 @@ describe('brotli module', () => {
     });
 
   const buffer = async (response: Response) => Buffer.from(await response.arrayBuffer());
+  const errorCode = async (response: Response) =>
+    ((await response.json()) as { error?: string }).error;
 
   const sample = Buffer.from('brotli round trip fixture — ☃\n'.repeat(400));
 
@@ -108,24 +113,24 @@ describe('brotli module', () => {
   it('refuses a declared-oversize compress before reading the body', async () => {
     const response = await post('/api/brotli/compress', Buffer.alloc(MAX_INPUT_MB * MB + 1024));
     expect(response.status).toBe(413);
-    expect((await response.json()).error).toBe('PAYLOAD_TOO_LARGE');
+    expect(await errorCode(response)).toBe('PAYLOAD_TOO_LARGE');
   });
 
   it('still catches an oversize compress that declares no length', async () => {
     // A streamed body is sent chunked, so there is no content-length for the
     // pre-check to read and the streaming counter is the only guard left.
-    const chunked = Readable.toWeb(
-      Readable.from([Buffer.alloc(MAX_INPUT_MB * MB + 1024)]),
-    ) as ReadableStream;
-    const response = await post('/api/brotli/compress', chunked, { duplex: 'half' } as RequestInit);
+    const chunked = Readable.toWeb(Readable.from([Buffer.alloc(MAX_INPUT_MB * MB + 1024)]));
+    const response = await post('/api/brotli/compress', chunked as RequestInit['body'], {
+      duplex: 'half',
+    } as RequestInit);
     expect(response.status).toBe(413);
-    expect((await response.json()).error).toBe('PAYLOAD_TOO_LARGE');
+    expect(await errorCode(response)).toBe('PAYLOAD_TOO_LARGE');
   });
 
   it('answers 422 for bytes that are not brotli at all', async () => {
     const response = await post('/api/brotli/decompress', Buffer.from('this is not a .br file'));
     expect(response.status).toBe(422);
-    expect((await response.json()).error).toBe('INVALID_BROTLI');
+    expect(await errorCode(response)).toBe('INVALID_BROTLI');
   });
 
   it('aborts a decompression bomb at the cap instead of expanding it', async () => {
