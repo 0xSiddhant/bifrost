@@ -9,6 +9,7 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import { useCapabilities } from '../../core/useCapabilities';
 import { copyText } from '../../core/copy';
+import { log } from '../../core/log';
 import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
@@ -31,6 +32,7 @@ import {
   type VariantJsonOptions,
   type VariantTextOptions,
 } from './compare';
+import { downloadExport, exportJsonPatch, exportUnifiedDiff } from './export';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
 import { crossPaneOffset } from './search';
 import { LibraryPicker } from './LibraryPicker';
@@ -480,6 +482,43 @@ export function VariantPage() {
     ok('Keys sorted A→Z on both sides');
   };
 
+  /**
+   * Export the compare as a file (PLAN-26). Both modes are pure client
+   * compute; the export always describes the compare that actually ran, not
+   * the current pane contents — an edit drops the results first.
+   */
+  const exportDiff = () => {
+    const result =
+      mode === 'json'
+        ? results &&
+          exportJsonPatch({
+            records: results.records,
+            leftText: results.left,
+            rightText: results.right,
+            options: jsonOptions,
+            leftLabel: left.label,
+            rightLabel: right.label,
+          })
+        : textResult &&
+          exportUnifiedDiff({
+            leftText: textResult.left,
+            rightText: textResult.right,
+            leftLabel: left.label,
+            rightLabel: right.label,
+          });
+    if (!result) return;
+    if (!result.ok) {
+      // A blocked export means a generated patch failed its own replay check —
+      // rare enough to be worth a line, since the only other symptom is a user
+      // seeing a refusal they cannot act on.
+      log.warn(`variant: ${mode} export refused — ${result.reason}`, { module: 'variant' });
+      fail(result.reason);
+      return;
+    }
+    downloadExport(result);
+    ok(`Exported ${result.filename}`);
+  };
+
   const clearBoth = () => {
     if (!window.confirm('Clear both panes?')) return;
     setPanes((prev) => ({
@@ -666,6 +705,16 @@ export function VariantPage() {
           Sort keys
         </Button>
       )}
+      {/* Nothing to export until a compare has run — and an edit drops the
+          results again, so this follows the same lifecycle as the nav arrows. */}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={exportDiff}
+        disabled={mode === 'json' ? results === null : textResult === null}
+      >
+        {mode === 'json' ? 'Export as JSON Patch' : 'Export as unified diff'}
+      </Button>
       {mode === 'json' && (
         <div className="variant-modetoggle" role="group" aria-label="Pane view">
           <button
