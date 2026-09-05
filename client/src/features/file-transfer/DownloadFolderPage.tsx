@@ -104,6 +104,7 @@ export function DownloadFolderPage() {
                       className="btn btn--ghost btn--icon"
                       to={`${entry.id}/preview`}
                       aria-label={`Preview ${entry.name}`}
+                      title={`Preview ${entry.name}`}
                     >
                       <EyeIcon size={18} />
                     </Link>
@@ -113,6 +114,7 @@ export function DownloadFolderPage() {
                     href={downloadUrl(entry.id)}
                     download={entry.name}
                     aria-label={`Download ${entry.name}`}
+                    title={`Download ${entry.name}`}
                   >
                     <DownloadIcon size={18} />
                   </a>

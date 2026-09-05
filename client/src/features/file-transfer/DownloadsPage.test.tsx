@@ -142,6 +142,30 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
     expect(rowNames()).toEqual([]);
   });
 
+  /**
+   * Icon-only actions say what they do on hover — the name is right there on
+   * the row, but the icon alone is not self-evident. `title` matches the
+   * `aria-label` so the two cannot drift into telling different stories.
+   */
+  it('names every icon-only action on hover, on both views', () => {
+    render('/downloads');
+
+    const hoverable = ['Preview loose.txt', 'Download loose.txt', 'Download Trip photos as a zip'];
+    for (const label of hoverable) {
+      const el = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+      expect(el?.getAttribute('title'), label).toBe(label);
+    }
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    render('/downloads/folder/fold0000000000001');
+
+    for (const label of ['Preview a.jpg', 'Download a.jpg']) {
+      const el = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+      expect(el?.getAttribute('title'), label).toBe(label);
+    }
+  });
+
   it('subscribes to the feed once per view, never twice', () => {
     render('/downloads');
     // React 19 renders once here (no StrictMode double-render in this harness);

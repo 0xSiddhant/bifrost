@@ -58,9 +58,7 @@ export function DownloadsPage() {
         <div>
           <span className="eyebrow eyebrow--violet">asgard → midgard</span>
           <h2>Receive files</h2>
-          <p>
-            Drop something into the downloads folder on the host — it appears here instantly.
-          </p>
+          <p>Drop something into the downloads folder on the host — it appears here instantly.</p>
         </div>
       </div>
 
@@ -126,6 +124,7 @@ export function DownloadsPage() {
                         className="btn btn--ghost btn--icon"
                         to={`${entry.id}/preview`}
                         aria-label={`Preview ${entry.name}`}
+                        title={`Preview ${entry.name}`}
                       >
                         <EyeIcon size={18} />
                       </Link>
@@ -135,6 +134,7 @@ export function DownloadsPage() {
                       href={downloadUrl(entry.id)}
                       download={entry.name}
                       aria-label={`Download ${entry.name}`}
+                      title={`Download ${entry.name}`}
                     >
                       <DownloadIcon size={18} />
                     </a>
@@ -178,6 +178,7 @@ function FolderRow({
           href={folderArchiveUrl(entry.id)}
           download={`${entry.name}.zip`}
           aria-label={`Download ${entry.name} as a zip`}
+          title={`Download ${entry.name} as a zip`}
         >
           <ArchiveFileIcon size={18} />
         </a>
