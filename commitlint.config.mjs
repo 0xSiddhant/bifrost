@@ -25,6 +25,7 @@ export default {
         'atlas',
         'loki',
         'accio',
+        'brotli',
         'nimbus',
         'portkey',
         'screensaver',

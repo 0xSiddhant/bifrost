@@ -31,6 +31,8 @@ describe('reserved roots', () => {
       'sigil',
       'ollivanders',
       'diagon-alley',
+      // PLAN-25: the Brotli workbench's page.
+      'brotli',
     ]) {
       expect(RESERVED_ROOTS.has(root), `${root} is reserved`).toBe(true);
     }

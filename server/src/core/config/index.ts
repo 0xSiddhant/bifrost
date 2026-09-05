@@ -37,6 +37,13 @@ const envSchema = z.object({
   // request to a user-pasted address, so neither may be hardcoded.
   ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
+  // Brotli (PLAN-25) — the two size caps and the per-route rate limit. The
+  // OUTPUT cap is the decompression-bomb guard: unlike every other limit here
+  // it bounds bytes the server *manufactures*, not bytes a client sent, which
+  // is exactly why it cannot be derived from the input's declared size.
+  BROTLI_MAX_INPUT_MB: z.coerce.number().int().positive().default(256),
+  BROTLI_MAX_OUTPUT_MB: z.coerce.number().int().positive().default(512),
+  BROTLI_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   // Nimbus (PLAN-14) — the largest payload one speed test may move in either
   // direction. Also the upload cap: past it /api/nimbus/up answers 413.
   NIMBUS_MAX_TEST_MB: z.coerce.number().int().min(1).max(1024).default(100),
@@ -155,6 +162,14 @@ export interface AppConfig {
     titleTimeoutMs: number;
     /** Hard cap on how much of a page body the lookup reads. */
     titleMaxBytes: number;
+  };
+  brotli: {
+    /** Largest body /api/brotli/compress will accept (413 past it). */
+    maxInputMb: number;
+    /** Largest output /api/brotli/decompress may produce — the bomb guard. */
+    maxOutputMb: number;
+    /** Per-IP requests per minute, budgeted per route rather than shared. */
+    rateLimitPerMin: number;
   };
   nimbus: {
     /** Largest test payload per direction; also the hard upload cap (413 past it). */
@@ -333,6 +348,11 @@ export function loadConfig(env: Env = process.env): AppConfig {
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,
       titleMaxBytes: raw.ACCIO_TITLE_MAX_BYTES,
+    },
+    brotli: {
+      maxInputMb: raw.BROTLI_MAX_INPUT_MB,
+      maxOutputMb: raw.BROTLI_MAX_OUTPUT_MB,
+      rateLimitPerMin: raw.BROTLI_RATE_LIMIT_PER_MIN,
     },
     nimbus: {
       maxTestMb: raw.NIMBUS_MAX_TEST_MB,
