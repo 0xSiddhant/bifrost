@@ -23,6 +23,7 @@ import {
 import {
   compressedName,
   decompressedName,
+  fromBase64,
   gzippedName,
   looksLikeText,
   savedPercent,
@@ -94,6 +95,7 @@ export function BrotliPage() {
   const [compressed, setCompressed] = useState<CompressResult | null>(null);
 
   const [archive, setArchive] = useState<File | null>(null);
+  const [archiveText, setArchiveText] = useState('');
   const [decompressed, setDecompressed] = useState<DecompressResult | null>(null);
 
   const textInputRef = useRef<HTMLInputElement>(null);
@@ -208,11 +210,10 @@ export function BrotliPage() {
     if (compressed) void compressCurrent(level);
   };
 
-  const runDecompress = async (file: File) => {
+  const runDecompress = async (source: { bytes: Uint8Array; name: string | null }) => {
     setBusy(true);
     try {
-      const source = new Uint8Array(await file.arrayBuffer());
-      const bytes = await decompressContent(source);
+      const bytes = await decompressContent(source.bytes);
       const isText = looksLikeText(bytes);
       // Above the threshold nothing is rendered and no parser is started —
       // not a truncated preview, not a "detecting…" spinner.
@@ -220,8 +221,8 @@ export function BrotliPage() {
       const body = readable ? new TextDecoder().decode(bytes) : null;
       setDecompressed({
         bytes,
-        sourceBytes: source.length,
-        sourceName: file.name,
+        sourceBytes: source.bytes.length,
+        sourceName: source.name,
         isText,
         text: body,
         format: body === null ? null : offeredFormat(body, hasModule),
@@ -232,6 +233,29 @@ export function BrotliPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * A file if one is chosen, otherwise the pasted base64 — the same "the file
+   * wins, and the box says so" rule the compress side already uses.
+   *
+   * Pasted base64 is the other end of the trip "Copy as base64" exists for: a
+   * compressed blob that went into an env var or a config value as a string
+   * comes back the same way, with no file to save first.
+   */
+  const decompressCurrent = async () => {
+    if (archive) {
+      await runDecompress({ bytes: new Uint8Array(await archive.arrayBuffer()), name: archive.name });
+      return;
+    }
+    const decoded = fromBase64(archiveText);
+    if (!decoded) {
+      fail('That is not base64 — paste the string a “Copy as base64” produced.');
+      return;
+    }
+    // No filename to work from, so `decompressedName` names it by what the
+    // bytes turn out to be.
+    await runDecompress({ bytes: decoded, name: null });
   };
 
   const copyBase64 = async (bytes: Uint8Array) => {
@@ -428,11 +452,31 @@ export function BrotliPage() {
         </Card>
       ) : (
         <Card className="brotli-panel">
+          <label className="field">
+            <span className="field__label">Base64-encoded Brotli data</span>
+            <textarea
+              className="input brotli-input"
+              rows={5}
+              value={archiveText}
+              spellCheck={false}
+              placeholder="Paste the string a “Copy as base64” produced…"
+              onChange={(event) => {
+                setArchiveText(event.target.value);
+                setArchive(null);
+                setDecompressed(null);
+              }}
+            />
+          </label>
+
           <div className="brotli-row">
             <Button size="sm" variant="ghost" onClick={() => archiveInputRef.current?.click()}>
-              {archive ? `File: ${archive.name}` : 'Choose a .br file…'}
+              {archive ? `File: ${archive.name}` : 'Or choose a .br file…'}
             </Button>
-            {archive && <span className="caption">{formatBytes(archive.size)}</span>}
+            {archive && (
+              <span className="caption">
+                {formatBytes(archive.size)} — the text box is ignored
+              </span>
+            )}
             <input
               ref={archiveInputRef}
               type="file"
@@ -445,8 +489,8 @@ export function BrotliPage() {
               }}
             />
             <Button
-              disabled={busy || archive === null}
-              onClick={() => archive && void runDecompress(archive)}
+              disabled={busy || (archive === null && archiveText.trim() === '')}
+              onClick={() => void decompressCurrent()}
             >
               {busy ? 'Decompressing…' : 'Decompress'}
             </Button>

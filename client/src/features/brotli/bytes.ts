@@ -29,6 +29,28 @@ export function toBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * The inverse of `toBase64`, for pasting a compressed blob back in — the other
+ * end of the trip "Copy as base64" exists for.
+ *
+ * Whitespace is stripped first because that is the real-world friction: the
+ * `base64` CLI wraps at 76 columns, and a blob pulled out of a config file or
+ * an env var arrives with newlines and indentation in it. Nothing else is
+ * repaired — `null` means "this is not base64", which is something the page
+ * has to be able to say plainly rather than guess around.
+ */
+export function fromBase64(text: string): Uint8Array | null {
+  const packed = text.replace(/\s+/g, '');
+  if (packed === '') return null;
+  try {
+    return Uint8Array.from(atob(packed), (character) => character.charCodeAt(0));
+  } catch {
+    // Ordinary validation control flow: "not base64" is this function's whole
+    // answer, and the caller turns it into the message the user reads.
+    return null;
+  }
+}
+
+/**
  * Saved bytes as a percentage of the original; negative when it grew.
  *
  * Floored rather than rounded, on purpose: an extreme but real ratio (12.9 KB

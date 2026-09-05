@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   compressedName,
   decompressedName,
+  fromBase64,
   gzippedName,
   looksLikeText,
   savedPercent,
@@ -39,6 +40,27 @@ describe('toBase64', () => {
     const bytes = new Uint8Array(200_000).map((_, index) => index % 256);
     const decoded = Uint8Array.from(atob(toBase64(bytes)), (char) => char.charCodeAt(0));
     expect(decoded).toEqual(bytes);
+  });
+});
+
+describe('fromBase64', () => {
+  it('is the exact inverse of toBase64', () => {
+    const bytes = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255]);
+    expect(fromBase64(toBase64(bytes))).toEqual(bytes);
+  });
+
+  it('tolerates the whitespace real pasted base64 arrives with', () => {
+    const bytes = new Uint8Array(200).map((_, index) => index % 256);
+    const wrapped = (toBase64(bytes).match(/.{1,76}/g) ?? []).join('\n');
+    expect(wrapped).toContain('\n');
+    expect(fromBase64(`  ${wrapped}\n  `)).toEqual(bytes);
+  });
+
+  it('says so plainly when the text is not base64', () => {
+    // Not a guess and not a throw — the page has to be able to tell the user.
+    expect(fromBase64('this is not base64!!')).toBeNull();
+    expect(fromBase64('')).toBeNull();
+    expect(fromBase64('   \n  ')).toBeNull();
   });
 });
 

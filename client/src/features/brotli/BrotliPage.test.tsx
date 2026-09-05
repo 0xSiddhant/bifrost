@@ -40,6 +40,7 @@ vi.mock('../../core/api', async (importOriginal) => {
 });
 
 import { putBrotliSeed } from '../../core/brotliSeed';
+import { toBase64 } from './bytes';
 import { BrotliPage } from './BrotliPage';
 
 const CONFIG = {
@@ -115,6 +116,16 @@ describe('BrotliPage', () => {
     expect(button, `button "${label}"`).toBeTruthy();
     await act(async () => {
       button?.click();
+    });
+  };
+
+  /** Types into a textarea the way React's controlled input requires. */
+  const paste = async (value: string) => {
+    const area = container.querySelector('textarea');
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(area, value);
+      area?.dispatchEvent(new Event('input', { bubbles: true }));
     });
   };
 
@@ -212,6 +223,62 @@ describe('BrotliPage', () => {
       const seeded = JSON.parse(sessionStorage.getItem(key) ?? '{}') as { text?: string };
       expect(seeded.text).toBe(body);
       expect(navigate).toHaveBeenCalledWith(route);
+    });
+
+    it('decodes pasted base64 and decompresses what is inside it', async () => {
+      // The other end of "Copy as base64": a blob that went into a config value
+      // as a string comes back the same way, with no file to save first.
+      const inner = '{"from":"a config value"}';
+      wire.decompressContent.mockResolvedValue(new TextEncoder().encode(inner));
+      await render();
+      await switchMode('Decompress');
+      await paste(toBase64(new Uint8Array([1, 2, 3, 4])));
+      await click('Decompress');
+      await waitFor(hasDecompressed);
+
+      // The decoded bytes reached the server, not the base64 text.
+      expect(wire.decompressContent).toHaveBeenCalledWith(new Uint8Array([1, 2, 3, 4]));
+      expect(container.querySelector('.brotli-preview')?.textContent).toContain('a config value');
+      expect(container.textContent).toContain('Open in Runestone');
+    });
+
+    it('tolerates base64 that arrives wrapped across lines', async () => {
+      wire.decompressContent.mockResolvedValue(new TextEncoder().encode('unwrapped fine'));
+      await render();
+      await switchMode('Decompress');
+      const bytes = new Uint8Array(120).map((_, index) => index % 256);
+      const wrapped = (toBase64(bytes).match(/.{1,76}/g) ?? []).join('\n');
+      await paste(`  ${wrapped}\n`);
+      await click('Decompress');
+      await waitFor(hasDecompressed);
+
+      expect(wire.decompressContent).toHaveBeenCalledWith(bytes);
+    });
+
+    it('refuses text that is not base64 without troubling the server', async () => {
+      await render();
+      await switchMode('Decompress');
+      await paste('this is definitely not base64!!');
+      await click('Decompress');
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      expect(wire.decompressContent).not.toHaveBeenCalled();
+      expect(document.body.textContent).toContain('not base64');
+    });
+
+    it('lets a chosen file win over anything left in the box', async () => {
+      wire.decompressContent.mockResolvedValue(new TextEncoder().encode('from the file'));
+      await render();
+      await switchMode('Decompress');
+      await paste(toBase64(new Uint8Array([9, 9, 9])));
+      await choose(0, new File([new Uint8Array([1])], 'thing.br'));
+      await click('Decompress');
+      await waitFor(hasDecompressed);
+
+      expect(wire.decompressContent).toHaveBeenCalledWith(new Uint8Array([1]));
+      expect(container.textContent).toContain('the text box is ignored');
     });
 
     it('offers nothing at all for content it does not recognise', async () => {
