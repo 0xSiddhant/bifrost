@@ -527,9 +527,13 @@ export function BrotliPage() {
         </Card>
       )}
 
+      {/* The quality half belongs to the compress side only — a Brotli stream
+          decodes the same whatever level produced it, so naming one here would
+          be stating something that has no bearing on what is on screen. */}
       <p className="caption brotli-footer">
-        Quality {qualityLevel(quality)} ({qualityLabel(quality)}) · standard window, never
-        large-window — so any Brotli decoder can read what this page produces.
+        {mode === 'compress'
+          ? `Quality ${qualityLevel(quality)} (${qualityLabel(quality)}) · standard window, never large-window — so any Brotli decoder can read what this page produces.`
+          : 'Decoding is the same whatever quality made the file · standard window, never large-window.'}
       </p>
 
       {notice && (

@@ -66,5 +66,8 @@ describe('savedPercent', () => {
     // Compression can grow already-compressed input; saying so beats hiding it.
     expect(savedPercent(100, 120)).toBe(-20);
     expect(savedPercent(0, 0)).toBe(0);
+    // Never "100% smaller" for something that still has bytes in it.
+    expect(savedPercent(13_209, 48)).toBe(99);
+    expect(savedPercent(100, 0)).toBe(100);
   });
 });

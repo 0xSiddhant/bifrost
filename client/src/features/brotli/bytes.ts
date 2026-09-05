@@ -28,10 +28,16 @@ export function toBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-/** Saved bytes as a percentage of the original; negative when it grew. */
+/**
+ * Saved bytes as a percentage of the original; negative when it grew.
+ *
+ * Floored rather than rounded, on purpose: an extreme but real ratio (12.9 KB
+ * down to 48 B) rounds to "100% smaller", which reads as though the content
+ * vanished. Only genuinely empty output should ever say 100.
+ */
 export function savedPercent(originalBytes: number, resultBytes: number): number {
   if (originalBytes === 0) return 0;
-  return Math.round(((originalBytes - resultBytes) / originalBytes) * 100);
+  return Math.floor(((originalBytes - resultBytes) / originalBytes) * 100);
 }
 
 /**

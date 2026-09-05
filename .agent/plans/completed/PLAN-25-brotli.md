@@ -181,45 +181,45 @@ Both `brotli` routes are local **and** cloud profile. Gzip comparison and both c
 ## Task checklist
 
 **Server**
-- [ ] `core/config`: `brotliMaxInputMb`, `brotliMaxOutputMb`, `brotliRateLimitPerMin` in the zod schema; `.env.example` entries
-- [ ] `modules/brotli/ports.ts`: `BrotliCodec` interface
-- [ ] `modules/brotli/services/node-brotli-codec.ts`: `NodeBrotliCodec` — both counting Transforms, both `zlib.createBrotli*` calls; the only file importing `zlib`'s Brotli API; decode failures before any output surface as a distinguishable error the route can map to 422, decode failures after streaming has begun surface as a plain stream error the route destroys the connection over
-- [ ] `modules/brotli/usecases/compress-content.ts` + `decompress-content.ts`: thin orchestration over the codec interface; log start/failure with `{ err, bytes }`; compress takes a validated quality level (4/9/11), decompress takes none
-- [ ] `modules/brotli/routes/brotli.ts`: `request.raw` streaming in both directions, content-length pre-check on compress only, `?quality=` schema-validated against `fast|balanced|best` and mapped to 4/9/11, `/config` route, `@fastify/rate-limit` (compress and decompress independently budgeted, not shared), `reply.raw.on('close', …)` destroying the pipeline on client disconnect (Nimbus's download-guard pattern), pre-stream decode failure → 422, mid-stream decode failure → destroyed connection + logged
-- [ ] `modules/brotli/module.ts`: wire codec → usecases → routes; register in `MANIFEST` (`local` **and** `cloud`)
-- [ ] `core/reserved-roots.ts` + `reserved-roots.test.ts`: add `brotli`
+- [x] `core/config`: `brotliMaxInputMb`, `brotliMaxOutputMb`, `brotliRateLimitPerMin` in the zod schema; `.env.example` entries
+- [x] `modules/brotli/ports.ts`: `BrotliCodec` interface
+- [x] `modules/brotli/services/node-brotli-codec.ts`: `NodeBrotliCodec` — both counting Transforms, both `zlib.createBrotli*` calls; the only file importing `zlib`'s Brotli API; decode failures before any output surface as a distinguishable error the route can map to 422, decode failures after streaming has begun surface as a plain stream error the route destroys the connection over
+- [x] `modules/brotli/usecases/compress-content.ts` + `decompress-content.ts`: thin orchestration over the codec interface; log start/failure with `{ err, bytes }`; compress takes a validated quality level (4/9/11), decompress takes none
+- [x] `modules/brotli/routes/brotli.ts`: `request.raw` streaming in both directions, content-length pre-check on compress only, `?quality=` schema-validated against `fast|balanced|best` and mapped to 4/9/11, `/config` route, `@fastify/rate-limit` (compress and decompress independently budgeted, not shared), `reply.raw.on('close', …)` destroying the pipeline on client disconnect (Nimbus's download-guard pattern), pre-stream decode failure → 422, mid-stream decode failure → destroyed connection + logged
+- [x] `modules/brotli/module.ts`: wire codec → usecases → routes; register in `MANIFEST` (`local` **and** `cloud`)
+- [x] `core/reserved-roots.ts` + `reserved-roots.test.ts`: add `brotli`
 
 **Client — Brotli page**
-- [ ] `core/api.ts` or `features/brotli/api.ts`: `compressContent`/`decompressContent` (raw `fetch` bodies, not JSON), `fetchBrotliConfig`
-- [ ] `core/brotliSeed.ts` (new): `BrotliSeed { text, sourceLabel? }`, `put`/`take`, mirroring `runestoneSeed.ts` exactly
-- [ ] `features/brotli/BrotliPage.tsx`: text input + file dropzone (compress), file dropzone (decompress); before/after size + ratio; client-side download naming (no server `Content-Disposition`); reads-and-clears a `BrotliSeed` on mount and **auto-compresses immediately** if one is present
-- [ ] Client-side pre-check against `BROTLI_MAX_INPUT_MB` (read from `/api/brotli/config`) before a compress request is even sent — mirrors `UploadPage.tsx`'s existing `addFiles()` pre-check against `maxUploadSizeMb` exactly, same shape, same reason (fail fast, no wasted upload)
-- [ ] Quality selector (Fast/Balanced/Best radio or segmented control) on the compress side only, defaulting to Balanced, riding the `?quality=` param; **changing it after a result exists re-compresses immediately**, matching seed-arrival's own auto-run
-- [ ] `core/compressionSupport.ts` (or similar, new): feature-detect `CompressionStream`; a client-side `gzipSize(bytes): Promise<{ size: number; blob: Blob }>` wrapper around `new CompressionStream('gzip')`, reading the whole compressed stream into one `Blob`
-- [ ] Compare panel: Brotli size/ratio vs. gzip size/ratio side by side, "Download .gz" using the already-computed gzip `Blob`; hidden (not broken) when `CompressionStream` is unsupported
-- [ ] "Copy as base64" on both compress and decompress output, via `core/copy.ts`'s `copyText`; hidden/disabled above the same size guard "Send to Hermes" uses (see Decisions)
-- [ ] `features/brotli/api.ts`: `sendToHermes(text)` — its own direct call to `POST /api/clipboard`, independent of `features/hermes/api.ts`; base64 for compress output, plain text for decompress-text output; client-side size guard before attempting, and a 413 (payload still over Hermes's own cap) surfaces the same way an oversized Hermes paste already does
-- [ ] Technical footer: fixed copy stating quality level used and that window size is standard (never large-window) — no new server field, this module's own policy
-- [ ] Decompress result: bounded-prefix null-byte binary check first (reuse `TEXT_SAMPLE_BYTES`-style sampling from `previews/services/fs-file-inspector.ts`'s reasoning — never scan the whole blob); above the unified display/detection size threshold, offer a download only with no inline view attempted; below it, if text, run `detectFormat` and show the matched entry's "Open in `<tool>`" button, or nothing if unmatched
-- [ ] `app/pages/OllivandersPage.tsx`: new `TOOLS` entry, **appended** (colour-follows-position — inserting mid-list would silently recolour every card after it, the same reasoning Groot's and Atlas's own entries already state), `ArchiveFileIcon` (existing icon, no new one needed)
-- [ ] `App.tsx`: `/brotli` route
+- [x] `core/api.ts` or `features/brotli/api.ts`: `compressContent`/`decompressContent` (raw `fetch` bodies, not JSON), `fetchBrotliConfig`
+- [x] `core/brotliSeed.ts` (new): `BrotliSeed { text, sourceLabel? }`, `put`/`take`, mirroring `runestoneSeed.ts` exactly
+- [x] `features/brotli/BrotliPage.tsx`: text input + file dropzone (compress), file dropzone (decompress); before/after size + ratio; client-side download naming (no server `Content-Disposition`); reads-and-clears a `BrotliSeed` on mount and **auto-compresses immediately** if one is present
+- [x] Client-side pre-check against `BROTLI_MAX_INPUT_MB` (read from `/api/brotli/config`) before a compress request is even sent — mirrors `UploadPage.tsx`'s existing `addFiles()` pre-check against `maxUploadSizeMb` exactly, same shape, same reason (fail fast, no wasted upload)
+- [x] Quality selector (Fast/Balanced/Best radio or segmented control) on the compress side only, defaulting to Balanced, riding the `?quality=` param; **changing it after a result exists re-compresses immediately**, matching seed-arrival's own auto-run
+- [x] `core/compressionSupport.ts` (or similar, new): feature-detect `CompressionStream`; a client-side `gzipSize(bytes): Promise<{ size: number; blob: Blob }>` wrapper around `new CompressionStream('gzip')`, reading the whole compressed stream into one `Blob`
+- [x] Compare panel: Brotli size/ratio vs. gzip size/ratio side by side, "Download .gz" using the already-computed gzip `Blob`; hidden (not broken) when `CompressionStream` is unsupported
+- [x] "Copy as base64" on both compress and decompress output, via `core/copy.ts`'s `copyText`; hidden/disabled above the same size guard "Send to Hermes" uses (see Decisions)
+- [x] `features/brotli/api.ts`: `sendToHermes(text)` — its own direct call to `POST /api/clipboard`, independent of `features/hermes/api.ts`; base64 for compress output, plain text for decompress-text output; client-side size guard before attempting, and a 413 (payload still over Hermes's own cap) surfaces the same way an oversized Hermes paste already does
+- [x] Technical footer: fixed copy stating quality level used and that window size is standard (never large-window) — no new server field, this module's own policy
+- [x] Decompress result: bounded-prefix null-byte binary check first (reuse `TEXT_SAMPLE_BYTES`-style sampling from `previews/services/fs-file-inspector.ts`'s reasoning — never scan the whole blob); above the unified display/detection size threshold, offer a download only with no inline view attempted; below it, if text, run `detectFormat` and show the matched entry's "Open in `<tool>`" button, or nothing if unmatched
+- [x] `app/pages/OllivandersPage.tsx`: new `TOOLS` entry, **appended** (colour-follows-position — inserting mid-list would silently recolour every card after it, the same reasoning Groot's and Atlas's own entries already state), `ArchiveFileIcon` (existing icon, no new one needed)
+- [x] `App.tsx`: `/brotli` route
 
 **Client — outbound hand-off (5 editors)**
-- [ ] `RunestonePage.tsx`, `EddaPage.tsx`, `GrootPage.tsx`, `AtlasPage.tsx`: one "Compress with Brotli" button each in the existing action row, calling `putBrotliSeed` with the editor's buffer + navigate; disabled when that buffer is empty/whitespace-only
-- [ ] `LokiPage.tsx`: same button, sends the **output** pane, not the input — the one editor here with two candidate buffers, resolved in Decisions
+- [x] `RunestonePage.tsx`, `EddaPage.tsx`, `GrootPage.tsx`, `AtlasPage.tsx`: one "Compress with Brotli" button each in the existing action row, calling `putBrotliSeed` with the editor's buffer + navigate; disabled when that buffer is empty/whitespace-only
+- [x] `LokiPage.tsx`: same button, sends the **output** pane, not the input — the one editor here with two candidate buffers, resolved in Decisions
 
 **Client — inbound hand-off (content-format registry)**
-- [ ] `core/atlasSeed.ts`, `core/eddaSeed.ts`, `core/grootSeed.ts` (new): mechanically identical to `runestoneSeed.ts`
-- [ ] `RunestonePage.tsx`, `AtlasPage.tsx`, `EddaPage.tsx`, `GrootPage.tsx`: mount-effect reading-and-clearing their own seed (Runestone's may already partially exist for Groot's hand-off — confirm, don't duplicate)
-- [ ] `client/src/core/contentFormat/types.ts` + `registry.ts`: `ContentFormatEntry`, `LIBRARY`-style array, `detectFormat`, `availableFormats` — JSON/XML/YAML tests reuse `core/json`/`core/xml`/`core/yaml`; Markdown test is new
-- [ ] `client/src/core/contentFormat/markdownHeuristic.ts` (new, pure, unit-testable in isolation): the construct-counter
+- [x] `core/atlasSeed.ts`, `core/eddaSeed.ts`, `core/grootSeed.ts` (new): mechanically identical to `runestoneSeed.ts`
+- [x] `RunestonePage.tsx`, `AtlasPage.tsx`, `EddaPage.tsx`, `GrootPage.tsx`: mount-effect reading-and-clearing their own seed (Runestone's may already partially exist for Groot's hand-off — confirm, don't duplicate)
+- [x] `client/src/core/contentFormat/types.ts` + `registry.ts`: `ContentFormatEntry`, `LIBRARY`-style array, `detectFormat`, `availableFormats` — JSON/XML/YAML tests reuse `core/json`/`core/xml`/`core/yaml`; Markdown test is new
+- [x] `client/src/core/contentFormat/markdownHeuristic.ts` (new, pure, unit-testable in isolation): the construct-counter
 
 **Skills & docs**
-- [ ] `.claude/skills/new-module/SKILL.md`: new bullet under the client section (beside the existing "Pure-client page? → offline-mode registry" one) — a structured-text module registers itself in `client/src/core/contentFormat/registry.ts`
-- [ ] `architecture.md`: module registry row for `brotli`; a short paragraph in Key Data Flows covering both hand-off directions and the decompression-bomb guard
-- [ ] `tech-stack.md`: note Brotli is Node's built-in `zlib`, not a new dependency (worth stating explicitly, since every other recent addition to that table *was* a new package)
-- [ ] `decisions.md`: log the server-vs-WASM call, the bomb-guard cap choice, and the registry-mirrors-library-registry decision, dated
-- [ ] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
+- [x] `.claude/skills/new-module/SKILL.md`: new bullet under the client section (beside the existing "Pure-client page? → offline-mode registry" one) — a structured-text module registers itself in `client/src/core/contentFormat/registry.ts`
+- [x] `architecture.md`: module registry row for `brotli`; a short paragraph in Key Data Flows covering both hand-off directions and the decompression-bomb guard
+- [x] `tech-stack.md`: note Brotli is Node's built-in `zlib`, not a new dependency (worth stating explicitly, since every other recent addition to that table *was* a new package)
+- [x] `decisions.md`: log the server-vs-WASM call, the bomb-guard cap choice, and the registry-mirrors-library-registry decision, dated
+- [x] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
 
 ## Acceptance criteria
 
@@ -256,16 +256,16 @@ Both `brotli` routes are local **and** cloud profile. Gzip comparison and both c
 
 ## Test checklist
 
-- [ ] Unit: `NodeBrotliCodec` — round-trip correctness against Node's own `zlib.brotliCompressSync`/`brotliDecompressSync` as an oracle; input cap aborts mid-stream; output cap aborts a real bomb file mid-stream without buffering past the cap (assert on peak memory or on bytes-read-before-abort, not just the final error)
-- [ ] Integration: `POST /api/brotli/compress` + `/decompress` happy path via `fastify.inject` with a raw body; 413 matrix (declared-oversize, undeclared/chunked-oversize, bomb-shaped decompress); 422 on garbage input; a truncated-mid-stream `.br` fixture ends the connection rather than hanging or 500ing; a forced client-abort mid-request leaves no dangling stream
-- [ ] Unit: `detectFormat` — one true-positive and one true-negative per kind, the JSON-vs-YAML ordering case, the bare-scalar JSON exclusion, the two-construct Markdown threshold
-- [ ] Unit: `markdownHeuristic` in isolation — a real README-shaped fixture matches, a plain paragraph does not, a single stray `*` does not
-- [ ] Client: `BrotliPage` — seed arrival auto-compresses; decompress → detect → "Open in…" wiring for each of the four kinds; no-match case renders no button; a blob over the display/detection threshold shows a download-only state with no parser or editor ever invoked (spy/assert, not just eyeball)
-- [ ] Client: `looksLikeText`-equivalent — samples only the bounded prefix, verified against a large fixture where the only null byte sits well past the sample window (must still read as "text", proving the scan didn't silently read further than intended)
-- [ ] Client: quality selector — each of the three settings reaches the server as the right `?quality=` value and the response round-trips correctly; changing it after a result exists triggers exactly one new compress call, not zero and not a duplicate
-- [ ] Client: gzip comparison — feature-detection branch (mocked `CompressionStream` present/absent), size numbers match a known-good gzip of a fixed fixture, zero network calls made for it
-- [ ] Client: "Copy as base64" — round-trip test (base64-decode the copied string, compare bytes)
-- [ ] Client: `sendToHermes` — posts to `/api/clipboard` with the right encoding (base64 vs. plain text) per source; a static import-boundary check (or the existing lint) confirms no `features/hermes/*` import under `features/brotli/`
-- [ ] Client: each of the five outbound buttons calls `putBrotliSeed` with the tool's actual current buffer, not a stale snapshot; Loki's specifically sends the output pane with input and output set to different fixture values; each of the five is disabled on an empty buffer
-- [ ] Client: each of the four inbound seeds is read-and-cleared exactly once (a second mount/refresh does not re-apply it)
-- [ ] Live-verify: a real file round-tripped through the app and through the OS `brotli` CLI compare byte-identical; each of the five "Compress with Brotli" buttons and each of the four "Open in…" buttons exercised in a real browser
+- [x] Unit: `NodeBrotliCodec` — round-trip correctness against Node's own `zlib.brotliCompressSync`/`brotliDecompressSync` as an oracle; input cap aborts mid-stream; output cap aborts a real bomb file mid-stream without buffering past the cap (assert on peak memory or on bytes-read-before-abort, not just the final error)
+- [x] Integration: `POST /api/brotli/compress` + `/decompress` happy path via `fastify.inject` with a raw body; 413 matrix (declared-oversize, undeclared/chunked-oversize, bomb-shaped decompress); 422 on garbage input; a truncated-mid-stream `.br` fixture ends the connection rather than hanging or 500ing; a forced client-abort mid-request leaves no dangling stream
+- [x] Unit: `detectFormat` — one true-positive and one true-negative per kind, the JSON-vs-YAML ordering case, the bare-scalar JSON exclusion, the two-construct Markdown threshold
+- [x] Unit: `markdownHeuristic` in isolation — a real README-shaped fixture matches, a plain paragraph does not, a single stray `*` does not
+- [x] Client: `BrotliPage` — seed arrival auto-compresses; decompress → detect → "Open in…" wiring for each of the four kinds; no-match case renders no button; a blob over the display/detection threshold shows a download-only state with no parser or editor ever invoked (spy/assert, not just eyeball)
+- [x] Client: `looksLikeText`-equivalent — samples only the bounded prefix, verified against a large fixture where the only null byte sits well past the sample window (must still read as "text", proving the scan didn't silently read further than intended)
+- [x] Client: quality selector — each of the three settings reaches the server as the right `?quality=` value and the response round-trips correctly; changing it after a result exists triggers exactly one new compress call, not zero and not a duplicate
+- [x] Client: gzip comparison — feature-detection branch (mocked `CompressionStream` present/absent), size numbers match a known-good gzip of a fixed fixture, zero network calls made for it
+- [x] Client: "Copy as base64" — round-trip test (base64-decode the copied string, compare bytes)
+- [x] Client: `sendToHermes` — posts to `/api/clipboard` with the right encoding (base64 vs. plain text) per source; a static import-boundary check (or the existing lint) confirms no `features/hermes/*` import under `features/brotli/`
+- [x] Client: each of the five outbound buttons calls `putBrotliSeed` with the tool's actual current buffer, not a stale snapshot; Loki's specifically sends the output pane with input and output set to different fixture values; each of the five is disabled on an empty buffer
+- [x] Client: each of the four inbound seeds is read-and-cleared exactly once (a second mount/refresh does not re-apply it)
+- [x] Live-verify: a real file round-tripped through the app and through the OS `brotli` CLI compare byte-identical; each of the five "Compress with Brotli" buttons and each of the four "Open in…" buttons exercised in a real browser
