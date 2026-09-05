@@ -26,7 +26,7 @@ const nameParamsSchema = {
 export const previewsModule: FeatureModule = {
   name: 'previews',
   register(app, deps) {
-    const downloadInspector = new FsDownloadInspector(deps.config.storage.downloads);
+    const downloadInspector = new FsDownloadInspector(deps.config.storage.downloads, deps.log);
     const downloadMeta = new GetDownloadPreviewMetaUseCase(
       downloadInspector,
       new GetPreviewMetaUseCase(downloadInspector),

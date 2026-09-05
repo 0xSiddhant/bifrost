@@ -9,6 +9,12 @@ import { PreviewBody, usePreviewMeta } from './PreviewBody';
 
 interface DownloadsContext {
   entries: DownloadEntry[];
+  /**
+   * Where this modal sits — `/downloads`, or `/downloads/folder/<id>` when the
+   * page underneath is a folder (PLAN-24). Closing and stepping to a sibling
+   * both stay inside whichever list opened the preview.
+   */
+  basePath: string;
 }
 
 /**
@@ -19,7 +25,7 @@ interface DownloadsContext {
 export function PreviewModal() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
-  const { entries } = useOutletContext<DownloadsContext>();
+  const { entries, basePath } = useOutletContext<DownloadsContext>();
   const meta = usePreviewMeta(id, fetchPreviewMeta);
 
   const index = entries.findIndex((entry) => entry.id === id);
@@ -27,9 +33,9 @@ export function PreviewModal() {
   const next = index >= 0 && index < entries.length - 1 ? entries[index + 1] : undefined;
   const fallbackName = index >= 0 ? entries[index]?.name : undefined;
 
-  const close = () => navigate('/downloads');
+  const close = () => navigate(basePath);
   const goTo = (entry: DownloadEntry | undefined) => {
-    if (entry) navigate(`/downloads/${entry.id}/preview`, { replace: true });
+    if (entry) navigate(`${basePath}/${entry.id}/preview`, { replace: true });
   };
 
   useEffect(() => {

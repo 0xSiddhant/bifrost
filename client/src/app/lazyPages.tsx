@@ -36,6 +36,10 @@ export function createLazyPages() {
       () => import('../features/file-transfer/DownloadsPage'),
       (m) => m.DownloadsPage,
     ),
+    DownloadFolderPage: page(
+      () => import('../features/file-transfer/DownloadFolderPage'),
+      (m) => m.DownloadFolderPage,
+    ),
     PreviewModal: page(
       () => import('../features/previews/PreviewModal'),
       (m) => m.PreviewModal,

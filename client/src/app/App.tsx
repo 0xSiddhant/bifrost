@@ -282,6 +282,11 @@ export function App() {
                 {/* Modal route: deep-linkable, back button closes the preview. */}
                 <Route path=":id/preview" element={<pages.PreviewModal />} />
               </Route>
+              {/* One level of folders inside Receive (PLAN-24). Nested under an
+                  already-reserved root, so RESERVED_ROOTS needs no new entry. */}
+              <Route path="/downloads/folder/:folderId" element={<pages.DownloadFolderPage />}>
+                <Route path=":id/preview" element={<pages.PreviewModal />} />
+              </Route>
               <Route path="/hermes" element={<pages.HermesPage />} />
               <Route path="/accio" element={<pages.AccioPage />} />
               {/* pre-rename URL (shipped as "muninn") */}

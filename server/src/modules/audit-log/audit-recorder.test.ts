@@ -36,7 +36,15 @@ describe('AuditRecorder', () => {
       uploadedAt: 1,
       uploaderHint: '10.0.0.5',
     });
-    bus.emit('download.added', { id: 'x', name: 'b.zip', size: 1, mtime: 1, ext: '.zip' });
+    bus.emit('download.added', {
+      id: 'x',
+      name: 'b.zip',
+      size: 1,
+      mtime: 1,
+      ext: '.zip',
+      type: 'file',
+      parent: null,
+    });
     bus.emit('clipboard.updated', {
       action: 'add',
       entry: { id: 'c1', text: 'hi', kind: 'text', lang: null, deviceId: 'dev-9', createdAt: 1 },

@@ -1,8 +1,9 @@
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
+import { Input } from '../../core/ui/Field';
 import { FileRow } from '../../core/ui/FileRow';
 import { ProgressBar } from '../../core/ui/ProgressBar';
 import { CheckIcon, CloseIcon, DownloadIcon, EyeIcon, PencilIcon, UploadIcon } from '../../core/ui/icons';
@@ -18,6 +19,7 @@ import {
   type UploadConfig,
   type UploadTask,
 } from './api';
+import { useDownloads } from './useDownloads';
 import { RenameUploadModal } from './RenameUploadModal';
 
 /**
@@ -28,6 +30,10 @@ import { RenameUploadModal } from './RenameUploadModal';
  * would keep counting while the tab is backgrounded and the animation would
  * not — which is precisely how a card disappears before anyone read it, or
  * lingers after the animation finished.
+ *
+ * A folder-mode upload (PLAN-24) reuses the same machine and simply never
+ * visits `done`/`moving`: there is nothing to stage and nothing to move, so it
+ * goes `queued → uploading → moved` and inherits the identical exit.
  */
 type ItemStatus =
   | 'queued'
@@ -50,6 +56,8 @@ interface QueueItem {
   storedName?: string;
   /** Where it landed in downloads/, when that differs from the name we sent. */
   publishedAs?: string;
+  /** Folder it was published into, in folder mode only (PLAN-24). */
+  folder?: string;
 }
 
 const MAX_CONCURRENT_UPLOADS = 3;
@@ -64,6 +72,13 @@ const EXIT_ANIMATION_MS = 2400;
 /** What this file is called on the host right now. */
 const displayName = (item: QueueItem): string =>
   item.publishedAs ?? item.storedName ?? item.file.name;
+
+/** The row's second line: a collision suffix and a folder both belong there. */
+const statusLine = (item: QueueItem): string => {
+  if (item.status !== 'moved') return STATUS_LABEL[item.status];
+  if (item.publishedAs) return `saved as ${item.publishedAs}`;
+  return item.folder ? `you will find this in ${item.folder}` : STATUS_LABEL.moved;
+};
 
 const STATUS_LABEL: Record<ItemStatus, string> = {
   queued: 'waiting…',
@@ -83,16 +98,44 @@ const failed = (name: string, reason: string): void => {
   notify.error(`${name} — ${reason}`, { title: 'Upload failed', dedupeKey: `upload:${name}` });
 };
 
+/**
+ * A folder name is sanitized silently on the host (the same treatment a
+ * *filename* already gets), so the sender is told afterwards rather than shown
+ * a pre-submit preview — which would mean mirroring a security-relevant
+ * sanitizer into a second workspace and keeping the two in sync by hand. This
+ * is the shape PLAN-17b's rename-collision notice already uses; the dedupe key
+ * is the *typed* name, so a batch of ten files says it once.
+ */
+const announceFolder = (typed: string, used: string): void => {
+  if (typed === used) return;
+  notify.info(`Saved into "${used}" — that name could not be used exactly as typed`, {
+    dedupeKey: `upload-folder:${typed}`,
+  });
+};
+
 export function UploadPage() {
   const [items, setItems] = useState<QueueItem[]>([]);
   const [config, setConfig] = useState<UploadConfig | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [renaming, setRenaming] = useState<QueueItem | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<number | null>(null);
+  const [folder, setFolder] = useState('');
   const tasksRef = useRef(new Map<number, UploadTask>());
   const startedRef = useRef(new Set<number>());
   const nextKeyRef = useRef(1);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // The folder names already on the host, straight off the live Receive feed —
+  // one datalist, no second listing endpoint and no new component.
+  const { entries } = useDownloads();
+  const knownFolders = useMemo(
+    () =>
+      (entries ?? [])
+        .filter((entry) => entry.type === 'folder')
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b)),
+    [entries],
+  );
 
   useEffect(() => {
     let disposed = false;
@@ -115,10 +158,32 @@ export function UploadPage() {
 
   const begin = (item: QueueItem) => {
     patch(item.key, { status: 'uploading', progress: 0, error: undefined });
-    const task = uploadFile(item.file, (percent) => patch(item.key, { progress: percent }));
+    // Read once, here: the field stays editable while files are in flight, so
+    // each upload keeps the destination it actually started with.
+    const wanted = folder.trim();
+    const task = uploadFile(
+      item.file,
+      (percent) => patch(item.key, { progress: percent }),
+      wanted === '' ? undefined : wanted,
+    );
     tasksRef.current.set(item.key, task);
     task.promise
-      .then((storedName) => patch(item.key, { status: 'done', progress: 100, storedName }))
+      .then((placement) => {
+        if (placement.folder === undefined) {
+          patch(item.key, { status: 'done', progress: 100, storedName: placement.storedName });
+          return;
+        }
+        // Folder mode is already published — it lands on the same terminal
+        // state Move reaches, so the confirmation and swipe-out are shared.
+        patch(item.key, {
+          status: 'moved',
+          progress: 100,
+          publishedAs: placement.storedName !== item.file.name ? placement.storedName : undefined,
+          folder: placement.folder,
+          movedAt: Date.now(),
+        });
+        announceFolder(wanted, placement.folder);
+      })
       .catch((error: Error) => {
         if (error instanceof UploadCancelledError) {
           patch(item.key, { status: 'cancelled' });
@@ -271,6 +336,27 @@ export function UploadPage() {
       </div>
 
       <div className="stack">
+        <div className="upload-destination">
+          <Input
+            label="Folder in Receive (optional)"
+            list="upload-folders"
+            placeholder="Leave empty to stage as usual"
+            value={folder}
+            onChange={(event) => setFolder(event.target.value)}
+            autoComplete="off"
+          />
+          <datalist id="upload-folders">
+            {knownFolders.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
+          <p className="caption">
+            {folder.trim() === ''
+              ? 'Files wait in staging until you Move them — rename, preview or delete them first.'
+              : `Files go straight into "${folder.trim()}" in Receive: live for everyone at once, with no Move step and no undo.`}
+          </p>
+        </div>
+
         <div
           className={dragActive ? 'dropzone dropzone--active' : 'dropzone'}
           role="button"
@@ -336,11 +422,7 @@ export function UploadPage() {
                   // look like it is acting on a different file.
                   name={displayName(item)}
                   size={formatBytes(item.file.size)}
-                  time={
-                    item.status === 'moved' && item.publishedAs
-                      ? `saved as ${item.publishedAs}`
-                      : STATUS_LABEL[item.status]
-                  }
+                  time={statusLine(item)}
                   aside={
                     <ItemAside
                       item={item}
