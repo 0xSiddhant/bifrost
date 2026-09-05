@@ -69,9 +69,7 @@
 
 /* ── Card / Portal ──────────────────────────────────────────── */
 .card {
-  background:
-    var(--card-sheen),
-    var(--surface);
+  background: var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
@@ -89,9 +87,12 @@
   position: relative;
   --ct: transparent;
   background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--ct) 15%, transparent), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--ct) 15%, transparent),
+      transparent 55%
+    ),
+    var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   color: var(--text);
@@ -510,6 +511,92 @@ a.portal:hover .portal__go {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* ── Hover hint ─────────────────────────────────────────────────
+   Icon-only controls say what they do, on hover and on keyboard focus.
+
+   Native `title` is the browser's own answer and was tried first, but it
+   waits about a second before appearing and paints in an OS layer this app
+   cannot style — long enough that people reasonably conclude nothing
+   happens. Same text, shown promptly, in the app's own palette.
+
+   Three details are load-bearing:
+   - `pointer-events: none`, because the bubble overlaps the control it
+     describes and a hint that eats its own click is worse than no hint.
+   - It opens to the **left**: these controls sit at the right edge of a row,
+     so a bubble growing rightwards would run off the screen.
+   - It is **not** gated on `@media (hover: …)`. Gating was tried both ways and
+     dropped: a touch tap does leave :hover set until the next tap, which
+     parks a bubble over the row for a moment, but that is self-correcting and
+     harmless next to the failure the gate causes — any environment that
+     under-reports its pointer (headless Chromium reports `hover: none`
+     outright) shows no hint at all, which is the bug this exists to fix. */
+.tip {
+  position: relative;
+}
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  /* `width` is load-bearing, not decoration: an absolutely positioned box
+     shrink-fits against its containing block, which here is a 33px icon
+     button — without this the bubble renders one character wide and stacks
+     the label vertically. max-content sizes it to the text, and max-width
+     then wraps a long filename instead of running off the screen. */
+  width: max-content;
+  max-width: min(20rem, 55vw);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-1) var(--ease),
+    visibility var(--dur-1) var(--ease);
+}
+
+.tip:hover::after {
+  opacity: 1;
+  visibility: visible;
+  /* Long enough not to flicker while the pointer crosses a row of icons,
+     short enough to feel like an answer rather than a wait. */
+  transition-delay: 140ms;
+}
+
+/* A real touch device only. Tapping sets :hover and keeps it until the next
+   tap, which parks the bubble on top of the very row it describes — visibly
+   wrong on a phone, where the controls are large enough to read anyway.
+   Both conditions are required on purpose: `hover: none` alone also matches
+   anything that simply fails to report a pointer (headless Chromium says
+   exactly that), and suppressing there is how a hover hint silently becomes
+   no hint at all. */
+@media (hover: none) and (pointer: coarse) {
+  .tip:hover::after {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Last, so focus still wins on a touch device driven by a keyboard: someone
+   who has focused the control has already committed to it, and gets no delay. */
+.tip:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 /* ── ProgressBar ────────────────────────────────────────────── */

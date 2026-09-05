@@ -121,20 +121,20 @@ export function DownloadsPage() {
                   <span className="row">
                     {mayPreview(entry.name) && (
                       <Link
-                        className="btn btn--ghost btn--icon"
+                        className="btn btn--ghost btn--icon tip"
                         to={`${entry.id}/preview`}
                         aria-label={`Preview ${entry.name}`}
-                        title={`Preview ${entry.name}`}
+                        data-tip={`Preview ${entry.name}`}
                       >
                         <EyeIcon size={18} />
                       </Link>
                     )}
                     <a
-                      className="btn btn--ghost btn--icon"
+                      className="btn btn--ghost btn--icon tip"
                       href={downloadUrl(entry.id)}
                       download={entry.name}
                       aria-label={`Download ${entry.name}`}
-                      title={`Download ${entry.name}`}
+                      data-tip={`Download ${entry.name}`}
                     >
                       <DownloadIcon size={18} />
                     </a>
@@ -174,11 +174,11 @@ function FolderRow({
       time={formatTimeAgo(entry.mtime)}
       aside={
         <a
-          className="btn btn--ghost btn--icon"
+          className="btn btn--ghost btn--icon tip"
           href={folderArchiveUrl(entry.id)}
           download={`${entry.name}.zip`}
           aria-label={`Download ${entry.name} as a zip`}
-          title={`Download ${entry.name} as a zip`}
+          data-tip={`Download ${entry.name} as a zip`}
         >
           <ArchiveFileIcon size={18} />
         </a>

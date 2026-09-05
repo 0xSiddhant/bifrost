@@ -143,9 +143,11 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
   });
 
   /**
-   * Icon-only actions say what they do on hover — the name is right there on
-   * the row, but the icon alone is not self-evident. `title` matches the
-   * `aria-label` so the two cannot drift into telling different stories.
+   * Icon-only actions say what they do on hover and on focus — the file name
+   * is on the row, but the icon alone is not self-evident. The hint text
+   * matches the `aria-label` so the two cannot drift into telling different
+   * stories, and it rides `.tip`'s `data-tip` rather than a native `title`,
+   * which waits about a second and paints in an unstyleable OS layer.
    */
   it('names every icon-only action on hover, on both views', () => {
     render('/downloads');
@@ -153,7 +155,9 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
     const hoverable = ['Preview loose.txt', 'Download loose.txt', 'Download Trip photos as a zip'];
     for (const label of hoverable) {
       const el = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
-      expect(el?.getAttribute('title'), label).toBe(label);
+      expect(el?.getAttribute('data-tip'), label).toBe(label);
+      // Without the class the attribute renders nothing at all.
+      expect(el?.classList.contains('tip'), label).toBe(true);
     }
 
     act(() => root.unmount());
@@ -162,7 +166,8 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
 
     for (const label of ['Preview a.jpg', 'Download a.jpg']) {
       const el = container.querySelector<HTMLElement>(`[aria-label="${label}"]`);
-      expect(el?.getAttribute('title'), label).toBe(label);
+      expect(el?.getAttribute('data-tip'), label).toBe(label);
+      expect(el?.classList.contains('tip'), label).toBe(true);
     }
   });
 
