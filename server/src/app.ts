@@ -35,6 +35,7 @@ import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
 import { grootModule } from './modules/groot/module.js';
 import { atlasModule } from './modules/atlas/module.js';
+import { brotliModule } from './modules/brotli/module.js';
 import { lokiModule } from './modules/loki/module.js';
 import { accioModule } from './modules/accio/module.js';
 import { nimbusModule } from './modules/nimbus/module.js';
@@ -67,6 +68,9 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     grootModule,
     atlasModule,
     lokiModule,
+    // Both profiles: a stateless byte transform, bounded by BROTLI_MAX_INPUT_MB
+    // and BROTLI_MAX_OUTPUT_MB rather than by which profile is running (PLAN-25).
+    brotliModule,
     // Local only: a household bookmark shelf has no auth story of its own
     // (PLAN-13 decision) — revisit for cloud when real accounts exist.
     accioModule,
@@ -101,6 +105,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     grootModule,
     atlasModule,
     lokiModule,
+    brotliModule,
     screensaverModule,
     clientLogsModule,
     metricsModule,

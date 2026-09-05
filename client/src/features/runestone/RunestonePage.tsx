@@ -24,6 +24,7 @@ import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
 import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
+import { putBrotliSeed } from '../../core/brotliSeed';
 import { ApiError } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
@@ -324,6 +325,16 @@ export function RunestonePage() {
     }
   };
 
+
+  // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
+  // mount and compresses it straight away, so no feature imports another. The
+  // live buffer is sent, never the debounced copy the toolbar's disabled state
+  // is derived from — a snapshot 300ms old is not what the user is looking at.
+  const compressWithBrotli = () => {
+    putBrotliSeed({ text, sourceLabel: 'Runestone' });
+    void navigate('/brotli');
+  };
+
   const clearDocument = () => {
     if (!window.confirm('Clear the document? The cached draft is removed too.')) return;
     setText('');
@@ -592,6 +603,15 @@ export function RunestonePage() {
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
                 Copy
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                title="Send this document to the Brotli page and compress it"
+                onClick={compressWithBrotli}
+              >
+                Brotli
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={clearDocument}>
                 Clear

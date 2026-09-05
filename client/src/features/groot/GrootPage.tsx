@@ -22,6 +22,8 @@ import {
 } from '../../core/yaml';
 import { relicTitle } from '../../core/relicNames';
 import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
+import { putBrotliSeed } from '../../core/brotliSeed';
+import { takeGrootSeed } from '../../core/grootSeed';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { ApiError } from '../../core/api';
@@ -184,6 +186,16 @@ export function GrootPage() {
   // opening the tool fresh must not silently refill it with something old.
   useEffect(() => {
     if (!isScratch) return;
+    // A hand-off wins over a draft: the user just chose this document (PLAN-25),
+    // so it opens rather than being offered. Read once and cleared, so a
+    // refresh does not re-apply it.
+    const seed = takeGrootSeed();
+    if (seed) {
+      setText(seed.text);
+      if (seed.title) setTitle(seed.title);
+      setRestorable(null);
+      return;
+    }
     const draft = loadDraft();
     if (!draft || draft.text.trim() === '') return;
     if (takeLeftOpen(DRAFT_ID)) {
@@ -324,6 +336,16 @@ export function GrootPage() {
     if (!snapshot) return;
     putVariantTextSeed({ left: snapshot.text, right: text });
     void navigate('/variant');
+  };
+
+
+  // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
+  // mount and compresses it straight away, so no feature imports another. The
+  // live buffer is sent, never the debounced copy the toolbar's disabled state
+  // is derived from — a snapshot 300ms old is not what the user is looking at.
+  const compressWithBrotli = () => {
+    putBrotliSeed({ text, sourceLabel: 'Groot' });
+    void navigate('/brotli');
   };
 
   const clearDocument = () => {
@@ -636,6 +658,15 @@ export function GrootPage() {
                 onClick={diffAgainstSaved}
               >
                 Diff
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                title="Send this document to the Brotli page and compress it"
+                onClick={compressWithBrotli}
+              >
+                Brotli
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={clearDocument}>
                 Clear

@@ -40,6 +40,8 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'sigil',
   'ollivanders',
   'diagon-alley',
+  // PLAN-25: a client route only — the Brotli module publishes nothing outside /api.
+  'brotli',
 ]);
 
 /** True when `word` names one of the app's own path roots (already lowercased). */

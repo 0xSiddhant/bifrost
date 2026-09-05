@@ -51,6 +51,7 @@ describe('boot → health → capabilities', () => {
         'groot',
         'atlas',
         'loki',
+        'brotli',
         'accio',
         'nimbus',
         'portkey',
@@ -112,6 +113,9 @@ describe('capabilities in the cloud profile', () => {
     // The four structured-document workspaces ship in both profiles (PLAN-23).
     expect(body.modules).toContain('groot');
     expect(body.modules).toContain('atlas');
+    // Brotli too (PLAN-25): a stateless byte transform bounded by its own two
+    // caps, which is the class those workspaces are in — not file-transfer's.
+    expect(body.modules).toContain('brotli');
     // Warm-load policy is harmless client mechanism, so it ships in both
     // profiles too — a cloud build that lost it would show a dead toggle.
     expect(body.modules).toContain('offline-mode');

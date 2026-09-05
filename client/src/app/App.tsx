@@ -55,8 +55,8 @@ const NAV: NavCategory[] = [
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
-    match: ['/runestone', '/variant', '/edda', '/groot', '/atlas', '/loki', '/pensieve'],
-    modules: ['runestone', 'variant', 'edda', 'groot', 'atlas', 'loki'],
+    match: ['/runestone', '/variant', '/edda', '/groot', '/atlas', '/loki', '/brotli', '/pensieve'],
+    modules: ['runestone', 'variant', 'edda', 'groot', 'atlas', 'loki', 'brotli'],
   },
   {
     to: '/diagon-alley',
@@ -320,6 +320,7 @@ export function App() {
               <Route path="/atlas/library" element={<Navigate to="/pensieve?type=atlas" replace />} />
               <Route path="/atlas/:slug" element={<pages.AtlasPage />} />
               <Route path="/loki" element={<pages.LokiPage />} />
+              <Route path="/brotli" element={<pages.BrotliPage />} />
               <Route path="/wardens" element={<pages.WardensPage />} />
               {/* The QR page became a toolbox tool (PLAN-18). The root stays in
                   RESERVED_ROOTS: this redirect is a real route, and a /go/sigil

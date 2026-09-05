@@ -25,14 +25,39 @@ export function encodeBase64(text: string, variant: Base64Variant = 'standard'):
   return variant === 'url-safe' ? toUrlSafe(standard) : standard;
 }
 
-/** Text from Base64, accepting either variant and missing padding. */
-export function decodeBase64(encoded: string): string {
+/**
+ * Raised when the Base64 was perfectly good but what came out is not text.
+ *
+ * These are two different failures and they need two different answers. A
+ * compressed blob, an image or a key decodes to bytes no UTF-8 decoder will
+ * take, and telling someone their Base64 is malformed when it is not sends
+ * them hunting for a stray character that was never there.
+ */
+export class NotTextError extends Error {
+  constructor(public readonly byteLength: number) {
+    super('the decoded bytes are not text');
+    this.name = 'NotTextError';
+  }
+}
+
+/** Bytes from Base64, accepting either variant and missing padding. */
+export function decodeBase64Bytes(encoded: string): Uint8Array {
   const binary = atob(normalizeBase64(encoded));
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  // `fatal` so mojibake surfaces as an error instead of a string of U+FFFD that
-  // looks like a successful decode.
-  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  return bytes;
+}
+
+/** Text from Base64. Throws `NotTextError` when the bytes decode but aren't text. */
+export function decodeBase64(encoded: string): string {
+  const bytes = decodeBase64Bytes(encoded);
+  try {
+    // `fatal` so mojibake surfaces as an error instead of a string of U+FFFD
+    // that looks like a successful decode.
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    throw new NotTextError(bytes.length);
+  }
 }
 
 /** `+/` → `-_`, padding dropped (RFC 4648 §5). */
@@ -71,7 +96,13 @@ export function runBase64(
       value: mode === 'encode' ? encodeBase64(input, variant) : decodeBase64(input),
       error: null,
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof NotTextError) {
+      return {
+        value: '',
+        error: `That is valid Base64, but it decodes to ${error.byteLength} bytes of binary data rather than text — a compressed blob, an image or a key, for instance.`,
+      };
+    }
     return {
       value: '',
       error:
