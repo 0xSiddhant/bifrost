@@ -182,6 +182,55 @@ describe('brotli module', () => {
   });
 });
 
+/**
+ * The cloud profile runs the same module with the same caps — the point of
+ * putting it in both manifests rather than gating it to local. Driven through
+ * `inject`, which is enough here: nothing in this block is about what happens
+ * to a connection after headers are out.
+ */
+describe('brotli module on the cloud profile', () => {
+  let app: RunningApp;
+  let storageRoot: string;
+
+  beforeAll(async () => {
+    storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-cloud-'));
+    app = await createApp(
+      loadConfig({
+        HEIMDALL_PIN: '4321',
+        STORAGE_ROOT: storageRoot,
+        DEPLOY_PROFILE: 'cloud',
+        BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
+      }),
+      { logger: pino({ level: 'silent' }) },
+    );
+  }, 30_000);
+
+  afterAll(async () => {
+    await app.shutdown();
+    fs.rmSync(storageRoot, { recursive: true, force: true });
+  });
+
+  const send = (url: string, payload: Buffer) =>
+    app.fastify.inject({
+      method: 'POST',
+      url,
+      payload,
+      headers: { 'content-type': 'application/octet-stream' },
+    });
+
+  it('round-trips and enforces the same input cap', async () => {
+    const source = Buffer.from('cloud profile fixture\n'.repeat(200));
+    const compressed = await send('/api/brotli/compress', source);
+    expect(compressed.statusCode).toBe(200);
+
+    const restored = await send('/api/brotli/decompress', compressed.rawPayload);
+    expect(restored.rawPayload).toEqual(source);
+
+    const oversize = await send('/api/brotli/compress', Buffer.alloc(MAX_INPUT_MB * MB + 1024));
+    expect(oversize.statusCode).toBe(413);
+  });
+});
+
 /** Reads a body that is expected to be cut off, reporting how far it got. */
 async function readUntilItStops(response: Response): Promise<{
   received: number;

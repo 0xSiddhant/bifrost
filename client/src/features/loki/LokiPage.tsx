@@ -27,6 +27,7 @@ import {
   type JsSyntaxError,
 } from '../../core/js';
 import { formatBytes } from '../../core/format';
+import { putBrotliSeed } from '../../core/brotliSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { usePanelFont } from '../../core/panelFont';
 import { useCapabilities } from '../../core/useCapabilities';
@@ -282,6 +283,27 @@ export function LokiPage() {
     navigate('/variant');
   };
 
+
+  /**
+   * Loki is the one editor here without a single obvious buffer, and which one
+   * travels needed deciding rather than guessing (PLAN-25). Its two are
+   * `beforeSnapshot` — what the buffer held before the last transform — and
+   * `code`, the result that transform produced. The output is what goes: the
+   * input is equally reachable without ever opening Loki, so the thing worth
+   * carrying onward is specifically what Loki was used to make.
+   *
+   * (The run drawer is a console of log lines and a result value, not a second
+   * document, so it is not a candidate at all.)
+   *
+   * Persist the buffer before navigating, exactly as the Variant hand-off does,
+   * so coming back restores it.
+   */
+  const compressWithBrotli = () => {
+    saveLokiDraft({ code, mode, rxPattern, rxFlags, rxSubject });
+    putBrotliSeed({ text: code, sourceLabel: 'Loki' });
+    void navigate('/brotli');
+  };
+
   const clearAll = () => {
     if (!empty && !window.confirm('Clear the buffer?')) return;
     editorRef.current?.applyEdit(() => ({ doc: '', from: 0, to: 0 }));
@@ -485,6 +507,15 @@ export function LokiPage() {
                       onClick={() => editorRef.current?.unfoldAll()}
                     >
                       Unfold
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={empty}
+                      title="Send the current result to the Brotli page and compress it"
+                      onClick={compressWithBrotli}
+                    >
+                      Brotli
                     </Button>
                     <Button size="sm" variant="ghost" disabled={empty} onClick={clearAll}>
                       Clear

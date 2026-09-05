@@ -95,6 +95,10 @@ export function createLazyPages() {
       () => import('../features/loki/LokiPage'),
       (m) => m.LokiPage,
     ),
+    BrotliPage: page(
+      () => import('../features/brotli/BrotliPage'),
+      (m) => m.BrotliPage,
+    ),
     AccioPage: page(
       () => import('../features/accio/AccioPage'),
       (m) => m.AccioPage,

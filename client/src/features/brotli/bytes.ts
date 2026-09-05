@@ -1,0 +1,69 @@
+/**
+ * Pure byte helpers for the Brotli page — naming, sizing, encoding, and the
+ * text/binary read. Nothing here touches the network or React, so all of it is
+ * testable on its own.
+ */
+
+/**
+ * How much of a blob the text/binary check looks at. Bounded on purpose, and
+ * for the same reason the server's own `FsFileInspector.looksLikeText` bounds
+ * it: once a small prefix has answered "is this text", scanning hundreds of
+ * megabytes more for one byte value is wasted work. A decompressed output near
+ * the output cap must never trigger a whole-blob scan.
+ */
+export const TEXT_SAMPLE_BYTES = 4096;
+
+/** True when a bounded prefix holds no null byte — the same heuristic previews use. */
+export function looksLikeText(bytes: Uint8Array): boolean {
+  return !bytes.subarray(0, TEXT_SAMPLE_BYTES).includes(0);
+}
+
+/** Base64, chunked — `String.fromCharCode(...bytes)` overflows the stack on a big array. */
+export function toBase64(bytes: Uint8Array): string {
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/** Saved bytes as a percentage of the original; negative when it grew. */
+export function savedPercent(originalBytes: number, resultBytes: number): number {
+  if (originalBytes === 0) return 0;
+  return Math.round(((originalBytes - resultBytes) / originalBytes) * 100);
+}
+
+/**
+ * The server sets no `Content-Disposition` at all, so every name is decided
+ * here — the client already holds the bytes, and inventing filenames on the
+ * server would mean a helper crossing a module boundary for no gain.
+ */
+export function compressedName(sourceName: string | null): string {
+  return sourceName ? `${sourceName}.br` : 'compressed.br';
+}
+
+export function gzippedName(sourceName: string | null): string {
+  return sourceName ? `${sourceName}.gz` : 'compressed.gz';
+}
+
+/** Strips a trailing `.br`; falls back to a name that matches what the bytes are. */
+export function decompressedName(sourceName: string | null, isText: boolean): string {
+  if (sourceName && sourceName.toLowerCase().endsWith('.br')) {
+    const stripped = sourceName.slice(0, -3);
+    if (stripped !== '') return stripped;
+  }
+  return isText ? 'decompressed.txt' : 'decompressed.bin';
+}
+
+/** Hands the browser a file to save, the one mechanism a Blob download has. */
+export function saveBlob(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = name;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

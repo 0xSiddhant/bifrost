@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
 import {
+  ArchiveFileIcon,
   BookmarkIcon,
   BracesIcon,
   CodeIcon,
@@ -97,6 +98,18 @@ const TOOLS: Tool[] = [
     description:
       'An XML workspace — format, minify and fold any document; an Apple property list also opens as an editable, Xcode-shaped table.',
     go: 'hold the structure',
+  },
+  {
+    // Appended for the same reason Groot and Atlas were: colour follows
+    // position, so slotting Brotli in beside the editors would silently
+    // recolour every card after it on a page people know by its colours.
+    modules: ['brotli'],
+    to: '/brotli',
+    icon: <ArchiveFileIcon size={24} />,
+    title: 'Brotli',
+    description:
+      'Squeeze text or a file down with Brotli, or open a .br back up — with a gzip comparison, and a way straight into whichever editor the result turns out to suit.',
+    go: 'squeeze it down',
   },
 ];
 
