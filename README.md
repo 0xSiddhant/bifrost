@@ -109,6 +109,7 @@ See [`docs/observability.md`](docs/observability.md). Back up all state
 | `npm run build` | Production build (client + server) |
 | `npm start` | Run production build |
 | `npm run logs` | Pretty-tail the JSON log file |
+| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data |
 | `npm run backup` | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
 | `npm run restore -- <archive.zip>` | Restore an archive (refuses a live server unless `--force`) |
 | `npm run test:resilience` | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand) |

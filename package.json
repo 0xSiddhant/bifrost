@@ -19,6 +19,7 @@
     "build": "npm run build -w client && npm run build -w server",
     "start": "node --import ./server/dist/otel.js server/dist/bootstrap.js",
     "logs": "tail -F storage/logs/current.log | pino-pretty --levelKey logLevel",
+    "db:studio": "npm run db:studio -w server",
     "changelog": "changelogen --output CHANGELOG.md",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
