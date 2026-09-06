@@ -27,10 +27,11 @@ Every endpoint below was read directly from its route file (or, for the four doc
 
 **In:**
 - New npm workspace `cli/`, published as a global-installable package with a `bifrost` binary.
-- Commands: `push`, `pull`, `clip`, `open`, `preview`, `portkey` (+`go`), `status`, `devices`, `speed`.
+- Commands: `push`, `pull`, `clip`, `open`, `preview`, `portkey` (+`go`), `status`, `devices`, `speed`, `config`, `update`.
 - `commander` for argument parsing.
 - A config file (`--host` override, persisted default) and default discovery via `bifrost.local`.
 - `--json` output mode on every command, for scripting.
+- A background update check against the GitHub Releases API (never npm — there is no registry), surfaced as a one-line notice, plus an explicit `bifrost update` command that performs the update when the user actually runs it — see Decisions.
 
 **Out:**
 - Anything Heimdall-gated (admin settings, PIN login). Every command above hits an endpoint that's already unauthenticated LAN-trust; adding a PIN/session flow for the CLI is a separate, unasked-for feature.
@@ -38,6 +39,8 @@ Every endpoint below was read directly from its route file (or, for the four doc
 - Active mDNS service discovery (the CLI browsing `_http._tcp` itself). v1 relies on the OS's own `.local` resolution, same as a browser already does; see the discovery spike below for why, and what happens if that assumption is wrong on a given platform.
 - Any write-side presence action (`POST /api/presence/prune`, `PATCH /api/presence/name`) — `devices` is read-only in this plan; nothing about a CLI session should silently rename a household device.
 - A Swift/native rewrite. Settled before this plan was drafted.
+- Publishing to the public npm registry. Distribution is a `.tgz` built by `npm pack`, installed with `npm install -g <path-or-url-to-tarball>` — no npm account, no package-name fight. See the Distribution decision below.
+- The background update check ever mutating anything itself. It only ever notifies; `bifrost update` is the one explicit, user-run command that installs a newer version — see the Update check decision below.
 
 ## Decisions & reasoning
 
@@ -75,7 +78,9 @@ cli/
     │   ├── browser.test.ts
     │   ├── portkey.ts       # + redirect:'manual' slug resolution for go
     │   ├── presence.ts
-    │   └── nimbus.ts
+    │   ├── nimbus.ts
+    │   ├── selfUpdate.ts    # checkLatest() (cached) + performUpdate(), against GitHub Releases
+    │   └── selfUpdate.test.ts
     └── commands/
         ├── push.ts
         ├── pull.ts
@@ -86,12 +91,13 @@ cli/
         ├── status.ts
         ├── devices.ts
         ├── speed.ts
-        └── config.ts
+        ├── config.ts
+        └── update.ts
 ```
 
 **Test placement follows this codebase's own real convention, not a new one**: a plain `<name>.test.ts` sits beside the file it tests (`file-transfer/sanitize.test.ts`, `file-transfer/services/place-file.test.ts` are the confirmed precedent), and a real-server integration test is a **separate, `.int.test.ts`-suffixed file, split by concern** rather than one giant file — `file-transfer` itself has three (`file-transfer.int.test.ts`, `uploads.int.test.ts`, `watcher-sse.int.test.ts`), not one, and the CLI's three (`files`, `api`, `speed`) mirror that same split-by-concern shape.
 
-**`discover.ts`, `config.ts`, `output.ts`, `documents.ts`, `client.ts`, and `browser.ts` get a dedicated unit test — the other four `core/` files don't, and the line between them is real, not arbitrary.** `browser.ts` joins that list for the same reason `client.ts` does: it has its own small decision (launch vs. print, and `--json` always overriding `--no-open`'s own value) worth pinning with the `open` package mocked out, rather than trusting whichever path the integration suite happens to exercise. `files.ts`, `clipboard.ts`, `portkey.ts`, `presence.ts`, and `nimbus.ts` are thin, direct HTTP-calling wrappers with no branching of their own — they call `client.ts` and hand back what it returns, so their correctness genuinely does only show up against a real server. `client.ts` is different: its job is a small decision table (map a 2xx through, map a 404/409/5xx/network-failure each to a specific, worded CLI error) that every one of those five wrappers depends on being right — exactly the kind of pure, branchy logic `discover.ts`/`output.ts` already qualified for a unit test on, and worth mocking `fetch` for directly rather than trusting that whichever error cases the integration suite happens to trigger cover the whole table. `commands/*.ts` get no test files of their own for a different reason: they're deliberately thin (parse args, call `core/`, print), and the integration suite already drives them end-to-end through `index.ts`'s real command dispatch.
+**`discover.ts`, `config.ts`, `output.ts`, `documents.ts`, `client.ts`, `browser.ts`, and `selfUpdate.ts` get a dedicated unit test — the other five `core/` files don't, and the line between them is real, not arbitrary.** `browser.ts` joins that list for the same reason `client.ts` does: it has its own small decision (launch vs. print, and `--json` always overriding `--no-open`'s own value) worth pinning with the `open` package mocked out, rather than trusting whichever path the integration suite happens to exercise. `selfUpdate.ts` joins it too: cache-freshness checking, a semver compare, and picking the right asset out of a release's `assets` array are real branches worth pinning against a mocked GitHub API response, not something to trust the integration suite (which never runs against the real GitHub API) to exercise. `files.ts`, `clipboard.ts`, `portkey.ts`, `presence.ts`, and `nimbus.ts` are thin, direct HTTP-calling wrappers with no branching of their own — they call `client.ts` and hand back what it returns, so their correctness genuinely does only show up against a real server. `client.ts` is different: its job is a small decision table (map a 2xx through, map a 404/409/5xx/network-failure each to a specific, worded CLI error) that every one of those five wrappers depends on being right — exactly the kind of pure, branchy logic `discover.ts`/`output.ts` already qualified for a unit test on, and worth mocking `fetch` for directly rather than trusting that whichever error cases the integration suite happens to trigger cover the whole table. `commands/*.ts` get no test files of their own for a different reason: they're deliberately thin (parse args, call `core/`, print), and the integration suite already drives them end-to-end through `index.ts`'s real command dispatch.
 
 ### `commander` for argument parsing — small, standard, matches the established dependency pattern
 
@@ -149,9 +155,49 @@ A man page is new ground entirely — nothing in this repo has one today. `cli/m
 
 Unlike PLAN-18/20/25's genuinely route-free plans, this plan is in constant contact with the server — "None" would be actively misleading here. The table below lists every endpoint the CLI calls, each marked pre-existing and unchanged, which is the accurate claim: **zero new or modified server-side routes**, not zero server interaction.
 
-### Package naming needs a real availability check before publish
+### Distribution: `npm pack` tarball only, no public registry, no package-name fight
 
-`bifrost` itself is a common enough word to plausibly be taken on the public npm registry; this isn't assumed either way — checking availability (and falling back to a scoped name like `@bifrost/cli` if needed) is a concrete task-list item, not a detail left to whoever runs `npm publish` first.
+Deliberately not published to the npm registry — no npm account, no `bifrost`-vs-scoped-name availability check, no registry-facing update check. `cli/package.json`'s `name`/`version`/`bin`/`man` fields still matter (they're what `npm install -g <tarball>` reads), but nothing about them needs to be globally unique the way a registry publish would demand. The build produces `cli/*.tgz` via `npm pack`; `npm install -g` accepts a path or a URL to that tarball equally — `npm install -g` fetches an `http(s)://` URL directly (no `git clone`, no build step on the install machine, just the already-built tarball's own `dist/`), so a `.tgz` attached as a GitHub Release asset is a valid, direct install source: `npm install -g https://github.com/<owner>/bifrost/releases/download/v<version>/bifrost-cli-<version>.tgz`. A local path or a synced folder work identically for a same-LAN install. No `npm publish`/`npm login` step anywhere in the flow.
+
+### Dev-loop sync + release packaging: the same `npm pack`/`npm install -g` mechanism everywhere, never touching PM2 or CI's own global state
+
+Tarball-only distribution (above) still needs two concrete delivery paths, and both reuse the exact same mechanism rather than inventing a second one for dev: **`npm pack` produces the tarball, `npm install -g <tarball>` installs it** — a local path during development, a GitHub Release URL for a real install. Using the identical mechanism in both places is deliberate, not incidental: a dev-only shortcut like `npm link` (a symlink into `cli/`) would never exercise the real packaging step — `cli/package.json`'s `files` list, the `man` field wiring, whatever the tarball actually contains — so a packaging bug would only surface the day a real GitHub Release install is tried, exactly the kind of "assumed, not verified" gap this plan already avoids everywhere else.
+
+**New script, `scripts/cli-sync.ts`** (`tsx`, matching this repo's existing `scripts/*.ts` convention — `setup.ts`, `backup.ts`, `gen-build-info.ts`, confirmed directly): builds `cli/` (`npm run build -w cli`), `npm pack`s it to a throwaway temp directory, and — unless `process.env.CI` is set — runs `npm install -g` on the produced tarball, replacing whatever `bifrost` is currently on `PATH`, then deletes the temp file. Using a freshly-packed tarball each time rather than a version-pinned install is deliberate: `cli/package.json`'s version usually doesn't change between dev iterations, and a version-aware `npm install -g bifrost-cli@<version>` can see "already installed, nothing to do" and silently skip a real local change — installing an explicit tarball has no version check to short-circuit on.
+
+**Wired into root `package.json`** (confirmed current scripts: `"build": "npm run build -w client && npm run build -w server"`, `"start": "node --import ./server/dist/otel.js server/dist/bootstrap.js"`):
+- `build` gains a third step: `... && tsx scripts/cli-sync.ts`.
+- `start` gains a step *before* the server launches, not after: `"tsx scripts/cli-sync.ts && node --import ..."` — `start` runs the server in the foreground, so appending a step would only ever run on shutdown.
+
+This makes the re-sync automatic on both a plain dev iteration and a full build-and-restart on the household Mac — a deliberate, opinionated choice: on that machine, `npm run build`/`npm run start` always leaves the globally-installed `bifrost` pointed at whatever's currently checked out, dev or "prod" alike, since it's the same physical machine either way.
+
+**Never touches the always-on service.** `ecosystem.config.cjs`'s `script: 'server/dist/bootstrap.js'` (confirmed directly) is what PM2 actually execs — PM2 never runs the root `start` script at all, so the CLI only re-syncs when the owner runs `npm run build`/`npm run start` themselves, never as a side effect of PM2 restarting or crash-recovering the service.
+
+**Never touches CI either.** GitHub Actions sets `process.env.CI` automatically; `cli-sync.ts` still builds `cli/` in that case (so `cli/dist` exists for the packaging step below) but skips the `npm install -g` — a disposable CI runner has no reason to carry a globally-installed `bifrost`, and a global install attempt there would be pure noise, not a real requirement.
+
+**`cli/package.json` needs a `files` field** (or a `cli/.npmignore`) so `npm pack` bundles only `dist/`, `man/bifrost.1`, `package.json`, and `README.md` — not `src/`, the `.test.ts`/`.int.test.ts` files, or `tsconfig.json`.
+
+**`.github/workflows/release.yml` gains one new step**, right after the existing "Build release tarball" step (confirmed directly: that step already runs `npm run build` and tars up `server/dist client/dist ...` into `bifrost-v${VERSION}.tar.gz` for the PM2 deployment bundle) — pack the CLI (`npm pack -w cli --pack-destination .`, reusing the `cli/dist` that same `npm run build` already produced via `cli-sync.ts`'s CI-mode build) and add the resulting `.tgz` to the same `gh release create` asset list as the existing deployment tarball. One release, two distinct assets: the existing PM2 deployment bundle, and the new CLI install tarball. This is what turns `npm install -g https://github.com/<owner>/bifrost/releases/download/v<version>/bifrost-cli-<version>.tgz` from a hypothetical into something that actually exists once a release ships — no `npm publish`/registry step added anywhere in this flow, matching the Distribution decision above.
+
+### Update check + `bifrost update`: against GitHub Releases, not npm — checking is automatic, updating is not
+
+Distribution is GitHub-Releases-tarball-only (above), so "is a newer version available" has to mean "check GitHub's Releases API," not npm's registry — `update-notifier` (the library the earlier draft of this plan leaned on) is npm-registry-specific and doesn't apply here, and there's no equally standard off-the-shelf library for "check a GitHub repo's releases for something newer than me." This is hand-rolled, the same call already made for `config.ts`'s XDG path: a single unauthenticated `GET https://api.github.com/repos/0xSiddhant/bifrost/releases/latest` (confirmed real repo slug, `git remote -v`; public repo, no token needed) returns `tag_name` (`v1.4.0`) and an `assets` array to find the `bifrost-cli-*.tgz` entry's `browser_download_url` in — a JSON GET and a semver string compare, not fiddly enough to justify a dependency.
+
+**New `core/selfUpdate.ts`**: `checkLatest()` fetches and caches the result (a timestamp + last-seen version, held in the same config file `config.ts` already owns) so a repeat invocation within a day reuses the cache rather than hitting the API again — GitHub's unauthenticated rate limit is 60 requests/hour, and an uncached "check on every command" would be a real, self-inflicted way to hit that scripting the CLI in a loop. `performUpdate()` resolves the release asset's URL and shells out to `npm install -g <url>`, surfacing npm's own stdout/stderr directly on failure rather than swallowing it — an `npm install -g` can fail for reasons (permissions, network) that are npm's to explain, not this plan's to reinterpret.
+
+The currently-running CLI's own version is read from `cli/package.json` at runtime (it ships inside the very tarball that was installed, so it's always present next to `dist/index.js` — no separate baked-version file needed the way `server/build-info.json` exists for a reason specific to git not being available under PM2; this is a different situation, since the package.json is guaranteed to travel with the install).
+
+**The notice** is wired the same way discussed earlier in this plan: checked once ahead of dispatch in `index.ts`, printed as a single line only on a TTY and never under `--json`, naming the exact fix — `bifrost update` — rather than an npm command that no longer applies.
+
+**`bifrost update` is the one explicit, user-run exception to "the CLI never mutates its own install silently."** The background check only ever notifies; running `bifrost update` is the opt-in action that actually installs — consistent with, not a reversal of, the Scope exclusion above. It compares current vs. latest first and cleanly no-ops ("already on the latest version") rather than reinstalling identical bits when there's nothing to do.
+
+### README's CLI install command is generated, not hand-maintained — the release workflow owns it
+
+The exact install command (`npm install -g https://github.com/.../releases/download/v<version>/bifrost-cli-<version>.tgz`) embeds a version number, so a hand-written line in root `README.md` would silently go stale the moment the next release ships. Root `README.md` gets a new **CLI** section with the command inside `<!-- CLI_INSTALL_START -->` / `<!-- CLI_INSTALL_END -->` markers — the same "markers automation can find and replace" idea `CHANGELOG.md`'s own `## ` headers already give the release workflow's existing `awk` step (confirmed directly, `.github/workflows/release.yml`'s "Publish GitHub Release" step already parses `CHANGELOG.md` this way).
+
+`.github/workflows/release.yml`'s existing "Bump version + regenerate CHANGELOG" step — where `$VERSION` first becomes known, before the commit — gains one more line: an `awk` pass replacing the content between the two markers with a fenced block containing `npm install -g https://github.com/${{ github.repository }}/releases/download/v${VERSION}/bifrost-cli-${VERSION}.tgz`. `${{ github.repository }}` (GitHub Actions' own built-in context, resolving to `0xSiddhant/bifrost`) is used in the workflow rather than hardcoding the slug a second time — `core/selfUpdate.ts`'s own hardcoded constant is the one place that string has to be written literally, since runtime Node code has no such context available. The release asset's URL is deterministic from `$VERSION` alone (GitHub's download-URL shape is always `.../releases/download/<tag>/<asset-name>`), so this edit never needs to wait on or query the `gh release create` step that runs later in the same job.
+
+`README.md` joins the existing "Commit, tag, push" step's `git add` list (already staging `package.json package-lock.json CHANGELOG.md server/package.json client/package.json`) — the install-command bump rides in the same `chore(release): vX.Y.Z` commit as the version bump, never a separate commit. `docs/releasing.md`'s own description of what the workflow does (confirmed directly — it currently lists every step precisely) needs a line added here too, or it goes stale the same way the README line would have.
 
 ## API contracts
 
@@ -173,10 +219,14 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 ## Task checklist
 
 **Workspace setup**
-- [ ] `cli/package.json`: `bin: { bifrost: "./dist/index.js" }`, `man: ["./man/bifrost.1"]`, `commander` + `open` dependencies, `marked-man` devDependency; availability-check the package name (`bifrost` vs. a scoped fallback) before first publish
+- [ ] `cli/package.json`: `name: "bifrost-cli"` (so `npm pack` produces `bifrost-cli-<version>.tgz` — the package name and the `bin` command name are independent; the command itself is still `bifrost`), `bin: { bifrost: "./dist/index.js" }`, `man: ["./man/bifrost.1"]`, `commander` + `open` dependencies, `marked-man` devDependency, `files` field scoping `npm pack` to `dist/`, `man/bifrost.1`, `package.json`, `README.md`; no publish step, so no registry name-availability check needed
 - [ ] `cli/tsconfig.json`; root `package.json`'s `workspaces` gains `"cli"`
 - [ ] `cli/src/index.ts`: shebang, commander program setup, subcommand registration
 - [ ] `cli/man/bifrost.1.md` + a `prebuild` script (mirrors `scripts/gen-build-info.ts`'s pattern) compiling it to `cli/man/bifrost.1` via `marked-man`; the compiled file is gitignored, not committed
+- [ ] `scripts/cli-sync.ts`: build `cli/`, `npm pack` to a temp dir, `npm install -g` the tarball unless `process.env.CI` is set, then delete the temp tarball
+- [ ] Root `package.json`: `build` gains `&& tsx scripts/cli-sync.ts`; `start` gains `tsx scripts/cli-sync.ts &&` **before** the existing `node --import ...` command (not after — `start` is long-running)
+- [ ] `.github/workflows/release.yml`: after the existing "Build release tarball" step, `npm pack -w cli --pack-destination .` and add the resulting `.tgz` to the same `gh release create` asset list as `bifrost-v${VERSION}.tar.gz`
+- [ ] `.github/workflows/release.yml`'s "Bump version + regenerate CHANGELOG" step: an `awk` pass replacing the content between README's `<!-- CLI_INSTALL_START -->`/`<!-- CLI_INSTALL_END -->` markers with the new version's install command; `README.md` added to the "Commit, tag, push" step's `git add` list
 
 **Core (`cli/src/core/`)**
 - [ ] `client.ts`: fetch wrapper, base URL from `discover.ts`, non-2xx responses mapped to clean CLI errors (message + exit code, never a raw stack)
@@ -190,17 +240,21 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 - [ ] `portkey.ts`: list/create/update/remove; resolve-a-slug (for `go`) fetches `GET /go/:slug` with `redirect: 'manual'` and reads the `Location` header directly — there is no `GET /api/portkey/:slug` to ask instead, and the list endpoint's `q` is a fuzzy search, not an exact-match lookup. A `Location` matching the `/portkey?go=` bounce pattern means "unknown slug"; anything else is the real target
 - [ ] `presence.ts`: list (read-only)
 - [ ] `nimbus.ts`: ping (10x, median), down, up (raw body), release-on-cancel, save-results; single-flight 409 mapped to a specific error
+- [ ] `selfUpdate.ts` (+ `selfUpdate.test.ts`): `checkLatest()` against `GET https://api.github.com/repos/0xSiddhant/bifrost/releases/latest`, cached in `config.ts`'s config file; `performUpdate()` resolves the `bifrost-cli-*.tgz` asset URL and shells out to `npm install -g <url>`, surfacing npm's own error output on failure
 
 **Commands (`cli/src/commands/`)**
 - [ ] `push.ts`, `pull.ts`, `clip.ts`, `open.ts` (+ `--type`, `--out`), `preview.ts` (+ `--type`, `--no-open`; `--json` implies `--no-open`), `portkey.ts` (+ `go` subcommand, `--open` to launch the system browser via `core/browser.ts`), `status.ts`, `devices.ts`, `speed.ts`
+- [ ] `update.ts`: thin wrapper over `core/selfUpdate.ts`'s `performUpdate()`; no-ops cleanly when already on the latest version
 - [ ] Global `--json` flag wired through every command via `output.ts`
 - [ ] `config` subcommand: `bifrost config set-host <url>` / `bifrost config show`
+- [ ] `index.ts`: background `checkLatest()` call ahead of dispatch, printing a one-line notice naming `bifrost update` — TTY-only, suppressed under `--json`
 
 **Docs**
 - [ ] `architecture.md`: a short paragraph noting the CLI as a third workspace and what it's for
 - [ ] `tech-stack.md`: add `commander`, `open`, and `marked-man` rows
-- [ ] `cli/README.md`: install, one example per command, config file location, `--host`/discovery story
-- [ ] Root `README.md`'s "Project docs" list: one new line linking to `cli/README.md`
+- [ ] `cli/README.md`: install, one example per command, config file location, `--host`/discovery story, `bifrost update`
+- [ ] Root `README.md`: new **CLI** section with the install command inside `<!-- CLI_INSTALL_START -->`/`<!-- CLI_INSTALL_END -->` markers, seeded with the current version by hand at merge time; "Project docs" list gets one new line linking to `cli/README.md`
+- [ ] `docs/releasing.md`: add a line describing the two new release-workflow steps (CLI tarball asset, README install-command patch)
 - [ ] `decisions.md`: log the npm-vs-Swift call (already made, restated for the record with reasoning) and the discovery/push-streaming spike outcomes once run
 - [ ] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
 
@@ -221,6 +275,10 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 13. No file under `server/` or `client/` changes in this plan's implementation PR — confirmed by the diff, not assumed from the design.
 14. `bifrost preview <slug>` for a real Edda document opens `/edda/preview/<slug>` in the system's default browser, verified by an actual visible browser launch, not just a printed URL; for a real Runestone/Groot/Atlas document it opens that kind's raw `/<kind>/api/<slug>` URL instead, since no rendered page exists for those kinds today. `--no-open` prints the resolved `{ slug, kind, url }` instead of launching anything; `--json` never launches a browser regardless of `--no-open`. A nonexistent slug and a genuine cross-kind collision are handled identically to `open`'s own resolution (clean "not found" / ask for `--type`), not reimplemented differently.
 15. `cli/README.md` documents every command with at least one real, runnable example, and root `README.md`'s Project docs list links to it. After `npm install -g` from a packed tarball, `man bifrost` opens and renders with no groff/nroff warnings on the terminal, and documents the same command set `--help` does.
+16. Editing a CLI command's output, then running `npm run build` (or `npm run start`), replaces the globally-installed `bifrost` with that change — verified by actually running `bifrost` afterward and seeing the edit, not just a successful script exit. Running either from a `CI=true` shell builds `cli/` but leaves any pre-existing global `bifrost` install untouched. `pm2 restart bifrost` never invokes this sync at all, confirmed against `ecosystem.config.cjs`'s direct `script:` path.
+17. A tagged release produces a GitHub Release with two assets — the existing `bifrost-v<version>.tar.gz` deployment bundle and a new `bifrost-cli-<version>.tgz` — and `npm install -g` against that second asset's real release URL succeeds on a clean machine with no prior Bifrost checkout.
+18. With an older version installed and a real newer GitHub Release published, the next command invocation on a TTY (not `--json`) prints a one-line notice naming `bifrost update`; `--json` and non-TTY output never show it; the check is cached (verified by request count across repeated invocations within the cache window, not one per command). `bifrost update` then installs the real latest version, verified by `bifrost --version` afterward; running it again immediately reports already up to date and performs no reinstall.
+19. After a real tagged release runs, root `README.md`'s CLI section names that exact version's real, working `npm install -g` URL — verified by actually running the command from the README, not just checking the string — landing in the same release commit as the version bump (one commit, confirmed by `git show` on the release commit, not a follow-up).
 
 ## Test checklist
 
@@ -230,11 +288,15 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 - [ ] Unit `core/documents.test.ts` — `resolveKind()`'s zero/one/many-match branches, `--type` short-circuit, shared correctly between `open` and `preview`
 - [ ] Unit `core/browser.test.ts` — `open` package mocked: default launches, `--no-open` doesn't, `--json` overrides `--no-open`'s own value and never launches
 - [ ] Unit `core/output.test.ts` — `--json` mode never mixes in human-readable text; table mode renders a known fixture correctly
+- [ ] Unit `core/selfUpdate.test.ts` — mocked GitHub API responses: newer-available, already-latest, cache-hit skips the network call entirely, and a release with no matching `bifrost-cli-*.tgz` asset handled as a clean error rather than a crash
 - [ ] Integration `files.int.test.ts` — `push`/`pull` against a real listening server (`fastify.inject` doesn't cover multipart-from-a-real-file well); the multi-file-one-request behavior and its per-file accept/reject reporting; the large-file streaming spike as an actual measured test (peak memory during the request), not a manual one-off
 - [ ] Integration `api.int.test.ts` — `clip` (add/list/remove), `portkey`/`go` (including the unknown-slug bounce-vs-real-redirect distinction), `preview`'s kind resolution and URL choice for each of the four kinds (browser launch itself mocked out, not actually spawned in CI), `status`, `devices`, each against a real server
 - [ ] Integration `speed.int.test.ts` — a full ping/down/up/results cycle against a real server; the 409 single-flight-guard path forced and asserted on
 - [ ] Manual: `npm install -g` from a packed tarball on a clean shell, confirm `PATH` wiring and `--help`/`--version`
 - [ ] Manual: `man bifrost` after that same global install renders cleanly (no roff warnings) and lists every command `--help` does
+- [ ] Manual: `scripts/cli-sync.ts` — edit a command, run `npm run build`, confirm the global `bifrost` reflects the edit; run again with `CI=true npm run build` and confirm the pre-existing global install is left untouched; confirm `npm run start` also re-syncs before the server actually starts (not after)
+- [ ] Manual: run the release workflow (or its packaging steps locally) against a test tag, confirm the GitHub Release carries both `bifrost-v<version>.tar.gz` and `bifrost-cli-<version>.tgz`, and `npm install -g` against the CLI asset's real URL works on a separate machine; confirm root `README.md`'s CLI section was patched to that exact version in the same commit
+- [ ] Manual: install an older real release's CLI tarball, confirm the update notice appears and names `bifrost update`, then run `bifrost update` and confirm it actually installs the current latest — followed by a second run confirming the clean "already up to date" no-op
 - [ ] Live-verify: run each command from a real terminal against the actual dev Mac's Bifrost instance, on the LAN, not just `localhost` — `preview` specifically confirmed by watching an actual browser tab open to the right URL for one document of each kind
 
 ## On completion
