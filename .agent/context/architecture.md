@@ -27,7 +27,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 | `presence` | Connected-device dashboard (Wardens page), character aliases + renames | local only |
 | `audit-log` | Upload history & activity log (event-bus subscriber) | local only |
 | `runestone` | JSON viewer/editor + saved document library (PLAN-07) | both |
-| `variant` | JSON & text diff checker (PLAN-08) | both |
+| `variant` | JSON & text diff checker (PLAN-08); exports an RFC 6902 JSON Patch or a git-shaped unified `.patch` (PLAN-26) — both pure client compute, `register()` still a no-op | both |
 | `edda` | Markdown editor + live preview + saved library (PLAN-11) | both |
 | `groot` | YAML editor, tree view, comment-preserving format + advisory rail (PLAN-19); server stores text and **never parses YAML** | both |
 | `atlas` | XML editor + plist-aware editable table + saved library (PLAN-23); server stores text and **never parses XML**, and knows nothing about plists | both |

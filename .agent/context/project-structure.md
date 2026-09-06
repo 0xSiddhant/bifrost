@@ -74,7 +74,8 @@ bifrost/
 │       │                      #     extracted at its second consumer, as JsonEditor and TreeView
 │       │                      #     both were at theirs),
 │       │                      #   +in-editor search, TreeView +bulk collapse +alias annotation),
-│       │                      #   json/ (parse/format/diff),
+│       │                      #   json/ (parse/format/diff + jsonPatch.ts, PLAN-26's RFC 6902
+│       │                      #     mapping over the same diff records, and the replay that proves one),
 │       │                      #   markdown/ (renderMarkdown/outline/stats/commands + PLAN-20's
 │       │                      #     mermaid.ts + useMermaid.ts — the async diagram pass sits BESIDE
 │       │                      #     the pure renderer, and in core so features/previews/ can reach it),
