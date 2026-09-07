@@ -25,9 +25,15 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 8. Styling via tokens only — zero hardcoded colors/sizes (grep for hex before finishing).
 9. Shared logic goes in `client/src/core/`, never imported across feature folders.
 
+## CLI (`cli/`) — ask, don't assume
+
+10. **Does this module deserve a `bifrost` command?** Since PLAN-27 there is a third workspace, and it is a **consumer only**: it calls endpoints that already exist and adds no server surface. A module whose value is a stored artifact or a transfer (documents, files, clipboard, go-links) usually does; a module that is a *page* (an editor, a canvas, a dashboard) usually does not. Decide explicitly and say which, rather than leaving the question unasked.
+11. If it does: a thin `cli/src/commands/<name>.ts` over one flat `cli/src/core/<name>.ts`, reusing `client.ts` (the only HTTP and the whole error table), `output.ts` (every byte printed — colour and progress are TTY-gated there, never in a command) and `discover.ts`'s single remediation wording. Never a second error vocabulary, never a second launcher, never `console.*`. Add the command to `cli/README.md` **and** `cli/man/bifrost.1.md`, which are kept in sync by hand.
+12. Remember the asymmetry that never goes away: the CLI reads the local filesystem freely, a browser page cannot read an arbitrary path at all. Anything that moves real bytes between them needs a stated transport, not a hand-wave.
+
 ## Finish
 
-10. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
-11. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
-12. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
-13. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
+13. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
+14. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
+15. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
+16. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
