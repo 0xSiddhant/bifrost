@@ -146,8 +146,18 @@ export class ApiClient {
    * A multipart upload streamed straight off disk. The content-length is
    * computed exactly from the parts, which is also what lets the server's own
    * declared-size check answer 413 before it reads a byte.
+   *
+   * `onProgress` is fed the *envelope* bytes written so far — headers and
+   * boundaries included — which is why it is paired with `contentLength` rather
+   * than the sum of the file sizes: the two differ by a few hundred bytes and a
+   * bar drawn against the wrong total never reaches 100%.
    */
-  async postFiles<T>(what: string, path: string, files: readonly UploadInput[]): Promise<T> {
+  async postFiles<T>(
+    what: string,
+    path: string,
+    files: readonly UploadInput[],
+    options: { query?: RequestOptions['query']; onProgress?: (sent: number, total: number) => void } = {},
+  ): Promise<T> {
     const boundary = `----BifrostCli${crypto.randomBytes(12).toString('hex')}`;
     const parts = files.map((file) => ({
       file,
@@ -163,17 +173,29 @@ export class ApiClient {
       parts.reduce((total, part) => total + part.header.length + part.file.size + 2, 0) +
       tail.length;
 
+    const report = options.onProgress;
+    let sent = 0;
     async function* envelope(): AsyncGenerator<Buffer> {
+      const emit = function* (chunk: Buffer): Generator<Buffer> {
+        sent += chunk.length;
+        report?.(sent, contentLength);
+        yield chunk;
+      };
       for (const part of parts) {
-        yield part.header;
-        for await (const chunk of fs.createReadStream(part.file.path)) yield chunk as Buffer;
-        yield Buffer.from('\r\n', 'utf8');
+        yield* emit(part.header);
+        for await (const chunk of fs.createReadStream(part.file.path)) yield* emit(chunk as Buffer);
+        yield* emit(Buffer.from('\r\n', 'utf8'));
       }
-      yield tail;
+      yield* emit(tail);
     }
 
-    const target = new URL(this.url(path));
+    const target = new URL(this.url(path, options.query));
     const transport = target.protocol === 'https:' ? https : http;
+    // Set when the *envelope* fails rather than the socket — a file that
+    // vanished or became unreadable mid-upload. Reporting that as "couldn't
+    // reach the server" would send someone debugging their network over a
+    // local permissions problem.
+    let readFailure: Error | null = null;
     const answer = await new Promise<{ status: number; body: string }>((resolve, reject) => {
       const request = transport.request(
         {
@@ -202,11 +224,15 @@ export class ApiClient {
       // A read failure (the file vanished mid-upload) must abort the request
       // rather than send a truncated body the server would then mis-parse.
       source.on('error', (error: Error) => {
+        readFailure = error;
         request.destroy(error);
         reject(error);
       });
       source.pipe(request);
     }).catch((error: unknown) => {
+      if (readFailure !== null) {
+        throw new CliError(`${what} failed: couldn't read a file to send — ${readFailure.message}`);
+      }
       throw unreachable(this.baseUrl, describeTransportFailure(error));
     });
 

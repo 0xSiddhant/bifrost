@@ -67,27 +67,60 @@ Every command accepts the global flags `--host <address>` and `--json`.
 
 ```bash
 bifrost push ~/Desktop/notes.pdf
-bifrost push a.pdf b.jpg c.txt         # one request, not three
+bifrost push a.pdf b.jpg c.txt          # space-separated; one request, not three
+bifrost push .                          # everything in the current folder
+bifrost push ~/photos report.pdf        # folders and files together
+bifrost push report.pdf -d Reports      # straight into a Downloads folder
 ```
 
-Files land in **Send**, the staging area, where any device can preview, rename,
-delete or publish them. A batch is reported per file, so one rejected file (over
-the size cap, a blocked extension) does not hide the ones that landed — and the
-exit code says the batch was not wholly accepted. Uploads stream off disk: a
-multi-gigabyte push does not grow the process.
+By default files land in **Send**, the staging area, where any device can
+preview, rename, delete or publish them.
+
+**A folder argument expands to the files directly inside it — not recursively.**
+`downloads/` is exactly one level deep and `uploads/` is flat, so a nested tree
+has nowhere to land, and flattening one would silently collide names the tree
+kept apart. Sub-folders and hidden files are skipped and counted, so `push .` in
+a project directory never puts your `.env` on a share every device can read.
+
+**`-d, --dir <name>` writes straight into `Downloads/<name>`**, creating the
+folder if it is missing and appending to it if it is not. Two things follow from
+that, both deliberate: the files are **live to every device immediately** (the
+website's banner and listing update over SSE as they land), and there is **no
+staging step and no undo**. A name that is already a plain file on the host is
+refused rather than guessed around.
+
+Large batches are split into as many requests as the server's own
+`MAX_FILES_PER_UPLOAD` allows — read from the server, never assumed, because
+past that cap it rejects the *whole* request. A batch is reported per file, so
+one rejected file does not hide the ones that landed, and the exit code says the
+batch was not wholly accepted. Uploads stream off disk: a multi-gigabyte push
+does not grow the process.
 
 ### pull — list Downloads, or fetch from it
 
 ```bash
-bifrost pull                                   # list files, folders and folder contents
+bifrost pull                                   # list what is on offer
+bifrost pull --list                            # …the same, said explicitly (-l works too)
 bifrost pull notes.pdf                         # download into the current folder
+bifrost pull notes.pdf Trip photos.zip         # several at once, space-separated
+bifrost pull Trip                              # a folder arrives as Trip.zip
 bifrost pull Trip/notes.pdf --out /tmp/n.pdf   # a folder's copy, somewhere else
 ```
 
+The listing shows root files, folders and every folder's contents, grouped so a
+folder is followed by what is in it, with size and type per row. **A folder has
+no size of its own** — the server reports 0 and the real figure is the sum of
+the rows beneath it — so that cell reads `—` rather than a misleading zero.
+
+**A folder downloads as a `.zip`**, streamed and built on the fly by the server.
+Files and folders can be mixed in one invocation; each lands under its own name
+in the current directory. `--out` names one destination, so it is refused with
+more than one name rather than quietly applying to the first.
+
 An exact path always wins, so `notes.pdf` means the one at the root even when a
 folder holds one too. A bare name that matches files in two folders is reported
-as ambiguous with both paths, rather than guessed at. The file is written as
-`<name>.part` until the last byte arrives, and the CLI refuses to overwrite a
+as ambiguous with both paths, rather than guessed at. Every download is written
+as `<name>.part` until the last byte arrives, and the CLI refuses to overwrite a
 file that is already there.
 
 ### clip — the clipboard every device shares (Hermes)
@@ -225,7 +258,17 @@ the endpoints it uses are the same LAN-trust ones the browser app uses.
 
 ## Output
 
-`--json` puts machine-readable JSON on stdout and nothing else: progress goes to
-stderr, errors go to stderr as `{"error":"…"}`, and no command launches a
-browser. So `bifrost --json pull | jq '.[] | select(.type=="file")'` works
-without filtering anything out first.
+Every command prints through one formatter: a titled section, aligned box-drawn
+tables, `✓`/`✗`/`⚠` status marks, and a live progress bar for transfers.
+
+**All of that is decided by whether the output is a terminal.** Colour and
+progress bars appear on a TTY and disappear the instant output is piped or
+redirected, so nothing downstream ever sees an escape sequence or a redrawn
+line. `NO_COLOR` (any value) turns colour off everywhere; `FORCE_COLOR` turns it
+on. Progress is drawn on **stderr**, so it never touches what you are capturing.
+
+`--json` puts machine-readable JSON on stdout and nothing else: chatter and
+progress are suppressed entirely, errors go to stderr as `{"error":"…"}`, and no
+command launches a browser. So
+`bifrost --json pull | jq '.[] | select(.type=="file")'` works without filtering
+anything out first.

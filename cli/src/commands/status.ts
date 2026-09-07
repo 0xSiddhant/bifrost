@@ -1,6 +1,6 @@
 import type { Command } from 'commander';
 import { clientFromOptions } from '../core/client.js';
-import { print } from '../core/output.js';
+import { accent, dim, fields, heading, print } from '../core/output.js';
 
 export interface Health {
   ok: boolean;
@@ -26,10 +26,14 @@ export function registerStatus(program: Command): void {
 
       print({ host: client.baseUrl, ...health, modules: capabilities.modules }, (value) =>
         [
-          `host      ${value.host}`,
-          `profile   ${value.profile}`,
-          `uptime    ${formatUptime(value.uptime)}`,
-          `modules   ${value.modules.join(', ')}`,
+          heading('Bifrost'),
+          fields([
+            ['host', accent(value.host)],
+            ['profile', value.profile],
+            ['uptime', formatUptime(value.uptime)],
+            ['modules', `${value.modules.length} loaded`],
+          ]),
+          dim(`  ${value.modules.join(' · ')}`),
         ].join('\n'),
       );
     });

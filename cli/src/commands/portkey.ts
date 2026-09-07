@@ -8,7 +8,19 @@ import {
   resolvePortkey,
   updatePortkey,
 } from '../core/portkey.js';
-import { CliError, EXIT, formatWhen, note, print, table } from '../core/output.js';
+import {
+  accent,
+  CliError,
+  dim,
+  EXIT,
+  formatWhen,
+  heading,
+  note,
+  ok,
+  plural,
+  print,
+  table,
+} from '../core/output.js';
 
 export function registerPortkey(program: Command): void {
   const portkey = program.command('portkey').description('manage LAN go-links');
@@ -21,16 +33,20 @@ export function registerPortkey(program: Command): void {
       const client = clientFromOptions(command.optsWithGlobals());
       const links = await listPortkeys(client, options.query);
       print(links, (rows) => {
-        if (rows.length === 0) return 'No go-links yet.';
-        return table(rows, [
-          { header: 'SLUG', value: (row) => row.slug },
-          { header: 'TARGET', value: (row) => row.url },
-          { header: 'HITS', value: (row) => String(row.hits), align: 'right' },
-          {
-            header: 'LAST USED',
-            value: (row) => (row.lastUsedAt === null ? 'never' : formatWhen(row.lastUsedAt)),
-          },
-        ]);
+        if (rows.length === 0) return dim('No go-links yet.');
+        return [
+          heading('Go-links'),
+          table(rows, [
+            { header: 'SLUG', value: (row) => row.slug },
+            { header: 'TARGET', value: (row) => row.url },
+            { header: 'HITS', value: (row) => String(row.hits), align: 'right' },
+            {
+              header: 'LAST USED',
+              value: (row) => (row.lastUsedAt === null ? 'never' : formatWhen(row.lastUsedAt)),
+            },
+          ]),
+          dim(plural(rows.length, 'link')),
+        ].join('\n');
       });
     });
 
@@ -48,7 +64,7 @@ export function registerPortkey(program: Command): void {
         ...(options.note === undefined ? {} : { note: options.note }),
       });
       print({ ...link, go: `${client.baseUrl}/go/${link.slug}` }, (value) =>
-        `${value.go} → ${value.url}`,
+        ok(`${accent(value.go)} → ${value.url}`),
       );
     });
 
@@ -67,7 +83,7 @@ export function registerPortkey(program: Command): void {
         ...(options.url === undefined ? {} : { url: options.url }),
         ...(options.note === undefined ? {} : { note: options.note }),
       });
-      print(link, (value) => `${value.slug} → ${value.url}`);
+      print(link, (value) => ok(`${accent(value.slug)} → ${value.url}`));
     });
 
   portkey
@@ -77,7 +93,7 @@ export function registerPortkey(program: Command): void {
     .action(async (slug: string, _options: unknown, command: Command) => {
       const client = clientFromOptions(command.optsWithGlobals());
       await removePortkey(client, slug);
-      print({ removed: slug }, (value) => `removed ${value.removed}`);
+      print({ removed: slug }, (value) => ok(`removed ${accent(value.removed)}`));
     });
 
   // Top level, because following a go-link is the everyday verb and

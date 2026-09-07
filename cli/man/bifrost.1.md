@@ -27,11 +27,11 @@ The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name
 
 ## COMMANDS
 
-  * `bifrost push` <file>...:
-    Send files to the bridge. They land in Send (the staging area), where any device can preview, rename, delete or publish them. Every file in one invocation travels in one request, and the per-file accepted/rejected result is printed as such — a batch with one oversize file still lands the rest. Uploads stream off disk, so a multi-gigabyte push does not grow the process.
+  * `bifrost push` <path>... [`-d`|`--dir` <name>]:
+    Send files to the bridge, named individually, as folders, or as `.` for everything in the current directory. A folder argument expands to the files **directly** inside it — not recursively, because Downloads is one level deep and Send is flat, so a nested tree has nowhere to land; sub-folders and hidden files are skipped and counted. By default they land in Send (the staging area), where any device can preview, rename, delete or publish them. `--dir` writes straight into `Downloads/<name>` instead, creating the folder if missing and appending to it if not: the files are live to every device immediately, with no staging step and no undo. Batches are split to fit the server's own per-request file cap, and the per-file accepted/rejected result is printed as such — a batch with one oversize file still lands the rest. Uploads stream off disk, so a multi-gigabyte push does not grow the process.
 
-  * `bifrost pull` [<name>] [`--out` <path>]:
-    With no argument, list what Downloads is offering — root files, folders and the files inside them. With a name, download it. A bare name is enough unless two folders hold the same one, in which case pass `Folder/name`. The file lands under its own name in the current directory unless `--out` says otherwise, is written to `<name>.part` until the last byte arrives, and an existing local file is never overwritten.
+  * `bifrost pull` [<name>...] [`-l`|`--list`] [`--out` <path>]:
+    With no argument or `--list`, list what Downloads is offering — root files, folders and the files inside them, grouped so a folder is followed by its contents. A folder has no size of its own, so that cell reads `—` rather than a misleading zero. With names, download them: several at once, space-separated, files and folders mixed. A folder arrives as `<name>.zip`, streamed and built on the fly. A bare name is enough unless two folders hold the same one, in which case pass `Folder/name`. Each lands under its own name in the current directory unless `--out` says otherwise (which is refused with more than one name, since it names one destination), is written to `<name>.part` until the last byte arrives, and an existing local file is never overwritten.
 
   * `bifrost clip` [<text>] [`--list`] [`--rm` <id>] [`--code`] [`--lang` <lang>] [`--ttl` <seconds>]:
     Hermes, the clipboard every device shares. With text, share it. With nothing, print the most recent entry — so piping `bifrost clip` into `pbcopy` is the read half of the round trip. `--list` shows every entry, `--rm` deletes one.
@@ -78,6 +78,10 @@ The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name
   * `bifrost doctor`:
     Walk the chain every other command runs through — config, host resolution, server reachability, server profile, CLI version, Node runtime — one line each, with the same remediation wording the failing command itself prints. The version line is informational and never affects the exit code.
 
+## OUTPUT
+
+Every command prints through one formatter: a titled section, aligned box-drawn tables, `✓`/`✗`/`⚠` marks, and a progress bar for transfers. All of it is decided by whether the output is a terminal — colour and progress appear on a TTY and disappear the instant output is piped or redirected, so nothing downstream ever sees an escape sequence or a redrawn line. `NO_COLOR` (any value) disables colour, `FORCE_COLOR` enables it, and `--json` disables both. Progress is drawn on stderr, never stdout.
+
 ## EXIT STATUS
 
   * 0:
@@ -110,10 +114,14 @@ Send two files and see what landed:
 
     bifrost push ~/Desktop/notes.pdf ~/Desktop/photo.jpg
 
-List Downloads, then fetch one file:
+Send everything in this folder, straight into a named Downloads folder:
 
-    bifrost pull
-    bifrost pull notes.pdf --out /tmp/notes.pdf
+    bifrost push . --dir Holiday
+
+List Downloads, then fetch a file and a whole folder at once:
+
+    bifrost pull --list
+    bifrost pull notes.pdf Holiday
 
 Move text between machines:
 

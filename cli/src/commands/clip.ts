@@ -1,7 +1,19 @@
 import type { Command } from 'commander';
 import { clientFromOptions } from '../core/client.js';
 import { addClipboard, listClipboard, removeClipboard } from '../core/clipboard.js';
-import { CliError, EXIT, formatWhen, note, print, table } from '../core/output.js';
+import {
+  accent,
+  CliError,
+  dim,
+  EXIT,
+  formatWhen,
+  heading,
+  note,
+  ok,
+  plural,
+  print,
+  table,
+} from '../core/output.js';
 
 interface ClipOptions {
   list?: boolean;
@@ -26,7 +38,7 @@ export function registerClip(program: Command): void {
 
       if (options.rm !== undefined) {
         await removeClipboard(client, options.rm);
-        print({ removed: options.rm }, (value) => `removed ${value.removed}`);
+        print({ removed: options.rm }, (value) => ok(`removed ${accent(value.removed)}`));
         return;
       }
 
@@ -41,7 +53,7 @@ export function registerClip(program: Command): void {
           ...(options.lang === undefined ? {} : { lang: options.lang }),
           ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
         });
-        print(entry, (value) => `shared as ${value.id}`);
+        print(entry, (value) => ok(`shared as ${accent(value.id)}`));
         note('It is on every open Hermes page already.');
         return;
       }
@@ -49,13 +61,17 @@ export function registerClip(program: Command): void {
       const entries = await listClipboard(client);
       if (options.list === true) {
         print(entries, (rows) => {
-          if (rows.length === 0) return 'The clipboard is empty.';
-          return table(rows, [
-            { header: 'ID', value: (row) => row.id },
-            { header: 'KIND', value: (row) => row.kind },
-            { header: 'WHEN', value: (row) => formatWhen(row.createdAt) },
-            { header: 'TEXT', value: (row) => oneLine(row.text) },
-          ]);
+          if (rows.length === 0) return dim('The clipboard is empty.');
+          return [
+            heading('Hermes'),
+            table(rows, [
+              { header: 'ID', value: (row) => row.id },
+              { header: 'KIND', value: (row) => row.kind },
+              { header: 'WHEN', value: (row) => formatWhen(row.createdAt) },
+              { header: 'TEXT', value: (row) => oneLine(row.text) },
+            ]),
+            dim(plural(rows.length, 'entry', 'entries')),
+          ].join('\n');
         });
         return;
       }

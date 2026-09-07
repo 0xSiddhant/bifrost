@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { configPath, readConfig, updateConfig } from '../core/config.js';
 import { normalizeHost, resolveBaseUrl } from '../core/discover.js';
-import { print } from '../core/output.js';
+import { accent, dim, fields, heading, ok, print } from '../core/output.js';
 
 export function registerConfig(program: Command): void {
   const config = program.command('config').description('the CLI’s own settings');
@@ -12,12 +12,16 @@ export function registerConfig(program: Command): void {
     .action(() => {
       const stored = readConfig();
       const { baseUrl, source } = resolveBaseUrl(undefined, stored.host);
-      print({ path: configPath(), host: baseUrl, hostSource: source, deviceId: stored.deviceId ?? null },
+      print(
+        { path: configPath(), host: baseUrl, hostSource: source, deviceId: stored.deviceId ?? null },
         (value) =>
           [
-            `file        ${value.path}`,
-            `host        ${value.host} (${value.hostSource})`,
-            `device id   ${value.deviceId ?? '—'}`,
+            heading('CLI config'),
+            fields([
+              ['file', value.path],
+              ['host', `${accent(value.host)} ${dim(`(${value.hostSource})`)}`],
+              ['device id', value.deviceId ?? '—'],
+            ]),
           ].join('\n'),
       );
     });
@@ -29,6 +33,6 @@ export function registerConfig(program: Command): void {
     .action((address: string) => {
       const host = normalizeHost(address);
       updateConfig({ host });
-      print({ host, path: configPath() }, (value) => `host set to ${value.host}`);
+      print({ host, path: configPath() }, (value) => ok(`host set to ${accent(value.host)}`));
     });
 }

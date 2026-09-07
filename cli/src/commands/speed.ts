@@ -7,7 +7,7 @@ import {
   saveSpeedResult,
   type Phase,
 } from '../core/nimbus.js';
-import { CliError, note, print } from '../core/output.js';
+import { accent, CliError, fields, heading, note, print } from '../core/output.js';
 
 const PHASE_TEXT: Record<Phase, string> = {
   warmup: 'warming up…',
@@ -55,10 +55,13 @@ export function registerSpeed(program: Command): void {
         const saved = await saveSpeedResult(client, reading);
         print(saved, (value) =>
           [
-            `down      ${formatMbps(value.downMbps)} Mbps`,
-            `up        ${formatMbps(value.upMbps)} Mbps`,
-            `latency   ${value.latencyMs.toFixed(1)} ms`,
-            `payload   ${value.testMb} MB`,
+            heading('Speed test'),
+            fields([
+              ['down', `${accent(formatMbps(value.downMbps))} Mbps`],
+              ['up', `${accent(formatMbps(value.upMbps))} Mbps`],
+              ['latency', `${value.latencyMs.toFixed(1)} ms`],
+              ['payload', `${value.testMb} MB`],
+            ]),
           ].join('\n'),
         );
       } finally {

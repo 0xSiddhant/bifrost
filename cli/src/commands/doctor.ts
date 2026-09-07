@@ -4,7 +4,7 @@ import { ApiClient, describeTransportFailure } from '../core/client.js';
 import { configPath, deviceId, readConfig } from '../core/config.js';
 import { resolveBaseUrl, unreachableMessage } from '../core/discover.js';
 import { checkLatest, cliVersion, compareVersions } from '../core/selfUpdate.js';
-import { EXIT, print } from '../core/output.js';
+import { attention, bad, dim, EXIT, heading, ok, print } from '../core/output.js';
 import type { Capabilities } from './status.js';
 
 /**
@@ -24,7 +24,7 @@ export interface Check {
   detail: string;
 }
 
-const MARK: Record<CheckStatus, string> = { pass: '✓', fail: '✗', warn: '⚠' };
+const MARK: Record<CheckStatus, (text: string) => string> = { pass: ok, fail: bad, warn: attention };
 const PROFILES = ['local', 'cloud'];
 
 export function registerDoctor(program: Command): void {
@@ -34,7 +34,10 @@ export function registerDoctor(program: Command): void {
     .action(async (_options: unknown, command: Command) => {
       const checks = await runDoctor(command.optsWithGlobals());
       print(checks, (rows) =>
-        rows.map((row) => `${MARK[row.status]} ${row.name}\n    ${row.detail}`).join('\n'),
+        [
+          heading('Doctor'),
+          ...rows.map((row) => `${MARK[row.status](row.name)}\n  ${dim(row.detail)}`),
+        ].join('\n'),
       );
       // The GitHub check is informational: a household Mac with no WAN should
       // not fail `doctor` over an update it does not need.

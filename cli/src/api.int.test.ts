@@ -169,7 +169,7 @@ describe('open', () => {
     const run = await runCli([...host, 'open', 'nothing-here-a1b2c3']);
 
     expect(run.exitCode).toBe(4);
-    expect(run.stderr).toBe('error: no document with the slug "nothing-here-a1b2c3"\n');
+    expect(run.stderr).toBe('✗ error: no document with the slug "nothing-here-a1b2c3"\n');
   });
 });
 

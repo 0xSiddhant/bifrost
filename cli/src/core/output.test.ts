@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  accent,
+  bad,
   CliError,
+  colourEnabled,
   EXIT,
+  fields,
   formatBytes,
   formatWhen,
+  heading,
   isJsonMode,
   note,
+  ok,
+  plural,
   print,
   printError,
+  progress,
   setJsonMode,
   table,
   warn,
@@ -102,7 +110,7 @@ describe('human mode', () => {
     err.restore();
 
     expect(stdout).toBe('2 accepted\n');
-    expect(stderr).toBe('open Send on any device\nwarning: couldn’t save the config\n');
+    expect(stderr).toBe('open Send on any device\n⚠ warning: couldn’t save the config\n');
   });
 
   it('writes errors as one line, never a stack', () => {
@@ -111,7 +119,7 @@ describe('human mode', () => {
     const text = err.text();
     err.restore();
 
-    expect(text).toBe('error: pushing files failed: HTTP 400\n');
+    expect(text).toBe('✗ error: pushing files failed: HTTP 400\n');
   });
 });
 
@@ -128,12 +136,14 @@ describe('table', () => {
       ]),
     ).toBe(
       [
+        '┌────────────────────────┬────────┐',
         // The header sits in its column's alignment too, so a right-aligned
         // SIZE reads over the values rather than off to their left.
-        'NAME                      SIZE',
-        '----------------------  ------',
-        'notes.txt                 12 B',
-        'a-much-longer-name.bin  2.0 KB',
+        '│ NAME                   │   SIZE │',
+        '├────────────────────────┼────────┤',
+        '│ notes.txt              │   12 B │',
+        '│ a-much-longer-name.bin │ 2.0 KB │',
+        '└────────────────────────┴────────┘',
       ].join('\n'),
     );
   });
@@ -157,6 +167,91 @@ describe('formatting helpers', () => {
     expect(formatWhen(0)).toBe('—');
     expect(formatWhen(Number.NaN)).toBe('—');
     expect(formatWhen(Date.now())).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+});
+
+describe('colour', () => {
+  const restore = { ...process.env };
+  afterEach(() => {
+    process.env.NO_COLOR = restore.NO_COLOR;
+    process.env.FORCE_COLOR = restore.FORCE_COLOR;
+    if (restore.NO_COLOR === undefined) delete process.env.NO_COLOR;
+    if (restore.FORCE_COLOR === undefined) delete process.env.FORCE_COLOR;
+  });
+
+  it('is off when the output is not a terminal — nothing piped ever carries an escape', () => {
+    // vitest captures stdout, so isTTY is false here: exactly the piped case.
+    delete process.env.FORCE_COLOR;
+    expect(colourEnabled('stdout')).toBe(false);
+    expect(accent('notes.txt')).toBe('notes.txt');
+    expect(ok('done')).toBe('✓ done');
+    expect(bad('nope')).toBe('✗ nope');
+  });
+
+  it('is on under FORCE_COLOR, and off again under NO_COLOR whatever its value', () => {
+    process.env.FORCE_COLOR = '1';
+    expect(colourEnabled('stdout')).toBe(true);
+    expect(accent('x')).toContain('\u001b[36m');
+
+    // NO_COLOR wins by its presence alone, even set to an empty string.
+    process.env.NO_COLOR = '';
+    expect(colourEnabled('stdout')).toBe(false);
+    expect(accent('x')).toBe('x');
+  });
+
+  it('is off in JSON mode even on a terminal, so stdout stays parseable', () => {
+    process.env.FORCE_COLOR = '1';
+    setJsonMode(true);
+    expect(colourEnabled('stdout')).toBe(false);
+    expect(accent('x')).toBe('x');
+  });
+
+  it('keeps symbols but drops colour, so a ✓ survives into a log file', () => {
+    delete process.env.FORCE_COLOR;
+    expect(ok('installed')).toBe('✓ installed');
+  });
+});
+
+describe('heading and fields', () => {
+  it('underlines a heading to its own width', () => {
+    expect(heading('Downloads')).toBe('Downloads\n─────────');
+  });
+
+  it('aligns a key/value block on the longest key', () => {
+    expect(
+      fields([
+        ['host', 'http://bifrost.local:4646'],
+        ['profile', 'local'],
+      ]),
+    ).toBe('host     http://bifrost.local:4646\nprofile  local');
+  });
+
+  it('pluralizes, including the irregular case callers pass in', () => {
+    expect(plural(1, 'file')).toBe('1 file');
+    expect(plural(0, 'file')).toBe('0 files');
+    expect(plural(2, 'entry', 'entries')).toBe('2 entries');
+  });
+});
+
+describe('progress', () => {
+  it('is inert when stderr is not a terminal — a pipe never gets a redrawn line', () => {
+    const err = captureStderr();
+    const bar = progress('sending', 1000);
+    bar.update(500);
+    bar.stop();
+    const text = err.text();
+    err.restore();
+
+    expect(text).toBe('');
+  });
+
+  it('is inert for an unknown total, rather than drawing a bar against a guess', () => {
+    const err = captureStderr();
+    progress('pulling', 0).update(10);
+    const text = err.text();
+    err.restore();
+
+    expect(text).toBe('');
   });
 });
 
