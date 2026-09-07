@@ -140,6 +140,38 @@ Four things about it are load-bearing rather than incidental:
   machine re-syncs its global `bifrost` from `develop` on every build and is
   routinely *ahead* of the last published tag.
 
+A later owner round widened `push`/`pull` and made the whole output layer
+presentation-aware, still with **zero server change**:
+
+- **`push` takes folders and `.`**, expanding to the files *directly* inside —
+  never recursively, because `downloads/` is one level deep and `uploads/` flat,
+  so a tree has nowhere to land and flattening one would collide names it kept
+  apart. Hidden files are skipped (a `push .` must not put `.env` on the share).
+  Batches are split at the server's own `MAX_FILES_PER_UPLOAD`, read from
+  `/api/files/config` rather than assumed, because past that cap busboy aborts
+  the **whole** request — a 50-file push would otherwise land nothing.
+- **`push -d <name>`** is `POST /api/files?folder=`, PLAN-24's own path: the
+  folder is created if missing and appended to if not, and the files are live
+  immediately. Verified over a real SSE stream: one `download.added` for the new
+  folder row, one `file.published` carrying `folder` (the banner), one
+  `download.added` for the file. **A plain `push` produces no SSE event at all** —
+  `file.uploaded` is emitted but only `audit-log` and `metrics` subscribe, and
+  there is no `GET /api/files` listing route, so a browser's Send page is a
+  local queue of what *that browser* uploaded. Making a CLI push visible there
+  needs a listing route plus a broadcast, which is server surface and therefore
+  a separate plan, not a CLI change.
+- **`pull` is variadic and folder-aware**: `--list`/`-l`, several names at once,
+  and a folder streamed as `<name>.zip` through `GET /api/downloads/:id/archive`.
+  A folder's own size is never shown as a number — the server reports 0 and the
+  truth is the sum of its rows — so the cell reads `—`.
+- **Presentation lives entirely in `output.ts`**, which is the only module that
+  knows a terminal exists. Colour, `✓`/`✗`/`⚠` marks, box-drawn tables and
+  transfer bars are gated on `isTTY` per stream (plus `NO_COLOR`/`FORCE_COLOR`),
+  so a pipe never receives an escape sequence and progress is drawn on stderr
+  only. Table cells are padded *before* they are styled — an ANSI sequence
+  counted as visible width would skew every column after it. `--json` disables
+  the lot.
+
 `scripts/cli-sync.ts` keeps that global install honest: `npm run build` and `npm
 run start` both `npm pack` the workspace and `npm install -g` the tarball — the
 same mechanism a real install uses, never `npm link`, so a packaging bug cannot
