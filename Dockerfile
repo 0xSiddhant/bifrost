@@ -16,10 +16,13 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
+COPY cli/package.json ./cli/
 RUN npm ci
 # Build, then drop dev deps so only production node_modules ship.
 COPY . .
-RUN npm run build \
+# CI=true so the build's cli-sync step builds cli/ without also trying to
+# `npm install -g` the CLI into a throwaway image layer (PLAN-27).
+RUN CI=true npm run build \
   && npm prune --omit=dev
 
 # ---- runtime: slim, non-root, init ----

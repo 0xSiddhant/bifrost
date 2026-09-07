@@ -36,6 +36,7 @@ export default {
         // core areas
         'core',
         'client',
+        'cli',
         'ci',
         'docs',
         'ops',
