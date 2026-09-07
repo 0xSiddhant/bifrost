@@ -100,14 +100,43 @@ sh scripts/observability.sh    # http://localhost:3000  (admin / bifrost)
 See [`docs/observability.md`](docs/observability.md). Back up all state
 (`storage/` + `themes/`) any time with `npm run backup`.
 
+## CLI
+
+`bifrost` is a command-line client for a running hub — push and pull files, read
+and write the shared clipboard, fetch saved documents, resolve go-links, check
+server and device state, run a speed test. It is a third npm workspace
+(`cli/`) that consumes the existing API and adds no server routes of its own.
+
+Install it from the latest release's tarball:
+
+<!-- CLI_INSTALL_START -->
+
+```bash
+npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v1.3.0/bifrost-cli-1.3.0.tgz
+```
+
+<!-- CLI_INSTALL_END -->
+
+```bash
+bifrost push ~/Desktop/notes.pdf     # send a file to the bridge
+bifrost pull                         # list what Downloads is offering
+bifrost clip | pbcopy                # read the shared clipboard
+bifrost doctor                       # check config, host, server, CLI version
+```
+
+Every command, the config file, and the `--host`/discovery story:
+[`cli/README.md`](cli/README.md). On the host machine `npm run build` and
+`npm run start` re-install the global `bifrost` from what is checked out, so it
+never drifts from the server it talks to.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run setup` | Creates storage folders, verifies `.env`, runs DB migrations |
 | `npm run dev` | Dev mode with hot reload (server + client) |
-| `npm run build` | Production build (client + server) |
-| `npm start` | Run production build |
+| `npm run build` | Production build (client + server), then re-installs the global `bifrost` CLI |
+| `npm start` | Re-installs the global `bifrost` CLI, then runs the production build |
 | `npm run logs` | Pretty-tail the JSON log file |
 | `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data |
 | `npm run backup` | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
@@ -130,6 +159,7 @@ Operating & deploying:
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
+- [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 
 ## License
 

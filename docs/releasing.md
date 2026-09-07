@@ -12,11 +12,19 @@ edit versions or the changelog yourself.
 3. The push to `main` triggers `release.yml`, which — untouched by humans —:
    - reads every commit since the last tag and computes the bump
      (`feat:` → minor, `fix:` → patch, `!` / `BREAKING CHANGE` → major);
-   - bumps the root + `server` + `client` `package.json` and regenerates
+   - bumps the root + `server` + `client` + `cli` `package.json` and regenerates
      `CHANGELOG.md` (changelogen);
-   - commits `chore(release): vX.Y.Z`, tags `vX.Y.Z`, pushes;
-   - publishes a **GitHub Release** with that version's changelog section and a
-     `bifrost-vX.Y.Z.tar.gz` production build attached (rollback artifact);
+   - rewrites the block between `<!-- CLI_INSTALL_START -->` and
+     `<!-- CLI_INSTALL_END -->` in `README.md` with that version's real
+     `npm install -g <release URL>` command — the URL is deterministic from the
+     version, so it never has to wait on the release below;
+   - commits `chore(release): vX.Y.Z` (bump + changelog + that README line, one
+     commit), tags `vX.Y.Z`, pushes;
+   - packs the CLI workspace (`npm pack -w cli`) into `bifrost-cli-X.Y.Z.tgz`;
+   - publishes a **GitHub Release** with that version's changelog section and
+     **two assets**: the `bifrost-vX.Y.Z.tar.gz` production build (rollback
+     artifact / PM2 deployment bundle) and `bifrost-cli-X.Y.Z.tgz`, which is
+     what `npm install -g <url>` installs;
    - fast-forwards **`main` → `develop`** so develop carries the bump.
 
 A `chore:`/`docs:`-only merge to `main` produces **no release** (nothing
@@ -70,5 +78,7 @@ back-merge fails (develop diverged), merge `main` into `develop` manually.
 ## Deliberately excluded
 
 No container registry push (nothing consumes the image — the Mac runs native
-PM2), no auto-deploy (nowhere to deploy), no npm publish (not a library). Add
-GHCR the day a Linux host actually pulls the image.
+PM2), no auto-deploy (nowhere to deploy), no npm publish (not a library — the
+CLI ships as a Release asset installed by URL, which needs no registry account
+and no globally-unique package name). Add GHCR the day a Linux host actually
+pulls the image.

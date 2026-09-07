@@ -61,14 +61,23 @@ jobs:
           # Keep the workspaces in lockstep with the root version.
           npm version "$VERSION" --no-git-tag-version --allow-same-version \
             --workspaces --include-workspace-root=false
+          # README's CLI install command embeds the version, so it is generated
+          # here rather than hand-maintained — the URL is deterministic from
+          # $VERSION, so this never has to wait on `gh release create` below.
+          CLI_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/bifrost-cli-${VERSION}.tgz"
+          awk -v url="$CLI_URL" '
+            /CLI_INSTALL_START/ { print; print ""; print "```bash"; print "npm install -g " url; print "```"; print ""; skip = 1; next }
+            /CLI_INSTALL_END/   { skip = 0 }
+            !skip               { print }
+          ' README.md > README.md.tmp && mv README.md.tmp README.md
 
       - name: Commit, tag, push
         if: steps.detect.outputs.release == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json CHANGELOG.md \
-            server/package.json client/package.json
+          git add package.json package-lock.json CHANGELOG.md README.md \
+            server/package.json client/package.json cli/package.json
           git commit -m "chore(release): v${VERSION}"
           git tag "v${VERSION}"
           # Push the branch and the tag as separate refs. `--follow-tags` only
@@ -87,6 +96,15 @@ jobs:
             package.json package-lock.json server/package.json client/package.json \
             ecosystem.config.cjs .env.example
 
+      - name: Pack the CLI tarball
+        if: steps.detect.outputs.release == 'true'
+        run: |
+          # `npm run build` above already built cli/ (its cli-sync step runs in
+          # CI mode: build, no global install), so this only packages it.
+          # The result is the `npm install -g <url>` asset README now points at.
+          npm pack -w cli --pack-destination .
+          ls -l "bifrost-cli-${VERSION}.tgz"
+
       - name: Publish GitHub Release
         if: steps.detect.outputs.release == 'true'
         env:
@@ -95,7 +113,8 @@ jobs:
           # Notes = the section changelogen just prepended to CHANGELOG.md
           # (everything from the first "## " header to the next one).
           awk '/^## /{c++} c==1{print} c==2{exit}' CHANGELOG.md > RELEASE_NOTES.md
-          gh release create "v${VERSION}" "bifrost-v${VERSION}.tar.gz" \
+          gh release create "v${VERSION}" \
+            "bifrost-v${VERSION}.tar.gz" "bifrost-cli-${VERSION}.tgz" \
             --title "v${VERSION}" --notes-file RELEASE_NOTES.md
 
       - name: Back-merge main into develop
