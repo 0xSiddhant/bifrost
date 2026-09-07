@@ -8,7 +8,7 @@ bifrost/
 ├── .github/workflows/         # ci.yml (lint/typecheck/test/build + docker build + backup smoke)
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
-├── package.json               # npm workspaces: server, client
+├── package.json               # npm workspaces: server, client, cli
 ├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
 ├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
 ├── docker-compose.yml         # run on a Linux host (host networking)
@@ -117,8 +117,26 @@ bifrost/
 │                              #   toolbox (registry + lib/ pure utils + tools/ bodies in ONE lazy
 │                              #     chunk + own toolbox.css) in PLAN-18 — no route of its own,
 │                              #     the cards expand inside /diagon-alley/:toolId
-├── scripts/                   # setup, backup, restore, resilience (test:resilience) +
-│                              #   start-pm2.sh, start-launchd.sh, observability.sh
+├── cli/                       # THIRD workspace (PLAN-27): the `bifrost` command, installed
+│   ├── README.md              #   globally from a GitHub Release tarball. The first
+│   │                          #   workspace-level README in the repo — deliberately, since
+│   │                          #   `npm install -g` moves this one out of the monorepo
+│   ├── man/bifrost.1.md       #   hand-written; compiled to the gitignored bifrost.1 by
+│   │                          #   scripts/gen-man.ts in cli's prebuild (gen-build-info's pattern)
+│   └── src/
+│       ├── index.ts           #   commander program; self-starts only when it IS the entry
+│       │                      #     (realpath'd — `npm install -g` puts a SYMLINK on PATH)
+│       ├── core/              #   one flat file per capability, mirroring client/src/core/:
+│       │                      #     client (the only HTTP + the whole error table), discover,
+│       │                      #     config, output (+ CliError/EXIT), files, clipboard,
+│       │                      #     documents, browser, portkey, presence, nimbus, selfUpdate
+│       ├── commands/          #   thin: parse args, call core/, print. No usecase tier —
+│       │                      #     there is no rule here the server does not already enforce
+│       └── test/              #   liveServer (spawns a REAL server per int suite) + runCli
+├── scripts/                   # setup, backup, restore, resilience (test:resilience),
+│                              #   gen-build-info, gen-man, cli-sync (pack + npm install -g,
+│                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,
+│                              #   observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts
     ├── uploads/   downloads/   tmp/   data/ (app.db)   logs/
