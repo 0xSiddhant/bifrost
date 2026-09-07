@@ -27,7 +27,7 @@ Every endpoint below was read directly from its route file (or, for the four doc
 
 **In:**
 - New npm workspace `cli/`, published as a global-installable package with a `bifrost` binary.
-- Commands: `push`, `pull`, `clip`, `open`, `preview`, `portkey` (+`go`), `status`, `devices`, `speed`, `config`, `update`.
+- Commands: `push`, `pull`, `clip`, `open`, `preview`, `portkey` (+`go`), `status`, `devices`, `speed`, `config`, `update`, `doctor`.
 - `commander` for argument parsing.
 - A config file (`--host` override, persisted default) and default discovery via `bifrost.local`.
 - `--json` output mode on every command, for scripting.
@@ -92,7 +92,8 @@ cli/
         ├── devices.ts
         ├── speed.ts
         ├── config.ts
-        └── update.ts
+        ├── update.ts
+        └── doctor.ts
 ```
 
 **Test placement follows this codebase's own real convention, not a new one**: a plain `<name>.test.ts` sits beside the file it tests (`file-transfer/sanitize.test.ts`, `file-transfer/services/place-file.test.ts` are the confirmed precedent), and a real-server integration test is a **separate, `.int.test.ts`-suffixed file, split by concern** rather than one giant file — `file-transfer` itself has three (`file-transfer.int.test.ts`, `uploads.int.test.ts`, `watcher-sse.int.test.ts`), not one, and the CLI's three (`files`, `api`, `speed`) mirror that same split-by-concern shape.
@@ -144,6 +145,10 @@ Launching the OS's actual browser is a separate small capability, `core/browser.
 ### `speed`: reuses the browser client's own measurement philosophy, doesn't invent a second one
 
 Architecture.md is explicit that Nimbus's design puts the clock on the client deliberately — "the number a person cares about is the one their own device sees" — and that ping takes the median of ten samples, never the mean, because one retried packet would poison an average. The CLI's `speed` command reuses both: ten `GET /api/nimbus/ping` round-trips timed client-side, median taken; `GET /api/nimbus/down?mb=` and `POST /api/nimbus/up` (raw bytes, **not** multipart — confirmed against the route's own custom content-type parser) timed the same way. A completed run is `POST`ed to `/api/nimbus/results`, so a CLI-run test joins the same history a browser-run one would, rather than living in a second, disconnected place. The single-flight guard's 409 ("another broom is flying") is handled as a clean, specific CLI error naming the conflict — never a raw HTTP error dump — matching how the browser client already treats it as an expected state, not a failure.
+
+### `doctor`: a proactive diagnostic pass, not a repeat of `status`
+
+`status` assumes the connection to the server already works and reports what the server says about itself (`/api/health`, `/api/capabilities`). `doctor` exists for the moment that assumption is false — connectivity itself is broken and the caller doesn't know which layer failed. It runs the same chain every other command runs through implicitly, but sequentially and out loud: (1) config file readable, falling back to defaults cleanly if not; (2) the configured/default host actually resolves — reusing `discover.ts`'s own resolution path and its `--host`/`config set-host` remediation wording verbatim rather than inventing a second, differently-worded message; (3) `GET /api/health` reachable; (4) `GET /api/capabilities` returns a known `profile`; (5) the GitHub Releases API the update check depends on is reachable — reported but **not** counted toward the exit code, since the CLI's core job is talking to a LAN server with no dependency on internet access at all, and a household Mac with no WAN shouldn't fail `doctor` over it; (6) the running Node version supports the built-in `fetch`/`FormData` `push` already depends on. Every line is ✓/✗ (or ⚠ for #5) with the same specific remediation text the failing command would itself print — `doctor` doesn't invent a second vocabulary of errors, it just surfaces the first one before the user has to trigger it by accident. `--json` emits the same checks as a structured array; the command exits non-zero if any non-informational check fails. No new `core/` file — it's a thin sequence of calls into `discover.ts`, `client.ts`, `config.ts`, and `selfUpdate.ts`, which is why it gets no dedicated unit test either, matching this plan's own stated line for `commands/*.ts` (thin, driven end-to-end by the integration suite instead).
 
 ### `cli/README.md` + a generated man page — a real, first-class CLI needs both, and neither exists elsewhere in this repo to copy
 
@@ -211,7 +216,7 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 | `GET`/`POST /api/clipboard`, `DELETE /api/clipboard/:id` | `clip` | |
 | `GET/POST/PATCH/DELETE /api/portkey`, `GET /go/:slug` | `portkey`, `go` | |
 | `GET /api/presence` | `devices` | read-only |
-| `GET /api/health`, `GET /api/capabilities` | `status` | |
+| `GET /api/health`, `GET /api/capabilities` | `status`, `doctor` | |
 | `GET /api/nimbus/config\|ping\|down\|up\|release\|results` | `speed` | `up` is raw-body, not multipart |
 | `GET /runestone\|edda\|groot\|atlas/api/:slug` | `open`, `preview` (kind resolution only) | tried concurrently unless `--type` given |
 | `/edda/preview/:slug` | `preview` | client SPA route, not a JSON API — the CLI never `fetch`es it; it only builds the URL string and hands it to the OS browser launcher |
@@ -245,6 +250,7 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 **Commands (`cli/src/commands/`)**
 - [ ] `push.ts`, `pull.ts`, `clip.ts`, `open.ts` (+ `--type`, `--out`), `preview.ts` (+ `--type`, `--no-open`; `--json` implies `--no-open`), `portkey.ts` (+ `go` subcommand, `--open` to launch the system browser via `core/browser.ts`), `status.ts`, `devices.ts`, `speed.ts`
 - [ ] `update.ts`: thin wrapper over `core/selfUpdate.ts`'s `performUpdate()`; no-ops cleanly when already on the latest version
+- [ ] `doctor.ts`: sequences config/discover/client/capabilities/GitHub-reachability/Node-version checks into a ✓/✗ report reusing each layer's own remediation wording; GitHub-reachability is informational only and never affects the exit code; `--json` emits the same checks structured
 - [ ] Global `--json` flag wired through every command via `output.ts`
 - [ ] `config` subcommand: `bifrost config set-host <url>` / `bifrost config show`
 - [ ] `index.ts`: background `checkLatest()` call ahead of dispatch, printing a one-line notice naming `bifrost update` — TTY-only, suppressed under `--json`
@@ -279,6 +285,7 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 17. A tagged release produces a GitHub Release with two assets — the existing `bifrost-v<version>.tar.gz` deployment bundle and a new `bifrost-cli-<version>.tgz` — and `npm install -g` against that second asset's real release URL succeeds on a clean machine with no prior Bifrost checkout.
 18. With an older version installed and a real newer GitHub Release published, the next command invocation on a TTY (not `--json`) prints a one-line notice naming `bifrost update`; `--json` and non-TTY output never show it; the check is cached (verified by request count across repeated invocations within the cache window, not one per command). `bifrost update` then installs the real latest version, verified by `bifrost --version` afterward; running it again immediately reports already up to date and performs no reinstall.
 19. After a real tagged release runs, root `README.md`'s CLI section names that exact version's real, working `npm install -g` URL — verified by actually running the command from the README, not just checking the string — landing in the same release commit as the version bump (one commit, confirmed by `git show` on the release commit, not a follow-up).
+20. `bifrost doctor` against a real, reachable server reports all six checks passing. Pointing `--host` at an unreachable address reports the host-resolution/server-reachability checks as failing, using the same remediation text `status`/`pull`/etc. would themselves show, and the command exits non-zero. Disconnecting from the internet (GitHub unreachable) is reported as a warning, not a failure, and does not affect the exit code.
 
 ## Test checklist
 
@@ -290,7 +297,7 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 - [ ] Unit `core/output.test.ts` — `--json` mode never mixes in human-readable text; table mode renders a known fixture correctly
 - [ ] Unit `core/selfUpdate.test.ts` — mocked GitHub API responses: newer-available, already-latest, cache-hit skips the network call entirely, and a release with no matching `bifrost-cli-*.tgz` asset handled as a clean error rather than a crash
 - [ ] Integration `files.int.test.ts` — `push`/`pull` against a real listening server (`fastify.inject` doesn't cover multipart-from-a-real-file well); the multi-file-one-request behavior and its per-file accept/reject reporting; the large-file streaming spike as an actual measured test (peak memory during the request), not a manual one-off
-- [ ] Integration `api.int.test.ts` — `clip` (add/list/remove), `portkey`/`go` (including the unknown-slug bounce-vs-real-redirect distinction), `preview`'s kind resolution and URL choice for each of the four kinds (browser launch itself mocked out, not actually spawned in CI), `status`, `devices`, each against a real server
+- [ ] Integration `api.int.test.ts` — `clip` (add/list/remove), `portkey`/`go` (including the unknown-slug bounce-vs-real-redirect distinction), `preview`'s kind resolution and URL choice for each of the four kinds (browser launch itself mocked out, not actually spawned in CI), `status`, `devices`, `doctor` (all-checks-pass against a real server, and the resolution/reachability checks failing with exit code 1 against a deliberately unreachable `--host`), each against a real server
 - [ ] Integration `speed.int.test.ts` — a full ping/down/up/results cycle against a real server; the 409 single-flight-guard path forced and asserted on
 - [ ] Manual: `npm install -g` from a packed tarball on a clean shell, confirm `PATH` wiring and `--help`/`--version`
 - [ ] Manual: `man bifrost` after that same global install renders cleanly (no roff warnings) and lists every command `--help` does
