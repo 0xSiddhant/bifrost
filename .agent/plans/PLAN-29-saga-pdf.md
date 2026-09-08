@@ -12,7 +12,7 @@ PLAN-28 merged. Single PR.
 
 ## Verified against the codebase, not assumed
 
-- PLAN-28's `loadSource.ts` and `SagaPage.tsx` are the two files this plan actually touches for wiring; everything else (`useSlideshowNav`, `Dropzone`, `ShortcutsOverlay`, the CLI's `commands/saga.ts` and `core/localServe.ts`) is extended in place, not replaced — confirmed against PLAN-28's own file list rather than assumed.
+- PLAN-28's `loadSource.ts` and `SagaPage.tsx` are the two files this plan actually touches for wiring; everything else (`useSlideshowNav`, `Dropzone`, `ShortcutsOverlay`, the CLI's `core/preview.ts` routing table and `core/localServe.ts`) is extended in place, not replaced — confirmed against PLAN-28's own file list rather than assumed.
 - `client/package.json` has no PDF-rendering dependency today (checked directly) — `pdfjs-dist` is a genuinely new addition, not a package already available to lean on.
 
 **Mandated spike, before the rendering approach is finalized**: `pdf.js` requires a separate worker script (`GlobalWorkerOptions.workerSrc`, in the documented API — not yet confirmed against the actually-installed version here) and bundler integration for that worker is a known rough edge across build tools generally. Confirm `pdfjs-dist`'s worker actually loads and renders a real multi-page PDF correctly against the **built** client bundle (this project's own standing rule — verify against `npm run build` output, never just `npm run dev`), not only in dev mode. If it loads cleanly, the plan proceeds as designed below. If Vite's bundling of the worker script needs special handling (an explicit `?url` import, `new URL(..., import.meta.url)`, or a `vite-plugin-static-copy`-style asset step), that becomes a stated task-list item, not a silent surprise found during implementation. If the worker cannot be made to load reliably at all, the documented fallback is pdf.js's own main-thread rendering mode (`disableWorker`, real API, at a performance cost) — named here as the explicit fallback branch, not left unstated.
@@ -21,7 +21,7 @@ PLAN-28 merged. Single PR.
 
 **In:**
 - A dropped `.pdf` file on `/saga`'s landing page, rendered page-by-page as slides.
-- `bifrost saga <file>` (PLAN-28's CLI command) accepting `.pdf` the same way it accepts `.md`.
+- `bifrost preview deck.pdf` accepting `.pdf` the same way it already accepts `.md` — one row in PLAN-27's routing table. Saga is a `.pdf`'s only destination, so no `--type` is needed for it.
 - The exact same navigation shell PLAN-28 already built — keyboard, touch, fullscreen, shortcuts overlay — reused unchanged.
 
 **Out:**
@@ -44,9 +44,11 @@ PLAN-28 never had to distinguish; every slide was a markdown render. This plan i
 
 Rendering every page at a PDF's own native resolution (some decks embed print-resolution images) risks the same class of problem PLAN-25's decompression-bomb guard exists for, just client-side instead of server-side: an unbounded amount of memory going into canvases nobody asked for at that size. Each page renders at a scale fit to the current viewport (recomputed on resize/fullscreen-toggle), with a stated maximum canvas dimension as a hard ceiling regardless of viewport size — a real, named bound, not an assumption that "reasonable PDFs" will stay small.
 
-### CLI: one more accepted extension, nothing else changes
+### CLI: one more row in the routing table, nothing else changes
 
-`commands/saga.ts`'s extension check gains `.pdf` alongside `.md`/`.markdown`; `core/localServe.ts` sends `Content-Type: application/pdf` for it. The local-server mechanism itself (single-request-then-close, origin-scoped CORS, 60s timeout) is exactly PLAN-28's, unmodified — this plan extends what it's allowed to serve, not how it serves it.
+`core/preview.ts`'s table gains `.pdf` → `saga`, and `core/localServe.ts` sends `Content-Type: application/pdf` for it. The local-server mechanism itself (single-request-then-close, origin-scoped CORS, 60s timeout) is exactly PLAN-27's, unmodified — this plan extends what it is allowed to serve, not how it serves it.
+
+Until this plan lands, a `.pdf` is not unpreviewable from the terminal — PLAN-27's table already points it at the existing `PdfViewer`. What this row changes is the destination: from "read this PDF" to "present it," which is the whole point of the plan.
 
 ## API contracts
 
@@ -65,7 +67,7 @@ None. Still the same `saga` capability-only module from PLAN-28; nothing about P
 - [ ] `NotesPanel.tsx` / `ShortcutsOverlay.tsx`: explicit no-note branch for a PDF-page slide (not an implicit fallthrough)
 
 **CLI (`cli/src/`)**
-- [ ] `commands/saga.ts`: extension check gains `.pdf`
+- [ ] `core/preview.ts`: one row — `.pdf` → `saga`, replacing the `PdfViewer` destination PLAN-27's table gave it
 - [ ] `core/localServe.ts`: `Content-Type: application/pdf` for a `.pdf` source
 
 **Docs**
@@ -77,7 +79,7 @@ None. Still the same `saga` capability-only module from PLAN-28; nothing about P
 ## Acceptance criteria
 
 1. Dropping a real multi-page PDF on `/saga` renders each page as its own slide, in page order, navigated with the exact same keys/touch/fullscreen PLAN-28 already ships.
-2. `bifrost saga deck.pdf` opens a real browser tab presenting that exact file's pages end to end.
+2. `bifrost preview deck.pdf` opens a real browser tab presenting that exact file's pages end to end — as slides, not in the `PdfViewer` that route reached before this plan.
 3. The notes panel and its toggle affordance do not appear on a PDF-page slide; the shortcuts overlay still opens and lists the same bindings regardless of source.
 4. The pdf.js worker loads and renders correctly against the **built** client bundle (`npm run build` output), not only under `npm run dev` — closing the mandated spike, with the actual branch taken (default worker vs. fallback) stated in `decisions.md`.
 5. A large or high-resolution multi-page PDF does not spike browser memory unboundedly — verified by an actual measurement against the stated maximum canvas dimension, not assumed from the scaling logic's existence.
@@ -87,4 +89,4 @@ None. Still the same `saga` capability-only module from PLAN-28; nothing about P
 
 - [ ] Unit `loadPdfSlides.test.ts` — a real small fixture PDF, page count → slide count, canvas dimensions respecting the stated maximum
 - [ ] Component — `SlideView`'s markdown-vs-PDF branch, `NotesPanel`'s no-note-on-PDF-slide behavior
-- [ ] Live-verify: a real multi-page PDF dropped in a real browser (built client, not dev server) — page count matches slide count, navigation and fullscreen work identically to the markdown path; `bifrost saga <file>.pdf` end to end from a real terminal; desktop 1280×900 and mobile 390×844
+- [ ] Live-verify: a real multi-page PDF dropped in a real browser (built client, not dev server) — page count matches slide count, navigation and fullscreen work identically to the markdown path; `bifrost preview <file>.pdf` end to end from a real terminal; desktop 1280×900 and mobile 390×844

@@ -2,11 +2,11 @@
 
 ## Goal
 
-A fullscreen slideshow viewer — "Saga" — for a saved Edda document or a dropped `.md` file: `---`-delimited slides, keyboard/touch navigation, fullscreen, presenter notes. It ships as a fourth consumer of the same `renderMarkdown` pipeline Edda's live preview, public page, HTML/PDF export, and file-preview modal already share, and adds no new server surface beyond a capability-only module. A `bifrost saga <file>` CLI command opens a local `.md` file the same way, from a terminal. Promotes the **Skald** row from `PLAN-99-future-backlog.md`'s "Owner-reviewed additions," renamed after a same-session naming discussion. PDF support is deliberately a separate plan (PLAN-29) — see Scope.
+A fullscreen slideshow viewer — "Saga" — for a saved Edda document or a dropped `.md` file: `---`-delimited slides, keyboard/touch navigation, fullscreen, presenter notes. It ships as a fourth consumer of the same `renderMarkdown` pipeline Edda's live preview, public page, HTML/PDF export, and file-preview modal already share, and adds no new server surface beyond a capability-only module. From a terminal, `bifrost preview deck.md --type saga` presents a local `.md` file the same way — one row added to the routing table `bifrost preview` already owns (PLAN-27), not a command of its own. Promotes the **Skald** row from `PLAN-99-future-backlog.md`'s "Owner-reviewed additions," renamed after a same-session naming discussion. PDF support is deliberately a separate plan (PLAN-29) — see Scope.
 
 ## Gate
 
-PLAN-27 merged. Single PR. (Saga's CLI command extends `cli/`'s existing `core/browser.ts` and command-registration shape; nothing here works without that already existing.)
+PLAN-27 merged. Single PR. (Saga's terminal path is one entry in `bifrost preview`'s routing table, reusing the `core/localServe.ts` hand-off and the `/preview` client route PLAN-27 ships; nothing here works without those already existing.)
 
 ## Verified against the codebase, not assumed
 
@@ -31,7 +31,7 @@ PLAN-27 merged. Single PR. (Saga's CLI command extends `cli/`'s existing `core/b
 - A `?`/`H` shortcuts overlay listing every binding above.
 - Presenter notes via `<!-- notes: ... -->` HTML comments, shown in a toggleable panel; absent entirely when a slide has none.
 - Two sources: a saved Edda by slug (`/saga/:slug`, via the existing public `/edda/api/:slug`) and a dropped `.md`/`.markdown` file (`/saga`, via `URL.createObjectURL` — no upload, no browser storage).
-- One CLI command, `bifrost saga <file>`, opening a local `.md`/`.markdown` file the same way from a terminal.
+- One row in `bifrost preview`'s routing table (PLAN-27): `.md`/`.markdown` gains `saga` as a *second* destination, reached with `bifrost preview deck.md --type saga`. The default destination for markdown stays Edda — presenting is the deliberate ask, not the assumption.
 - A "Present" row action on Pensieve's Edda rows, next to "Read."
 - A `saga` capability-only server module (manifest presence + profile gating only, matching `toolbox`/`variant`) and a Midgard nav card.
 
@@ -42,6 +42,7 @@ PLAN-27 merged. Single PR. (Saga's CLI command extends `cli/`'s existing `core/b
 - Deckrun's presenter power-tools (laser pointer, drawing pen, blackout, overview grid) and deck linting. Real product surface for a standalone presentation tool; over-scoped for a view mode over an already-saved document.
 - Editing inside Saga. It is a viewer; changing content still means going back to Edda (or, for a dropped file, editing it locally and dropping it again).
 - Presenting Runestone/Groot/Atlas documents. Saga presents markdown-shaped content; a JSON/YAML/XML document has no `---`-slide structure to render, and the CLI's own `preview` command (PLAN-27) already covers "open the best available view of any document kind" for the raw-data case.
+- **A `bifrost saga <file>` command.** Cut on the merits: the local-file hand-off (`core/localServe.ts` + `/preview?source=`) is not markdown-specific and already has to exist for every other format, so a second command would be a second door onto one mechanism. One terminal entry point means a person learns `bifrost preview <file>` once instead of one command per tool.
 - Persisting a dropped file anywhere — no `sessionStorage`, no `IndexedDB`, no server upload. Losing an in-progress dropped deck on an accidental refresh is accepted, matching how Loki's execution state and Diagon Alley's tools already behave; the drop is re-done, not recovered.
 
 ## Decisions & reasoning
@@ -71,13 +72,15 @@ No existing Bifrost feature auto-hides its own chrome on inactivity — a real, 
 
 ### `?source=<url>` on the bare `/saga` route, not a separate path
 
-The CLI needs *some* address to open the browser to; reusing the same route the drag-drop landing page already lives on, with one query param, avoids inventing a fourth route for what is really the same "load this URL" case the loader already handles. Accepting an arbitrary caller-supplied URL here is a real, if minor, consideration — a crafted `/saga?source=http://evil.example/x` link would make the visitor's own browser `fetch()` and render that content as slides. Worth naming rather than skipping past: `renderMarkdown` already runs everything through DOMPurify (confirmed, Edda's own pipeline), so the worst case is misleading rendered text within the trusted origin, not script execution — the same class of already-accepted risk Portkey's own arbitrary-http(s)-target design carries. No new guard is added for it here; DOMPurify's existing sanitization is the boundary, the same as it already is for every other `renderMarkdown` consumer.
+The hand-off page needs *some* address to send a terminal-served file to; reusing the same route the drag-drop landing page already lives on, with one query param, avoids inventing a fourth route for what is really the same "load this URL" case the loader already handles. Accepting an arbitrary caller-supplied URL here is a real, if minor, consideration — a crafted `/saga?source=http://evil.example/x` link would make the visitor's own browser `fetch()` and render that content as slides. Worth naming rather than skipping past: `renderMarkdown` already runs everything through DOMPurify (confirmed, Edda's own pipeline), so the worst case is misleading rendered text within the trusted origin, not script execution — the same class of already-accepted risk Portkey's own arbitrary-http(s)-target design carries. No new guard is added for it here; DOMPurify's existing sanitization is the boundary, the same as it already is for every other `renderMarkdown` consumer.
 
-### CLI: a local, single-request HTTP server — no new persistent storage, anywhere
+### The terminal path is one row in `bifrost preview`'s table, not a `bifrost saga` command
 
-`bifrost saga <file>` starts a Node `http` server (built-in, no new dependency — same "well-established, no spike needed" reasoning PLAN-27 already used for `pull`'s streaming), bound to an OS-assigned free port, streaming the file straight off disk (`fs.createReadStream`, no buffering — this is the "read it from the file system directly" instinct from the design discussion, done by the one side of this boundary actually allowed to). It sets `Content-Type: text/markdown` and, deliberately tighter than the raw document endpoints' `Access-Control-Allow-Origin: *`, the **specific** Bifrost origin `discover.ts` already resolved before the browser was even opened — the one caller is known, so there's no reason to allow any origin. It serves exactly one successful request, then closes itself; a 60-second timeout closes it (and reports a clear message) if the browser tab never actually requests it — closing over a real failure mode (the tab didn't open, or was closed first) rather than hanging forever. The browser is opened via the CLI's existing `core/browser.ts` (`preview`/`go --open`'s own launcher), not a second mechanism.
+A browser page cannot read an arbitrary local path with no user gesture — that is a hard security boundary, not a limitation to design around — so a terminal-opened local file has to be served over a real (if local) HTTP request whatever its format is. That is why the mechanism belongs to `bifrost preview` and not to Saga: PLAN-27 owns `core/localServe.ts` (a built-in `http` server on an OS-assigned free port, streaming straight off disk with `fs.createReadStream`, `Access-Control-Allow-Origin` scoped to the one Bifrost origin `discover.ts` already resolved rather than `*`, closing after one successful request or a 60-second timeout) and the `/preview` hand-off route that turns a served URL into the right tool. A `.json` needed all of it before Saga existed.
 
-Extension validation happens **before** the server ever starts: `.md`/`.markdown` only in this plan. A `.pdf` (or anything else) is rejected with a clear message — PDF support is PLAN-29's job, and by the time it lands this same command and server gain one more accepted extension and `Content-Type`, nothing else about the mechanism changes.
+So this plan adds no CLI mechanism at all. It adds `saga` as an accepted `--type` for `.md`/`.markdown` in `core/preview.ts`'s routing table, and one branch on the hand-off page that navigates to `/saga?source=…` instead of seeding an editor. Extension and destination validation still happen **before** any server starts, in the table PLAN-27 already validates against: `--type saga` on a `.json` is a terminal error, and so is a `.pdf` until PLAN-29 adds that row.
+
+Stated plainly because it is the reason the command was cut: a person should not have to know which Bifrost tool renders their file in order to type the command that opens it.
 
 ### Presenter notes: a toggleable panel, not a second markdown pipeline
 
@@ -93,7 +96,7 @@ Both are long-standing, universally supported browser APIs with no platform-spec
 
 ## API contracts
 
-None. The new `saga` server module (capability-only, matching `toolbox`/`variant`) registers no routes. Saga's web page reads one already-existing, unchanged endpoint (`GET /edda/api/:slug`) and otherwise runs entirely client-side. The CLI's `bifrost saga <file>` command talks to a tiny server **it hosts itself** on the operator's own machine — not to the Bifrost server at all — for the file-serving half of its job; it still uses the Bifrost server's origin only to know where to open the browser.
+None. The new `saga` server module (capability-only, matching `toolbox`/`variant`) registers no routes. Saga's web page reads one already-existing, unchanged endpoint (`GET /edda/api/:slug`) and otherwise runs entirely client-side. The terminal path adds nothing either: `bifrost preview` already hosts its own single-request local server on the operator's own machine — not the Bifrost server at all — for the file-serving half of that job, and this plan only teaches its routing table one more destination.
 
 ## Task checklist
 
@@ -124,13 +127,11 @@ None. The new `saga` server module (capability-only, matching `toolbox`/`variant
 - [ ] `client/src/app/offlineWarmLoad.ts` + `server/src/modules/offline-mode/module.ts`'s `TARGETS`: add `saga`
 
 **CLI (`cli/src/`)**
-- [ ] `core/localServe.ts`: `serveFileOnce(filePath)` — Node's built-in `http`, `fs.createReadStream`, `.md`/`.markdown` only (validated by the caller before this is invoked), `Content-Type: text/markdown`, `Access-Control-Allow-Origin` set to the resolved Bifrost origin (not `*`), closes after one successful request or a 60s timeout
-- [ ] `core/localServe.test.ts`: real ephemeral server, real local `fetch()` against it — no Bifrost server, no mocking
-- [ ] `commands/saga.ts`: `bifrost saga <file>` — validates the extension before starting anything, starts `localServe`, opens `${origin}/saga?source=http://127.0.0.1:<port>/payload` via the existing `core/browser.ts`, reports success or the timeout
+- [ ] `core/preview.ts` (PLAN-27's routing table): `.md`/`.markdown` gains `saga` as a second accepted `--type`, Edda staying its default destination — one entry. No new command, and `core/localServe.ts` is not touched
 
 **Docs**
 - [ ] `architecture.md`: a short paragraph on Saga (pure client, `presentRoute` registry extension, the CLI local-serve mechanism)
-- [ ] Root `README.md`: a Features bullet for Saga, matching every other tool's; `cli/README.md` (PLAN-27) gains a `saga` command entry once that file exists
+- [ ] Root `README.md`: a Features bullet for Saga, matching every other tool's; `cli/README.md`'s `preview` section gains `saga` as a destination for `.md`
 - [ ] `decisions.md` / `progress.md`
 - [ ] `context-sync` pass once implemented; archive this plan file into `completed/` in the implementation PR
 
@@ -146,10 +147,10 @@ None. The new `saga` server module (capability-only, matching `toolbox`/`variant
 8. The footer overlays fullscreen slide content on a scrim rather than occupying layout space — the slide's own position and size do not change when the footer appears or disappears, verified by measuring the slide's bounding box in both states.
 9. `?` or `H` opens the shortcuts overlay, listing every binding in (4), in both windowed and fullscreen mode.
 10. A slide with a `<!-- notes: ... -->` comment shows that text in the notes panel and nowhere in the rendered slide body; a slide without one shows no panel content and no notes-toggle button in the footer.
-11. `bifrost saga <file>` for a real local `.md` file opens the system's default browser to a real, running presentation of that exact file's content — verified end to end, not just that a local server started — and the CLI's server closes itself once that one request completes.
-12. A `.pdf` or any other non-markdown extension passed to `bifrost saga` is rejected with a clear message before any server starts.
+11. `bifrost preview deck.md --type saga` for a real local `.md` file opens the system's default browser to a real, running presentation of that exact file's content — verified end to end, not just that a local server started — and the CLI's server closes itself once that one request completes. The same file with no `--type` still opens in Edda, unchanged by this plan.
+12. `--type saga` on a file Saga cannot present — a `.json`, and a `.pdf` until PLAN-29 — is refused in the terminal, naming what `saga` does accept, before any browser is opened or any server started.
 13. The Saga card is present on Midgard and the Pensieve "Present" link is present on Edda rows only when `/api/capabilities` reports the respective module — verified by toggling each off and confirming both disappear, not just assumed from the gating code.
-14. No file under `server/` beyond the new `saga` module, and no file under `client/src/core/library`, `client/src/core/markdown`, `client/src/core/edda.ts`, or `cli/src/core/browser.ts`, changes in a way that alters any *other* consumer's behavior — confirmed by the diff, not assumed from the design.
+14. No file under `server/` beyond the new `saga` module, and no file under `client/src/core/library`, `client/src/core/markdown`, `client/src/core/edda.ts`, `cli/src/core/browser.ts`, or `cli/src/core/localServe.ts`, changes in a way that alters any *other* consumer's behavior — confirmed by the diff, not assumed from the design.
 
 ## Test checklist
 
@@ -158,8 +159,8 @@ None. The new `saga` server module (capability-only, matching `toolbox`/`variant
 - [ ] Component `SagaPage`/`Dropzone` — drop → render flow (a real `File`, real `URL.createObjectURL`, no mock), keyboard nav via simulated key events, shortcuts overlay open/close, notes panel show/hide
 - [ ] Unit `useIdleActivity.test.ts` — fake timers: active immediately, idle after the timeout with no events, resets on a simulated `mousemove`/`keydown`/`touchstart`
 - [ ] Component `SlideFooter` — always visible and static in windowed mode; in a fullscreen-flagged render, hides after the idle timeout and reappears on a simulated activity event or a tap; slide bounding box unchanged across both footer states
-- [ ] Unit (CLI) `core/localServe.test.ts` — correct bytes, `Content-Type`, and CORS header served on a real ephemeral port; closes after one request; closes on timeout when never fetched
-- [ ] Live-verify: a real saved Edda presented via Pensieve's "Present" link; a real dropped `.md` file; `bifrost saga <file>` end to end from an actual terminal against the built server, opening an actual browser tab; **both modes explicitly** — windowed footer never hides, fullscreen footer hides on real inactivity and reappears on a real mouse move/keypress, checked by observing the actual screenshots over time, not assumed from the component test; desktop 1280×900 and mobile 390×844, both themes
+- [ ] Unit (CLI) `core/preview.test.ts` — `.md` resolves to Edda by default and to Saga under `--type saga`; `--type saga` on a `.json` is refused with the wording acceptance 12 names. `core/localServe.ts` is untouched and PLAN-27's own tests for it still pass unchanged
+- [ ] Live-verify: a real saved Edda presented via Pensieve's "Present" link; a real dropped `.md` file; `bifrost preview <file>.md --type saga` end to end from an actual terminal against the built server, opening an actual browser tab; **both modes explicitly** — windowed footer never hides, fullscreen footer hides on real inactivity and reappears on a real mouse move/keypress, checked by observing the actual screenshots over time, not assumed from the component test; desktop 1280×900 and mobile 390×844, both themes
 
 ## On completion
 
