@@ -120,7 +120,7 @@ Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 
 ## Project docs
 
-Architecture, rules, plans and progress live in [`.agent/`](.agent/). Start with [`.agent/plans/README.md`](.agent/plans/README.md).
+Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`.agents/plans/README.md`](.agents/plans/README.md).
 
 Operating & deploying:
 

@@ -5,12 +5,12 @@ description: Scaffold a new Bifrost feature module (server vertical slice + clie
 
 # New Module — scaffold a vertical slice
 
-Read `.agent/context/architecture.md` first. The three rules are law: feature-first slices; modules import only `core` (cross-module = event bus only); the profile manifest decides what loads.
+Read `.agents/context/architecture.md` first. The three rules are law: feature-first slices; modules import only `core` (cross-module = event bus only); the profile manifest decides what loads.
 
 ## Server (`server/src/modules/<name>/`)
 
 1. `module.ts` implementing the `FeatureModule` contract `{ name, register(app, deps) }` (see `server/src/core/module.ts`; `name` doubles as commit scope and capability name) — copy the shape from an existing module (e.g. `qr-tool` for simple, `file-transfer` for full).
-2. Subfolders as needed: `routes/` (HTTP only), `usecases/` (business rules — depend on the repository *interfaces* in the module's `ports.ts`, never Drizzle/fs directly), `services/` (concrete impls).
+2. Subfolders as needed: `routes/` (HTTP only), `usecases/` (business rules — depend on the repository _interfaces_ in the module's `ports.ts`, never Drizzle/fs directly), `services/` (concrete impls).
 3. New tables go in the central `server/src/core/db/schema.ts` (drizzle.config reads only that file) with a doc comment naming the owning module — then follow the `db-migration` skill.
 4. New events: add typed names + payloads to `core/bus/events.ts` — dot-namespaced `<module>.<event>`. Never import another module to "notify" it.
 5. Register in `MANIFEST` in `server/src/app.ts` (`local`, `cloud`, or both); `/api/capabilities` exposes it automatically from the manifest.
@@ -30,4 +30,4 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 10. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
 11. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
 12. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
-13. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
+13. Update `.agents/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.

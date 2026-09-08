@@ -1,6 +1,6 @@
 /**
  * Conventional Commits, enforced. Scopes = module names + core areas
- * (see .agent/rules/git.md).
+ * (see .agents/rules/git.md).
  */
 export default {
   extends: ['@commitlint/config-conventional'],

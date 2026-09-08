@@ -111,7 +111,7 @@ All four are **local profile only** — they inherit `file-transfer`'s existing 
 - [x] **Real adoption:** route upload and download failures through `notify.error` (an owner requirement in its own right)
 - [x] Unit tests: timer pause/resume, dedupe counter, stack cap, reduced-motion branch
 - [x] `live-verify` + screenshots for the owner checkpoint
-- [x] Update `.agent/memory/progress.md` in the 17a PR (`git.md` step 7)
+- [x] Update `.agents/memory/progress.md` in the 17a PR (`git.md` step 7)
 - [x] ⛔ **Stop. Owner approves UI + flow, and picks LAN-trust vs capability-token, before 17b starts** — **cleared 2026-07-30: owner said "implement 17b as well"; LAN trust taken as the answer (the plan's recommendation), stated in the PR**
 
 ### 17b — Send/Receive flow
@@ -138,7 +138,7 @@ All four are **local profile only** — they inherit `file-transfer`'s existing 
 - [x] Keep the Send page queue in plain component state — it must vanish on refresh; no `sessionStorage`
 - [x] `.env.example:22`: correct the blocklist comment now that uploads can be served
 - [x] `architecture.md:20` + `decisions.md`: log the supersession of the write-only and metadata-only decisions with reasoning
-- [x] `context-sync`; update `.agent/memory/progress.md` (`git.md` step 7); archive this plan file
+- [x] `context-sync`; update `.agents/memory/progress.md` (`git.md` step 7); archive this plan file
 
 ## Acceptance criteria
 

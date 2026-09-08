@@ -23,7 +23,7 @@ destroy the conventional-commit history the workflow reads).
 ## Procedure
 
 1. **Preflight** on a clean `develop`: every plan intended for this release is
-   `done` in `.agent/memory/progress.md` and its merge commit exists on develop.
+   `done` in `.agents/memory/progress.md` and its merge commit exists on develop.
    Run the `verify` skill. Confirm the repo secret **`RELEASE_TOKEN`** exists
    (fine-grained PAT, Contents + Workflows: write) — without it the workflow
    can't push. Abort on any mismatch.

@@ -455,5 +455,5 @@ real exercise of the standing-knowledge checkpoint PLAN-22 created.
 ## On completion
 
 This PR's paperwork: the docs sync in Tasks, plus archiving this file to
-`.agent/plans/completed/` — the established one-PR-closes-its-own-paperwork
+`.agents/plans/completed/` — the established one-PR-closes-its-own-paperwork
 rule.

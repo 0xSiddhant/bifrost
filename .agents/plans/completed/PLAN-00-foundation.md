@@ -9,7 +9,7 @@ A running skeleton: one Fastify process that boots cleanly, loads zero-or-more m
 - Work happens as **direct commits to `main`** — the only plan ever allowed to do this.
 - Commit in small logical chunks. **Before each push to `main`, present the changeset to the user and wait for explicit manual approval.** No approval, no push.
 - Conventional Commits still apply (scope `core`, `client`, `ci`, `docs`, `chore`).
-- Final task of this plan: create `develop` from `main` and push it. Every subsequent plan follows `.agent/rules/git.md` (feature branch → PR into `develop`).
+- Final task of this plan: create `develop` from `main` and push it. Every subsequent plan follows `.agents/rules/git.md` (feature branch → PR into `develop`).
 
 ## Scope
 

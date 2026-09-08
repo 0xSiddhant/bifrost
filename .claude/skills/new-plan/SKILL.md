@@ -9,9 +9,9 @@ Two plans drafted the same day both needed a second pass to catch real defects �
 
 ## 1. Read before drafting
 
-Same order CLAUDE.md already mandates, applied specifically to plan-authoring: `.agent/context/architecture.md`, `.agent/rules/coding.md`, `.agent/rules/git.md`, the recent tail of `.agent/memory/progress.md` and `.agent/memory/decisions.md`. Then **read 2–3 actual recent plan files** (`.agent/plans/completed/PLAN-2[0-3]*.md` is a good default set) as live templates — not from memory of "the format." The format has drifted over the project's history (see §2); working from a stale mental model is exactly how a plan ends up citing a section nobody else uses.
+Same order CLAUDE.md already mandates, applied specifically to plan-authoring: `.agents/context/architecture.md`, `.agents/rules/coding.md`, `.agents/rules/git.md`, the recent tail of `.agents/memory/progress.md` and `.agents/memory/decisions.md`. Then **read 2–3 actual recent plan files** (`.agents/plans/completed/PLAN-2[0-3]*.md` is a good default set) as live templates — not from memory of "the format." The format has drifted over the project's history (see §2); working from a stale mental model is exactly how a plan ends up citing a section nobody else uses.
 
-**The plan number is mechanical, not a guess**: it's one more than the highest `PLAN-N` row already in `.agent/plans/README.md`'s gate table (check the table itself, not just the newest file in `completed/` — a plan can be drafted, gated, and sitting un-implemented, which is exactly PLAN-24 and PLAN-25's state at the time this skill was written). The gate is "PLAN-(N-1) merged" worded the way the existing rows word it, even when that prior plan hasn't actually merged yet at drafting time — every plan in this project's history was gated on paper before the thing it depended on was necessarily done.
+**The plan number is mechanical, not a guess**: it's one more than the highest `PLAN-N` row already in `.agents/plans/README.md`'s gate table (check the table itself, not just the newest file in `completed/` — a plan can be drafted, gated, and sitting un-implemented, which is exactly PLAN-24 and PLAN-25's state at the time this skill was written). The gate is "PLAN-(N-1) merged" worded the way the existing rows word it, even when that prior plan hasn't actually merged yet at drafting time — every plan in this project's history was gated on paper before the thing it depended on was necessarily done.
 
 ## 2. The real section order — `plans/README.md`'s own format line is stale
 
@@ -59,11 +59,11 @@ Read the whole draft start to finish and check each of these explicitly. Every o
 
 A plan is not "just a file" the moment it's written. In the same session, before considering the plan done:
 
-- Add a gate-table row to `.agent/plans/README.md`, matching the existing rows' phrasing (`PLAN-N merged. Single PR.` or the multi-part shape).
-- Log the real design calls in `.agent/memory/decisions.md` — dated, with the actual reasoning (not "decided X," but *why*), one row per distinct call, matching the density and specificity every existing row already has.
-- Add a session note to `.agent/memory/progress.md`'s "Recent activity" section (newest first), ending with something like "Nothing implemented — plan only" when that's true. This is the project's own established pattern for every plan-only session (PLAN-18 through 25's planning sessions all do this).
+- Add a gate-table row to `.agents/plans/README.md`, matching the existing rows' phrasing (`PLAN-N merged. Single PR.` or the multi-part shape).
+- Log the real design calls in `.agents/memory/decisions.md` — dated, with the actual reasoning (not "decided X," but *why*), one row per distinct call, matching the density and specificity every existing row already has.
+- Add a session note to `.agents/memory/progress.md`'s "Recent activity" section (newest first), ending with something like "Nothing implemented — plan only" when that's true. This is the project's own established pattern for every plan-only session (PLAN-18 through 25's planning sessions all do this).
 
-The plan file itself lives at `.agent/plans/PLAN-XX-<slug>.md` — directly under `plans/`, **not** under `completed/`. It only moves to `completed/` as part of its own implementation PR, once real work has landed.
+The plan file itself lives at `.agents/plans/PLAN-XX-<slug>.md` — directly under `plans/`, **not** under `completed/`. It only moves to `completed/` as part of its own implementation PR, once real work has landed.
 
 ## Boundaries
 

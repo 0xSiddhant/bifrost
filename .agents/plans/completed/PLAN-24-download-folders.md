@@ -187,7 +187,7 @@ Everything here is filesystem state, an in-memory watcher registry, and bus even
 - [ ] `architecture.md`: module registry row for `file-transfer`; "Live download" data-flow paragraph; watcher depth comment
 - [ ] `tech-stack.md`: add `archiver` row
 - [ ] `decisions.md`: log the depth-0 supersession + the design calls above, dated
-- [ ] `context-sync` pass once implemented; update `.agent/memory/progress.md` (`git.md` step 7); archive this plan file into `completed/` in the implementation PR
+- [ ] `context-sync` pass once implemented; update `.agents/memory/progress.md` (`git.md` step 7); archive this plan file into `completed/` in the implementation PR
 
 ## Acceptance criteria
 

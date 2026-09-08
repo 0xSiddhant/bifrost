@@ -102,7 +102,7 @@ None. Both exports are pure client compute — `variant`'s server module stays a
 **Docs**
 - [ ] `decisions.md`: log the `diff`-dependency choice and the verify-by-replaying-rather-than-asserting design, dated, with the real reasoning
 - [ ] `tech-stack.md`: add a `diff` row (small, single-purpose, unified-diff/patch formatting — the reason a dependency was worth it here, mirroring PLAN-25's `archiver` precedent)
-- [ ] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
+- [ ] `context-sync` pass once implemented; update `.agents/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
 
 ## Acceptance criteria
 

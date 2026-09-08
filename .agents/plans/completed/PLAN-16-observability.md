@@ -119,15 +119,15 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 - [x] `GET /api/client-logs/config` (public) shipping `CLIENT_LOG_LEVEL`; `CLIENT_LOG_LEVEL=warn` in `.env.example` + `core/config`; client fetches once on boot and falls back to `warn` if it fails
 - [x] Replace the blind `.catch(() => {})` sites in `client/src/core/` with reports through the new logger
 - [x] Dashboard: `source` + `module` template variables (both multi-select, both defaulting to All) wired into every log panel, so one pane splits into backend/frontend on demand; point "Errors by module" at both sources and add a stacked errors-by-source panel
-- [x] **Make this a standing convention, not a one-off cleanup.** `.agent/rules/coding.md` → "Errors & logging": every plan ships the critical logs for the code it adds — each new failure path gets a `warn`/`error`/`fatal` line where it is handled, and a deliberately silent `catch` carries a comment saying why silence is correct. Replace "No `console.log` outside scripts" with the positive rule now that a client path exists: client code logs through `core/log.ts`, never bare `console.*`
-- [x] `.agent/plans/README.md` → rules of engagement: a plan is not done until its failure paths are logged
+- [x] **Make this a standing convention, not a one-off cleanup.** `.agents/rules/coding.md` → "Errors & logging": every plan ships the critical logs for the code it adds — each new failure path gets a `warn`/`error`/`fatal` line where it is handled, and a deliberately silent `catch` carries a comment saying why silence is correct. Replace "No `console.log` outside scripts" with the positive rule now that a client path exists: client code logs through `core/log.ts`, never bare `console.*`
+- [x] `.agents/plans/README.md` → rules of engagement: a plan is not done until its failure paths are logged
 - [x] Add the logging line to `.claude/skills/new-module/SKILL.md` so scaffolded modules start with it
 
 **16a wrap-up** — must land in the 16a PR, not deferred to 16b:
 
-- [x] `.agent/memory/decisions.md`: numeric `level` → `logLevel` (and why the archive is not rewritten), Heimdall Logs removed viewer + level switch, client logging introduced with `source`/`module` as cross-cutting labels, `LOG_LEVEL` default → `trace`
+- [x] `.agents/memory/decisions.md`: numeric `level` → `logLevel` (and why the archive is not rewritten), Heimdall Logs removed viewer + level switch, client logging introduced with `source`/`module` as cross-cutting labels, `LOG_LEVEL` default → `trace`
 - [x] Run the **`context-sync`** skill: `architecture.md`'s module table gains `client-logs`, the `core` list loses `logtap`, `project-structure.md` reflects the new client `core/log.ts`
-- [x] Update `.agent/memory/progress.md` in the 16a PR (`git.md` step 7)
+- [x] Update `.agents/memory/progress.md` in the 16a PR (`git.md` step 7)
 - [x] `verify` green before the PR
 
 ### Step 2 — Metrics snapshot (no containers, no dependencies)
@@ -165,10 +165,10 @@ Audited at plan time: **36 log calls server-wide** (19 info / 9 warn / 5 error /
 
 - [x] Grafana alert rules: error rate > N/min, loop lag p99 > 100ms
 - [x] `docs/observability.md` — what is durable vs on-demand, and why
-- [x] `.agent/memory/decisions.md`: the snapshot-as-record decision, deltas-not-counters, the `node_exporter`-on-macOS exclusion, the slow-cycle `diskMb` sampling, and snapshots being level-independent
+- [x] `.agents/memory/decisions.md`: the snapshot-as-record decision, deltas-not-counters, the `node_exporter`-on-macOS exclusion, the slow-cycle `diskMb` sampling, and snapshots being level-independent
 - [x] Run **`context-sync`** again for the `metrics` module + the new observability services
-- [x] Update `.agent/memory/progress.md` in the 16b PR (`git.md` step 7)
-- [x] Archive this file to `.agent/plans/completed/` as part of the 16b PR
+- [x] Update `.agents/memory/progress.md` in the 16b PR (`git.md` step 7)
+- [x] Archive this file to `.agents/plans/completed/` as part of the 16b PR
 
 ## Acceptance criteria
 

@@ -142,13 +142,13 @@ None. The `toolbox` module registers no routes; every tool is pure client comput
 - [x] `hash` — `crypto.subtle`, gated by `supported()`; verify the card is absent over LAN http and present on `localhost`
 - [x] *Stretch:* Iris "export as theme JSON starter" against THEME-SPEC
 - [x] Docs sync: `architecture.md` module registry + the `toolbox` note, `project-structure.md`, `decisions.md` rows, `progress.md`, `plans/README.md` gate row ticked
-- [x] Archive this file to `.agent/plans/completed/` **in the Part B PR** (PLAN-99 is already stripped — see "On completion")
+- [x] Archive this file to `.agents/plans/completed/` **in the Part B PR** (PLAN-99 is already stripped — see "On completion")
 
 ## On completion
 
 **PLAN-99 is already clean.** Both rows this plan absorbs — Tier A's **Utility toolbox page** and the 2026-07-22 round's **Iris** — were deleted on 2026-08-04 at the owner's instruction, when the plan was scheduled rather than when it completes, so a backlog row for work that already has a numbered plan never sits around to be misread as still-open. A `PROMOTED … to PLAN-18` note points here in their place. *(This supersedes the earlier instruction in this section to strip them in the Part B PR.)*
 
-So the remaining paperwork is the docs sync in Part B's task list plus **archiving this file to `.agent/plans/completed/` in the Part B PR** — a plan's own PR closes its own paperwork. Not after Part A: Part A ships four tools and none of them is Iris, so this plan is not done until B lands. Optionally flip the PLAN-99 note from `PROMOTED` to `DONE` then.
+So the remaining paperwork is the docs sync in Part B's task list plus **archiving this file to `.agents/plans/completed/` in the Part B PR** — a plan's own PR closes its own paperwork. Not after Part A: Part A ships four tools and none of them is Iris, so this plan is not done until B lands. Optionally flip the PLAN-99 note from `PROMOTED` to `DONE` then.
 
 ## Acceptance criteria
 
