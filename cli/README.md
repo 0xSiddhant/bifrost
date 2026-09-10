@@ -34,6 +34,35 @@ directly.
 After installing, `man bifrost` works too: npm links the packaged man page into
 the system man path.
 
+## Running it from a checkout
+
+You do not have to install anything to try a change. From the repo root:
+
+```bash
+# Straight from source — no build step, so this is the one to use while editing.
+npx tsx cli/src/index.ts pull --list
+
+# From the compiled output — starts faster, but rebuild after every edit.
+npm run build -w cli && node cli/dist/index.js pull --list
+
+# As the real installed binary, which is what a user actually gets.
+npm run build && bifrost pull --list
+```
+
+All three are the same entry point (`--version` agrees), so anything you can
+type after `bifrost` works after `npx tsx cli/src/index.ts` too.
+
+Two things that trip people up:
+
+- **Point it somewhere if `.local` does not resolve.** Every form defaults to
+  `http://bifrost.local:4646`, so pass `--host` when you need to —
+  `npx tsx cli/src/index.ts --host 192.168.1.20 pull --list` — or save it once
+  with `bifrost config set-host 192.168.1.20`.
+- **Colour only appears on a real terminal.** Run it plain and you get the
+  colours; pipe it (`| less`, `| cat`, `> out.txt`) and they vanish by design.
+  To keep them through a pager: `FORCE_COLOR=1 npx tsx cli/src/index.ts pull
+  --list | less -R`.
+
 ## Finding your bridge
 
 By default the CLI talks to `http://bifrost.local:4646`. That name resolves

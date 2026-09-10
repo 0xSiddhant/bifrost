@@ -124,10 +124,11 @@ bifrost clip | pbcopy                # read the shared clipboard
 bifrost doctor                       # check config, host, server, CLI version
 ```
 
-Every command, the config file, and the `--host`/discovery story:
-[`cli/README.md`](cli/README.md). On the host machine `npm run build` and
-`npm run start` re-install the global `bifrost` from what is checked out, so it
-never drifts from the server it talks to.
+Every command, the config file, the `--host`/discovery story, and how to run it
+straight from a checkout without installing: [`cli/README.md`](cli/README.md).
+On the host machine `npm run build` and `npm run start` re-install the global
+`bifrost` from what is checked out, so it never drifts from the server it talks
+to.
 
 ## Scripts
 
