@@ -1,7 +1,16 @@
 import type { Command } from 'commander';
 import { clientFromOptions } from '../core/client.js';
 import { listDevices } from '../core/presence.js';
-import { dim, formatWhen, heading, plural, print, table } from '../core/output.js';
+import {
+  accent,
+  dim,
+  formatWhen,
+  heading,
+  plural,
+  positive,
+  print,
+  table,
+} from '../core/output.js';
 
 export function registerDevices(program: Command): void {
   program
@@ -16,10 +25,20 @@ export function registerDevices(program: Command): void {
         return [
           heading('Devices'),
           table(rows, [
-            { header: 'NAME', value: (row) => row.name ?? row.charName ?? row.deviceId },
-            { header: 'DEVICE', value: (row) => row.label },
-            { header: 'STATE', value: (row) => (row.online ? 'online' : 'offline') },
-            { header: 'LAST SEEN', value: (row) => formatWhen(row.lastSeen) },
+            {
+              header: 'NAME',
+              value: (row) => row.name ?? row.charName ?? row.deviceId,
+              style: accent,
+            },
+            { header: 'DEVICE', value: (row) => row.label, style: dim },
+            {
+              header: 'STATE',
+              value: (row) => (row.online ? 'online' : 'offline'),
+              // Green for online only. Offline is dim rather than red: a phone
+              // that is simply asleep is not a failure to flag.
+              style: (text, row) => (row.online ? positive(text) : dim(text)),
+            },
+            { header: 'LAST SEEN', value: (row) => formatWhen(row.lastSeen), style: dim },
           ]),
           dim(`${plural(rows.length, 'device')}, ${online} online`),
         ].join('\n');

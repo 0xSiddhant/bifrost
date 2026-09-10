@@ -4,6 +4,7 @@ import { addClipboard, listClipboard, removeClipboard } from '../core/clipboard.
 import {
   accent,
   CliError,
+  code,
   dim,
   EXIT,
   formatWhen,
@@ -65,10 +66,26 @@ export function registerClip(program: Command): void {
           return [
             heading('Hermes'),
             table(rows, [
-              { header: 'ID', value: (row) => row.id },
-              { header: 'KIND', value: (row) => row.kind },
-              { header: 'WHEN', value: (row) => formatWhen(row.createdAt) },
-              { header: 'TEXT', value: (row) => oneLine(row.text) },
+              { header: 'ID', value: (row) => row.id, style: dim },
+              {
+                header: 'KIND',
+                value: (row) => row.kind,
+                // Echoes the colour its TEXT gets, so the label and the content
+                // agree instead of the label being decoration of its own.
+                style: (text, row) => (row.kind === 'code' ? code(text) : dim(text)),
+              },
+              { header: 'WHEN', value: (row) => formatWhen(row.createdAt), style: dim },
+              {
+                header: 'TEXT',
+                value: (row) => oneLine(row.text),
+                // Code and links are the two things worth spotting without
+                // reading; prose stays the terminal's own colour, because a
+                // listing where every row is coloured distinguishes nothing.
+                style: (text, row) => {
+                  if (row.kind === 'code') return code(text);
+                  return /^[a-z][a-z0-9+.-]*:\/\//i.test(row.text) ? accent(text) : text;
+                },
+              },
             ]),
             dim(plural(rows.length, 'entry', 'entries')),
           ].join('\n');

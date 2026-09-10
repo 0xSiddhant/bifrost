@@ -14,6 +14,7 @@ import {
 import {
   accent,
   CliError,
+  fileTint,
   dim,
   formatBytes,
   formatWhen,
@@ -76,8 +77,20 @@ function printListing(entries: readonly DownloadEntry[]): void {
     return [
       heading('Downloads'),
       table(sortForListing(rows), [
-        { header: 'NAME', value: displayPath },
-        { header: 'TYPE', value: (row) => row.type },
+        {
+          header: 'NAME',
+          value: displayPath,
+          // The listing puts a folder immediately above its own contents, and
+          // that grouping is invisible in a flat column of names. Colouring the
+          // folder row is what makes it read as a heading for the rows under it.
+          style: (text, row) =>
+            row.type === 'folder' ? accent(text) : fileTint(row.name, text),
+        },
+        {
+          header: 'TYPE',
+          value: (row) => row.type,
+          style: (text, row) => (row.type === 'folder' ? accent(text) : dim(text)),
+        },
         {
           header: 'SIZE',
           // A folder's own size is meaningless here — the server reports 0 and
@@ -85,8 +98,9 @@ function printListing(entries: readonly DownloadEntry[]): void {
           // already carry.
           value: (row) => (row.type === 'folder' ? '—' : formatBytes(row.size)),
           align: 'right',
+          style: dim,
         },
-        { header: 'MODIFIED', value: (row) => formatWhen(row.mtime) },
+        { header: 'MODIFIED', value: (row) => formatWhen(row.mtime), style: dim },
       ]),
       dim(`${plural(files, 'file')}, ${plural(folders, 'folder')}`),
     ].join('\n');

@@ -80,7 +80,7 @@ The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name
 
 ## OUTPUT
 
-Every command prints through one formatter: a titled section, aligned box-drawn tables, `✓`/`✗`/`⚠` marks, and a progress bar for transfers. All of it is decided by whether the output is a terminal — colour and progress appear on a TTY and disappear the instant output is piped or redirected, so nothing downstream ever sees an escape sequence or a redrawn line. `NO_COLOR` (any value) disables colour, `FORCE_COLOR` enables it, and `--json` disables both. Progress is drawn on stderr, never stdout.
+Every command prints through one formatter: a titled section, aligned box-drawn tables, `✓`/`✗`/`⚠` marks, and a progress bar for transfers. Colour in a table is semantic and consistent: cyan is the thing you would type next (a slug, a folder), dim is metadata (ids, timestamps, sizes), green is a live state, magenta and yellow mark media and archive files in a **pull** listing, and content itself is left in the terminal's own colour. All of it is decided by whether the output is a terminal — colour and progress appear on a TTY and disappear the instant output is piped or redirected, so nothing downstream ever sees an escape sequence or a redrawn line. `NO_COLOR` (any value) disables colour, `FORCE_COLOR` enables it, and `--json` disables both. Progress is drawn on stderr, never stdout.
 
 ## EXIT STATUS
 

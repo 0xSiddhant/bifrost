@@ -6,6 +6,7 @@ import {
   colourEnabled,
   EXIT,
   fields,
+  fileTint,
   formatBytes,
   formatWhen,
   heading,
@@ -18,6 +19,7 @@ import {
   progress,
   setJsonMode,
   table,
+  tintUrl,
   warn,
 } from './output.js';
 
@@ -47,6 +49,15 @@ afterEach(() => {
   setJsonMode(false);
   vi.restoreAllMocks();
 });
+
+/**
+ * Strips SGR escapes so a coloured render can be compared against its plain
+ * one. The ESC byte is exactly what these assertions are about, hence the
+ * targeted disable rather than a looser pattern.
+ */
+// eslint-disable-next-line no-control-regex
+const SGR = /\u001b\[\d+m/g;
+const strip = (text: string): string => text.replace(SGR, '');
 
 describe('json mode', () => {
   it('serializes the data and never calls the human renderer', () => {
@@ -150,6 +161,97 @@ describe('table', () => {
 
   it('is empty for no rows, so the caller can say something better', () => {
     expect(table([], [{ header: 'NAME', value: () => '' }])).toBe('');
+  });
+
+  it('leaves a styled column byte-identical when the output is piped', () => {
+    // vitest captures stdout, so this is the piped case: a `style` must add
+    // nothing at all rather than an empty escape pair.
+    delete process.env.FORCE_COLOR;
+    const rows = [{ name: 'notes.txt' }];
+    const plain = table(rows, [{ header: 'NAME', value: (row) => row.name }]);
+    const styled = table(rows, [
+      { header: 'NAME', value: (row) => row.name, style: accent },
+    ]);
+    expect(styled).toBe(plain);
+  });
+});
+
+describe('table styling', () => {
+  const restore = { FORCE_COLOR: process.env.FORCE_COLOR };
+  afterEach(() => {
+    process.env.FORCE_COLOR = restore.FORCE_COLOR;
+    if (restore.FORCE_COLOR === undefined) delete process.env.FORCE_COLOR;
+  });
+
+  it('colours cells without moving a column — the whole point of padding first', () => {
+    process.env.FORCE_COLOR = '1';
+    const rows = [
+      { name: 'notes.txt', kind: 'file' },
+      { name: 'a-much-longer-name.bin', kind: 'folder' },
+    ];
+    const columns = [
+      { header: 'NAME', value: (row: (typeof rows)[number]) => row.name },
+      { header: 'KIND', value: (row: (typeof rows)[number]) => row.kind },
+    ];
+    const coloured = table(rows, [
+      { ...columns[0]!, style: (text: string) => accent(text) },
+      columns[1]!,
+    ]);
+
+    // The escape is present…
+    expect(coloured).toContain('\u001b[36m');
+    // …and stripping it back out reproduces the uncoloured table exactly, which
+    // is only true if padding happened before styling.
+    process.env.FORCE_COLOR = '0';
+    expect(strip(coloured)).toBe(table(rows, columns));
+  });
+
+  it('hands the row to the style, so a folder can look different from a file', () => {
+    process.env.FORCE_COLOR = '1';
+    const rows = [{ name: 'Trip', type: 'folder' as const }, { name: 'a.txt', type: 'file' as const }];
+    const rendered = table(rows, [
+      {
+        header: 'NAME',
+        value: (row) => row.name,
+        style: (text, row) => (row.type === 'folder' ? accent(text) : text),
+      },
+    ]);
+    const [, , , folderLine, fileLine] = rendered.split('\n');
+    expect(folderLine).toContain('\u001b[36m');
+    expect(fileLine).not.toContain('\u001b[36m');
+  });
+});
+
+describe('content tints', () => {
+  const restore = { FORCE_COLOR: process.env.FORCE_COLOR };
+  afterEach(() => {
+    process.env.FORCE_COLOR = restore.FORCE_COLOR;
+    if (restore.FORCE_COLOR === undefined) delete process.env.FORCE_COLOR;
+  });
+
+  it('tints a filename by what the file is, and leaves the unknown plain', () => {
+    process.env.FORCE_COLOR = '1';
+    expect(fileTint('shot.png', 'shot.png')).toContain('\u001b[35m');
+    expect(fileTint('clip.mp4', 'clip.mp4')).toContain('\u001b[35m');
+    expect(fileTint('src.zip', 'src.zip')).toContain('\u001b[33m');
+    // No colour of its own — a listing where everything is coloured says nothing.
+    expect(fileTint('notes.txt', 'notes.txt')).toBe('notes.txt');
+    expect(fileTint('big.bin', 'big.bin')).toBe('big.bin');
+  });
+
+  it('matches on the extension, not anywhere in the name', () => {
+    process.env.FORCE_COLOR = '1';
+    expect(fileTint('png-notes.txt', 'png-notes.txt')).toBe('png-notes.txt');
+  });
+
+  it('dims only a URL scheme, so the padded width is untouched', () => {
+    process.env.FORCE_COLOR = '1';
+    const padded = 'https://example.com/x  ';
+    const tinted = tintUrl(padded);
+    expect(tinted.startsWith('\u001b[2mhttps://\u001b[0m')).toBe(true);
+    expect(strip(tinted)).toBe(padded);
+    // Not a URL: nothing to dim, nothing changed.
+    expect(tintUrl('never')).toBe('never');
   });
 });
 

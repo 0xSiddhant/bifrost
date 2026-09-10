@@ -20,6 +20,7 @@ import {
   plural,
   print,
   table,
+  tintUrl,
 } from '../core/output.js';
 
 export function registerPortkey(program: Command): void {
@@ -37,12 +38,13 @@ export function registerPortkey(program: Command): void {
         return [
           heading('Go-links'),
           table(rows, [
-            { header: 'SLUG', value: (row) => row.slug },
-            { header: 'TARGET', value: (row) => row.url },
-            { header: 'HITS', value: (row) => String(row.hits), align: 'right' },
+            { header: 'SLUG', value: (row) => row.slug, style: accent },
+            { header: 'TARGET', value: (row) => row.url, style: tintUrl },
+            { header: 'HITS', value: (row) => String(row.hits), align: 'right', style: dim },
             {
               header: 'LAST USED',
               value: (row) => (row.lastUsedAt === null ? 'never' : formatWhen(row.lastUsedAt)),
+              style: dim,
             },
           ]),
           dim(plural(rows.length, 'link')),

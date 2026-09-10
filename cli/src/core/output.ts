@@ -66,6 +66,8 @@ const CODES = {
   green: '\u001b[32m',
   yellow: '\u001b[33m',
   cyan: '\u001b[36m',
+  blue: '\u001b[34m',
+  magenta: '\u001b[35m',
 } as const;
 
 /**
@@ -100,6 +102,43 @@ export const attention = (text: string): string => paint(`⚠ ${text}`, [CODES.y
 export const dim = (text: string): string => paint(text, [CODES.dim], 'stdout');
 export const bold = (text: string): string => paint(text, [CODES.bold], 'stdout');
 export const accent = (text: string): string => paint(text, [CODES.cyan], 'stdout');
+/**
+ * Colour without a glyph, for a live state inside a table cell — `ok()` cannot
+ * be used there because its `✓` would widen an already-padded cell.
+ */
+export const positive = (text: string): string => paint(text, [CODES.green], 'stdout');
+export const code = (text: string): string => paint(text, [CODES.blue], 'stdout');
+export const media = (text: string): string => paint(text, [CODES.magenta], 'stdout');
+export const archive = (text: string): string => paint(text, [CODES.yellow], 'stdout');
+
+/**
+ * A filename's colour, by what the file *is* — the same affordance `ls --color`
+ * gives, so a listing can be skimmed by shape before it is read. Unknown
+ * extensions stay plain rather than getting a colour of their own: a palette
+ * where everything is coloured says nothing.
+ *
+ * Matching is on the trailing extension of the trimmed text, so it is safe to
+ * hand this an already-padded cell.
+ */
+const IMAGE = /\.(png|jpe?g|gif|svg|webp|heic|bmp|tiff?)$/i;
+const MEDIA = /\.(mp4|mov|mkv|avi|webm|mp3|wav|m4a|flac|aac|ogg)$/i;
+const ARCHIVE = /\.(zip|tar|gz|tgz|bz2|7z|rar|xz)$/i;
+
+export function fileTint(name: string, text: string): string {
+  if (IMAGE.test(name)) return media(text);
+  if (MEDIA.test(name)) return media(text);
+  if (ARCHIVE.test(name)) return archive(text);
+  return text;
+}
+
+/**
+ * Dims a URL's scheme so the host and path — the part anyone actually reads —
+ * carries the weight. Colour only, and only over a prefix, so an already-padded
+ * cell keeps its width.
+ */
+export function tintUrl(text: string): string {
+  return text.replace(/^(https?:\/\/)/, (scheme) => dim(scheme));
+}
 
 /** A section title: bold, with a rule under it so blocks separate at a glance. */
 export function heading(text: string): string {
@@ -155,6 +194,15 @@ export interface Column<T> {
   value: (row: T) => string;
   /** Right-aligned for numbers, so sizes line up on the decimal-ish end. */
   align?: 'left' | 'right';
+  /**
+   * Colour for this column's cells, applied to the **already-padded** text and
+   * given the row so a style can depend on it (a folder's name, an online
+   * device). It must only add colour: anything that changes the visible length
+   * — a glyph, a truncation — would push every column after it out of line,
+   * which is why `ok`/`bad`/`attention` are not usable here and `positive` and
+   * `accent` are.
+   */
+  style?: (text: string, row: T) => string;
 }
 
 const BOX = {
@@ -176,8 +224,9 @@ const BOX = {
  *
  * **Cell values must be plain text.** Padding happens before styling — an ANSI
  * sequence inside a value would be counted as visible width and every column
- * after it would sit crooked. The renderer styles the frame and header itself,
- * which is why no caller needs to.
+ * after it would sit crooked. The frame and header are styled here; a column
+ * that wants colour declares a `style`, which this applies *after* padding for
+ * exactly that reason.
  */
 export function table<T>(rows: readonly T[], columns: readonly Column<T>[]): string {
   if (rows.length === 0) return '';
@@ -192,19 +241,25 @@ export function table<T>(rows: readonly T[], columns: readonly Column<T>[]): str
   };
   const rule = (left: string, mid: string, right: string): string =>
     dim(left + widths.map((width) => BOX.horizontal.repeat(width + 2)).join(mid) + right);
-  const line = (values: readonly string[], style: (text: string) => string): string => {
+  const line = (values: readonly string[], style: (text: string, index: number) => string): string => {
     const bar = dim(BOX.vertical);
-    return `${bar} ${values.map((value, index) => style(pad(value, index))).join(` ${bar} `)} ${bar}`;
+    return `${bar} ${values.map((value, index) => style(pad(value, index), index)).join(` ${bar} `)} ${bar}`;
   };
 
   return [
     rule(BOX.topLeft, BOX.topMid, BOX.topRight),
     line(
       columns.map((column) => column.header),
-      bold,
+      (text) => bold(text),
     ),
     rule(BOX.midLeft, BOX.midMid, BOX.midRight),
-    ...cells.map((row) => line(row, (text) => text)),
+    ...cells.map((values, rowIndex) =>
+      line(values, (text, index) => {
+        const style = columns[index]?.style;
+        const row = rows[rowIndex];
+        return style !== undefined && row !== undefined ? style(text, row) : text;
+      }),
+    ),
     rule(BOX.bottomLeft, BOX.bottomMid, BOX.bottomRight),
   ].join('\n');
 }

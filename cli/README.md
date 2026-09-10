@@ -261,6 +261,22 @@ the endpoints it uses are the same LAN-trust ones the browser app uses.
 Every command prints through one formatter: a titled section, aligned box-drawn
 tables, `✓`/`✗`/`⚠` status marks, and a live progress bar for transfers.
 
+Colour in a listing is **semantic, not decoration** — one rule across every
+table, so a colour means the same thing wherever you see it:
+
+| colour | means |
+|---|---|
+| cyan | the thing you would type next — a go-link slug, a folder name |
+| dim | metadata you scan past — ids, timestamps, sizes, counts |
+| green | a live state (`devices` shows an online device this way) |
+| magenta / yellow | an image or media file / an archive, in `pull --list` |
+| plain | the content itself — a clipped line, a go-link's target |
+
+So `pull --list` reads as folders leading their own contents, `clip --list`
+picks out code and links from prose without you reading a row, and anything
+left uncoloured is deliberately uncoloured: a listing where every cell is
+coloured distinguishes nothing.
+
 **All of that is decided by whether the output is a terminal.** Colour and
 progress bars appear on a TTY and disappear the instant output is piped or
 redirected, so nothing downstream ever sees an escape sequence or a redrawn
