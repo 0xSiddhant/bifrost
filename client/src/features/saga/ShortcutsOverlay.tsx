@@ -12,6 +12,8 @@ const BINDINGS: readonly { keys: string; does: string }[] = [
   { keys: 'Home · End', does: 'First · last slide' },
   { keys: 'F', does: 'Enter or leave fullscreen' },
   { keys: 'N', does: 'Show or hide presenter notes' },
+  { keys: '+ · −', does: 'Bigger · smaller slide text' },
+  { keys: '0', does: 'Slide text back to 100%' },
   { keys: '? · H', does: 'This list' },
   { keys: 'Esc', does: 'Close this list, or leave fullscreen' },
   { keys: 'Swipe', does: 'Next or previous slide, on a touch screen' },

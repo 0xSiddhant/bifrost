@@ -1,5 +1,13 @@
 import { Button } from '../../core/ui/Button';
-import { ChevronLeftIcon, ChevronRightIcon, DocFileIcon, MonitorIcon } from '../../core/ui/icons';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DocFileIcon,
+  MinusIcon,
+  MonitorIcon,
+  PlusIcon,
+} from '../../core/ui/icons';
+import type { SlideScale } from './useSlideScale';
 
 /**
  * The one footer, rendered in both modes (PLAN-28).
@@ -26,6 +34,8 @@ export interface SlideFooterProps {
   notesOpen: boolean;
   onToggleNotes: () => void;
   onShowShortcuts: () => void;
+  /** Slide text size. Rendered here so it is reachable in fullscreen too. */
+  scale: SlideScale;
 }
 
 export function SlideFooter({
@@ -40,6 +50,7 @@ export function SlideFooter({
   notesOpen,
   onToggleNotes,
   onShowShortcuts,
+  scale,
 }: SlideFooterProps) {
   const classes = ['saga-footer'];
   // Overlaid rather than in flow: reserving layout space would make the slide
@@ -78,6 +89,37 @@ export function SlideFooter({
       <span className="saga-footer__hint caption">← → navigate · F fullscreen · ? shortcuts</span>
 
       <div className="saga-footer__actions">
+        {/* Sized for the room, not for this screen — so it belongs beside the
+            slide in both modes rather than in a settings panel behind one. */}
+        <div className="saga-footer__scale">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Smaller slide text"
+            onClick={scale.dec}
+            disabled={scale.atMin}
+          >
+            <MinusIcon size={15} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Slide text size ${scale.percent}%, reset to 100%`}
+            onClick={scale.reset}
+            disabled={scale.percent === 100}
+          >
+            <span className="mono">{scale.percent}%</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Larger slide text"
+            onClick={scale.inc}
+            disabled={scale.atMax}
+          >
+            <PlusIcon size={15} />
+          </Button>
+        </div>
         {hasNotes && (
           <Button
             variant="ghost"

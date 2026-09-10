@@ -20,6 +20,15 @@ const BASE: SlideFooterProps = {
   notesOpen: false,
   onToggleNotes: () => {},
   onShowShortcuts: () => {},
+  scale: {
+    value: 1,
+    percent: 100,
+    dec: () => {},
+    inc: () => {},
+    reset: () => {},
+    atMin: false,
+    atMax: false,
+  },
 };
 
 describe('SlideFooter (PLAN-28)', () => {
@@ -93,6 +102,51 @@ describe('SlideFooter (PLAN-28)', () => {
     render({ index: 3 });
     expect(button('Previous slide')?.disabled).toBe(false);
     expect(button('Next slide')?.disabled).toBe(true);
+  });
+
+  it('offers the size controls in both modes — a deck is sized in fullscreen', () => {
+    render({ fullscreen: false });
+    expect(button('Larger slide text')).not.toBeNull();
+    expect(button('Smaller slide text')).not.toBeNull();
+
+    render({ fullscreen: true });
+    expect(button('Larger slide text')).not.toBeNull();
+    expect(button('Smaller slide text')).not.toBeNull();
+  });
+
+  it('shows the current size and offers a reset only away from 100%', () => {
+    render();
+    expect(container.querySelector('.saga-footer__scale')?.textContent).toContain('100%');
+    expect(button('Slide text size 100%, reset to 100%')?.disabled).toBe(true);
+
+    render({ scale: { ...BASE.scale, value: 1.4, percent: 140 } });
+    expect(container.querySelector('.saga-footer__scale')?.textContent).toContain('140%');
+    expect(button('Slide text size 140%, reset to 100%')?.disabled).toBe(false);
+  });
+
+  it('disables the end of the range it has reached', () => {
+    render({ scale: { ...BASE.scale, atMin: true } });
+    expect(button('Smaller slide text')?.disabled).toBe(true);
+    expect(button('Larger slide text')?.disabled).toBe(false);
+
+    render({ scale: { ...BASE.scale, atMax: true } });
+    expect(button('Smaller slide text')?.disabled).toBe(false);
+    expect(button('Larger slide text')?.disabled).toBe(true);
+  });
+
+  it('wires the size controls to their callbacks', () => {
+    const inc = vi.fn();
+    const dec = vi.fn();
+    const reset = vi.fn();
+    render({ scale: { ...BASE.scale, value: 1.2, percent: 120, inc, dec, reset } });
+
+    act(() => button('Larger slide text')?.click());
+    act(() => button('Smaller slide text')?.click());
+    act(() => button('Slide text size 120%, reset to 100%')?.click());
+
+    expect(inc).toHaveBeenCalledOnce();
+    expect(dec).toHaveBeenCalledOnce();
+    expect(reset).toHaveBeenCalledOnce();
   });
 
   it('wires every control to its callback', () => {

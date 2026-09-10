@@ -9,6 +9,9 @@
   /* The scrim-overlaid footer is positioned against this in fullscreen. */
   position: relative;
   min-height: 60vh;
+  /* Overwritten inline by SagaPage. Declared here so the slide still has a
+     size if the property is ever missing. */
+  --saga-scale: 1;
 }
 
 .saga-stage {
@@ -32,7 +35,7 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: var(--space-6);
-  font-size: var(--text-lg);
+  font-size: calc(var(--text-lg) * var(--saga-scale));
 }
 
 .saga-slide__body > :first-child {
@@ -97,6 +100,37 @@
   align-items: center;
   gap: var(--space-2);
   margin-left: auto;
+  /* The actions wrap among themselves, not just against the row above: four
+     controls do not fit one 390px line, and since the size control refuses to
+     compress, without this they push the page sideways instead. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* The three size controls read as one control, not three buttons. */
+.saga-footer__scale {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  /* Never compressed. On a phone the footer wraps and the row runs tight, and
+     an icon button squeezed narrower than its glyph renders as an empty oval —
+     seen on a real 390px viewport, not guessed at. */
+  flex-shrink: 0;
+}
+
+.saga-footer__scale .btn {
+  flex: 0 0 auto;
+}
+
+.saga-footer__scale svg {
+  flex-shrink: 0;
+}
+
+.saga-footer__scale .mono {
+  font-size: var(--text-xs);
 }
 
 /* Fullscreen: the identical footer, overlaid on a scrim rather than occupying
@@ -140,7 +174,9 @@
 .saga:fullscreen .saga-slide__body {
   border: 0;
   background: transparent;
-  font-size: clamp(var(--text-lg), 2.2vw, 2rem);
+  /* The multiplier rides on top of the viewport-relative base, so a deck sized
+     for the room keeps scaling with the projector rather than being pinned. */
+  font-size: calc(clamp(var(--text-lg), 2.2vw, 2rem) * var(--saga-scale));
   display: flex;
   flex-direction: column;
   justify-content: center;

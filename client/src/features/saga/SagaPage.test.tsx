@@ -49,6 +49,7 @@ describe('SagaPage (PLAN-28)', () => {
     root = createRoot(container);
     blobs.clear();
     revoked.length = 0;
+    localStorage.clear();
 
     vi.spyOn(URL, 'createObjectURL').mockImplementation((source: Blob | MediaSource) => {
       const url = realCreate(source as Blob);
@@ -268,6 +269,67 @@ describe('SagaPage (PLAN-28)', () => {
     expect(toggle()).not.toBeNull();
     press('ArrowRight');
     expect(toggle()).toBeNull();
+  });
+
+  const scaleOf = () =>
+    container.querySelector<HTMLElement>('.saga')?.style.getPropertyValue('--saga-scale');
+
+  it('resizes the slide text with + and -, and 0 puts it back', async () => {
+    await open('/saga');
+    await drop('deck.md', DECK);
+    expect(scaleOf()).toBe('1');
+
+    press('+');
+    expect(scaleOf()).toBe('1.1');
+    press('=');
+    expect(scaleOf()).toBe('1.2');
+    press('-');
+    expect(scaleOf()).toBe('1.1');
+    press('0');
+    expect(scaleOf()).toBe('1');
+  });
+
+  it('keeps the chosen size across the fullscreen toggle', async () => {
+    // The whole point of the request: a deck sized for the room must not snap
+    // back to 100% the moment it is actually presented.
+    await open('/saga');
+    await drop('deck.md', DECK);
+    press('+');
+    press('+');
+    expect(scaleOf()).toBe('1.2');
+
+    const container_ = container.querySelector<HTMLElement>('.saga');
+    if (!container_) throw new Error('saga container missing');
+    // jsdom implements neither requestFullscreen nor document.fullscreenElement,
+    // so the mode switch is driven the way the browser would report it. The real
+    // requestFullscreen call is proven in live-verify.
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: container_,
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(container.querySelector('.saga')?.className).toContain('saga--fullscreen');
+    expect(scaleOf()).toBe('1.2');
+
+    press('+');
+    expect(scaleOf()).toBe('1.3');
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    await act(async () => {
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--fullscreen');
+    expect(scaleOf()).toBe('1.3');
+  });
+
+  it('does not resize the deck behind an open shortcuts overlay', async () => {
+    await open('/saga');
+    await drop('deck.md', DECK);
+    press('?');
+    press('+');
+    expect(scaleOf()).toBe('1');
   });
 
   it('presents a saved edda by slug', async () => {

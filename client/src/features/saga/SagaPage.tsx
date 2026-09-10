@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { log } from '../../core/log';
 import { Dropzone } from './Dropzone';
@@ -8,6 +8,7 @@ import { SlideFooter } from './SlideFooter';
 import { SlideView } from './SlideView';
 import { loadFromSlug, loadFromUrl } from './loadSource';
 import { useIdleActivity } from './useIdleActivity';
+import { useSlideScale } from './useSlideScale';
 import { useSlideshowNav } from './useSlideshowNav';
 import type { Slide } from './parseSlides';
 import './saga.css';
@@ -148,6 +149,10 @@ export function SagaPage() {
   const [notesOpen, setNotesOpen] = useState(false);
   const nav = useSlideshowNav(slides.length, { disabled: shortcutsOpen });
   const { active } = useIdleActivity(fullscreen);
+  // Held here rather than in the footer, so the size a presenter picked
+  // survives entering and leaving fullscreen — the footer re-renders across
+  // that switch, this component does not remount.
+  const scale = useSlideScale();
 
   const current = slides[nav.index];
   const hasNotes = Boolean(current?.notes);
@@ -173,11 +178,27 @@ export function SagaPage() {
       if (event.key === 'n' || event.key === 'N') {
         event.preventDefault();
         setNotesOpen((open) => !open);
+        return;
+      }
+      // `=` is the unshifted key `+` lives on, so both reach the same place.
+      if (event.key === '+' || event.key === '=') {
+        event.preventDefault();
+        scale.inc();
+        return;
+      }
+      if (event.key === '-' || event.key === '_') {
+        event.preventDefault();
+        scale.dec();
+        return;
+      }
+      if (event.key === '0') {
+        event.preventDefault();
+        scale.reset();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [shortcutsOpen, toggleFullscreen]);
+  }, [shortcutsOpen, toggleFullscreen, scale]);
 
   const heading = title ?? 'This deck';
 
@@ -224,6 +245,10 @@ export function SagaPage() {
       ref={containerRef}
       className={fullscreen ? 'saga saga--fullscreen' : 'saga'}
       data-testid="saga-container"
+      // A multiplier, not a size: each mode keeps its own base — windowed reads
+      // at a page's measure, fullscreen scales with the viewport — and this
+      // moves both together.
+      style={{ '--saga-scale': scale.value } as CSSProperties}
     >
       <div className="saga-stage" {...nav.touchHandlers}>
         <SlideView markdown={current?.body ?? ''} />
@@ -242,6 +267,7 @@ export function SagaPage() {
         notesOpen={notesOpen}
         onToggleNotes={() => setNotesOpen((open) => !open)}
         onShowShortcuts={() => setShortcutsOpen(true)}
+        scale={scale}
       />
 
       {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
