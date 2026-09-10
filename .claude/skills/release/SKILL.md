@@ -7,10 +7,17 @@ description: Cut a Bifrost release (develop → main). Since PLAN-09, the versio
 
 `.github/workflows/release.yml` runs on every push to `main`: it computes the
 semver bump from conventional commits since the last tag, bumps root + workspace
-`package.json`, regenerates `CHANGELOG.md` (changelogen), commits
-`chore(release): vX.Y.Z`, tags, publishes a GitHub Release with a build tarball,
-and fast-forwards `main → develop`. A `chore:`/`docs:`-only merge produces no
+`package.json` (server, client **and cli** — three since PLAN-27), regenerates
+`CHANGELOG.md` (changelogen), rewrites root `README.md`'s CLI install command
+between its `<!-- CLI_INSTALL_START -->` markers, commits
+`chore(release): vX.Y.Z`, tags, publishes a GitHub Release with **two assets**
+(the `bifrost-vX.Y.Z.tar.gz` deployment bundle and `bifrost-cli-X.Y.Z.tgz`), and
+fast-forwards `main → develop`. A `chore:`/`docs:`-only merge produces no
 release. Full reference: `docs/releasing.md`.
+
+**Confirm both assets exist** on the published Release before calling it done —
+the CLI install command in README points at the second one, so a release that
+shipped only the tarball leaves that command 404ing.
 
 **So this skill no longer bumps versions, tags, or back-merges by hand** — it
 gets a clean release onto `main` and verifies the workflow did the rest.

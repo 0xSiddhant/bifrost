@@ -96,6 +96,89 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 
 - **Portkey (LAN go-links):** management `POST /api/portkey {slug,url,note?}` → usecase validates the slug (lowercase kebab `[a-z0-9-]{1,32}`, not a `core/reserved-roots` word → 422) and normalizes the target (http(s) only, any host → 422), 409s a taken slug → `portkeys` table (the **slug is the primary key**, immutable — a rename is delete+recreate) → `bus.emit('portkey.saved')` → SSE + audit. The redirect is **`GET /go/:slug`, registered outside `/api/`** so a real route wins over the SPA fallback and `bifrost.local/go/router` is the whole address: it resolves the slug and answers a **302 (never 301) with `cache-control: no-store`** (targets like router IPs move; a 301 would pin the stale one in caches). The **hit count is bumped out of band** — the route schedules the write with `setImmediate` *after* the redirect is flushed (guarded against shutdown; a failed write is a `warn`, never a failed hop), then a dedicated **`portkey.hit` → SSE** (deliberately **not** audited) updates open management pages' hit/last-used within a heartbeat. An unknown slug **302-bounces to `/portkey?go=<slug>`** — the creative-404 pattern, so the management page's "enchant it now" form arrives pre-filled. Each link carries a QR (shared `<QrCard>`) encoding `<origin>/go/<slug>`, so a phone scan lands through the redirect. **Local profile only, permanently** — a go-links service reachable from the internet is an open-redirect/phishing primitive.
 
+## The CLI — a third workspace, and a consumer only (PLAN-27)
+
+`cli/` is a third npm workspace publishing a `bifrost` binary, installed globally
+from a GitHub Release tarball onto machines that may have neither `server/` nor
+`client/` checked out. It pushes/pulls files, reads and writes the clipboard,
+fetches saved documents by slug, opens a document's page in a browser, manages
+go-links, reports server and device state, and runs a Nimbus test — **against
+endpoints that already existed, with zero new or modified server routes**. Its
+shape is `commands/` (parse args, print) over `core/` (one flat file per
+capability, mirroring `client/src/core/`); there is no usecase tier because
+there is no business rule here the server does not already enforce.
+
+Four things about it are load-bearing rather than incidental:
+
+- **Uploads do not use `fetch`.** The mandated spike came back the opposite way
+  to the plan's premise: Node's built-in `fetch` + `FormData` buffers the whole
+  file (~412 MB live for a 400 MB upload, measured out-of-process with forced
+  GC), and so does a `duplex: 'half'` streaming body. `node:http` with the
+  multipart envelope piped in holds ~23 MB for the same file, so `postFiles` is
+  built on that — no dependency either way, and `undici` was never needed.
+  Every other call is `fetch`.
+- **Discovery is the OS's, not the CLI's.** `bifrost.local` resolves through
+  `getaddrinfo()`, which is mDNS-aware on macOS; Linux needs `nss-mdns` and
+  Windows needs Bonjour. Nothing browses `_http._tcp`. What makes that safe is
+  that **one** wording (`discover.ts`'s `unreachableMessage`) names the two
+  fixes — `--host` or `bifrost config set-host` — and `client.ts` and `doctor`
+  both raise exactly it rather than inventing a second vocabulary.
+- **A slug names a document but not its kind.** `open`/`preview` ask all four
+  raw endpoints concurrently and use the one that answers; `--type` skips the
+  fan-out; a cross-kind collision is reported, never resolved by guessing. The
+  media-type check on each answer is not belt-and-braces: those endpoints live
+  *outside* `/api/`, so on a profile missing that module the SPA fallback
+  answers **200 with `index.html`**, and only the content type tells that from a
+  real document. `preview` opens `/edda/preview/:slug` for the one kind that has
+  a rendered page and the raw content URL for the other three, saying which it
+  did — a fifth `readRoute` is one line the day one of them gains a page.
+- **The GitHub API is touched by exactly two commands.** `update` and `doctor`,
+  sharing one six-hour cache in the config file; `push`/`pull`/`clip`/… never
+  reach the internet at all. Distribution is a Release tarball rather than an
+  npm publish, so the version check reads `releases/latest` and compares by
+  plain string inequality — not a semver ordering, because the owner's own dev
+  machine re-syncs its global `bifrost` from `develop` on every build and is
+  routinely *ahead* of the last published tag.
+
+A later owner round widened `push`/`pull` and made the whole output layer
+presentation-aware, still with **zero server change**:
+
+- **`push` takes folders and `.`**, expanding to the files *directly* inside —
+  never recursively, because `downloads/` is one level deep and `uploads/` flat,
+  so a tree has nowhere to land and flattening one would collide names it kept
+  apart. Hidden files are skipped (a `push .` must not put `.env` on the share).
+  Batches are split at the server's own `MAX_FILES_PER_UPLOAD`, read from
+  `/api/files/config` rather than assumed, because past that cap busboy aborts
+  the **whole** request — a 50-file push would otherwise land nothing.
+- **`push -d <name>`** is `POST /api/files?folder=`, PLAN-24's own path: the
+  folder is created if missing and appended to if not, and the files are live
+  immediately. Verified over a real SSE stream: one `download.added` for the new
+  folder row, one `file.published` carrying `folder` (the banner), one
+  `download.added` for the file. **A plain `push` produces no SSE event at all** —
+  `file.uploaded` is emitted but only `audit-log` and `metrics` subscribe, and
+  there is no `GET /api/files` listing route, so a browser's Send page is a
+  local queue of what *that browser* uploaded. Making a CLI push visible there
+  needs a listing route plus a broadcast, which is server surface and therefore
+  a separate plan, not a CLI change.
+- **`pull` is variadic and folder-aware**: `--list`/`-l`, several names at once,
+  and a folder streamed as `<name>.zip` through `GET /api/downloads/:id/archive`.
+  A folder's own size is never shown as a number — the server reports 0 and the
+  truth is the sum of its rows — so the cell reads `—`.
+- **Presentation lives entirely in `output.ts`**, which is the only module that
+  knows a terminal exists. Colour, `✓`/`✗`/`⚠` marks, box-drawn tables and
+  transfer bars are gated on `isTTY` per stream (plus `NO_COLOR`/`FORCE_COLOR`),
+  so a pipe never receives an escape sequence and progress is drawn on stderr
+  only. Table cells are padded *before* they are styled — an ANSI sequence
+  counted as visible width would skew every column after it. `--json` disables
+  the lot.
+
+`scripts/cli-sync.ts` keeps that global install honest: `npm run build` and `npm
+run start` both `npm pack` the workspace and `npm install -g` the tarball — the
+same mechanism a real install uses, never `npm link`, so a packaging bug cannot
+hide until release day. It skips the global install under `CI` (and the
+Dockerfile sets `CI=true` for its build), and PM2 never runs it at all, since
+`ecosystem.config.cjs` execs `server/dist/bootstrap.js` directly.
+
 ## Restart safety (server is stopped/started constantly)
 
 - SQLite in **WAL mode**, `synchronous=NORMAL`, `busy_timeout` set; better-sqlite3 is synchronous so no half-finished async writes.
@@ -115,4 +198,4 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 - **Run modes:** macOS runs **native** (PM2 or launchd — mDNS + FSEvents need it) via `ecosystem.config.cjs` / a launchd plist, with one-command `scripts/start-*.sh`. **Docker targets a future Linux host** (`--network host`); it is deliberately not the macOS run mode.
 - **Backup/restore:** `npm run backup` / `restore` wrap `core/backup` (online-safe snapshot, rotation, `--include-env` opt-in; restore refuses a live server).
 - **Observability (optional, detachable):** `docker-compose.observability.yml` runs Grafana + Loki + Alloy; Alloy tails `storage/logs/*.log`, so it works with any run mode and backfills after downtime.
-- **Releases are automated:** `.github/workflows/release.yml` on push to `main` computes the semver bump from conventional commits, tags, publishes a GitHub Release + tarball, and back-merges to `develop` (needs a `RELEASE_TOKEN` PAT).
+- **Releases are automated:** `.github/workflows/release.yml` on push to `main` computes the semver bump from conventional commits, tags, publishes a GitHub Release + tarball, and back-merges to `develop` (needs a `RELEASE_TOKEN` PAT). Since PLAN-27 the release carries **two** assets — the PM2 deployment bundle and `bifrost-cli-<version>.tgz` — and the same commit rewrites root `README.md`'s `<!-- CLI_INSTALL_START -->` block with that version's real install URL, since a hand-written one would go stale on the next release.
