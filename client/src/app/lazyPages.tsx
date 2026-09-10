@@ -111,6 +111,10 @@ export function createLazyPages() {
       () => import('../features/portkey/PortkeyPage'),
       (m) => m.PortkeyPage,
     ),
+    SagaPage: page(
+      () => import('../features/saga/SagaPage'),
+      (m) => m.SagaPage,
+    ),
     // Nótt idle screensaver — desktop-only, so the whole chunk is loaded lazily
     // and only ever imported on a real computer that has actually gone idle.
     Screensaver: page(

@@ -83,4 +83,11 @@ export interface LibraryEntry {
   mimeType?: string;
   /** A rendered read-only view, if the tool has one (Edda's preview page). */
   readRoute?(item: LibraryItem): string;
+  /**
+   * A slideshow view, if the tool's documents can be presented (PLAN-28).
+   * Only Edda has one: Saga splits markdown on `---` lines, and a JSON/YAML/XML
+   * document has no slide structure to split on. Optional for the same reason
+   * `readRoute` is — a kind without one simply renders no "Present" action.
+   */
+  presentRoute?(item: LibraryItem): string;
 }

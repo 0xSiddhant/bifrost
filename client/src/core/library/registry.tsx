@@ -66,6 +66,7 @@ const eddaEntry: LibraryEntry = {
   apiRoute: (item) => `/edda/api/${item.slug}`,
   mimeType: 'text/markdown',
   readRoute: (item) => `/edda/preview/${item.slug}`,
+  presentRoute: (item) => `/saga/${item.slug}`,
 };
 
 const grootEntry: LibraryEntry = {

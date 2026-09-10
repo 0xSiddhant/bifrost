@@ -62,6 +62,7 @@ describe('offline-mode module', () => {
       'edda',
       'variant',
       'loki',
+      'saga',
       'screensaver',
     ]);
     expect(config.targets.every((target) => target.label.length > 0)).toBe(true);

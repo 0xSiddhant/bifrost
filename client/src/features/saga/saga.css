@@ -1,0 +1,278 @@
+/* Saga (PLAN-28). Tokens only — no literal colours, per rules/coding.md.
+   Saga inherits whichever theme is active, exactly as Edda's preview, public
+   page and PDF export already do; there is no second template system here. */
+
+.saga {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* The scrim-overlaid footer is positioned against this in fullscreen. */
+  position: relative;
+  min-height: 60vh;
+}
+
+.saga-stage {
+  display: flex;
+  gap: var(--space-4);
+  min-height: 0;
+  flex: 1;
+}
+
+.saga-slide {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+/* The slide is the reading surface, so it drops `.md-preview`'s own frame and
+   takes the page's measure instead. */
+.saga-slide__body {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-6);
+  font-size: var(--text-lg);
+}
+
+.saga-slide__body > :first-child {
+  margin-top: 0;
+}
+
+/* ── presenter notes ────────────────────────────────────────────────────── */
+
+.saga-notes {
+  width: min(22rem, 34vw);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.saga-notes__label {
+  margin: 0 0 var(--space-2);
+}
+
+.saga-notes__body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ── footer ─────────────────────────────────────────────────────────────── */
+
+.saga-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+}
+
+.saga-footer__position {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.saga-footer__nav {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.saga-footer__hint {
+  /* Eats the slack so the actions sit hard right at every width. */
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.saga-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* Fullscreen: the identical footer, overlaid on a scrim rather than occupying
+   layout space. Reserving space would make the slide shift every time the
+   footer faded in or out, which reads as unpolished mid-presentation. */
+.saga-footer--overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  border: 0;
+  border-radius: 0;
+  /* The same surface the windowed footer sits on, faded in from transparent
+     rather than a scrim: every theme's `--scrim` is a dark wash, which leaves
+     `--text-muted` unreadable on it in the light themes. Blending the real
+     surface in instead means the footer's contrast is identical in both modes,
+     in every theme, with no colour of its own to keep in step. */
+  background: linear-gradient(180deg, transparent 0%, var(--surface) 45%);
+  padding: var(--space-6) var(--space-4) var(--space-4);
+  transition:
+    opacity var(--dur-2) var(--ease),
+    visibility var(--dur-2) var(--ease);
+}
+
+/* `visibility`, not `display`: it leaves the accessibility tree and the tab
+   order without changing the slide's box, which is what acceptance 8 measures. */
+.saga-footer--idle {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ── fullscreen container ───────────────────────────────────────────────── */
+
+/* Scoped to Saga's own container, which is what `requestFullscreen()` targets —
+   the browser's Fullscreen API is what hides the app header and nav. */
+.saga:fullscreen {
+  background: var(--bg);
+  padding: var(--space-4);
+  gap: 0;
+}
+
+.saga:fullscreen .saga-slide__body {
+  border: 0;
+  background: transparent;
+  font-size: clamp(var(--text-lg), 2.2vw, 2rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ── shortcuts overlay ──────────────────────────────────────────────────── */
+
+.saga-shortcuts {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  z-index: 2;
+}
+
+.saga-shortcuts__card {
+  width: min(30rem, 92%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-5);
+}
+
+.saga-shortcuts__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.saga-shortcuts__head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.saga-shortcuts__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.saga-shortcuts__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.saga-shortcuts__row dt {
+  flex: 0 0 auto;
+  width: 14rem;
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+
+.saga-shortcuts__row dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ── landing / dropzone ─────────────────────────────────────────────────── */
+
+.saga-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-4);
+  color: var(--text-muted);
+  text-align: center;
+  transition: border-color var(--dur-1) var(--ease);
+}
+
+.saga-drop--over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.saga-drop__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.saga-drop__input {
+  display: none;
+}
+
+.saga-landing__error {
+  margin-top: var(--space-3);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Notes stack under the slide rather than squeezing it to a column. */
+  .saga-stage {
+    flex-direction: column;
+  }
+
+  .saga-notes {
+    width: auto;
+  }
+
+  .saga-footer__hint {
+    display: none;
+  }
+
+  .saga-shortcuts__row {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .saga-shortcuts__row dt {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* An instant cut, not a fade — this codebase's existing convention
+     (screensaver, mermaid) applied here rather than skipped because the
+     feature is new. */
+  .saga-footer--overlay,
+  .saga-drop {
+    transition: none;
+  }
+}

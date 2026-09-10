@@ -42,6 +42,7 @@ const TARGETS: readonly OfflineModeTarget[] = [
   { id: 'edda', label: 'Edda (Markdown)' },
   { id: 'variant', label: 'Variant (diff)' },
   { id: 'loki', label: 'Loki (JS workbench)' },
+  { id: 'saga', label: 'Saga (slideshow)' },
   { id: 'screensaver', label: 'Nótt screensaver' },
 ];
 

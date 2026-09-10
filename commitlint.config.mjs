@@ -32,6 +32,7 @@ export default {
         'client-logs',
         'metrics',
         'toolbox',
+        'saga',
         'offline-mode',
         // core areas
         'core',

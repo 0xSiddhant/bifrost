@@ -243,6 +243,26 @@ describe('PensievePage', () => {
     expect(rowNames()).toEqual(['Alpha notes']);
   });
 
+  // Acceptance 13 (PLAN-28): the row action follows Saga's own capability, not
+  // the row's kind — an edda is presentable, but only where Saga is loaded.
+  it('offers Present on edda rows only while the saga module is loaded', async () => {
+    mocks.modules = ['runestone', 'edda', 'saga'];
+    await open();
+
+    const present = [...container.querySelectorAll('.lib-row__link')].filter((node) =>
+      node.textContent?.includes('Present'),
+    );
+    expect(present).toHaveLength(1);
+    expect(present[0]?.getAttribute('href')).toBe('/saga/alpha-notes-e1');
+  });
+
+  it('drops Present everywhere when the saga module is absent', async () => {
+    mocks.modules = ['runestone', 'edda'];
+    await open();
+
+    expect(container.textContent).not.toContain('Present');
+  });
+
   it('shows an empty state that tells filtering apart from an empty basin', async () => {
     mocks.listRunestones.mockResolvedValue([]);
     mocks.listEddas.mockResolvedValue([]);
