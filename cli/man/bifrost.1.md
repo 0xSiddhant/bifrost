@@ -39,8 +39,8 @@ The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name
   * `bifrost open` <slug> [`--type` <kind>] [`--out` <file>]:
     Print a saved document by its slug. A slug names a document but not which kind, so all four raw endpoints (runestone, edda, groot, atlas) are asked at once; `--type` skips that. A slug that exists as two kinds is reported rather than guessed at.
 
-  * `bifrost preview` <slug> [`--type` <kind>] [`--no-open`]:
-    Open a saved document's page in your browser. Edda documents have a real rendered page (`/edda/preview/<slug>`); the other three kinds have none yet, so their raw content URL is opened instead — which a browser renders readably — and the CLI says which of the two it did. `--no-open` prints the resolved URL instead of launching anything, and `--json` never launches a browser.
+  * `bifrost preview` <target> [`--type` <kind|destination>] [`--no-open`]:
+    Open a saved document's page, or a local file, in your browser. A <target> carrying a path separator, a leading `.`, or an extension is read as a **file on this machine**; anything else is a document **slug**. Edda documents have a real rendered page (`/edda/preview/<slug>`); the other three kinds have none yet, so their raw content URL is opened instead — which a browser renders readably — and the CLI says which of the two it did. A local file is served to the page over a one-shot loopback HTTP server on an OS-assigned port, scoped by CORS to your Bifrost origin alone and closed as soon as the page has read it, or after 60 seconds if it never does. `--type` is the document kind for a slug and the destination for a file; `saga` presents `.md` and `.markdown` as slides and is required, since markdown has no default destination yet. An extension or destination the routing table has no row for is refused before any port is opened or any browser launched. `--no-open` prints the resolved URL instead of launching anything, and `--json` never launches a browser — in neither mode is the file served, since nothing will fetch it.
 
   * `bifrost portkey list` [`-q` <text>]:
     List LAN go-links.
