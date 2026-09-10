@@ -140,4 +140,4 @@ Accio's shelf became a card grid (2026-07-25) because a bookmark is a short, gla
 
 **PLAN-99 is already clean** — its Tier B **Unified library shell** row was deleted on 2026-08-04 when this plan was scheduled, under the rule adopted that day (a backlog row goes when its idea is *scheduled*, not when the plan completes), with a `PROMOTED … to PLAN-21` note in its place.
 
-So this PR's only paperwork is the docs sync in Tasks plus **archiving this file to `.agent/plans/completed/`**.
+So this PR's only paperwork is the docs sync in Tasks plus **archiving this file to `.agents/plans/completed/`**.

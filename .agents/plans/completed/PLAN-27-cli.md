@@ -265,7 +265,7 @@ All pre-existing, unchanged by this plan — listed here because the CLI's whole
 - [ ] Root `README.md`: new **CLI** section with the install command inside `<!-- CLI_INSTALL_START -->`/`<!-- CLI_INSTALL_END -->` markers, seeded with the current version by hand at merge time; "Project docs" list gets one new line linking to `cli/README.md`
 - [ ] `docs/releasing.md`: add a line describing the two new release-workflow steps (CLI tarball asset, README install-command patch)
 - [ ] `decisions.md`: log the npm-vs-Swift call (already made, restated for the record with reasoning) and the discovery/push-streaming spike outcomes once run
-- [ ] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
+- [ ] `context-sync` pass once implemented; update `.agents/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
 
 ## Acceptance criteria
 

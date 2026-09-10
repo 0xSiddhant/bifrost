@@ -219,7 +219,7 @@ Both `brotli` routes are local **and** cloud profile. Gzip comparison and both c
 - [x] `architecture.md`: module registry row for `brotli`; a short paragraph in Key Data Flows covering both hand-off directions and the decompression-bomb guard
 - [x] `tech-stack.md`: note Brotli is Node's built-in `zlib`, not a new dependency (worth stating explicitly, since every other recent addition to that table *was* a new package)
 - [x] `decisions.md`: log the server-vs-WASM call, the bomb-guard cap choice, and the registry-mirrors-library-registry decision, dated
-- [x] `context-sync` pass once implemented; update `.agent/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
+- [x] `context-sync` pass once implemented; update `.agents/memory/progress.md`; archive this plan file into `completed/` in the implementation PR
 
 ## Acceptance criteria
 

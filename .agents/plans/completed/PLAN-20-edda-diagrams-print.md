@@ -136,4 +136,4 @@ Both rows say the feature is *"listed in Edda's coming-soon footer"*. **There is
 
 **PLAN-99 is already clean** — the owner had both rows stripped on 2026-08-04 when this plan was written, rather than at completion, so a backlog row for scheduled work never sat around to be misread as still-open. A `PROMOTED … to PLAN-20` note points here in their place.
 
-So this PR's only paperwork is the docs sync in Tasks plus **archiving this file to `.agent/plans/completed/`** — a plan's own PR closes its own paperwork, the same rule as PLAN-18. Optionally flip the PLAN-99 note from `PROMOTED` to `DONE` at the same time.
+So this PR's only paperwork is the docs sync in Tasks plus **archiving this file to `.agents/plans/completed/`** — a plan's own PR closes its own paperwork, the same rule as PLAN-18. Optionally flip the PLAN-99 note from `PROMOTED` to `DONE` at the same time.

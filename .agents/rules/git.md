@@ -16,7 +16,7 @@
 4. Run `npm run lint && npm run typecheck && npm test` locally — must pass.
 5. Push and raise a **PR into `develop`**. Title: `feat(plan-XX): <summary>`. Body: what the plan delivered, any deviations + why, test evidence.
 6. CI must be green. User reviews and merges. Never self-merge.
-7. Update `.agent/memory/progress.md` in the same PR.
+7. Update `.agents/memory/progress.md` in the same PR.
 
 ## Commits — Conventional Commits, enforced by commitlint + husky
 

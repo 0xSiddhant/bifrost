@@ -30,6 +30,7 @@ export const WARM_LOADERS: WarmLoaders = {
   edda: () => import('../features/edda/EddaPage'),
   variant: () => import('../features/variant/VariantPage'),
   loki: () => import('../features/loki/LokiPage'),
+  screensaver: () => import('../features/screensaver/Screensaver'),
 };
 
 export interface WarmLoadResult {

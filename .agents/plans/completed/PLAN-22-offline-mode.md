@@ -268,7 +268,7 @@ this PR.
 - [ ] `docs/offline-mode.md` — per the required structure above
 - [ ] `docs/ARCHITECTURE.md` — add the pointer
 - [ ] `.claude/skills/new-module/SKILL.md` — standing-knowledge update
-- [ ] `.agent/context/architecture.md` — module registry row + paragraph
+- [ ] `.agents/context/architecture.md` — module registry row + paragraph
 - [ ] Failure paths logged per `rules/coding.md` — the config fetch
       failing, a warm-load target failing, and the admin PATCH failing all
       get a line; a deliberately silent catch (e.g. an individual warm
@@ -335,5 +335,5 @@ this PR.
 ## On completion
 
 This PR's paperwork: the docs sync in Tasks, plus **archiving this file to
-`.agent/plans/completed/`** — a plan's own PR closes its own paperwork, per
+`.agents/plans/completed/`** — a plan's own PR closes its own paperwork, per
 the PLAN-18/PLAN-20 precedent.

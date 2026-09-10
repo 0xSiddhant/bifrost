@@ -62,6 +62,7 @@ describe('offline-mode module', () => {
       'edda',
       'variant',
       'loki',
+      'screensaver',
     ]);
     expect(config.targets.every((target) => target.label.length > 0)).toBe(true);
     expect(config.disabled).toEqual([]);

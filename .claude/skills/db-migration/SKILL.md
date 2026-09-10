@@ -14,4 +14,4 @@ Hard rule: **the schema edit and its migration are one change, landed together.*
 5. Verify both DB paths, then run the `verify` skill (its restart smoke is mandatory for schema changes):
    - **Upgrade path**: built server against the existing `storage/data/app.db` → `/api/health` 200 → `PRAGMA integrity_check` returns `ok`.
    - **Fresh path**: `STORAGE_ROOT=<scratch dir> npm start` → health 200 — proves the migration chain bootstraps from zero, not just from the previous state.
-6. If tables were added/renamed, update the data section of `.agent/context/architecture.md` (context-sync diffs docs against Drizzle schemas, so stale docs will surface later as drift).
+6. If tables were added/renamed, update the data section of `.agents/context/architecture.md` (context-sync diffs docs against Drizzle schemas, so stale docs will surface later as drift).

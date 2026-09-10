@@ -139,4 +139,4 @@ Point the CLI at a bridge whose `.local` name does not resolve:
 
 ## SEE ALSO
 
-The project README, and `.agent/context/architecture.md` in the Bifrost repository, for what the server side of each of these endpoints does.
+The project README, and `.agents/context/architecture.md` in the Bifrost repository, for what the server side of each of these endpoints does.

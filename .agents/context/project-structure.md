@@ -2,9 +2,9 @@
 
 ```
 bifrost/
-├── CLAUDE.md                  # entry point for AI agents → points to .agent/
+├── CLAUDE.md                  # entry point for AI agents → points to .agents/
 ├── README.md
-├── .agent/                    # plans, context, rules, memory (this folder)
+├── .agents/                    # plans, context, rules, memory (this folder)
 ├── .github/workflows/         # ci.yml (lint/typecheck/test/build + docker build + backup smoke)
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
@@ -16,7 +16,7 @@ bifrost/
 ├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
 │                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
-│   ├── ARCHITECTURE.md        # pointer → .agent/context/architecture.md (no duplication)
+│   ├── ARCHITECTURE.md        # pointer → .agents/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
 │   ├── THEME-SPEC.md          # rules + JSON schema for user-made themes
 │   ├── pm2.md · launchd.md    # run as a service on macOS
