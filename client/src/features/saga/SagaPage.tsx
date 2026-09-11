@@ -6,7 +6,7 @@ import { NotesPanel } from './NotesPanel';
 import { ShortcutsOverlay } from './ShortcutsOverlay';
 import { SlideFooter } from './SlideFooter';
 import { SlideView } from './SlideView';
-import { loadFromSlug, loadFromUrl } from './loadSource';
+import { loadFromSlug, loadFromUrl, type SagaDeck, type SagaSlide } from './loadSource';
 import {
   enterFullscreen,
   exitFullscreen,
@@ -16,7 +16,6 @@ import {
 } from './fullscreen';
 import { useSlideScale } from './useSlideScale';
 import { useSlideshowNav } from './useSlideshowNav';
-import type { Slide } from './parseSlides';
 import './saga.css';
 
 /**
@@ -24,8 +23,9 @@ import './saga.css';
  *
  * One component serves `/saga` and `/saga/:slug`, the same way `EddaPage`
  * already serves both the bare and the slugged form of its own route. Which of
- * the three sources produced the deck is entirely `loadSource`'s business:
- * everything below works from a `Slide[]`.
+ * the sources produced the deck is entirely `loadSource`'s business: everything
+ * below works from a `SagaSlide[]`, whether those slides came from markdown or
+ * from a PDF's pages (PLAN-29).
  */
 type Phase = 'idle' | 'loading' | 'ready' | 'notfound' | 'error';
 
@@ -37,7 +37,7 @@ export function SagaPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [slides, setSlides] = useState<Slide[]>([]);
+  const [slides, setSlides] = useState<SagaSlide[]>([]);
   const [title, setTitle] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>(slug || source ? 'loading' : 'idle');
 
@@ -54,6 +54,17 @@ export function SagaPage() {
   // The name and the phase move at drop time, not when the object URL lands a
   // tick later — otherwise the dropzone stays on screen for that tick, which
   // reads as the drop not having registered.
+  /**
+   * Whatever the open deck holds — a PDF's worker and parsed document. Kept in
+   * a ref rather than state because releasing it must not re-render, and must
+   * happen exactly once even if two loads race.
+   */
+  const disposeRef = useRef<(() => void) | null>(null);
+  const adopt = useCallback((deck: SagaDeck) => {
+    disposeRef.current?.();
+    disposeRef.current = deck.dispose;
+  }, []);
+
   const handleFile = useCallback((dropped: File) => {
     setFile(dropped);
     setTitle(dropped.name);
@@ -73,6 +84,7 @@ export function SagaPage() {
             setPhase('notfound');
             return;
           }
+          adopt(deck);
           setSlides(deck.slides);
           setTitle(deck.title);
           setPhase('ready');
@@ -96,7 +108,13 @@ export function SagaPage() {
       setPhase('loading');
       loadFromUrl(url)
         .then((deck) => {
-          if (cancelled) return;
+          // A deck that finished loading after the source changed still holds a
+          // worker, so it is released here rather than simply dropped.
+          if (cancelled) {
+            deck.dispose?.();
+            return;
+          }
+          adopt(deck);
           setSlides(deck.slides);
           setPhase('ready');
         })
@@ -116,7 +134,17 @@ export function SagaPage() {
     return () => {
       cancelled = true;
     };
-  }, [slug, url, navigate]);
+  }, [slug, url, navigate, adopt]);
+
+  // Leaving the page entirely: nothing above runs again to release the last
+  // deck, and a presenter closing a PDF should not leave its worker running.
+  useEffect(
+    () => () => {
+      disposeRef.current?.();
+      disposeRef.current = null;
+    },
+    [],
+  );
 
   // ------------------------------------------------------------- presenting --
   const containerRef = useRef<HTMLDivElement>(null);
@@ -169,6 +197,13 @@ export function SagaPage() {
   const scale = useSlideScale();
 
   const current = slides[nav.index];
+  /**
+   * Whether this slide could carry a presenter note at all — false for a
+   * rasterized PDF page (PLAN-29). A deck is all one kind, so this does not
+   * flicker as the deck is navigated; it is read from the current slide rather
+   * than the deck because the slide is what `NotesPanel` actually shows.
+   */
+  const canNotes = current?.kind !== 'pdf';
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -190,7 +225,7 @@ export function SagaPage() {
       }
       if (event.key === 'n' || event.key === 'N') {
         event.preventDefault();
-        setNotesOpen((open) => !open);
+        if (canNotes) setNotesOpen((open) => !open);
         return;
       }
       // `=` is the unshifted key `+` lives on, so both reach the same place.
@@ -211,7 +246,7 @@ export function SagaPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [shortcutsOpen, togglePresenting, scale]);
+  }, [shortcutsOpen, togglePresenting, scale, canNotes]);
 
   const heading = title ?? 'This deck';
 
@@ -264,8 +299,8 @@ export function SagaPage() {
       style={{ '--saga-scale': scale.value } as CSSProperties}
     >
       <div className="saga-stage">
-        <SlideView markdown={current?.body ?? ''} />
-        {notesOpen && <NotesPanel notes={current?.notes ?? null} />}
+        <SlideView slide={current} scale={scale.value} />
+        {notesOpen && <NotesPanel slide={current} />}
       </div>
 
       <SlideFooter
@@ -276,6 +311,7 @@ export function SagaPage() {
         fullscreen={presenting}
         canFullscreen={canPresent}
         onToggleFullscreen={togglePresenting}
+        canNotes={canNotes}
         notesOpen={notesOpen}
         onToggleNotes={() => setNotesOpen((open) => !open)}
         onShowShortcuts={() => setShortcutsOpen(true)}
@@ -283,7 +319,11 @@ export function SagaPage() {
       />
 
       {shortcutsOpen && (
-        <ShortcutsOverlay canFullscreen={canPresent} onClose={() => setShortcutsOpen(false)} />
+        <ShortcutsOverlay
+          canFullscreen={canPresent}
+          canNotes={canNotes}
+          onClose={() => setShortcutsOpen(false)}
+        />
       )}
     </div>
   );

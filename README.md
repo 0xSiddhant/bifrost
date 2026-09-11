@@ -43,7 +43,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
-- 🎞 Saga — present a markdown deck fullscreen: `---` splits the slides, keyboard navigation, presenter notes, +/− text sizing that carries into fullscreen, and a shortcuts overlay; drop a `.md` file (never uploaded, never stored) or open a saved Edda
+- 🎞 Saga — present a deck fullscreen: drop a `.md` file (`---` splits the slides, `<!-- notes: … -->` feeds the presenter panel) or a `.pdf` (one page per slide, rasterized at a bounded resolution); keyboard navigation, +/− sizing that carries into fullscreen, and a shortcuts overlay. Nothing is uploaded or stored — or open a saved Edda
 - 🌳 Groot — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
 - 🃏 Loki — JavaScript workbench: transforms, regex tester, and a sandboxed Web-Worker runner
 - 🔖 Accio — read-later shelf with tags and best-effort page-title lookup

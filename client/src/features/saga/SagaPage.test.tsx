@@ -5,6 +5,27 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import * as edda from '../../core/edda';
 import { SagaPage } from './SagaPage';
+import type { PdfDeck } from './loadPdfSlides';
+
+/**
+ * pdf.js is stubbed out here and nowhere else in this file. jsdom has no canvas
+ * 2d context, so a real rasterization could not happen at all — and what these
+ * tests are about is the shell around a PDF deck (how many slides, which
+ * controls, what is released), not the rendering. `loadPdfSlides.test.ts` runs
+ * the real thing against a real file; live-verify runs it in a real browser.
+ */
+const destroyed: string[] = [];
+vi.mock('./loadPdfSlides', () => ({
+  loadPdfDeck: (bytes: Uint8Array) =>
+    Promise.resolve({
+      pageCount: 3,
+      renderPage: () => Promise.resolve({ width: 400, height: 518 }),
+      destroy: () => {
+        destroyed.push(`${bytes.length} bytes`);
+        return Promise.resolve();
+      },
+    } satisfies PdfDeck),
+}));
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -34,7 +55,20 @@ const DECK = [
  * registry the drop populated. The un-bridged end-to-end path is what the
  * live-verify pass proves in a real browser.
  */
-const blobs = new Map<string, string>();
+/**
+ * jsdom has no `ResizeObserver`. Every browser Bifrost targets has had one
+ * since 2020, so `SlideView` uses it directly rather than carrying a guard that
+ * only jsdom would ever take.
+ */
+class FakeResizeObserver {
+  constructor(private readonly callback: () => void) {}
+  observe() {
+    this.callback();
+  }
+  disconnect() {}
+}
+
+const blobs = new Map<string, { body: ArrayBuffer; type: string }>();
 const realCreate = URL.createObjectURL.bind(URL);
 const revoked: string[] = [];
 
@@ -49,24 +83,37 @@ describe('SagaPage (PLAN-28)', () => {
     root = createRoot(container);
     blobs.clear();
     revoked.length = 0;
+    destroyed.length = 0;
+    vi.stubGlobal('ResizeObserver', FakeResizeObserver);
     localStorage.clear();
 
     vi.spyOn(URL, 'createObjectURL').mockImplementation((source: Blob | MediaSource) => {
-      const url = realCreate(source as Blob);
-      void (source as Blob).text().then((text) => blobs.set(url, text));
+      const blob = source as Blob;
+      const url = realCreate(blob);
+      void blob.arrayBuffer().then((body) => blobs.set(url, { body, type: blob.type }));
       return url;
     });
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url: string) => {
       revoked.push(url);
     });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(((url: string) =>
-      Promise.resolve(new Response(blobs.get(String(url)) ?? '', { status: 200 }))) as typeof fetch);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((url: string) => {
+      const blob = blobs.get(String(url));
+      return Promise.resolve(
+        new Response(blob?.body ?? '', {
+          status: 200,
+          // The dropped file's own type, which is the only thing that tells a
+          // blob URL's reader what it is holding.
+          headers: blob?.type ? { 'Content-Type': blob.type } : {},
+        }),
+      );
+    }) as typeof fetch);
   });
 
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   /** Render at `entry`, letting the load promise chain settle. */
@@ -99,8 +146,8 @@ describe('SagaPage (PLAN-28)', () => {
     });
 
   /** Drop a real `File` on the landing zone. */
-  async function drop(name: string, text: string) {
-    const file = new File([text], name, { type: 'text/markdown' });
+  async function drop(name: string, body: string | Uint8Array, type = 'text/markdown') {
+    const file = new File([body as BlobPart], name, { type });
     const zone = container.querySelector('.saga-drop');
     if (!zone) throw new Error('dropzone missing');
     const event = new Event('drop', { bubbles: true }) as Event & {
@@ -129,12 +176,60 @@ describe('SagaPage (PLAN-28)', () => {
     expect(position()).toBe('1 / 3');
   });
 
-  it('refuses a file that is not markdown, without leaving the landing state', async () => {
+  it('refuses a file it cannot present, without leaving the landing state', async () => {
     await open('/saga');
     await drop('data.json', '{"a":1}');
 
     expect(container.querySelector('.saga-drop')).not.toBeNull();
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('.md');
+  });
+
+  /** Bytes shaped like a PDF; the stub above is what turns them into pages. */
+  const PDF_BYTES = new TextEncoder().encode('%PDF-1.4 pretend');
+
+  it('renders a dropped PDF as one slide per page', async () => {
+    await open('/saga');
+    await drop('deck.pdf', PDF_BYTES, 'application/pdf');
+
+    expect(container.querySelector('.saga-drop')).toBeNull();
+    expect(position()).toBe('1 / 3');
+    expect(container.querySelector('canvas')?.getAttribute('aria-label')).toBe('Page 1');
+  });
+
+  it('withholds the notes affordances on a PDF deck, on every slide', async () => {
+    await open('/saga');
+    await drop('deck.pdf', PDF_BYTES, 'application/pdf');
+
+    const toggle = () => container.querySelector('[aria-label="Show presenter notes"]');
+    expect(toggle()).toBeNull();
+    press('ArrowRight');
+    expect(position()).toBe('2 / 3');
+    expect(toggle()).toBeNull();
+
+    // And the key cannot open a panel the toggle is not offering.
+    press('n');
+    expect(container.querySelector('.saga-notes')).toBeNull();
+  });
+
+  it('still opens the shortcuts overlay on a PDF deck, saying what N does there', async () => {
+    await open('/saga');
+    await drop('deck.pdf', PDF_BYTES, 'application/pdf');
+
+    press('?');
+    const overlay = container.querySelector('.saga-shortcuts');
+    expect(overlay).not.toBeNull();
+    expect(overlay?.textContent).toContain('markdown decks only');
+    expect(overlay?.textContent).toContain('Next slide');
+  });
+
+  it('releases the PDF worker when the page goes away', async () => {
+    await open('/saga');
+    await drop('deck.pdf', PDF_BYTES, 'application/pdf');
+    expect(destroyed).toHaveLength(0);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    expect(destroyed).toEqual(['16 bytes']);
   });
 
   it('revokes the object URL when the page goes away', async () => {
@@ -374,7 +469,10 @@ describe('SagaPage (PLAN-28)', () => {
   });
 
   it('loads a ?source= URL through the same loader', async () => {
-    blobs.set('http://127.0.0.1:5000/payload', DECK);
+    blobs.set('http://127.0.0.1:5000/payload', {
+      body: new TextEncoder().encode(DECK).buffer as ArrayBuffer,
+      type: 'text/markdown; charset=utf-8',
+    });
     await open('/saga?source=http%3A%2F%2F127.0.0.1%3A5000%2Fpayload');
     expect(slideText()).toContain('First');
     expect(position()).toBe('1 / 3');

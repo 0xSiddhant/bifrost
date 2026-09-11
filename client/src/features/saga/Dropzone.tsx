@@ -3,7 +3,8 @@ import { Button } from '../../core/ui/Button';
 import { SlidesIcon } from '../../core/ui/icons';
 
 /**
- * The bare `/saga` landing state (PLAN-28): drop a markdown file, present it.
+ * The bare `/saga` landing state (PLAN-28, PLAN-29): drop a markdown file or a
+ * PDF, present it.
  *
  * Nothing is uploaded and nothing is stored — `SagaPage` turns the `File` this
  * reports into an object URL, which is an address for bytes already sitting in
@@ -16,9 +17,17 @@ import { SlidesIcon } from '../../core/ui/icons';
  * moment a deck is showing, so revoking on *its* unmount would tear down the
  * URL a moment after handing it over.
  */
-const ACCEPTED = ['.md', '.markdown'];
+/**
+ * Matched on the extension rather than the `File`'s own MIME type: browsers
+ * disagree about markdown (`text/markdown`, `text/plain`, or empty depending on
+ * the OS), and an empty type is common enough that typing alone would reject
+ * real files. `loadSource` makes the same call for the opposite reason — it has
+ * bytes and no reliable name, so it reads the content type and the file's own
+ * `%PDF-` header.
+ */
+const ACCEPTED = ['.md', '.markdown', '.pdf'];
 
-function isMarkdown(file: File): boolean {
+function isPresentable(file: File): boolean {
   const name = file.name.toLowerCase();
   return ACCEPTED.some((extension) => name.endsWith(extension));
 }
@@ -30,8 +39,8 @@ export function Dropzone({ onFile }: { onFile: (file: File) => void }) {
 
   const take = (file: File | undefined) => {
     if (!file) return;
-    if (!isMarkdown(file)) {
-      setRejected(`“${file.name}” isn't markdown — Saga presents ${ACCEPTED.join(' and ')} files.`);
+    if (!isPresentable(file)) {
+      setRejected(`Saga can't present “${file.name}” — it presents ${ACCEPTED.join(', ')} files.`);
       return;
     }
     setRejected(null);
@@ -45,9 +54,9 @@ export function Dropzone({ onFile }: { onFile: (file: File) => void }) {
           <span className="eyebrow">᛫ saga ᛫</span>
           <h2>Present a deck</h2>
           <p>
-            Drop a markdown file to present it as slides — split on a <code>---</code> line, never
-            uploaded, never stored. Or open a saved manuscript from the{' '}
-            <a href="/pensieve?type=edda">Pensieve</a>.
+            Drop a markdown file to present it as slides — split on a <code>---</code> line — or a
+            PDF, one page per slide. Never uploaded, never stored. Or open a saved manuscript from
+            the <a href="/pensieve?type=edda">Pensieve</a>.
           </p>
         </div>
       </div>
@@ -66,7 +75,7 @@ export function Dropzone({ onFile }: { onFile: (file: File) => void }) {
         }}
       >
         <SlidesIcon size={32} />
-        <p className="saga-drop__title">Drop a .md file here</p>
+        <p className="saga-drop__title">Drop a .md or .pdf file here</p>
         <p className="caption">or</p>
         <Button variant="ghost" onClick={() => input.current?.click()}>
           Choose a file
@@ -74,7 +83,7 @@ export function Dropzone({ onFile }: { onFile: (file: File) => void }) {
         <input
           ref={input}
           type="file"
-          accept=".md,.markdown,text/markdown"
+          accept=".md,.markdown,.pdf,text/markdown,application/pdf"
           className="saga-drop__input"
           onChange={(event) => {
             take(event.target.files?.[0]);

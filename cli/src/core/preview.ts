@@ -2,7 +2,7 @@ import path from 'node:path';
 import { CliError } from './output.js';
 
 /**
- * Which tool opens a local file (PLAN-28).
+ * Which tool opens a local file (PLAN-28, PLAN-29).
  *
  * `bifrost preview` has two jobs that look the same from a terminal — "show me
  * this saved document" and "show me this file on my disk" — and only the second
@@ -11,9 +11,10 @@ import { CliError } from './output.js';
  * sentence rather than a stray server and a blank tab.
  *
  * A destination is a client route that knows how to read a URL. Saga is the
- * first (`/saga?source=…`, PLAN-28). Others are one row each: PLAN-29's PDF
- * source lands as another extension on the Saga row, and an Edda destination
- * that seeds the editor from a URL lands as another entry in `destinations`.
+ * only one so far (`/saga?source=…`, PLAN-28), and it now presents two kinds of
+ * file rather than one (PLAN-29). Others are one row each: an Edda destination
+ * that seeds the editor from a URL would land as another entry in
+ * `destinations`.
  */
 
 export const PREVIEW_DESTINATIONS = ['saga'] as const;
@@ -29,10 +30,13 @@ interface Destination {
   clientPath(payloadUrl: string): string;
 }
 
+const MARKDOWN_EXTENSIONS = ['.md', '.markdown'] as const;
+const PDF_EXTENSIONS = ['.pdf'] as const;
+
 const SAGA: Destination = {
   id: 'saga',
-  presents: 'markdown',
-  extensions: ['.md', '.markdown'],
+  presents: 'markdown and pdf',
+  extensions: [...MARKDOWN_EXTENSIONS, ...PDF_EXTENSIONS],
   clientPath: (payloadUrl) => `/saga?source=${encodeURIComponent(payloadUrl)}`,
 };
 
@@ -54,7 +58,15 @@ interface FileRoute {
 }
 
 const ROUTES: readonly FileRoute[] = [
-  { extensions: SAGA.extensions, destinations: ['saga'], fallback: null },
+  { extensions: MARKDOWN_EXTENSIONS, destinations: ['saga'], fallback: null },
+  /**
+   * A PDF needs no `--type`, where markdown does. The reasoning above is about
+   * markdown having a second plausible destination worth leaving room for; a
+   * PDF has exactly one thing `preview` can do with it, so demanding a flag to
+   * pick from a list of one would be ceremony. PLAN-27's table pointed `.pdf`
+   * at the read-only `PdfViewer`; presenting it is the whole point of PLAN-29.
+   */
+  { extensions: PDF_EXTENSIONS, destinations: ['saga'], fallback: 'saga' },
 ];
 
 /** Every extension `preview` can open from disk, for the error wording. */

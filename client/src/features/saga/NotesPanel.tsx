@@ -1,3 +1,5 @@
+import type { SagaSlide } from './loadSource';
+
 /**
  * Presenter notes (PLAN-28).
  *
@@ -14,8 +16,19 @@
  * every slide the author had not annotated — the panel, the footer toggle and
  * any sign the key had been read all vanished together. Now the panel stays and
  * says there is nothing here, so the binding always has a visible answer.
+ *
+ * **A PDF page is the one slide that renders no panel at all** (PLAN-29), and
+ * that is branched on here rather than left to fall through the `notes === null`
+ * path above. The two are different facts: a markdown slide with no note is a
+ * deck the author has not annotated *yet*, and the panel's empty state says how
+ * to. A rasterized page has no source to add a note to, so the same message
+ * there would be an instruction that cannot be followed. Nothing else in Saga
+ * reaches this state, because `SagaPage` withholds the toggle too.
  */
-export function NotesPanel({ notes }: { notes: string | null }) {
+export function NotesPanel({ slide }: { slide: SagaSlide | undefined }) {
+  if (slide?.kind === 'pdf') return null;
+  const notes = slide?.notes ?? null;
+
   return (
     <aside className="saga-notes" aria-label="Presenter notes">
       <p className="caption saga-notes__label">Presenter notes</p>

@@ -216,17 +216,23 @@ describe('preview', () => {
 });
 
 /**
- * The local-file half of `preview` (PLAN-28). The browser is still mocked, but
- * here the mock *acts* like one: it fetches the `?source=` URL out of the page
- * address, which is what proves the whole chain — the CLI served the file, a
- * page read it, and the one-shot server then closed and let the command exit.
+ * The local-file half of `preview` (PLAN-28, PLAN-29). The browser is still
+ * mocked, but here the mock *acts* like one: it fetches the `?source=` URL out
+ * of the page address, which is what proves the whole chain — the CLI served
+ * the file, a page read it, and the one-shot server then closed and let the
+ * command exit.
  */
 describe('preview <file>', () => {
   let deck: string;
+  let slides: string;
 
   beforeAll(() => {
     deck = path.join(workspace, 'deck.md');
     fs.writeFileSync(deck, '# One\n\n---\n\n# Two\n');
+    // Not a valid PDF and does not need to be: nothing in the CLI parses it.
+    // What is under test is that the bytes and the content type reach the page.
+    slides = path.join(workspace, 'slides.pdf');
+    fs.writeFileSync(slides, '%PDF-1.4 not really\n');
   });
 
   // The shared `launch` is only cleared between tests, not reset, so the
@@ -236,15 +242,19 @@ describe('preview <file>', () => {
   });
 
   /** Stand in for the browser: fetch the payload the page would have fetched. */
-  const browserThatReads = (captured: { body?: string }) =>
+  const browserThatReads = (captured: { body?: string; type?: string | null }) =>
     launch.mockImplementation(async (target: string) => {
       const source = new URL(target).searchParams.get('source');
-      if (source) captured.body = await (await fetch(source)).text();
+      if (source) {
+        const response = await fetch(source);
+        captured.type = response.headers.get('content-type');
+        captured.body = await response.text();
+      }
       return undefined;
     });
 
   it('serves a real .md to Saga and closes once the page has read it', async () => {
-    const captured: { body?: string } = {};
+    const captured: { body?: string; type?: string | null } = {};
     browserThatReads(captured);
 
     const run = await runCli([...host, 'preview', deck, '--type', 'saga']);
@@ -256,6 +266,7 @@ describe('preview <file>', () => {
     expect(opened.searchParams.get('source')).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/payload$/);
     // End to end: the bytes the page received are the bytes on disk.
     expect(captured.body).toBe('# One\n\n---\n\n# Two\n');
+    expect(captured.type).toBe('text/markdown; charset=utf-8');
   });
 
   it('refuses --type saga on a .json before opening a browser or a port', async () => {
@@ -268,10 +279,18 @@ describe('preview <file>', () => {
     expect(launch).not.toHaveBeenCalled();
   });
 
-  it('refuses a .pdf the same way, until a plan adds that row', async () => {
-    const run = await runCli([...host, 'preview', path.join(workspace, 'slides.pdf'), '--type', 'saga']);
-    expect(run.exitCode).toBe(1);
-    expect(launch).not.toHaveBeenCalled();
+  it('serves a .pdf to Saga with no --type, telling the page what it is', async () => {
+    // PLAN-29. The payload URL has no extension on it, so the content type is
+    // the page's only clue about which of Saga's two sources it just received.
+    const captured: { body?: string; type?: string | null } = {};
+    browserThatReads(captured);
+
+    const run = await runCli([...host, 'preview', slides]);
+
+    expect(run.exitCode).toBe(0);
+    expect(new URL(String(launch.mock.calls[0]?.[0])).pathname).toBe('/saga');
+    expect(captured.type).toBe('application/pdf');
+    expect(captured.body).toBe('%PDF-1.4 not really\n');
   });
 
   it('names the missing file rather than looking for a document by that name', async () => {
