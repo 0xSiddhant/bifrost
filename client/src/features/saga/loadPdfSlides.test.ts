@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_CANVAS_AREA, MAX_CANVAS_EDGE, fitScale, loadPdfDeck } from './loadPdfSlides';
+import { polyfillPromiseWithResolvers } from './__fixtures__/pdfjsUnderNode';
 
 /**
  * The one thing that cannot be real here: `?url` is a *bundler* instruction, so
@@ -17,6 +18,11 @@ import { MAX_CANVAS_AREA, MAX_CANVAS_EDGE, fitScale, loadPdfDeck } from './loadP
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({
   default: createRequire(import.meta.url).resolve('pdfjs-dist/legacy/build/pdf.worker.mjs'),
 }));
+
+// Node 20 has no `Promise.withResolvers`, which pdf.js calls on every document
+// it opens. See the module for why this is a test-runner gap and not a
+// browser-support one.
+polyfillPromiseWithResolvers();
 
 /**
  * A real PDF, not a stub (PLAN-29).

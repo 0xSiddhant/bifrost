@@ -4,12 +4,18 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as edda from '../../core/edda';
 import { loadFromSlug, loadFromUrl } from './loadSource';
+import { polyfillPromiseWithResolvers } from './__fixtures__/pdfjsUnderNode';
 
 // See `loadPdfSlides.test.ts`: `?url` is a bundler instruction with no meaning
 // outside a build, so Node gets the worker's real path on disk instead.
 vi.mock('pdfjs-dist/legacy/build/pdf.worker.mjs?url', () => ({
   default: createRequire(import.meta.url).resolve('pdfjs-dist/legacy/build/pdf.worker.mjs'),
 }));
+
+// Node 20 has no `Promise.withResolvers`, which pdf.js calls on every document
+// it opens. See the module for why this is a test-runner gap and not a
+// browser-support one.
+polyfillPromiseWithResolvers();
 
 const DECK = '# One\n\n<!-- notes: wave -->\n\n---\n\n# Two';
 

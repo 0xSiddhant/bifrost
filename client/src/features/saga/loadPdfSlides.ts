@@ -13,7 +13,13 @@ import { log } from '../../core/log';
  * on Node 22 — proven here, so the unit tests could not run against it — and on
  * any iPad or iPhone more than a release or two old, which is exactly the
  * hardware this app exists to serve on a LAN. The `legacy/` build bundles
- * core-js and polyfills it. That is the whole reason `legacy/` exists.
+ * core-js and polyfills it. That is the whole reason `legacy/` exists — and it
+ * lowers the *browser* floor only, deliberately not the Node one: the package
+ * declares `engines: node >=22.13.0`, while this repo builds and tests on Node
+ * 20. Nothing shipped pays for that, since no Node process here ever loads
+ * pdf.js, but the unit tests have to supply `Promise.withResolvers` themselves —
+ * see `__fixtures__/pdfjsUnderNode.ts` for why that is a test-runner gap and not
+ * a browser-support one.
  *
  * **The default worker, not `disableWorker`.** The plan named main-thread
  * rendering as the documented fallback if Vite could not be made to emit the
