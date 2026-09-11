@@ -2,21 +2,44 @@
    Saga inherits whichever theme is active, exactly as Edda's preview, public
    page and PDF export already do; there is no second template system here. */
 
+/* A presentation is a **fixed frame**, not a document that grows: the deck is
+   the thing that scrolls, and it scrolls *inside* the slide. Sizing the text up
+   used to grow the page instead, pushing the controls below the fold — so the
+   one control you reach for while presenting walked away exactly when you used
+   it. The stage takes a definite height, the slide body scrolls within it, and
+   the footer stays put. Same `max(<floor>, calc(100vh - <chrome>))` shape Edda,
+   Loki, Runestone and Atlas already use for their workspaces. */
 .saga {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   /* The scrim-overlaid footer is positioned against this in fullscreen. */
   position: relative;
-  min-height: 60vh;
+  --saga-h: max(24rem, calc(100dvh - 14rem));
+  height: var(--saga-h);
   /* Overwritten inline by SagaPage. Declared here so the slide still has a
      size if the property is ever missing. */
   --saga-scale: 1;
 }
 
+/* Full-width breakout (the Edda/Variant/Runestone precedent): a slide is not
+   prose at a 62rem reading measure — it is a screen, and the extra width is
+   what lets the footer carry a real key legend instead of one cramped line. */
+@media (min-width: 1024px) {
+  .saga {
+    --saga-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--saga-w);
+    margin-inline: calc((100% - var(--saga-w)) / 2);
+    --saga-h: max(28rem, calc(100dvh - 12rem));
+  }
+}
+
 .saga-stage {
   display: flex;
   gap: var(--space-4);
+  /* `min-height: 0` is what actually lets the slide scroll rather than stretch
+     the stage: a flex item's default `min-height: auto` refuses to shrink below
+     its content, which silently defeats the fixed height above. */
   min-height: 0;
   flex: 1;
 }
@@ -24,6 +47,7 @@
 .saga-slide {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
 }
 
@@ -31,6 +55,10 @@
    takes the page's measure instead. */
 .saga-slide__body {
   flex: 1;
+  min-height: 0;
+  /* The deck scrolls here, and only here. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -67,20 +95,32 @@
 
 /* ── footer ─────────────────────────────────────────────────────────────── */
 
+/* Three zones: where you are · what you can press · what you can change.
+   `flex-shrink: 0` on the outer two and a shrinking legend between them means
+   the bar gives up its hints before it ever squeezes a control. */
 .saga-footer {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
+  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
   padding: var(--space-2) var(--space-3);
 }
 
+.saga-footer__where {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
 .saga-footer__position {
   font-size: var(--text-sm);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .saga-footer__nav {
@@ -88,11 +128,61 @@
   gap: var(--space-1);
 }
 
-.saga-footer__hint {
-  /* Eats the slack so the actions sit hard right at every width. */
+/* Eats the slack so the actions sit hard right at every width. */
+.saga-footer__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
   flex: 1;
   min-width: 0;
-  text-align: center;
+}
+
+.saga-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.saga-legend__does {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Dropped one at a time by priority, not by source order, as the bar narrows —
+   so the hint that survives longest is the one worth having. It goes entirely
+   only once the bar is about to wrap, where the controls beside it do the same
+   job and `?` opens the complete list. */
+@media (max-width: 1400px) {
+  .saga-legend[data-rank='5'] {
+    display: none;
+  }
+}
+
+@media (max-width: 1240px) {
+  .saga-legend[data-rank='4'] {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .saga-legend[data-rank='3'] {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .saga-legend[data-rank='2'] {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .saga-footer__legend {
+    display: none;
+  }
 }
 
 .saga-footer__actions {
@@ -169,6 +259,11 @@
   background: var(--bg);
   padding: var(--space-4);
   gap: 0;
+  /* The fullscreen element is the viewport now, so the windowed box's computed
+     height and breakout margins would both be wrong here. */
+  width: 100%;
+  height: 100%;
+  margin-inline: 0;
 }
 
 .saga:fullscreen .saga-slide__body {
@@ -179,7 +274,19 @@
   font-size: calc(clamp(var(--text-lg), 2.2vw, 2rem) * var(--saga-scale));
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* A short slide sits in the middle of the screen; a long one starts at the
+     top. `safe` is what switches between the two — plain `center` keeps
+     centring once the content is taller than the frame, which pushes the first
+     lines off the top edge where no amount of scrolling can reach them. */
+  justify-content: safe center;
+}
+
+/* Flex children shrink below their own content by default, and with a fixed
+   frame that finally had somewhere to bite: every code block on an overflowing
+   slide flattened into nothing but its own horizontal scrollbar. Seen in a
+   fullscreen screenshot at 150%, not reasoned about. */
+.saga:fullscreen .saga-slide__body > * {
+  flex-shrink: 0;
 }
 
 /* ── shortcuts overlay ──────────────────────────────────────────────────── */
@@ -287,10 +394,6 @@
 
   .saga-notes {
     width: auto;
-  }
-
-  .saga-footer__hint {
-    display: none;
   }
 
   .saga-shortcuts__row {

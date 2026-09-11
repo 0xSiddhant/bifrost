@@ -58,6 +58,25 @@ describe('SlideFooter (PLAN-28)', () => {
     expect(container.querySelector('.saga-footer__position')?.textContent).toBe('2 / 4');
   });
 
+  it('carries a key legend, every entry of which is also a real control here', () => {
+    render();
+    const legend = [...container.querySelectorAll('.saga-legend')].map(
+      (node) => node.textContent ?? '',
+    );
+    expect(legend.some((entry) => entry.includes('navigate'))).toBe(true);
+    expect(legend.some((entry) => entry.includes('fullscreen'))).toBe(true);
+    expect(legend.some((entry) => entry.includes('size'))).toBe(true);
+    // Ranked, so CSS drops the least useful first rather than whichever is last.
+    expect(
+      [...container.querySelectorAll('.saga-legend')].map((n) => n.getAttribute('data-rank')),
+    ).toEqual(['1', '2', '3', '4', '5']);
+    // Decoration: each binding is a button in this same bar, and `?` reads out
+    // the full list — so a screen reader must not hear the legend twice.
+    expect(container.querySelector('.saga-footer__legend')?.getAttribute('aria-hidden')).toBe(
+      'true',
+    );
+  });
+
   it('is static in windowed mode — never overlaid, never idle', () => {
     // Acceptance 5: windowed, the footer is visible at all times. `visible` is
     // ignored outside fullscreen, so an idle timer that fired anyway cannot
