@@ -30,6 +30,8 @@ export interface SlideFooterProps {
   onPrevious: () => void;
   onNext: () => void;
   fullscreen: boolean;
+  /** False where the browser cannot fullscreen an element — iPhone Safari. */
+  canFullscreen: boolean;
   onToggleFullscreen: () => void;
   notesOpen: boolean;
   onToggleNotes: () => void;
@@ -44,9 +46,9 @@ export interface SlideFooterProps {
  * in the markup. Every entry here also appears in `ShortcutsOverlay`, which is
  * the complete list; this is the glanceable subset.
  */
-const LEGEND: readonly { keys: string; does: string; rank: number }[] = [
+const LEGEND: readonly { keys: string; does: string; rank: number; needsFullscreen?: true }[] = [
   { keys: '← →', does: 'navigate', rank: 1 },
-  { keys: 'F', does: 'fullscreen', rank: 2 },
+  { keys: 'F', does: 'fullscreen', rank: 2, needsFullscreen: true },
   { keys: 'N', does: 'notes', rank: 3 },
   { keys: '+ −', does: 'size', rank: 4 },
   { keys: '?', does: 'shortcuts', rank: 5 },
@@ -58,6 +60,7 @@ export function SlideFooter({
   onPrevious,
   onNext,
   fullscreen,
+  canFullscreen,
   onToggleFullscreen,
   notesOpen,
   onToggleNotes,
@@ -100,7 +103,7 @@ export function SlideFooter({
       {/* Decoration for a screen reader: every binding below is a real control
           in this same bar, and the shortcuts card is the readable list. */}
       <div className="saga-footer__legend" aria-hidden="true">
-        {LEGEND.map((entry) => (
+        {LEGEND.filter((entry) => canFullscreen || !entry.needsFullscreen).map((entry) => (
           <span className="saga-legend" data-rank={entry.rank} key={entry.keys}>
             <span className="kbd">{entry.keys}</span>
             <span className="saga-legend__does">{entry.does}</span>
@@ -151,15 +154,20 @@ export function SlideFooter({
         >
           <DocFileIcon size={15} /> Notes
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-pressed={fullscreen}
-          aria-label={fullscreen ? 'Leave fullscreen' : 'Enter fullscreen'}
-          onClick={onToggleFullscreen}
-        >
-          <MonitorIcon size={15} /> {fullscreen ? 'Exit' : 'Fullscreen'}
-        </Button>
+        {/* Offered only where it can actually happen. Safari on iPhone has the
+            Fullscreen API on `<video>` and nowhere else, and a control that
+            cannot do the one thing it names is worse than no control. */}
+        {canFullscreen && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={fullscreen}
+            aria-label={fullscreen ? 'Leave fullscreen' : 'Enter fullscreen'}
+            onClick={onToggleFullscreen}
+          >
+            <MonitorIcon size={15} /> {fullscreen ? 'Exit' : 'Fullscreen'}
+          </Button>
+        )}
         <Button variant="ghost" size="sm" aria-label="Keyboard shortcuts" onClick={onShowShortcuts}>
           ?
         </Button>

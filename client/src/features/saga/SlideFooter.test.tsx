@@ -14,6 +14,7 @@ const BASE: SlideFooterProps = {
   onPrevious: () => {},
   onNext: () => {},
   fullscreen: false,
+  canFullscreen: true,
   onToggleFullscreen: () => {},
   notesOpen: false,
   onToggleNotes: () => {},
@@ -54,6 +55,21 @@ describe('SlideFooter (PLAN-28)', () => {
   it('shows the position one-based', () => {
     render();
     expect(container.querySelector('.saga-footer__position')?.textContent).toBe('2 / 4');
+  });
+
+  it('offers no fullscreen control where the browser has none', () => {
+    // Safari on iPhone has the Fullscreen API on `<video>` and nowhere else, so
+    // the control is not offered rather than offered and dead.
+    render({ canFullscreen: false });
+    expect(button('Enter fullscreen')).toBeNull();
+    expect(
+      [...container.querySelectorAll('.saga-legend')].some((n) =>
+        n.textContent?.includes('fullscreen'),
+      ),
+    ).toBe(false);
+
+    render({ canFullscreen: true });
+    expect(button('Enter fullscreen')).not.toBeNull();
   });
 
   it('carries a key legend, every entry of which is also a real control here', () => {

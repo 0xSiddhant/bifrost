@@ -23,11 +23,28 @@ interface WebkitDocument extends Document {
 
 const doc = (): WebkitDocument => document as WebkitDocument;
 
-/** Whether this browser can put *this element* into real fullscreen. */
-export function canFullscreen(element: HTMLElement | null): boolean {
-  if (!element) return false;
-  const el = element as WebkitElement;
-  return typeof el.requestFullscreen === 'function' || typeof el.webkitRequestFullscreen === 'function';
+/**
+ * Whether this browser can put an element into real fullscreen at all.
+ *
+ * Asked of the **environment**, not of a particular node, and deliberately so:
+ * the answer decides whether the control is rendered, and the container does
+ * not exist yet on a deck that has not loaded. Reading it off an element meant
+ * the question was asked while the ref was still null, so the control never
+ * appeared for a dropped file — caught by a test, after the first attempt.
+ *
+ * `fullscreenEnabled` is the second half: it is `false` inside an iframe
+ * without `allowfullscreen`, where the method exists and always rejects. It is
+ * `undefined` in environments that implement none of this, which must not read
+ * as a refusal, hence the explicit `!== false`.
+ */
+export function fullscreenSupported(): boolean {
+  if (typeof document === 'undefined') return false;
+  const proto = Element.prototype as WebkitElement;
+  const hasMethod =
+    typeof proto.requestFullscreen === 'function' ||
+    typeof proto.webkitRequestFullscreen === 'function';
+  const enabled = doc().fullscreenEnabled ?? (doc() as { webkitFullscreenEnabled?: boolean }).webkitFullscreenEnabled;
+  return hasMethod && enabled !== false;
 }
 
 /** The element the browser currently considers fullscreen, either spelling. */

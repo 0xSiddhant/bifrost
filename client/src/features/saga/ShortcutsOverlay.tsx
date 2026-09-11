@@ -6,20 +6,39 @@ import { CloseIcon } from '../../core/ui/icons';
  * `useSlideshowNav` and not added here is visible as a gap rather than silently
  * undocumented.
  */
-const BINDINGS: readonly { keys: string; does: string }[] = [
+const BINDINGS: readonly {
+  keys: string;
+  does: string;
+  needsFullscreen?: true;
+  /** Wording when fullscreen exists — Esc does two jobs there, one here. */
+  fullscreenAlso?: string;
+}[] = [
   { keys: '→ · ↓ · Space · PageDown · S · D', does: 'Next slide' },
   { keys: '← · ↑ · Backspace · PageUp · W · A', does: 'Previous slide' },
   { keys: 'Home · End', does: 'First · last slide' },
-  { keys: 'F', does: 'Enter or leave fullscreen' },
+  { keys: 'F', does: 'Enter or leave fullscreen', needsFullscreen: true },
   { keys: 'N', does: 'Show or hide presenter notes' },
   { keys: '+ · −', does: 'Bigger · smaller slide text' },
   { keys: '0', does: 'Slide text back to 100%' },
   { keys: '? · H', does: 'This list' },
-  { keys: 'Esc', does: 'Close this list, or leave fullscreen' },
+  { keys: 'Esc', does: 'Close this list', fullscreenAlso: 'Close this list, or leave fullscreen' },
   { keys: 'Swipe', does: 'Next or previous slide, on a touch screen' },
 ];
 
-export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
+export function ShortcutsOverlay({
+  canFullscreen,
+  onClose,
+}: {
+  /** Fullscreen rows are omitted where the browser has no element fullscreen. */
+  canFullscreen: boolean;
+  onClose: () => void;
+}) {
+  const bindings = BINDINGS.filter((binding) => canFullscreen || !binding.needsFullscreen).map(
+    (binding) => ({
+      ...binding,
+      does: canFullscreen ? (binding.fullscreenAlso ?? binding.does) : binding.does,
+    }),
+  );
   return (
     <div className="saga-shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       <div className="saga-shortcuts__card">
@@ -30,7 +49,7 @@ export function ShortcutsOverlay({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
         <dl className="saga-shortcuts__list">
-          {BINDINGS.map((binding) => (
+          {bindings.map((binding) => (
             <div className="saga-shortcuts__row" key={binding.keys}>
               <dt className="mono">{binding.keys}</dt>
               <dd>{binding.does}</dd>

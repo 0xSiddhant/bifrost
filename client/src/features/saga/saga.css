@@ -242,14 +242,24 @@
   padding: var(--space-6) var(--space-4) var(--space-4);
 }
 
-/* **Presenting on a machine with a keyboard shows no chrome at all.** The deck
-   is the whole screen, the bindings drive it, and Esc leaves — which the
-   browser says itself on entering fullscreen. Touch devices keep the bar:
-   a phone or tablet has no Esc and no arrow keys, so tapping is the only way
-   in. Same pair of queries `isDesktop.ts` and `ui.css` already split on. */
-@media (hover: hover) and (pointer: fine) {
+/* **Presenting shows no chrome.** The deck is the whole screen, the bindings
+   drive it, and Esc leaves — which the browser says itself on entering
+   fullscreen.
+   
+   Hidden by default and shown back only for a coarse pointer, rather than
+   hidden only for a fine one. The first attempt keyed on
+   `(hover: hover) and (pointer: fine)`, which fails toward *showing* the bar on
+   anything that reports neither — and the bar duly turned up on a real desktop
+   where it was supposed to be gone. This way the stated intent is the default
+   and only a device that positively reports touch opts back in, because a phone
+   or tablet has no Esc and no arrow keys, so tapping is the only way in. */
+.saga--presenting .saga-footer {
+  display: none;
+}
+
+@media (pointer: coarse) {
   .saga--presenting .saga-footer {
-    display: none;
+    display: flex;
   }
 }
 
@@ -271,19 +281,6 @@
   margin-inline: 0;
 }
 
-/* Safari on **iPhone** exposes the Fullscreen API on `<video>` and nowhere
-   else, so no call can put this element into real fullscreen. Covering the app
-   ourselves is the honest alternative: the deck still gets the whole viewport,
-   and `inset: 0` on a fixed box sidesteps the mobile-viewport-unit problems
-   `100dvh` still has there. Above the sticky header, below the notification
-   host (70), so a warning can still reach the presenter. */
-.saga--immersive {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  width: auto;
-  height: auto;
-}
 
 .saga--presenting .saga-slide__body {
   border: 0;

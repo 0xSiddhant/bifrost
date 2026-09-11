@@ -8,10 +8,10 @@ import { SlideFooter } from './SlideFooter';
 import { SlideView } from './SlideView';
 import { loadFromSlug, loadFromUrl } from './loadSource';
 import {
-  canFullscreen,
   enterFullscreen,
   exitFullscreen,
   fullscreenElement,
+  fullscreenSupported,
   onFullscreenChange,
 } from './fullscreen';
 import { useSlideScale } from './useSlideScale';
@@ -120,27 +120,25 @@ export function SagaPage() {
 
   // ------------------------------------------------------------- presenting --
   const containerRef = useRef<HTMLDivElement>(null);
-  /** Real, browser-owned fullscreen. */
-  const [fullscreen, setFullscreen] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   /**
-   * The stand-in for browsers with no element fullscreen — Safari on iPhone,
-   * which has it on `<video>` and nowhere else. There is no call that makes it
-   * work there, so instead the page covers the app itself (`.saga--immersive`)
-   * and the deck still gets the whole screen.
+   * Whether this browser can fullscreen an element at all. Safari on **iPhone**
+   * cannot — it has the Fullscreen API on `<video>` and nowhere else — so there
+   * the control is not offered rather than offered and dead. An environment
+   * fact, so it is read once and never changes for the life of the tab.
    */
-  const [immersive, setImmersive] = useState(false);
-  const presenting = fullscreen || immersive;
+  const [canPresent] = useState(fullscreenSupported);
 
-  // The browser is the source of truth for the real thing: Esc and F11 both
-  // leave without going through the button.
+  // The browser is the source of truth: Esc and F11 both leave without going
+  // through the button.
   useEffect(() => {
-    const sync = () => setFullscreen(fullscreenElement() === containerRef.current);
+    const sync = () => setPresenting(fullscreenElement() === containerRef.current);
     return onFullscreenChange(sync);
   }, []);
 
   const togglePresenting = useCallback(() => {
     const element = containerRef.current;
-    if (!element) return;
+    if (!element || !fullscreenSupported()) return;
 
     if (fullscreenElement() === element) {
       void exitFullscreen().catch((error: unknown) => {
@@ -150,32 +148,16 @@ export function SagaPage() {
       });
       return;
     }
-    if (immersive) {
-      setImmersive(false);
-      return;
-    }
-    if (!canFullscreen(element)) {
-      // Not a failure worth an error: it is the platform, and the fallback is
-      // about to give the deck the screen anyway.
-      log.info('saga: no element fullscreen here — presenting in-page instead', {
-        module: 'saga',
-      });
-      setImmersive(true);
-      return;
-    }
     // Deliberately this container and never `document.documentElement`: the
     // browser's own Fullscreen API is then what hides Bifrost's header and nav,
-    // so no Saga-specific hiding logic is needed for the real path.
+    // so no Saga-specific hiding logic is needed at all.
     void enterFullscreen(element).catch((error: unknown) => {
-      // A rejected request (an iframe without the permission, a gesture the
-      // browser did not accept) would otherwise leave a dead button; fall back
-      // rather than strand the presenter.
-      log.warn(`saga: fullscreen refused, presenting in-page instead: ${(error as Error).message}`, {
-        module: 'saga',
-      });
-      setImmersive(true);
+      // A rejected request — an iframe without the permission, a gesture the
+      // browser declined — leaves a control that looks broken, and nothing here
+      // can retry it for the presenter.
+      log.warn(`saga: fullscreen refused: ${(error as Error).message}`, { module: 'saga' });
     });
-  }, [immersive]);
+  }, []);
 
   // ------------------------------------------------------------ interaction --
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -191,17 +173,9 @@ export function SagaPage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === 'Escape') {
-        if (shortcutsOpen) {
-          setShortcutsOpen(false);
-          return;
-        }
-        // The browser handles Esc for real fullscreen; the in-page stand-in has
-        // nobody else to do it.
-        if (immersive) {
-          setImmersive(false);
-          return;
-        }
+      if (event.key === 'Escape' && shortcutsOpen) {
+        setShortcutsOpen(false);
+        return;
       }
       if (event.key === '?' || event.key === 'h' || event.key === 'H') {
         event.preventDefault();
@@ -237,7 +211,7 @@ export function SagaPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [shortcutsOpen, togglePresenting, immersive, scale]);
+  }, [shortcutsOpen, togglePresenting, scale]);
 
   const heading = title ?? 'This deck';
 
@@ -282,11 +256,7 @@ export function SagaPage() {
   return (
     <div
       ref={containerRef}
-      className={
-        ['saga', presenting && 'saga--presenting', immersive && 'saga--immersive']
-          .filter(Boolean)
-          .join(' ')
-      }
+      className={presenting ? 'saga saga--presenting' : 'saga'}
       data-testid="saga-container"
       // A multiplier, not a size: each mode keeps its own base — windowed reads
       // at a page's measure, fullscreen scales with the viewport — and this
@@ -304,6 +274,7 @@ export function SagaPage() {
         onPrevious={nav.previous}
         onNext={nav.next}
         fullscreen={presenting}
+        canFullscreen={canPresent}
         onToggleFullscreen={togglePresenting}
         notesOpen={notesOpen}
         onToggleNotes={() => setNotesOpen((open) => !open)}
@@ -311,7 +282,9 @@ export function SagaPage() {
         scale={scale}
       />
 
-      {shortcutsOpen && <ShortcutsOverlay onClose={() => setShortcutsOpen(false)} />}
+      {shortcutsOpen && (
+        <ShortcutsOverlay canFullscreen={canPresent} onClose={() => setShortcutsOpen(false)} />
+      )}
     </div>
   );
 }

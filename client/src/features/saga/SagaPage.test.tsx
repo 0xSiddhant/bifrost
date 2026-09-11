@@ -379,7 +379,7 @@ describe('SagaPage (PLAN-28)', () => {
     expect(position()).toBe('1 / 3');
   });
 
-  it('presents in-page where the browser has no element fullscreen (iPhone)', async () => {
+  it('offers nothing and does nothing where the browser has no fullscreen', async () => {
     // Safari on iPhone exposes the Fullscreen API on <video> and nowhere else.
     // jsdom is the same shape — it implements neither — so this is the real
     // code path that device takes, not a simulation of it.
@@ -388,42 +388,51 @@ describe('SagaPage (PLAN-28)', () => {
     const el = container.querySelector<HTMLElement>('.saga');
     expect(el && 'requestFullscreen' in el).toBe(false);
 
+    expect(container.querySelector('[aria-label="Enter fullscreen"]')).toBeNull();
     press('f');
-    expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
-    expect(container.querySelector('.saga')?.className).toContain('saga--immersive');
-
-    // Esc has to leave, because nothing else will: the browser does not own
-    // this one.
-    press('Escape');
-    expect(container.querySelector('.saga')?.className).not.toContain('saga--immersive');
     expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
+
+    // The shortcuts card must not advertise a key that cannot do anything.
+    press('?');
+    const rows = container.querySelector('.saga-shortcuts')?.textContent ?? '';
+    expect(rows).not.toContain('fullscreen');
+    expect(rows).toContain('Close this list');
   });
 
-  it('uses the real API when the browser has one, and never the stand-in', async () => {
-    await open('/saga');
-    await drop('deck.md', DECK);
-    const el = container.querySelector<HTMLElement>('.saga');
-    if (!el) throw new Error('saga container missing');
-
-    const request = vi.fn(async () => {
-      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: el });
+  it('uses the real API where the browser has one', async () => {
+    // Patched on the prototype *before* mounting, because support is read once
+    // for the real element — which is the same order a browser presents it in.
+    const request = vi.fn(async function (this: Element) {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: this });
       document.dispatchEvent(new Event('fullscreenchange'));
     });
-    Object.defineProperty(el, 'requestFullscreen', { configurable: true, value: request });
-
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+    Object.defineProperty(Element.prototype, 'requestFullscreen', {
+      configurable: true,
+      writable: true,
+      value: request,
     });
+    try {
+      await open('/saga');
+      await drop('deck.md', DECK);
+      expect(container.querySelector('[aria-label="Enter fullscreen"]')).not.toBeNull();
 
-    expect(request).toHaveBeenCalledOnce();
-    expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
-    expect(container.querySelector('.saga')?.className).not.toContain('saga--immersive');
+      await act(async () => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+      });
 
-    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
-    await act(async () => {
-      document.dispatchEvent(new Event('fullscreenchange'));
-    });
-    expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
+      expect(request).toHaveBeenCalledOnce();
+      expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
+
+      // The browser owns leaving, and the page follows it rather than guessing.
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+      await act(async () => {
+        document.dispatchEvent(new Event('fullscreenchange'));
+      });
+      expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
+    } finally {
+      delete (Element.prototype as { requestFullscreen?: unknown }).requestFullscreen;
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    }
   });
 
   it('says so when a deck has no slides in it', async () => {
