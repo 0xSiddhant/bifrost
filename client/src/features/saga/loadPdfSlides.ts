@@ -27,11 +27,18 @@ import { log } from '../../core/log';
  * asset and hands back its built path, which is why the line below works
  * against `npm run build` output and not only under the dev server.
  *
- * **No `standardFontDataUrl`.** pdf.js warns about it under Node, which is
- * misleading here: `useSystemFonts` defaults to `!isNodeJS`, so in a browser
- * the standard 14 fonts resolve against the machine's own fonts and the 820 KB
- * of font data does not need shipping. CJK decks needing `cMapUrl` (another
- * 1.7 MB) are the honest limitation of not shipping either.
+ * **No `standardFontDataUrl`, but `wasmUrl` is mandatory.** The two look alike
+ * and are not. Font data can be skipped because `useSystemFonts` defaults to
+ * `!isNodeJS`, so a browser resolves the standard 14 fonts against its own and
+ * 820 KB need not ship; CJK decks needing `cMapUrl` (another 1.7 MB) are the
+ * honest limitation of skipping that one too. `wasmUrl` is different in kind:
+ * pdf.js 6 moved JBIG2 **and CCITTFax**, JPEG 2000 and colour management into
+ * WebAssembly fetched from that directory, and left unset it builds the URL
+ * `"null" + filename`, fails, fails again on the JS fallback, warns, and
+ * **drops the image** — so a scanned deck presents as blank white slides while
+ * `render()` resolves happily and nothing is logged. Scanned PDFs are exactly
+ * what gets dropped on a presenter, so this is a correctness requirement, not a
+ * nicety. `scripts/copy-pdf-wasm.ts` puts the files where this points.
  *
  * **Pages are rasterized on demand, not up front.** A deck is opened by reading
  * its structure only; a page becomes pixels when it is actually shown, and
@@ -48,6 +55,14 @@ import { log } from '../../core/log';
  * blank canvas, so this is a correctness bound on the devices this app targets
  * and not only a memory one.
  */
+/**
+ * Where `scripts/copy-pdf-wasm.ts` puts pdf.js's decoders, as a directory
+ * prefix — pdf.js appends the filename itself. A root-absolute path, because
+ * Saga is reachable at both `/saga` and `/saga/:slug` and a relative one would
+ * resolve differently on the two.
+ */
+const WASM_URL = '/pdfjs-wasm/';
+
 export const MAX_CANVAS_EDGE = 4096;
 export const MAX_CANVAS_AREA = 16_777_216;
 
@@ -125,7 +140,7 @@ export async function loadPdfDeck(data: Uint8Array): Promise<PdfDeck> {
   const lib = await pdfjs();
   // The loading task, not just the document it resolves to: teardown lives on
   // the task (it owns the worker), and the document proxy has no `destroy()`.
-  const task = lib.getDocument({ data });
+  const task = lib.getDocument({ data, wasmUrl: WASM_URL });
   const doc = await task.promise;
 
   /**
@@ -149,15 +164,21 @@ export async function loadPdfDeck(data: Uint8Array): Promise<PdfDeck> {
 
       canvas.width = Math.max(1, Math.floor(viewport.width));
       canvas.height = Math.max(1, Math.floor(viewport.height));
+      // Set in the same breath as the raster size, and deliberately here rather
+      // than by the caller after this resolves: the canvas is oversampled to the
+      // pixel ratio, so between the two assignments above and the end of a
+      // render it would otherwise be *displayed* at twice its intended size —
+      // one scrollbarred flash per slide advance on a retina screen.
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const size = { width: canvas.width / ratio, height: canvas.height / ratio };
+      canvas.style.width = `${size.width}px`;
+      canvas.style.height = `${size.height}px`;
+
       const context = canvas.getContext('2d');
       if (!context) throw new Error('could not get a 2d context for the slide');
 
       await page.render({ canvas, canvasContext: context, viewport }).promise;
-      // The CSS size is the raster divided back out by the pixel ratio: the
-      // canvas is deliberately oversampled, and without this it would be drawn
-      // at twice its intended size on a retina screen.
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      return { width: canvas.width / ratio, height: canvas.height / ratio };
+      return size;
     } finally {
       // Freed whether or not the render succeeded: the page holds its operator
       // list and fonts otherwise, and a long deck walks through every page.

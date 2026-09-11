@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "tsx ../scripts/copy-pdf-wasm.ts",
     "dev": "vite",
+    "prebuild": "tsx ../scripts/copy-pdf-wasm.ts",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

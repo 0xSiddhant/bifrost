@@ -60,7 +60,6 @@ function MarkdownSlide({ markdown }: { markdown: string }) {
 function PdfSlide({ deck, page, scale }: { deck: PdfDeck; page: number; scale: number }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -70,6 +69,8 @@ function PdfSlide({ deck, page, scale }: { deck: PdfDeck; page: number; scale: n
 
     let done = false;
     let frameId = 0;
+    /** The box last handed to a render, so an identical one is not redrawn. */
+    let drawn = '';
 
     const draw = () => {
       frameId = 0;
@@ -77,15 +78,23 @@ function PdfSlide({ deck, page, scale }: { deck: PdfDeck; page: number; scale: n
       const box = { width: frame.clientWidth * scale, height: frame.clientHeight * scale };
       // A frame with no size yet: the observer fires again once it has one.
       if (box.width <= 0 || box.height <= 0) return;
+      // `observe()` reports the element's current size as well as later
+      // changes, so mounting otherwise rasterizes the same page twice — the
+      // explicit first call and the observer's own — for identical pixels.
+      const key = `${box.width}x${box.height}`;
+      if (key === drawn) return;
+      drawn = key;
       deck
         .renderPage(page, canvas, box)
-        .then((rendered) => {
+        .then(() => {
           if (done) return;
-          setSize(rendered);
           setFailed(false);
         })
         .catch((error: unknown) => {
           if (done) return;
+          // Left redrawable: a box that failed should be retried if it comes
+          // round again, rather than suppressed as already drawn.
+          drawn = '';
           setFailed(true);
           // A page that will not rasterize is a blank frame in front of an
           // audience, and nothing else records which page or why.
@@ -111,15 +120,10 @@ function PdfSlide({ deck, page, scale }: { deck: PdfDeck; page: number; scale: n
   return (
     <div className="saga-slide">
       <div ref={frameRef} className="saga-slide__body saga-slide__page">
-        <canvas
-          ref={canvasRef}
-          className="saga-slide__canvas"
-          // The raster is oversampled to the device pixel ratio; these are the
-          // CSS pixels it should occupy, so it is drawn sharp and at size.
-          style={size ? { width: `${size.width}px`, height: `${size.height}px` } : undefined}
-          role="img"
-          aria-label={`Page ${page}`}
-        />
+        {/* No `style` here on purpose: `renderPage` sets the canvas's CSS size
+            in the same breath as its raster size, so there is never a frame in
+            which the oversampled bitmap is shown at its full pixel size. */}
+        <canvas ref={canvasRef} className="saga-slide__canvas" role="img" aria-label={`Page ${page}`} />
         {failed && (
           <p className="saga-slide__failed caption" role="alert">
             This page could not be drawn.

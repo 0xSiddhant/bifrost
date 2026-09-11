@@ -94,6 +94,11 @@
 .saga-slide__canvas {
   display: block;
   border-radius: var(--radius-sm);
+  /* A belt for the one frame before the first render has sized it: an
+     unstyled canvas is displayed at its raster size, which is oversampled to
+     the device pixel ratio and would otherwise overflow the frame. */
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .saga-slide__failed {

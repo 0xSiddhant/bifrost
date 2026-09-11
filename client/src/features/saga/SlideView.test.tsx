@@ -17,12 +17,19 @@ declare global {
  * asks for, not pdf.js: that a real PDF rasterizes is `loadPdfSlides.test.ts`
  * and, in a real browser, live-verify.
  */
+/** Callbacks of the live observers, so a test can fire one a second time. */
+const observers: (() => void)[] = [];
+
 class FakeResizeObserver {
   constructor(private readonly callback: () => void) {}
   observe() {
+    observers.push(this.callback);
     this.callback();
   }
-  disconnect() {}
+  disconnect() {
+    const at = observers.indexOf(this.callback);
+    if (at !== -1) observers.splice(at, 1);
+  }
 }
 
 interface RenderCall {
@@ -57,6 +64,7 @@ describe('SlideView (PLAN-29)', () => {
       return 1;
     });
     vi.stubGlobal('cancelAnimationFrame', () => {});
+    observers.length = 0;
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -91,17 +99,34 @@ describe('SlideView (PLAN-29)', () => {
     expect(calls).toEqual([{ page: 2, box: { width: 800, height: 600 } }]);
   });
 
-  it('draws the page at the CSS size the render reported', async () => {
+  it('rasterizes a page once on mount, not once per size report', async () => {
+    // `observe()` reports the element's current size as well as later changes,
+    // so the explicit first call and the observer's own both reach `draw` with
+    // an identical box. Without the guard that is two rasterizations of the
+    // same pixels on every slide.
     const calls: RenderCall[] = [];
+    const deck = fakeDeck(calls);
     await act(async () => {
-      root.render(<SlideView slide={{ kind: 'pdf', page: 1, deck: fakeDeck(calls) }} scale={1} />);
+      root.render(<SlideView slide={{ kind: 'pdf', page: 1, deck }} scale={1} />);
     });
-    const canvas = container.querySelector<HTMLCanvasElement>('canvas');
-    // Not the raster size: the canvas is oversampled to the device pixel ratio
-    // and would otherwise be drawn at twice its intended size on a retina
-    // screen.
-    expect(canvas?.style.width).toBe('400px');
-    expect(canvas?.style.height).toBe('518px');
+    // Drive the observer again with the frame unchanged, as a resize storm does.
+    observers.forEach((fire) => fire());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('re-rasterizes when the box actually changes', async () => {
+    const calls: RenderCall[] = [];
+    const deck = fakeDeck(calls);
+    await act(async () => {
+      root.render(<SlideView slide={{ kind: 'pdf', page: 1, deck }} scale={1} />);
+    });
+    await act(async () => {
+      root.render(<SlideView slide={{ kind: 'pdf', page: 1, deck }} scale={1.5} />);
+    });
+    expect(calls.map((call) => call.box.width)).toEqual([800, 1200]);
   });
 
   it('scales the box it fits the page into, so + and - mean the same thing here', async () => {

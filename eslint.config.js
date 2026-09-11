@@ -5,7 +5,17 @@ import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', 'server/drizzle/**', 'storage/**'],
+    // `client/public/pdfjs-wasm/` is pdf.js's own vendored decoders, copied out
+    // of node_modules by scripts/copy-pdf-wasm.ts — third-party build output
+    // that happens to land outside node_modules, so it is ignored for the same
+    // reason node_modules is.
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      'server/drizzle/**',
+      'storage/**',
+      'client/public/pdfjs-wasm/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
