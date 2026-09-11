@@ -15,8 +15,6 @@ const BASE: SlideFooterProps = {
   onNext: () => {},
   fullscreen: false,
   onToggleFullscreen: () => {},
-  visible: true,
-  hasNotes: false,
   notesOpen: false,
   onToggleNotes: () => {},
   onShowShortcuts: () => {},
@@ -77,40 +75,25 @@ describe('SlideFooter (PLAN-28)', () => {
     );
   });
 
-  it('is static in windowed mode — never overlaid, never idle', () => {
-    // Acceptance 5: windowed, the footer is visible at all times. `visible` is
-    // ignored outside fullscreen, so an idle timer that fired anyway cannot
-    // hide it.
-    render({ fullscreen: false, visible: false });
+  it('is in the flow windowed, and overlaid while presenting', () => {
+    render({ fullscreen: false });
     expect(footer()?.className).not.toContain('saga-footer--overlay');
-    expect(footer()?.className).not.toContain('saga-footer--idle');
-  });
 
-  it('overlays in fullscreen and hides itself when idle', () => {
-    render({ fullscreen: true, visible: true });
+    // Overlaid so the slide's own box does not move when it appears. Which
+    // devices actually *see* it while presenting is a CSS decision (a keyboard
+    // machine shows none), and that is a live-verify matter, not a jsdom one.
+    render({ fullscreen: true });
     expect(footer()?.className).toContain('saga-footer--overlay');
-    expect(footer()?.className).not.toContain('saga-footer--idle');
-
-    render({ fullscreen: true, visible: false });
-    expect(footer()?.className).toContain('saga-footer--idle');
   });
 
-  it('leaves the slide’s own box untouched across both footer states', () => {
-    // Acceptance 8, as far as jsdom can carry it: the footer is the only node
-    // that changes, and in fullscreen it is never in the slide's flow. jsdom
-    // reports every box as zero, so the *measured* proof is the live-verify
-    // pass; what is pinned here is that no sibling markup changes at all.
-    render({ fullscreen: true, visible: true });
-    const shown = container.querySelector('.saga-footer__actions')?.outerHTML;
-    render({ fullscreen: true, visible: false });
-    expect(container.querySelector('.saga-footer__actions')?.outerHTML).toBe(shown);
-  });
-
-  it('offers no notes toggle when the slide has no note', () => {
-    render({ hasNotes: false });
-    expect(button('Show presenter notes')).toBeNull();
-    render({ hasNotes: true });
+  it('keeps the notes toggle on every slide, note or no note', () => {
+    // It is a mode, not a per-slide control: a toggle that came and went as you
+    // moved through a deck read as the control breaking rather than the slide
+    // changing, and made `N` look dead on any unannotated slide.
+    render();
     expect(button('Show presenter notes')).not.toBeNull();
+    render({ notesOpen: true });
+    expect(button('Hide presenter notes')).not.toBeNull();
   });
 
   it('disables prev on the first slide and next on the last', () => {
@@ -174,7 +157,7 @@ describe('SlideFooter (PLAN-28)', () => {
     const onToggleFullscreen = vi.fn();
     const onToggleNotes = vi.fn();
     const onShowShortcuts = vi.fn();
-    render({ onNext, onPrevious, onToggleFullscreen, onToggleNotes, onShowShortcuts, hasNotes: true });
+    render({ onNext, onPrevious, onToggleFullscreen, onToggleNotes, onShowShortcuts });
 
     act(() => button('Next slide')?.click());
     act(() => button('Previous slide')?.click());

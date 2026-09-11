@@ -86,6 +86,10 @@
   margin: 0 0 var(--space-2);
 }
 
+.saga-notes__empty {
+  margin: 0;
+}
+
 .saga-notes__body {
   margin: 0;
   white-space: pre-wrap;
@@ -223,50 +227,65 @@
   font-size: var(--text-xs);
 }
 
-/* Fullscreen: the identical footer, overlaid on a scrim rather than occupying
-   layout space. Reserving space would make the slide shift every time the
-   footer faded in or out, which reads as unpolished mid-presentation. */
+/* While presenting, the footer overlays the slide rather than occupying layout
+   space, so the slide's own box does not move when it appears. Background is
+   the theme's own surface faded in from transparent, not `--scrim`: every
+   theme's scrim is a dark wash, which leaves `--text-muted` unreadable on it in
+   the light themes. */
 .saga-footer--overlay {
   position: absolute;
   inset-inline: 0;
   bottom: 0;
   border: 0;
   border-radius: 0;
-  /* The same surface the windowed footer sits on, faded in from transparent
-     rather than a scrim: every theme's `--scrim` is a dark wash, which leaves
-     `--text-muted` unreadable on it in the light themes. Blending the real
-     surface in instead means the footer's contrast is identical in both modes,
-     in every theme, with no colour of its own to keep in step. */
   background: linear-gradient(180deg, transparent 0%, var(--surface) 45%);
   padding: var(--space-6) var(--space-4) var(--space-4);
-  transition:
-    opacity var(--dur-2) var(--ease),
-    visibility var(--dur-2) var(--ease);
 }
 
-/* `visibility`, not `display`: it leaves the accessibility tree and the tab
-   order without changing the slide's box, which is what acceptance 8 measures. */
-.saga-footer--idle {
-  opacity: 0;
-  visibility: hidden;
+/* **Presenting on a machine with a keyboard shows no chrome at all.** The deck
+   is the whole screen, the bindings drive it, and Esc leaves — which the
+   browser says itself on entering fullscreen. Touch devices keep the bar:
+   a phone or tablet has no Esc and no arrow keys, so tapping is the only way
+   in. Same pair of queries `isDesktop.ts` and `ui.css` already split on. */
+@media (hover: hover) and (pointer: fine) {
+  .saga--presenting .saga-footer {
+    display: none;
+  }
 }
 
-/* ── fullscreen container ───────────────────────────────────────────────── */
+/* ── presenting ─────────────────────────────────────────────────────────── */
 
-/* Scoped to Saga's own container, which is what `requestFullscreen()` targets —
-   the browser's Fullscreen API is what hides the app header and nav. */
-.saga:fullscreen {
+/* Driven by a class rather than `:fullscreen`, because there are two ways to be
+   presenting and they must look identical: real browser fullscreen (which is
+   what `requestFullscreen()` on this container buys — the browser hides the app
+   header and nav for free), and the in-page stand-in below, for browsers that
+   have no element fullscreen at all. */
+.saga--presenting {
   background: var(--bg);
   padding: var(--space-4);
   gap: 0;
-  /* The fullscreen element is the viewport now, so the windowed box's computed
-     height and breakout margins would both be wrong here. */
+  /* The element is the viewport now, so the windowed box's computed height and
+     breakout margins would both be wrong here. */
   width: 100%;
   height: 100%;
   margin-inline: 0;
 }
 
-.saga:fullscreen .saga-slide__body {
+/* Safari on **iPhone** exposes the Fullscreen API on `<video>` and nowhere
+   else, so no call can put this element into real fullscreen. Covering the app
+   ourselves is the honest alternative: the deck still gets the whole viewport,
+   and `inset: 0` on a fixed box sidesteps the mobile-viewport-unit problems
+   `100dvh` still has there. Above the sticky header, below the notification
+   host (70), so a warning can still reach the presenter. */
+.saga--immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  width: auto;
+  height: auto;
+}
+
+.saga--presenting .saga-slide__body {
   border: 0;
   background: transparent;
   /* The multiplier rides on top of the viewport-relative base, so a deck sized
@@ -285,7 +304,7 @@
    frame that finally had somewhere to bite: every code block on an overflowing
    slide flattened into nothing but its own horizontal scrollbar. Seen in a
    fullscreen screenshot at 150%, not reasoned about. */
-.saga:fullscreen .saga-slide__body > * {
+.saga--presenting .saga-slide__body > * {
   flex-shrink: 0;
 }
 
@@ -407,10 +426,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* An instant cut, not a fade — this codebase's existing convention
-     (screensaver, mermaid) applied here rather than skipped because the
-     feature is new. */
-  .saga-footer--overlay,
   .saga-drop {
     transition: none;
   }

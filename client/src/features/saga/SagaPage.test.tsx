@@ -254,21 +254,38 @@ describe('SagaPage (PLAN-28)', () => {
     expect(container.querySelector('.saga-notes')).toBeNull();
 
     press('n');
-    expect(container.querySelector('.saga-notes')?.textContent).toContain('breathe');
+    expect(container.querySelector('.saga-notes__body')?.textContent).toContain('breathe');
     expect(slideText()).not.toContain('breathe');
 
     press('n');
     expect(container.querySelector('.saga-notes')).toBeNull();
   });
 
-  it('offers no notes toggle on a slide that has no note', async () => {
+  it('N always answers, even on a slide the author never annotated', async () => {
+    // The reported bug: showing notes is a *mode*, but the panel only rendered
+    // on slides that had one — so on every other slide the key did nothing
+    // visible and read as broken.
+    await open('/saga');
+    await drop('deck.md', DECK);
+
+    press('ArrowRight');
+    expect(container.querySelector('.saga-slide__body')?.textContent).toContain('Second');
+    press('n');
+
+    const panel = container.querySelector('.saga-notes');
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain('Nothing written for this slide');
+    expect(container.querySelector('.saga-notes__body')).toBeNull();
+  });
+
+  it('keeps the notes toggle on every slide', async () => {
     await open('/saga');
     await drop('deck.md', DECK);
 
     const toggle = () => container.querySelector('[aria-label="Show presenter notes"]');
     expect(toggle()).not.toBeNull();
     press('ArrowRight');
-    expect(toggle()).toBeNull();
+    expect(toggle()).not.toBeNull();
   });
 
   const scaleOf = () =>
@@ -310,7 +327,7 @@ describe('SagaPage (PLAN-28)', () => {
     await act(async () => {
       document.dispatchEvent(new Event('fullscreenchange'));
     });
-    expect(container.querySelector('.saga')?.className).toContain('saga--fullscreen');
+    expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
     expect(scaleOf()).toBe('1.2');
 
     press('+');
@@ -320,7 +337,7 @@ describe('SagaPage (PLAN-28)', () => {
     await act(async () => {
       document.dispatchEvent(new Event('fullscreenchange'));
     });
-    expect(container.querySelector('.saga')?.className).not.toContain('saga--fullscreen');
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
     expect(scaleOf()).toBe('1.3');
   });
 
@@ -360,6 +377,53 @@ describe('SagaPage (PLAN-28)', () => {
     await open('/saga?source=http%3A%2F%2F127.0.0.1%3A5000%2Fpayload');
     expect(slideText()).toContain('First');
     expect(position()).toBe('1 / 3');
+  });
+
+  it('presents in-page where the browser has no element fullscreen (iPhone)', async () => {
+    // Safari on iPhone exposes the Fullscreen API on <video> and nowhere else.
+    // jsdom is the same shape — it implements neither — so this is the real
+    // code path that device takes, not a simulation of it.
+    await open('/saga');
+    await drop('deck.md', DECK);
+    const el = container.querySelector<HTMLElement>('.saga');
+    expect(el && 'requestFullscreen' in el).toBe(false);
+
+    press('f');
+    expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
+    expect(container.querySelector('.saga')?.className).toContain('saga--immersive');
+
+    // Esc has to leave, because nothing else will: the browser does not own
+    // this one.
+    press('Escape');
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--immersive');
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
+  });
+
+  it('uses the real API when the browser has one, and never the stand-in', async () => {
+    await open('/saga');
+    await drop('deck.md', DECK);
+    const el = container.querySelector<HTMLElement>('.saga');
+    if (!el) throw new Error('saga container missing');
+
+    const request = vi.fn(async () => {
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: el });
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    Object.defineProperty(el, 'requestFullscreen', { configurable: true, value: request });
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+    });
+
+    expect(request).toHaveBeenCalledOnce();
+    expect(container.querySelector('.saga')?.className).toContain('saga--presenting');
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--immersive');
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    await act(async () => {
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(container.querySelector('.saga')?.className).not.toContain('saga--presenting');
   });
 
   it('says so when a deck has no slides in it', async () => {

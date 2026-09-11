@@ -31,10 +31,6 @@ export interface SlideFooterProps {
   onNext: () => void;
   fullscreen: boolean;
   onToggleFullscreen: () => void;
-  /** Fullscreen only. Windowed callers pass `true` and it never changes. */
-  visible: boolean;
-  /** Absent when the current slide carries no note — no dead toggle. */
-  hasNotes: boolean;
   notesOpen: boolean;
   onToggleNotes: () => void;
   onShowShortcuts: () => void;
@@ -63,19 +59,15 @@ export function SlideFooter({
   onNext,
   fullscreen,
   onToggleFullscreen,
-  visible,
-  hasNotes,
   notesOpen,
   onToggleNotes,
   onShowShortcuts,
   scale,
 }: SlideFooterProps) {
   const classes = ['saga-footer'];
-  // Overlaid rather than in flow: reserving layout space would make the slide
-  // visibly shift every time the footer faded in or out, which reads as
-  // unpolished in the middle of a real presentation.
+  // Overlaid rather than in flow, so the slide's own box does not move when a
+  // touch device shows this bar over a presentation.
   if (fullscreen) classes.push('saga-footer--overlay');
-  if (fullscreen && !visible) classes.push('saga-footer--idle');
 
   return (
     <div className={classes.join(' ')} data-testid="saga-footer">
@@ -148,17 +140,17 @@ export function SlideFooter({
             <PlusIcon size={15} />
           </Button>
         </div>
-        {hasNotes && (
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={notesOpen}
-            aria-label={notesOpen ? 'Hide presenter notes' : 'Show presenter notes'}
-            onClick={onToggleNotes}
-          >
-            <DocFileIcon size={15} /> Notes
-          </Button>
-        )}
+        {/* Always here: a toggle that came and went as you moved through the
+            deck read as the control breaking rather than the slide changing. */}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-pressed={notesOpen}
+          aria-label={notesOpen ? 'Hide presenter notes' : 'Show presenter notes'}
+          onClick={onToggleNotes}
+        >
+          <DocFileIcon size={15} /> Notes
+        </Button>
         <Button
           variant="ghost"
           size="sm"
