@@ -127,3 +127,31 @@ describe('block/insert commands leave a collapsed cursor, not a selection', () =
     expect(type(out, 'x')).toBe('[link text](https://x)');
   });
 });
+
+describe('presenterNote', () => {
+  it('inserts an empty note with the caret inside it', () => {
+    const out = runCommand('presenterNote', sel('|'));
+    expect(out.doc).toBe('<!-- notes:  -->\n');
+    expect(out.from).toBe(out.to);
+    // Typing continues the note rather than replacing it.
+    const typed = out.doc.slice(0, out.from) + 'breathe' + out.doc.slice(out.to);
+    expect(typed).toBe('<!-- notes: breathe -->\n');
+  });
+
+  it('turns a selection into the note’s text', () => {
+    const out = runCommand('presenterNote', sel('|say this out loud|'));
+    expect(out.doc).toBe('<!-- notes: say this out loud -->\n');
+  });
+
+  it('always lands on its own line, never inline', () => {
+    // Inline is legal markdown and parses, but it eats the spacing either side,
+    // so the toolbar must not be able to produce it.
+    const out = runCommand('presenterNote', sel('Some text|'));
+    expect(out.doc).toBe('Some text\n<!-- notes:  -->\n');
+  });
+
+  it('does not add a second newline when already at a line start', () => {
+    const out = runCommand('presenterNote', sel('# Title\n|'));
+    expect(out.doc).toBe('# Title\n<!-- notes:  -->\n');
+  });
+});
