@@ -24,11 +24,15 @@ export function SlideView({ slide, scale }: { slide: SagaSlide | undefined; scal
 }
 
 /**
- * `features/edda/MarkdownPreview` does the same job and is deliberately *not*
- * reused: a feature may not import another feature. The one thing worth
- * carrying over from it is the memoized `__html` object — React compares that
- * prop by identity, so an inline literal re-sets `innerHTML` on every render
- * and throws away the mermaid diagrams the pass just swapped in.
+ * `core/ui/MarkdownPreview` does the same job and is deliberately *not* reused.
+ * The boundary rule that used to be the reason is gone — PLAN-30 promoted it
+ * out of `features/edda/`, so a feature may import it now — but a slide is not
+ * a preview pane: it wants no scroll container of its own, and since PLAN-30 a
+ * `MarkdownPreview` also grows a copy button on every fenced block, which is
+ * chrome on a projector. The one thing worth carrying over is the memoized
+ * `__html` object — React compares that prop by identity, so an inline literal
+ * re-sets `innerHTML` on every render and throws away the mermaid diagrams the
+ * pass just swapped in.
  */
 function MarkdownSlide({ markdown }: { markdown: string }) {
   const ref = useRef<HTMLDivElement>(null);
