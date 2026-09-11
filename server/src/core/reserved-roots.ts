@@ -42,6 +42,8 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'diagon-alley',
   // PLAN-25: a client route only — the Brotli module publishes nothing outside /api.
   'brotli',
+  // PLAN-28: a client route only — the Saga module registers no route at all.
+  'saga',
 ]);
 
 /** True when `word` names one of the app's own path roots (already lowercased). */

@@ -44,6 +44,7 @@ import { screensaverModule } from './modules/screensaver/module.js';
 import { clientLogsModule } from './modules/client-logs/module.js';
 import { metricsModule } from './modules/metrics/module.js';
 import { toolboxModule } from './modules/toolbox/module.js';
+import { sagaModule } from './modules/saga/module.js';
 import { offlineModeModule } from './modules/offline-mode/module.js';
 
 /**
@@ -90,6 +91,10 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Capability-only, both profiles: the toolbox is pure client compute, so
     // this entry is purely the on/off switch for the Diagon Alley tools.
     toolboxModule,
+    // Capability-only, both profiles: Saga renders slides in the browser from a
+    // saved edda or a dropped file, so this entry is purely its on/off switch
+    // for the Midgard card and Pensieve's "Present" action (PLAN-28).
+    sagaModule,
     // Both profiles: policy only for the client-side warm load (PLAN-22) —
     // harmless mechanism, not a LAN-trust concern.
     offlineModeModule,
@@ -110,6 +115,7 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     clientLogsModule,
     metricsModule,
     toolboxModule,
+    sagaModule,
     offlineModeModule,
   ],
 };

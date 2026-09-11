@@ -3,7 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-const launch = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
+// Typed with the argument `open` really takes, so a test can read the URL the
+// command chose out of `launch.mock.calls` (PLAN-28).
+const launch = vi.hoisted(() =>
+  vi.fn<(target: string) => Promise<undefined>>(async () => undefined),
+);
 // The browser is mocked, never actually spawned: CI has no display, and the
 // assertion that matters is *which URL* preview chose.
 vi.mock('open', () => ({ default: launch }));
@@ -208,6 +212,95 @@ describe('preview', () => {
     const badType = await runCli([...host, 'preview', slugs.edda as string, '--type', 'pensieve']);
     expect(badType.exitCode).toBe(1);
     expect(badType.stderr).toContain('unknown --type');
+  });
+});
+
+/**
+ * The local-file half of `preview` (PLAN-28). The browser is still mocked, but
+ * here the mock *acts* like one: it fetches the `?source=` URL out of the page
+ * address, which is what proves the whole chain — the CLI served the file, a
+ * page read it, and the one-shot server then closed and let the command exit.
+ */
+describe('preview <file>', () => {
+  let deck: string;
+
+  beforeAll(() => {
+    deck = path.join(workspace, 'deck.md');
+    fs.writeFileSync(deck, '# One\n\n---\n\n# Two\n');
+  });
+
+  // The shared `launch` is only cleared between tests, not reset, so the
+  // browser-shaped implementation below must not leak into the rest of the file.
+  afterEach(() => {
+    launch.mockImplementation(async () => undefined);
+  });
+
+  /** Stand in for the browser: fetch the payload the page would have fetched. */
+  const browserThatReads = (captured: { body?: string }) =>
+    launch.mockImplementation(async (target: string) => {
+      const source = new URL(target).searchParams.get('source');
+      if (source) captured.body = await (await fetch(source)).text();
+      return undefined;
+    });
+
+  it('serves a real .md to Saga and closes once the page has read it', async () => {
+    const captured: { body?: string } = {};
+    browserThatReads(captured);
+
+    const run = await runCli([...host, 'preview', deck, '--type', 'saga']);
+
+    expect(run.exitCode).toBe(0);
+    const opened = new URL(String(launch.mock.calls[0]?.[0]));
+    expect(opened.origin).toBe(server.baseUrl);
+    expect(opened.pathname).toBe('/saga');
+    expect(opened.searchParams.get('source')).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/payload$/);
+    // End to end: the bytes the page received are the bytes on disk.
+    expect(captured.body).toBe('# One\n\n---\n\n# Two\n');
+  });
+
+  it('refuses --type saga on a .json before opening a browser or a port', async () => {
+    // Acceptance 12.
+    const run = await runCli([...host, 'preview', path.join(workspace, 'data.json'), '--type', 'saga']);
+
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('markdown');
+    expect(run.stderr).toContain('.md, .markdown');
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('refuses a .pdf the same way, until a plan adds that row', async () => {
+    const run = await runCli([...host, 'preview', path.join(workspace, 'slides.pdf'), '--type', 'saga']);
+    expect(run.exitCode).toBe(1);
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('names the missing file rather than looking for a document by that name', async () => {
+    const run = await runCli([...host, 'preview', path.join(workspace, 'gone.md'), '--type', 'saga']);
+    expect(run.exitCode).toBe(4);
+    expect(run.stderr).toContain('no such file');
+  });
+
+  it('asks for a --type rather than guessing markdown’s destination', async () => {
+    const run = await runCli([...host, 'preview', deck]);
+    expect(run.exitCode).toBe(1);
+    expect(run.stderr).toContain('--type saga');
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it('under --no-open prints the URL and serves nothing', async () => {
+    const run = await runCli([...host, 'preview', deck, '--type', 'saga', '--no-open']);
+
+    expect(launch).not.toHaveBeenCalled();
+    expect(run.stdout.trim()).toContain('/saga?source=');
+    expect(run.stderr).toContain('not served in --no-open mode');
+  });
+
+  it('leaves a bare slug resolving as a document, not as a file', async () => {
+    // PLAN-27's own behaviour, unchanged: a slug has no separator and no
+    // extension this table knows, so it never starts looking on disk.
+    const run = await runCli([...host, 'preview', slugs.edda as string]);
+    expect(launch).toHaveBeenCalledWith(`${server.baseUrl}/edda/preview/${slugs.edda}`);
+    expect(run.exitCode).toBe(0);
   });
 });
 

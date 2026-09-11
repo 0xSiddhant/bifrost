@@ -50,7 +50,15 @@ interface NavCategory {
 }
 
 const NAV: NavCategory[] = [
-  { to: '/', label: 'Midgard', icon: <FolderIcon size={18} />, modules: [null] },
+  {
+    to: '/',
+    label: 'Midgard',
+    icon: <FolderIcon size={18} />,
+    // Midgard needed no `match` until PLAN-28: it was the only hub whose tools
+    // all lived at their own top-level routes that already start with '/'.
+    match: ['/saga'],
+    modules: [null],
+  },
   {
     to: '/ollivanders',
     label: 'Ollivanders',
@@ -194,9 +202,13 @@ export function App() {
 
   // A category tab is active on its own page and on any of its tools' pages.
   const isActive = (category: NavCategory) => {
+    // `match` is consulted first, and for every category: Midgard's `to` is '/',
+    // which would otherwise short-circuit before its own sub-routes were ever
+    // considered (PLAN-28 gave it its first one).
+    const matched = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+    if ((category.match ?? []).some(matched)) return true;
     if (category.to === '/') return pathname === '/';
-    const paths = [category.to, ...(category.match ?? [])];
-    return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+    return matched(category.to);
   };
   const navItems = () =>
     nav.map((category) => (
@@ -326,6 +338,11 @@ export function App() {
                   RESERVED_ROOTS: this redirect is a real route, and a /go/sigil
                   slug shadowing it would be confusing. */}
               <Route path="/sigil" element={<Navigate replace to="/diagon-alley/qr" />} />
+              {/* Saga (PLAN-28) — a slideshow over a dropped file (bare route,
+                  or `?source=` for the terminal hand-off) or a saved edda.
+                  One component serves both, as EddaPage already does. */}
+              <Route path="/saga" element={<pages.SagaPage />} />
+              <Route path="/saga/:slug" element={<pages.SagaPage />} />
               <Route path="/nimbus" element={<pages.NimbusPage />} />
               <Route path="/portkey" element={<pages.PortkeyPage />} />
               <Route path="*" element={<NotFoundPage />} />

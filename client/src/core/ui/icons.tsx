@@ -408,3 +408,15 @@ export const DisclosureIcon = (p: IconProps) => (
     <path d="M9 5.5 16.5 12 9 18.5Z" />
   </svg>
 );
+
+/**
+ * Saga's slideshow (PLAN-28): a projected frame on a stand. Scanned the whole
+ * export list first — there was no slides/presentation glyph here before, so
+ * this is a genuine addition rather than a near-duplicate of `DocFileIcon`.
+ */
+export const SlidesIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M12 16v4m-3 0h6" />
+  </svg>
+);

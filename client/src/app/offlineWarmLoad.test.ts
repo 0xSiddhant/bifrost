@@ -53,7 +53,17 @@ describe('runWarmLoad (PLAN-22)', () => {
   it('ships a loader for every id the server registry advertises', () => {
     // The two lists are joined by id at runtime; nothing else checks they agree.
     expect(Object.keys(WARM_LOADERS).sort()).toEqual(
-      ['atlas', 'edda', 'groot', 'loki', 'runestone', 'screensaver', 'toolbox', 'variant'].sort(),
+      [
+        'atlas',
+        'edda',
+        'groot',
+        'loki',
+        'runestone',
+        'saga',
+        'screensaver',
+        'toolbox',
+        'variant',
+      ].sort(),
     );
   });
 });

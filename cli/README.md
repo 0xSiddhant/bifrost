@@ -177,17 +177,40 @@ A slug names a document but not which *kind*, so all four raw endpoints
 used. A slug that somehow exists as two kinds is reported, and `--type` settles
 it.
 
-### preview — open a document's page in your browser
+### preview — open a saved document, or a local file, in your browser
 
 ```bash
-bifrost preview trip-notes-a1b2c3              # launches the browser
+bifrost preview trip-notes-a1b2c3              # a saved document; launches the browser
 bifrost preview trip-notes-a1b2c3 --no-open    # just print the URL
+
+bifrost preview deck.md --type saga            # a file on this machine, presented as slides
 ```
 
-Edda documents have a real rendered page (`/edda/preview/<slug>`). Runestone,
-Groot and Atlas have none yet, so their raw content URL is opened instead —
-which a browser renders readably — and the CLI says which of the two it did.
-`--json` never launches a browser, whatever `--no-open` says.
+**A saved document** is addressed by slug. Edda documents have a real rendered
+page (`/edda/preview/<slug>`); Runestone, Groot and Atlas have none yet, so
+their raw content URL is opened instead — which a browser renders readably —
+and the CLI says which of the two it did.
+
+**A local file** is anything with a path separator, a leading `.`, or an
+extension; everything else is read as a slug, so nothing that resolved as a
+document before starts looking on disk. A browser page cannot open an arbitrary
+local path with no user gesture, so the file is handed over through a **one-shot
+HTTP server** this command runs on your own machine: loopback only, an
+OS-assigned port, one path serving one file, CORS scoped to your Bifrost origin
+alone, and gone the moment the page has read it (or after 60 seconds, if it
+never does — which is then reported, with exit 1).
+
+`--type` means the destination for a file, and the document kind for a slug.
+Today `saga` is markdown's only destination, so `--type saga` is required;
+anything else is refused before a port is opened or a browser is launched:
+
+```
+$ bifrost preview data.json --type saga
+✗ error: --type saga presents markdown — .md, .markdown — not .json
+```
+
+`--json` never launches a browser, whatever `--no-open` says — and since
+nothing will then fetch the file, neither mode serves it.
 
 ### portkey and go — LAN go-links
 

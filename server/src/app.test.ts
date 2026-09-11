@@ -59,6 +59,7 @@ describe('boot → health → capabilities', () => {
         'client-logs',
         'metrics',
         'toolbox',
+        'saga',
         'offline-mode',
       ],
     });
@@ -107,6 +108,10 @@ describe('capabilities in the cloud profile', () => {
     const body = response.json();
     expect(body.profile).toBe('cloud');
     expect(body.modules).toContain('toolbox');
+    // Saga is the same class (PLAN-28): a slideshow rendered entirely in the
+    // browser, so a cloud build that lost the entry would hide the Midgard card
+    // and Pensieve's "Present" action with nothing to explain why.
+    expect(body.modules).toContain('saga');
     // qr-tool stays loaded in both profiles — /sigil became a tool, but
     // GET /api/qr/server-url is still what Midgard's Join card reads.
     expect(body.modules).toContain('qr-tool');

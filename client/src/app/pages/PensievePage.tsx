@@ -9,7 +9,15 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
 import { cardToneClass } from '../../core/ui/cardTone';
-import { BookmarkIcon, CheckIcon, ClipboardIcon, CloseIcon, EyeIcon, SearchIcon } from '../../core/ui/icons';
+import {
+  BookmarkIcon,
+  CheckIcon,
+  ClipboardIcon,
+  CloseIcon,
+  EyeIcon,
+  SearchIcon,
+  SlidesIcon,
+} from '../../core/ui/icons';
 import {
   LIBRARY_REGISTRY,
   availableKinds,
@@ -79,6 +87,11 @@ export function PensievePage() {
   // is what the load effect and the SSE subscriptions both depend on, so a
   // fresh-but-equal object would re-fetch and re-subscribe on every render.
   const moduleKey = capabilities ? capabilities.modules.join(' ') : null;
+  // The "Present" action is gated on Saga's own module, not on the row's kind:
+  // an entry carries a `presentRoute` because its documents *can* be presented,
+  // and whether the viewer can is a separate question (PLAN-28). Rows do not
+  // render before capabilities land, so `false` here is never a false negative.
+  const canPresent = capabilities?.modules.includes('saga') ?? false;
   const kinds = useMemo(() => {
     if (moduleKey === null) return null;
     const modules = new Set(moduleKey.split(' '));
@@ -345,6 +358,15 @@ export function PensievePage() {
                         aria-label={`Read ${item.name}`}
                       >
                         <EyeIcon size={15} /> Read
+                      </Link>
+                    )}
+                    {entry.presentRoute && canPresent && (
+                      <Link
+                        className="btn btn--ghost btn--sm lib-row__link"
+                        to={entry.presentRoute(item)}
+                        aria-label={`Present ${item.name}`}
+                      >
+                        <SlidesIcon size={15} /> Present
                       </Link>
                     )}
                     {entry.apiRoute && entry.mimeType && (

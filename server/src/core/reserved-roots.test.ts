@@ -33,6 +33,8 @@ describe('reserved roots', () => {
       'diagon-alley',
       // PLAN-25: the Brotli workbench's page.
       'brotli',
+      // PLAN-28: Saga's slideshow page, at /saga and /saga/:slug.
+      'saga',
     ]) {
       expect(RESERVED_ROOTS.has(root), `${root} is reserved`).toBe(true);
     }
