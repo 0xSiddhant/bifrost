@@ -27,6 +27,36 @@ function run(args: string[], options: { cwd?: string } = {}): string {
   });
 }
 
+interface PackEntry {
+  filename?: string;
+}
+
+/**
+ * The one tarball `npm pack` just wrote, across two different JSON shapes.
+ *
+ * npm 10 answers `--json` with an **array** of entries; npm 12 answers with an
+ * **object keyed by package name**. Reading `[0].filename` therefore worked for
+ * years and then returned `undefined` the day a developer upgraded npm, with
+ * "npm pack produced no tarball" as the only clue — the pack itself had
+ * succeeded. Both shapes are accepted rather than pinning an npm version,
+ * because nothing else here needs one: this script wants a filename, and both
+ * npms are willing to say what it is.
+ */
+function packedFilename(packed: string): string | undefined {
+  const parsed = JSON.parse(packed) as PackEntry[] | Record<string, PackEntry>;
+  const entries = Array.isArray(parsed) ? parsed : Object.values(parsed);
+  return entries.find((entry) => entry?.filename)?.filename;
+}
+
+/** Only ever used to make the failure above name the npm that produced it. */
+function npmVersion(): string {
+  try {
+    return run(['--version']).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
 run(['run', 'build', '-w', 'cli']);
 
 if (process.env.CI) {
@@ -39,9 +69,10 @@ try {
   // --pack-destination keeps the tarball out of the working tree entirely, so a
   // dev iteration never leaves an untracked .tgz behind.
   const packed = run(['pack', '-w', 'cli', '--pack-destination', tmpDir, '--json']);
-  const entries = JSON.parse(packed) as { filename: string }[];
-  const filename = entries[0]?.filename;
-  if (!filename) throw new Error('npm pack produced no tarball');
+  const filename = packedFilename(packed);
+  if (!filename) {
+    throw new Error(`npm pack produced no tarball — npm ${npmVersion()} reported: ${packed.trim()}`);
+  }
   const tarball = path.join(tmpDir, filename);
 
   run(['install', '-g', tarball]);
