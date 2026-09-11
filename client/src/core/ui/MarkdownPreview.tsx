@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useMemo, useRef } from 'react';
-import { useMermaidDiagrams } from '../markdown';
+import { useCodeCopy, useMermaidDiagrams } from '../markdown';
 
 /**
  * Renders already-sanitized HTML from `renderMarkdown` into the themed preview
@@ -7,9 +7,10 @@ import { useMermaidDiagrams } from '../markdown';
  * EddaPage); this is purely the presentation shell, shared by the live preview
  * and the public preview page so they look identical.
  *
- * It also owns the mermaid pass (PLAN-20) — every surface that mounts this
- * gets it, which is what keeps them from drifting apart on diagrams the way
- * they never have on anything else.
+ * It also owns the two imperative passes over the committed HTML — the mermaid
+ * one (PLAN-20) and the code-block copy buttons (PLAN-30). Doing them here is
+ * what keeps every surface that mounts this from drifting apart the way they
+ * never have on anything else.
  *
  * It lives in `core/ui/` since PLAN-30 rather than in `features/edda/`, where
  * it started: the guide panel is a third consumer, and `core/` reaching into a
@@ -30,6 +31,7 @@ export const MarkdownPreview = forwardRef<
     [ref],
   );
   useMermaidDiagrams(innerRef, html, module);
+  useCodeCopy(innerRef, html);
 
   // Memoized, and it is load-bearing rather than a micro-optimisation: React
   // compares this prop **by object identity**, so an inline `{ __html }`

@@ -15,3 +15,5 @@ export {
   type MermaidPalette,
 } from './mermaid';
 export { useMermaidDiagrams } from './useMermaid';
+export { attachCodeCopyButtons, handleCodeCopyClick, COPIED_FEEDBACK_MS } from './codeCopy';
+export { useCodeCopy } from './useCodeCopy';

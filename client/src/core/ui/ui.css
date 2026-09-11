@@ -1597,3 +1597,119 @@ a.portal:hover .portal__go {
     opacity: 1;
   }
 }
+
+/* ── Code-block copy buttons (PLAN-30) ──────────────────────
+   Injected by core/markdown's copy pass into every MarkdownPreview, so this
+   sits beside the mermaid rules above for the same reason: both style DOM that
+   a pass writes rather than markup any component returns.
+
+   The button is dimmed rather than hidden until hover — a coarse pointer has
+   no hover state to reveal it with, and a copy button nobody can find on a
+   phone is a copy button that does not exist. */
+.md-preview .md-codeblock {
+  position: relative;
+  margin: 0 0 var(--space-3);
+}
+
+/* The wrapper owns the spacing now, so the block inside it must not add more. */
+.md-preview .md-codeblock > pre {
+  margin: 0;
+}
+
+.md-copy {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: pointer;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.md-codeblock:hover .md-copy,
+.md-copy:focus-visible {
+  opacity: 1;
+}
+
+.md-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* ── Guide panel (PLAN-30) ──────────────────────────────────
+   A right-edge drawer over the page, not a dialog in the middle of it: this is
+   reference material to glance at while working, so it deliberately leaves the
+   page behind it interactive and takes no scrim. It stops short of the mobile
+   bottom nav rather than covering it — the drawer is not a mode, so the nav
+   must stay reachable. */
+.guide-button {
+  display: flex;
+}
+
+.guide-panel {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  bottom: var(--bottomnav-h, 0px);
+  z-index: 40;
+  width: min(26rem, 100vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  padding-right: max(var(--space-4), env(safe-area-inset-right));
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  animation: guide-slide-in 180ms ease-out;
+}
+
+@keyframes guide-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-panel {
+    animation: none;
+  }
+}
+
+.guide-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.guide-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+/* The drawer is already a bordered surface; a second frame around the prose
+   inside it would just be a box in a box. The scroll behaviour is the part of
+   .md-preview that matters here, and that stays. */
+.guide-panel__body {
+  border: 0;
+  padding: 0;
+}
+
+.guide-panel__status {
+  margin: 0;
+}
