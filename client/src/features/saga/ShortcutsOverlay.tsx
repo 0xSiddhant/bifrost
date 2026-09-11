@@ -22,7 +22,6 @@ const BINDINGS: readonly {
   { keys: '0', does: 'Slide text back to 100%' },
   { keys: '? · H', does: 'This list' },
   { keys: 'Esc', does: 'Close this list', fullscreenAlso: 'Close this list, or leave fullscreen' },
-  { keys: 'Swipe', does: 'Next or previous slide, on a touch screen' },
 ];
 
 export function ShortcutsOverlay({

@@ -263,7 +263,7 @@ export function SagaPage() {
       // moves both together.
       style={{ '--saga-scale': scale.value } as CSSProperties}
     >
-      <div className="saga-stage" {...nav.touchHandlers}>
+      <div className="saga-stage">
         <SlideView markdown={current?.body ?? ''} />
         {notesOpen && <NotesPanel notes={current?.notes ?? null} />}
       </div>

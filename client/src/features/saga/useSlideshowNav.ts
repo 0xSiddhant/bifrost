@@ -1,26 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 /**
  * Slide position, and every way of changing it (PLAN-28).
  *
- * The keyboard half uses the same shape `features/previews/PreviewModal` already
- * does — one `window` listener registered in a `useEffect` and removed on
- * cleanup — rather than a second convention for the same job.
+ * Uses the same shape `features/previews/PreviewModal` already does — one
+ * `window` listener registered in a `useEffect` and removed on cleanup — rather
+ * than a second convention for the same job.
+ *
+ * **There is deliberately no swipe.** It was here, with deckrun's own 50px
+ * threshold, and it measured horizontal distance without ever checking the
+ * gesture was horizontal — so scrolling a long slide on a phone changed the
+ * slide whenever a finger drifted. On a surface whose whole job is to scroll,
+ * a drag belongs to the content; the footer's prev/next buttons are the touch
+ * affordance, and they are always there.
  */
-
-/** Deckrun's own swipe threshold. Below it, a tap is a tap, not a drag. */
-const SWIPE_PX = 50;
 
 export interface SlideshowNav {
   index: number;
   next: () => void;
   previous: () => void;
   goTo: (index: number) => void;
-  /** Spread onto the slide surface to arm swipe navigation. */
-  touchHandlers: {
-    onTouchStart: (event: React.TouchEvent) => void;
-    onTouchEnd: (event: React.TouchEvent) => void;
-  };
 }
 
 export interface SlideshowNavOptions {
@@ -97,28 +96,5 @@ export function useSlideshowNav(count: number, options: SlideshowNavOptions = {}
     return () => window.removeEventListener('keydown', onKey);
   }, [disabled, next, previous, goTo, count]);
 
-  const startX = useRef<number | null>(null);
-
-  const onTouchStart = useCallback((event: React.TouchEvent) => {
-    startX.current = event.touches[0]?.clientX ?? null;
-  }, []);
-
-  const onTouchEnd = useCallback(
-    (event: React.TouchEvent) => {
-      const from = startX.current;
-      startX.current = null;
-      if (from === null) return;
-      const to = event.changedTouches[0]?.clientX;
-      if (to === undefined) return;
-      const delta = to - from;
-      if (Math.abs(delta) < SWIPE_PX) return;
-      // Swiping left drags the deck forward, matching every paged surface a
-      // phone already has.
-      if (delta < 0) next();
-      else previous();
-    },
-    [next, previous],
-  );
-
-  return { index, next, previous, goTo, touchHandlers: { onTouchStart, onTouchEnd } };
+  return { index, next, previous, goTo };
 }

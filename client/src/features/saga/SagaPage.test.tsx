@@ -177,32 +177,32 @@ describe('SagaPage (PLAN-28)', () => {
     expect(position()).toBe('1 / 3');
   });
 
-  it('navigates on a swipe past the threshold, and ignores a shorter drag', async () => {
+  it('never navigates on a touch drag — the deck scrolls, it does not turn', async () => {
+    // Swipe used to measure horizontal distance without checking the gesture
+    // *was* horizontal, so scrolling a long slide on a phone turned the page
+    // whenever a finger drifted past 50px. On a surface whose whole job is to
+    // scroll, a drag belongs to the content.
     await open('/saga');
     await drop('deck.md', DECK);
 
-    // jsdom cannot construct a real TouchEvent, so the two properties the
-    // handler actually reads are attached to a plain event of the right type.
-    const swipe = (from: number, to: number) => {
+    const drag = (fromX: number, toX: number, fromY = 400, toY = 400) => {
       const stage = container.querySelector('.saga-stage');
       if (!stage) throw new Error('stage missing');
       const start = new Event('touchstart', { bubbles: true }) as Event & { touches: unknown[] };
-      start.touches = [{ clientX: from }];
+      start.touches = [{ clientX: fromX, clientY: fromY }];
       const end = new Event('touchend', { bubbles: true }) as Event & { changedTouches: unknown[] };
-      end.changedTouches = [{ clientX: to }];
+      end.changedTouches = [{ clientX: toX, clientY: toY }];
       act(() => {
         stage.dispatchEvent(start);
         stage.dispatchEvent(end);
       });
     };
 
-    swipe(300, 200); // 100px left — forward
-    expect(position()).toBe('2 / 3');
-
-    swipe(200, 300); // 100px right — back
+    drag(300, 100); // a long leftward drag — once a "next slide"
     expect(position()).toBe('1 / 3');
-
-    swipe(300, 270); // 30px, under the 50px threshold — a tap, not a swipe
+    drag(100, 300); // and rightward
+    expect(position()).toBe('1 / 3');
+    drag(300, 200, 600, 100); // a vertical scroll that drifts sideways
     expect(position()).toBe('1 / 3');
   });
 
@@ -228,6 +228,7 @@ describe('SagaPage (PLAN-28)', () => {
     press('?');
     expect(container.querySelector('.saga-shortcuts')).not.toBeNull();
     expect(container.querySelector('.saga-shortcuts')?.textContent).toContain('Next slide');
+    expect(container.querySelector('.saga-shortcuts')?.textContent).not.toContain('Swipe');
 
     // Acceptance 4's bindings must not move the deck behind an open overlay.
     press('ArrowRight');
