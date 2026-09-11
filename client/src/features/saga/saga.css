@@ -70,6 +70,42 @@
   margin-top: 0;
 }
 
+/* ── a rasterized pdf page (PLAN-29) ────────────────────────────────────── */
+
+/* No padding of its own, deliberately: `SlideView` measures this element to
+   decide what size to rasterize the page at, so the box it measures has to be
+   the box the canvas is allowed to fill. A PDF page brings its own margins. */
+.saga-slide__page {
+  padding: 0;
+  /* Both axes, unlike a markdown slide: a page zoomed past 100% overflows
+     sideways as well as down, and a page whose left edge cannot be reached is
+     worse than one that scrolls. */
+  overflow: auto;
+  display: grid;
+  /* `safe` for the same reason the presenting body uses it — plain `center`
+     keeps centring once the content is larger than the frame, pushing the
+     page's top-left corner where no scrolling can reach it. */
+  place-content: safe center;
+}
+
+/* pdf.js paints the page's own white background onto the canvas, so this needs
+   no ground of its own — and must not be given one, or a page with real
+   transparency in it would sit on a colour the document never specified. */
+.saga-slide__canvas {
+  display: block;
+  border-radius: var(--radius-sm);
+  /* A belt for the one frame before the first render has sized it: an
+     unstyled canvas is displayed at its raster size, which is oversampled to
+     the device pixel ratio and would otherwise overflow the frame. */
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.saga-slide__failed {
+  padding: var(--space-6);
+  text-align: center;
+}
+
 /* ── presenter notes ────────────────────────────────────────────────────── */
 
 .saga-notes {
@@ -303,6 +339,14 @@
    fullscreen screenshot at 150%, not reasoned about. */
 .saga--presenting .saga-slide__body > * {
   flex-shrink: 0;
+}
+
+/* Re-asserted rather than inherited: the two rules above are more specific
+   than `.saga-slide__page`, so without this a page would be laid out by the
+   markdown branch's column flex the moment the deck went fullscreen. */
+.saga--presenting .saga-slide__page {
+  display: grid;
+  place-content: safe center;
 }
 
 /* ── shortcuts overlay ──────────────────────────────────────────────────── */

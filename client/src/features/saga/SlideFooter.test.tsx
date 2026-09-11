@@ -16,6 +16,7 @@ const BASE: SlideFooterProps = {
   fullscreen: false,
   canFullscreen: true,
   onToggleFullscreen: () => {},
+  canNotes: true,
   notesOpen: false,
   onToggleNotes: () => {},
   onShowShortcuts: () => {},
@@ -55,6 +56,16 @@ describe('SlideFooter (PLAN-28)', () => {
   it('shows the position one-based', () => {
     render();
     expect(container.querySelector('.saga-footer__position')?.textContent).toBe('2 / 4');
+  });
+
+  it('offers no notes control on a deck whose slides cannot carry one', () => {
+    // A PDF deck (PLAN-29). Absent throughout rather than per slide: every page
+    // in such a deck is the same shape, so the control never flickers.
+    render({ canNotes: false });
+    expect(button('Show presenter notes')).toBeNull();
+    expect(
+      [...container.querySelectorAll('.saga-legend')].some((n) => n.textContent?.includes('notes')),
+    ).toBe(false);
   });
 
   it('offers no fullscreen control where the browser has none', () => {

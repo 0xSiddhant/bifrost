@@ -33,6 +33,8 @@ export interface SlideFooterProps {
   /** False where the browser cannot fullscreen an element — iPhone Safari. */
   canFullscreen: boolean;
   onToggleFullscreen: () => void;
+  /** False on a PDF page, which has no markdown source to carry a note. */
+  canNotes: boolean;
   notesOpen: boolean;
   onToggleNotes: () => void;
   onShowShortcuts: () => void;
@@ -46,10 +48,16 @@ export interface SlideFooterProps {
  * in the markup. Every entry here also appears in `ShortcutsOverlay`, which is
  * the complete list; this is the glanceable subset.
  */
-const LEGEND: readonly { keys: string; does: string; rank: number; needsFullscreen?: true }[] = [
+const LEGEND: readonly {
+  keys: string;
+  does: string;
+  rank: number;
+  needsFullscreen?: true;
+  needsNotes?: true;
+}[] = [
   { keys: '← →', does: 'navigate', rank: 1 },
   { keys: 'F', does: 'fullscreen', rank: 2, needsFullscreen: true },
-  { keys: 'N', does: 'notes', rank: 3 },
+  { keys: 'N', does: 'notes', rank: 3, needsNotes: true },
   { keys: '+ −', does: 'size', rank: 4 },
   { keys: '?', does: 'shortcuts', rank: 5 },
 ];
@@ -62,6 +70,7 @@ export function SlideFooter({
   fullscreen,
   canFullscreen,
   onToggleFullscreen,
+  canNotes,
   notesOpen,
   onToggleNotes,
   onShowShortcuts,
@@ -103,7 +112,10 @@ export function SlideFooter({
       {/* Decoration for a screen reader: every binding below is a real control
           in this same bar, and the shortcuts card is the readable list. */}
       <div className="saga-footer__legend" aria-hidden="true">
-        {LEGEND.filter((entry) => canFullscreen || !entry.needsFullscreen).map((entry) => (
+        {LEGEND.filter(
+          (entry) =>
+            (canFullscreen || !entry.needsFullscreen) && (canNotes || !entry.needsNotes),
+        ).map((entry) => (
           <span className="saga-legend" data-rank={entry.rank} key={entry.keys}>
             <span className="kbd">{entry.keys}</span>
             <span className="saga-legend__does">{entry.does}</span>
@@ -143,17 +155,21 @@ export function SlideFooter({
             <PlusIcon size={15} />
           </Button>
         </div>
-        {/* Always here: a toggle that came and went as you moved through the
-            deck read as the control breaking rather than the slide changing. */}
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-pressed={notesOpen}
-          aria-label={notesOpen ? 'Hide presenter notes' : 'Show presenter notes'}
-          onClick={onToggleNotes}
-        >
-          <DocFileIcon size={15} /> Notes
-        </Button>
+        {/* Always here *within a deck*: a toggle that came and went as you
+            moved through the slides read as the control breaking rather than
+            the slide changing. A PDF deck is the one case where it is absent
+            throughout, because no page in it can ever carry a note. */}
+        {canNotes && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-pressed={notesOpen}
+            aria-label={notesOpen ? 'Hide presenter notes' : 'Show presenter notes'}
+            onClick={onToggleNotes}
+          >
+            <DocFileIcon size={15} /> Notes
+          </Button>
+        )}
         {/* Offered only where it can actually happen. Safari on iPhone has the
             Fullscreen API on `<video>` and nowhere else, and a control that
             cannot do the one thing it names is worse than no control. */}

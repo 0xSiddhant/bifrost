@@ -20,6 +20,12 @@ server/build-info.json
 # generated roff man page (scripts/gen-man.ts, from cli/man/bifrost.1.md)
 cli/man/bifrost.1
 
+# pdf.js wasm decoders, copied out of node_modules by scripts/copy-pdf-wasm.ts
+client/public/pdfjs-wasm/
+
+# incremental typecheck cache (`tsc -b`)
+*.tsbuildinfo
+
 # npm pack output (the CLI install tarball, produced at build/release time)
 *.tgz
 

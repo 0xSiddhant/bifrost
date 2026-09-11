@@ -184,6 +184,7 @@ bifrost preview trip-notes-a1b2c3              # a saved document; launches the 
 bifrost preview trip-notes-a1b2c3 --no-open    # just print the URL
 
 bifrost preview deck.md --type saga            # a file on this machine, presented as slides
+bifrost preview deck.pdf                       # a PDF, one page per slide — no --type needed
 ```
 
 **A saved document** is addressed by slug. Edda documents have a real rendered
@@ -201,12 +202,15 @@ alone, and gone the moment the page has read it (or after 60 seconds, if it
 never does — which is then reported, with exit 1).
 
 `--type` means the destination for a file, and the document kind for a slug.
-Today `saga` is markdown's only destination, so `--type saga` is required;
-anything else is refused before a port is opened or a browser is launched:
+Saga is the only destination either kind of file has, but only markdown is made
+to ask for it: a second markdown destination is planned, so a default chosen now
+would have to be taken back, while a PDF has exactly one thing `preview` can do
+with it and asking you to pick from a list of one would be ceremony. Anything
+else is refused before a port is opened or a browser is launched:
 
 ```
 $ bifrost preview data.json --type saga
-✗ error: --type saga presents markdown — .md, .markdown — not .json
+✗ error: --type saga presents markdown and pdf — .md, .markdown, .pdf — not .json
 ```
 
 `--json` never launches a browser, whatever `--no-open` says — and since

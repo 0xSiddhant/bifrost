@@ -51,11 +51,22 @@ describe('preview routing table (PLAN-28)', () => {
       // any server started — this function runs before either.
       expect(() => routeLocalFile('data.json', 'saga')).toThrow(CliError);
       expect(() => routeLocalFile('data.json', 'saga')).toThrow(/markdown/);
-      expect(() => routeLocalFile('data.json', 'saga')).toThrow(/\.md, \.markdown/);
+      expect(() => routeLocalFile('data.json', 'saga')).toThrow(/\.md, \.markdown, \.pdf/);
     });
 
-    it('refuses --type saga on a .pdf until a plan adds that row', () => {
-      expect(() => routeLocalFile('slides.pdf', 'saga')).toThrow(/\.md, \.markdown/);
+    it('routes a PDF to Saga with no --type at all (PLAN-29)', () => {
+      // Markdown needs the flag because a second destination for it is planned;
+      // a PDF has exactly one thing `preview` can do with it, so asking a
+      // presenter to choose from a list of one would be ceremony.
+      const destination = routeLocalFile('slides.pdf');
+      expect(destination.id).toBe('saga');
+      expect(destination.clientPath('http://127.0.0.1:5000/payload')).toBe(
+        '/saga?source=http%3A%2F%2F127.0.0.1%3A5000%2Fpayload',
+      );
+    });
+
+    it('accepts --type saga on a PDF too, case-insensitively', () => {
+      expect(routeLocalFile('SLIDES.PDF', 'saga').id).toBe('saga');
     });
 
     it('refuses an unknown --type for a file', () => {
@@ -63,7 +74,7 @@ describe('preview routing table (PLAN-28)', () => {
     });
 
     it('refuses an extension it has no row for at all', () => {
-      expect(() => routeLocalFile('notes.txt')).toThrow(/\.md, \.markdown/);
+      expect(() => routeLocalFile('notes.txt')).toThrow(/\.md, \.markdown, \.pdf/);
     });
 
     it('requires --type for markdown rather than assuming a destination', () => {
@@ -74,7 +85,7 @@ describe('preview routing table (PLAN-28)', () => {
     });
 
     it('exposes exactly the extensions the table knows', () => {
-      expect([...PREVIEWABLE_EXTENSIONS]).toEqual(['.md', '.markdown']);
+      expect([...PREVIEWABLE_EXTENSIONS]).toEqual(['.md', '.markdown', '.pdf']);
     });
   });
 });

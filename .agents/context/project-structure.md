@@ -114,6 +114,11 @@ bifrost/
 │                              #   atlas (XML workspace — the code pane always, the plist table only
 │                              #     when the document is one; no multi-document tabs, since
 │                              #     XML has exactly one root) in PLAN-23;
+│                              #   saga (slideshow — parseSlides/loadSource/SlideView/SlideFooter/
+│                              #     NotesPanel/ShortcutsOverlay/Dropzone/fullscreen/useSlideScale/
+│                              #     useSlideshowNav + own saga.css) in PLAN-28; loadPdfSlides.ts
+│                              #     (pdfjs-dist legacy build, page-per-slide, bounded canvas) in
+│                              #     PLAN-29 — a slide is a tagged union from loadSource.ts onward;
 │                              #   toolbox (registry + lib/ pure utils + tools/ bodies in ONE lazy
 │                              #     chunk + own toolbox.css) in PLAN-18 — no route of its own,
 │                              #     the cards expand inside /diagon-alley/:toolId

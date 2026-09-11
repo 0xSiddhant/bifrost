@@ -12,12 +12,18 @@ const BINDINGS: readonly {
   needsFullscreen?: true;
   /** Wording when fullscreen exists — Esc does two jobs there, one here. */
   fullscreenAlso?: string;
+  /** Wording on a deck whose slides can carry no note — a PDF (PLAN-29). */
+  withoutNotes?: string;
 }[] = [
   { keys: '→ · ↓ · Space · PageDown · S · D', does: 'Next slide' },
   { keys: '← · ↑ · Backspace · PageUp · W · A', does: 'Previous slide' },
   { keys: 'Home · End', does: 'First · last slide' },
   { keys: 'F', does: 'Enter or leave fullscreen', needsFullscreen: true },
-  { keys: 'N', does: 'Show or hide presenter notes' },
+  {
+    keys: 'N',
+    does: 'Show or hide presenter notes',
+    withoutNotes: 'Presenter notes — markdown decks only',
+  },
   { keys: '+ · −', does: 'Bigger · smaller slide text' },
   { keys: '0', does: 'Slide text back to 100%' },
   { keys: '? · H', does: 'This list' },
@@ -26,17 +32,28 @@ const BINDINGS: readonly {
 
 export function ShortcutsOverlay({
   canFullscreen,
+  canNotes,
   onClose,
 }: {
   /** Fullscreen rows are omitted where the browser has no element fullscreen. */
   canFullscreen: boolean;
+  /**
+   * False on a PDF deck. The row is **kept** rather than dropped, unlike the
+   * fullscreen ones: `F` on an iPhone is a key the browser will never honour,
+   * but `N` is a real Saga binding that this particular deck has nothing to
+   * show for — so the list stays the same list and says why, instead of
+   * leaving a presenter to wonder whether they misremembered the key.
+   */
+  canNotes: boolean;
   onClose: () => void;
 }) {
+  const wording = (binding: (typeof BINDINGS)[number]): string => {
+    if (!canNotes && binding.withoutNotes) return binding.withoutNotes;
+    if (canFullscreen && binding.fullscreenAlso) return binding.fullscreenAlso;
+    return binding.does;
+  };
   const bindings = BINDINGS.filter((binding) => canFullscreen || !binding.needsFullscreen).map(
-    (binding) => ({
-      ...binding,
-      does: canFullscreen ? (binding.fullscreenAlso ?? binding.does) : binding.does,
-    }),
+    (binding) => ({ ...binding, does: wording(binding) }),
   );
   return (
     <div className="saga-shortcuts" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">

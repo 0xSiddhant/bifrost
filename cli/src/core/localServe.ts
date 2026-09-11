@@ -5,7 +5,7 @@ import { CliError, EXIT } from './output.js';
 
 /**
  * A one-shot local HTTP server, so a browser page can read a file off this
- * machine's disk (PLAN-28).
+ * machine's disk (PLAN-28, PLAN-29).
  *
  * A browser page cannot open an arbitrary local path with no user gesture —
  * that is a hard security boundary, not a limitation to design around — so a
@@ -28,6 +28,22 @@ import { CliError, EXIT } from './output.js';
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 const PAYLOAD_PATH = '/payload';
+
+/**
+ * What the page is told it is receiving.
+ *
+ * The header is the browser's only clue: the payload is served from one fixed
+ * path with no extension on it, so `/saga?source=…` cannot read the kind off
+ * the URL the way a dropped file's name gives it away. `core/preview.ts` has
+ * already refused anything not in this table by the time a server exists, so
+ * the fallback is for a row added there and forgotten here — a deliberate
+ * "unknown bytes" rather than a wrong, confident `text/markdown`.
+ */
+const CONTENT_TYPES: Readonly<Record<string, string>> = {
+  '.md': 'text/markdown; charset=utf-8',
+  '.markdown': 'text/markdown; charset=utf-8',
+  '.pdf': 'application/pdf',
+};
 
 export interface LocalPayloadServer {
   /** The address to hand the browser. */
@@ -64,6 +80,9 @@ export async function serveFileOnce(
     throw new CliError(`no such file: ${filePath}`, EXIT.notFound);
   }
 
+  const contentType =
+    CONTENT_TYPES[path.extname(absolute).toLowerCase()] ?? 'application/octet-stream';
+
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let settle: (error?: Error) => void = () => {};
   const finished = new Promise<void>((resolve, reject) => {
@@ -90,8 +109,7 @@ export async function serveFileOnce(
     }
 
     response.setHeader('Access-Control-Allow-Origin', options.origin);
-    // The file is markdown for now, but the browser only ever reads it as text.
-    response.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    response.setHeader('Content-Type', contentType);
     response.setHeader('Content-Length', String(stat.size));
     response.setHeader('Cache-Control', 'no-store');
 
