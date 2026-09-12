@@ -1,6 +1,67 @@
 # Changelog
 
 
+## v1.4.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.3.0...v1.4.0)
+
+### 🚀 Enhancements
+
+- **plan-18a:** Diagon alley's cards expand in place ([#48](https://github.com/0xSiddhant/bifrost/pull/48))
+- **plan-18b:** The remaining nine toolbox tools ([#49](https://github.com/0xSiddhant/bifrost/pull/49))
+- **plan-21:** One Pensieve over every document kind ([#50](https://github.com/0xSiddhant/bifrost/pull/50))
+- **plan-19:** Groot — YAML editor, viewer & library ([#52](https://github.com/0xSiddhant/bifrost/pull/52))
+- **plan-20:** Mermaid diagrams in every preview surface, and PDF export ([#53](https://github.com/0xSiddhant/bifrost/pull/53))
+- **plan-22:** Offline mode — warm-load for the pure-client pages ([#55](https://github.com/0xSiddhant/bifrost/pull/55))
+- **plan-23:** Atlas — xml editor with an editable, plist-aware table ([#56](https://github.com/0xSiddhant/bifrost/pull/56))
+- **client:** Add copy-curl button to pensieve rows ([#57](https://github.com/0xSiddhant/bifrost/pull/57))
+- **plan-24:** Download folders — folder uploads, browsing, zip download ([#58](https://github.com/0xSiddhant/bifrost/pull/58))
+- **plan-25:** Brotli — compress/decompress, five hand-offs, format detector ([#60](https://github.com/0xSiddhant/bifrost/pull/60))
+- **plan-26:** Variant diff export — json patch + unified diff ([#61](https://github.com/0xSiddhant/bifrost/pull/61))
+- **client:** Expand screensaver lore quotes ([da99ad9](https://github.com/0xSiddhant/bifrost/commit/da99ad9))
+- Add Tokyo theme - inspired by Tokyo's neon nights and cherry blossom aesthetics ([190e483](https://github.com/0xSiddhant/bifrost/commit/190e483))
+- **plan-27:** Bifrost cli — a third workspace over the existing LAN API ([#62](https://github.com/0xSiddhant/bifrost/pull/62))
+- **plan-28:** Saga — a fullscreen slideshow over an edda or a dropped file ([#65](https://github.com/0xSiddhant/bifrost/pull/65))
+- **saga:** Present a pdf as slides, one page each (PLAN-29) ([#67](https://github.com/0xSiddhant/bifrost/pull/67))
+- **plan-30:** Guide panel — a per-page format reference behind a header bulb ([#69](https://github.com/0xSiddhant/bifrost/pull/69))
+
+### 🩹 Fixes
+
+- **ops:** Clear all 12 npm audit advisories ([#54](https://github.com/0xSiddhant/bifrost/pull/54))
+- **core:** Wire drizzle-kit studio to the real sqlite db path ([cde5966](https://github.com/0xSiddhant/bifrost/commit/cde5966))
+- Include screensaver in offline warm-load registry ([e131a26](https://github.com/0xSiddhant/bifrost/commit/e131a26))
+- **ops:** Clear all 3 npm audit advisories ([#66](https://github.com/0xSiddhant/bifrost/pull/66))
+
+### 📖 Documentation
+
+- **docs:** Add plan-18 toolbox and plan-19 groot ([d08c34f](https://github.com/0xSiddhant/bifrost/commit/d08c34f))
+- **docs:** Add plan-20 and strip promoted ideas from plan-99 ([9dc571e](https://github.com/0xSiddhant/bifrost/commit/9dc571e))
+- **docs:** Add plan-21 pensieve and reorder it ahead of plan-19 ([d3e0a88](https://github.com/0xSiddhant/bifrost/commit/d3e0a88))
+- **docs:** Add plan-22 offline mode ([f29ca2d](https://github.com/0xSiddhant/bifrost/commit/f29ca2d))
+- **docs:** Add plan-23 atlas ([0f86daf](https://github.com/0xSiddhant/bifrost/commit/0f86daf))
+- **docs:** Add plan-24 download folders ([0823a37](https://github.com/0xSiddhant/bifrost/commit/0823a37))
+- **docs:** Add plan-25 brotli ([c07bd24](https://github.com/0xSiddhant/bifrost/commit/c07bd24))
+- **docs:** Add new-plan skill for drafting plans ([bdfa412](https://github.com/0xSiddhant/bifrost/commit/bdfa412))
+- **docs:** Add plan-26 variant diff export, clean plan-99 ([e06eac4](https://github.com/0xSiddhant/bifrost/commit/e06eac4))
+- **docs:** Add plan-27 bifrost cli ([547c3bd](https://github.com/0xSiddhant/bifrost/commit/547c3bd))
+- **docs:** Add plan-28 saga, plan-29 saga pdf ([55d83ac](https://github.com/0xSiddhant/bifrost/commit/55d83ac))
+- **docs:** Add plan-30 guide panel and guide content ([3c487eb](https://github.com/0xSiddhant/bifrost/commit/3c487eb))
+- **docs:** Move plan-27 cli distribution to github releases ([fbbec19](https://github.com/0xSiddhant/bifrost/commit/fbbec19))
+- **docs:** Add bifrost doctor command to plan-27 cli ([4317f2f](https://github.com/0xSiddhant/bifrost/commit/4317f2f))
+- **docs:** Throttle plan-27 update check to 6h, drop background notice ([8667c97](https://github.com/0xSiddhant/bifrost/commit/8667c97))
+- Add repo-wide copilot instructions ([db57c6c](https://github.com/0xSiddhant/bifrost/commit/db57c6c))
+- Sync readme/design theme lists and fix plan-30 status row ([#70](https://github.com/0xSiddhant/bifrost/pull/70))
+
+### 🏡 Chore
+
+- **docs:** Consolidate agent guidance ([724bfee](https://github.com/0xSiddhant/bifrost/commit/724bfee))
+
+### ❤️ Contributors
+
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Claude <noreply@anthropic.com>
+
 ## v1.3.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.2.0...v1.3.0)

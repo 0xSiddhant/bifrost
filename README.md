@@ -114,7 +114,7 @@ Install it from the latest release's tarball:
 <!-- CLI_INSTALL_START -->
 
 ```bash
-npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v1.3.0/bifrost-cli-1.3.0.tgz
+npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v1.4.0/bifrost-cli-1.4.0.tgz
 ```
 
 <!-- CLI_INSTALL_END -->
