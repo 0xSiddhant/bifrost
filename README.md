@@ -2,7 +2,7 @@
 
 # 🌈 Bifrost
 
-**A LAN-only file transfer & sync hub. Your devices, connected by the rainbow bridge.**
+**A private LAN workbench — transfer, sync, and a bridge of dev tools.**
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
