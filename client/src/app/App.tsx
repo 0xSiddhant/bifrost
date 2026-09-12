@@ -20,6 +20,7 @@ import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { RouteBoundary } from '../core/ui/RouteBoundary';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
+import { GuideButton } from '../core/guide/GuideButton';
 import { usePublishedBanner } from './usePublishedBanner';
 import { runWarmLoad } from './offlineWarmLoad';
 import { createLazyPages } from './lazyPages';
@@ -257,6 +258,9 @@ export function App() {
             onChange={armOffline}
           />
         )}
+        {/* Route-aware, so it is simply absent on a page with no format to
+            explain (PLAN-30) — the header's last-but-one slot either way. */}
+        <GuideButton />
         <ThemeSwitcher />
       </header>
 

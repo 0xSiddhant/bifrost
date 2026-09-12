@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../core/ui/Button';
 import { renderMarkdown, outline } from '../../core/markdown';
 import { fetchEdda, type EddaDoc } from '../../core/edda';
-import { MarkdownPreview } from './MarkdownPreview';
+import { MarkdownPreview } from '../../core/ui/MarkdownPreview';
 
 type Phase = 'loading' | 'ready' | 'notfound' | 'error';
 

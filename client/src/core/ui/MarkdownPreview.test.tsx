@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { clearMermaidCache, renderMarkdown } from '../../core/markdown';
+import { clearMermaidCache, renderMarkdown } from '../markdown';
 import { MarkdownPreview } from './MarkdownPreview';
 
 declare global {

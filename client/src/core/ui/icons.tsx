@@ -420,3 +420,15 @@ export const SlidesIcon = (p: IconProps) => (
     <path d="M12 16v4m-3 0h6" />
   </svg>
 );
+
+/**
+ * The guide panel's bulb (PLAN-30) — the one idea the 40-odd icons above had
+ * no shape for. `SparklesIcon` and `FlameIcon` are the nearest neighbours and
+ * neither reads as "here is an explanation".
+ */
+export const LightbulbIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.3.3.5.7.5 1.1h6c0-.4.2-.8.5-1.1A6 6 0 0 0 12 3Z" />
+  </svg>
+);

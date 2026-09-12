@@ -1597,3 +1597,222 @@ a.portal:hover .portal__go {
     opacity: 1;
   }
 }
+
+/* ── Code-block copy buttons (PLAN-30) ──────────────────────
+   Injected by core/markdown's copy pass into every MarkdownPreview, so this
+   sits beside the mermaid rules above for the same reason: both style DOM that
+   a pass writes rather than markup any component returns.
+
+   The button is dimmed rather than hidden until hover — a coarse pointer has
+   no hover state to reveal it with, and a copy button nobody can find on a
+   phone is a copy button that does not exist. */
+.md-preview .md-codeblock {
+  position: relative;
+  margin: 0 0 var(--space-3);
+}
+
+/* The wrapper owns the spacing now, so the block inside it must not add more. */
+.md-preview .md-codeblock > pre {
+  margin: 0;
+}
+
+.md-copy {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: pointer;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.md-codeblock:hover .md-copy,
+.md-copy:focus-visible {
+  opacity: 1;
+}
+
+.md-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* ── Guide panel (PLAN-30) ──────────────────────────────────
+   Two shapes from one component. On a desktop it is a wide right-edge drawer
+   taking close to half the screen — the guides are prose with code in them,
+   and the earlier narrow column wrapped every example. On a phone it is a
+   bottom sheet, which is the shape a thumb expects and can throw away.
+
+   Both sit over a scrim that dims and slightly blurs the page. That is a
+   deliberate reversal of the plan's non-blocking drawer, at the owner's
+   request: the dimming is what says the sheet is on top of your work rather
+   than part of it, and it also settles the one collision live-verify found —
+   Groot's advisory rail no longer competes with the panel for attention, it
+   is visibly behind it. */
+.guide-button {
+  display: flex;
+}
+
+.guide-scrim {
+  position: fixed;
+  inset: 0;
+  /* Above the page and the mobile bottom nav (10), below the Heimdall modal
+     scrim (50) and the toast host (70) — a reference sheet must never sit on
+     top of a gate or swallow a notification. */
+  z-index: 40;
+  background: var(--scrim);
+  /* The themed scrim is a modal blackout; this is a veil, not a gate. */
+  opacity: 0.55;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: guide-veil 180ms ease-out;
+}
+
+.guide-panel {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  /* "Almost half" on a big screen, never narrower than a readable column. */
+  width: max(22rem, 48vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  padding-right: max(var(--space-5), env(safe-area-inset-right));
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  animation: guide-slide-in 200ms ease-out;
+}
+
+@keyframes guide-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+
+@keyframes guide-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes guide-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* A drag is a live transform; an entry animation would fight it for the same
+   property and snap the sheet back under the finger. */
+.guide-panel--dragging {
+  animation: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-scrim,
+  .guide-panel {
+    animation: none;
+  }
+}
+
+.guide-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex: none;
+}
+
+.guide-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+/* The grab bar is sheet-only: on a drawer there is nothing to drag. */
+.guide-panel__grab {
+  display: none;
+}
+
+/* The drawer is already a bordered surface; a second frame around the prose
+   inside it would just be a box in a box. The scroll behaviour is the part of
+   .md-preview that matters here, and that stays.
+
+   Both class names, deliberately: .md-preview's own border rule carries equal
+   specificity and app.css loads after this file, so a single-class override
+   loses on source order — which is exactly what it did the first time. */
+.md-preview.guide-panel__body {
+  border: 0;
+  padding: 0;
+}
+
+.guide-panel__status {
+  margin: 0;
+}
+
+/* ── The phone shape: a bottom sheet ────────────────────────
+   640px is where the nav moves to the bottom of the screen, so it is also
+   where a right-edge drawer stops making sense. The sheet deliberately covers
+   that nav rather than sitting above it the drawer's way: it is a temporary
+   surface over everything, dismissed by the scrim, the ×, Escape, or a swipe
+   down on its header. */
+@media (max-width: 640px) {
+  .guide-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(82vh, 44rem);
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: guide-slide-up 220ms ease-out;
+  }
+
+  .guide-panel__head {
+    /* Room for the grab bar, which is absolutely placed above the title row so
+       it stays centred regardless of how wide the title is. */
+    position: relative;
+    padding-top: var(--space-3);
+    /* The whole header is the drag handle, so the browser must not claim the
+       gesture for scrolling first. */
+    touch-action: none;
+  }
+
+  .guide-panel__grab {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.25rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: var(--border);
+  }
+}
