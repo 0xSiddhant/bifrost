@@ -2,7 +2,7 @@
 
 # 🌈 Bifrost
 
-**A LAN-only file transfer & sync hub. Your devices, connected by the rainbow bridge.**
+**A private LAN workbench — transfer, sync, and a bridge of dev tools.**
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -39,7 +39,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Hermes — clipboard/text sync across devices
 - 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin built in), addable via JSON
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), addable via JSON
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
@@ -49,6 +49,7 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 🔖 Accio — read-later shelf with tags and best-effort page-title lookup
 - 🚪 Portkey — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
 - 🧹 Nimbus — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
+- 💡 Guide panel — a header bulb opens a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
 - 🌌 Nótt — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
