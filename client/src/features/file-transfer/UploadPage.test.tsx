@@ -21,11 +21,33 @@ vi.mock('./api', async (importOriginal) => {
       maxFilesPerUpload: 5,
       blockedExtensions: ['.exe'],
     })),
-    uploadFile: vi.fn(() => ({ promise: Promise.resolve('report.pdf'), cancel: vi.fn() })),
+    uploadFile: vi.fn(() => ({
+      promise: Promise.resolve({ storedName: 'report.pdf' }),
+      cancel: vi.fn(),
+    })),
     publishUpload: vi.fn(async () => ({ finalName: 'report.pdf', renamed: false })),
     deleteUpload: vi.fn(async () => null),
   };
 });
+
+// The page reads the live Receive feed only to fill the folder datalist; the
+// staging behaviour under test must not depend on a listing request.
+vi.mock('./useDownloads', () => ({
+  useDownloads: () => ({
+    entries: [
+      {
+        id: 'folder-id-000001',
+        name: 'Trip photos',
+        size: 0,
+        mtime: 1,
+        ext: '',
+        type: 'folder',
+        parent: null,
+      },
+    ],
+    sseStatus: 'open',
+  }),
+}));
 
 const cards = () => [...document.querySelectorAll('.staged')];
 const byText = (text: string) =>
@@ -34,6 +56,13 @@ const byText = (text: string) =>
     | undefined;
 const byLabel = (label: string) =>
   document.querySelector<HTMLElement>(`[aria-label="${label}"]`) ?? undefined;
+
+/** React tracks the DOM value itself, so a controlled input needs its setter. */
+const setValue = (input: HTMLInputElement | undefined, value: string) => {
+  if (!input) throw new Error('input not found');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
 
 describe('UploadPage staging actions', () => {
   let container: HTMLDivElement;
@@ -213,6 +242,82 @@ describe('UploadPage staging actions', () => {
     // Glanced away and back: the animation is still running, so nothing here
     // may cut the confirmation short.
     expect(cards()).toHaveLength(1);
+  });
+
+  /**
+   * PLAN-24 criterion 2: a folder upload is already published, so its card
+   * never visits `done` (no Move button) or `moving` — it lands straight on
+   * the same `moved` confirmation and leaves by the same animationend.
+   */
+  it('takes a folder-mode upload straight to moved, with no Move step', async () => {
+    vi.mocked(api.uploadFile).mockReturnValueOnce({
+      promise: Promise.resolve({ storedName: 'holiday.jpg', folder: 'Trip photos' }),
+      cancel: vi.fn(),
+    });
+
+    const field = [...container.querySelectorAll<HTMLInputElement>('input')].find(
+      (el) => el.getAttribute('list') === 'upload-folders',
+    );
+    await act(async () => {
+      setValue(field, 'Trip photos');
+    });
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    const file = new File(['payload'], 'holiday.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    await act(async () => {
+      input?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(api.uploadFile).toHaveBeenLastCalledWith(file, expect.any(Function), 'Trip photos');
+    const card = cards().find((el) => el.textContent?.includes('holiday.jpg'));
+    expect(card?.className).toContain('staged--leaving');
+    expect(card?.textContent).toContain('you will find this in Trip photos');
+    // No staging actions were ever offered for it.
+    expect(byLabel('Rename holiday.jpg')).toBeUndefined();
+    expect(api.publishUpload).not.toHaveBeenCalled();
+
+    await act(async () => {
+      card?.dispatchEvent(new Event('animationend', { bubbles: true }));
+      card?.dispatchEvent(new Event('webkitAnimationEnd', { bubbles: true }));
+    });
+    expect(cards().some((el) => el.textContent?.includes('holiday.jpg'))).toBe(false);
+  });
+
+  /** Sanitizing is reported after the fact, once per batch — never previewed. */
+  it('tells the sender when the folder actually used differs from what they typed', async () => {
+    vi.mocked(api.uploadFile).mockReturnValue({
+      promise: Promise.resolve({ storedName: 'a.txt', folder: 'Trip.photos' }),
+      cancel: vi.fn(),
+    });
+
+    const field = [...container.querySelectorAll<HTMLInputElement>('input')].find(
+      (el) => el.getAttribute('list') === 'upload-folders',
+    );
+    await act(async () => {
+      setValue(field, 'Trip..photos');
+    });
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    Object.defineProperty(input, 'files', {
+      value: [new File(['a'], 'a.txt'), new File(['b'], 'b.txt')],
+      configurable: true,
+    });
+    await act(async () => {
+      input?.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const messages = notifications
+      .getSnapshot()
+      .visible.filter((entry) => entry.message.includes('Trip.photos'));
+    // Two files, one destination, one notice.
+    expect(messages).toHaveLength(1);
   });
 
   // Criterion 20: the queue is state, not storage.

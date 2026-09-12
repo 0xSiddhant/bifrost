@@ -17,7 +17,7 @@ declared in `core/fonts.css` with `font-display: swap` and system fallbacks.
 
 ## Themes
 
-Four themes ship built in; users add more as JSON — see
+Seven themes ship built in; users add more as JSON — see
 [THEME-SPEC.md](THEME-SPEC.md) for the schema and resolver.
 
 - **Aurora** (default, dark) — near-black blue-slate, aurora accents
@@ -27,6 +27,12 @@ Four themes ship built in; users add more as JSON — see
   lantern-gold accent, dusk-teal / meadow-green, horizon-glow sky.
 - **Olympus** (dark) — midnight-Aegean blue, gilded-gold accent, Aegean-cyan,
   laurel-green, terracotta danger, a gold summit glow in `--sky`.
+- **Gryffindor** (dark) — near-black oak-brown base, gilded-gold accent,
+  scarlet accent-2, a warm house-crest palette.
+- **Slytherin** (dark) — deep forest-green base, emerald accent,
+  silver-green accent-2, a cool house-crest palette.
+- **Tokyo** (dark) — near-black indigo base, neon-pink accent, cyan accent-2,
+  neon-green ok — Shibuya-at-night energy.
 
 Switching = one attribute: `<html data-theme="daybreak">`. Nothing else moves.
 A theme need only author ~14 colors — the resolver derives the rest, including

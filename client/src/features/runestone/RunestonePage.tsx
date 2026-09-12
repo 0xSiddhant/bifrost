@@ -22,6 +22,9 @@ import {
 } from '../../core/json';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
+import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
+import { takeRunestoneSeed } from '../../core/runestoneSeed';
+import { putBrotliSeed } from '../../core/brotliSeed';
 import { ApiError } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
@@ -41,6 +44,9 @@ import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
+
+/** Identifies this editor's buffer to `core/draftReturn`. */
+const DRAFT_ID = 'runestone';
 
 /** Debounce heavy derived work (validate/stats on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -154,12 +160,51 @@ export function RunestonePage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // Offer to restore a cached draft once, on arriving at the scratch editor.
+  // What is on screen right now, for the leave handler below — it has to flush
+  // the current buffer on unmount, not the one that existed when it registered.
+  const bufferRef = useRef({ title, text, isScratch });
+  bufferRef.current = { title, text, isScratch };
+
+  // On arriving at the scratch editor, in order of how directly the person
+  // asked for it:
+  //   1. a hand-off from another tool (Groot's "Open in Runestone") — a
+  //      document they just asked for, so it opens rather than offering to;
+  //   2. a buffer left open by a navigation inside this page's lifetime —
+  //      leaving to convert something in Groot and coming back is one task;
+  //   3. a draft from an earlier page load, which is still only *offered*,
+  //      because opening the tool fresh must not silently refill it.
   useEffect(() => {
     if (!isScratch) return;
+    const seed = takeRunestoneSeed();
+    if (seed) {
+      setText(seed.text);
+      if (seed.title) setTitle(seed.title);
+      setView('code');
+      setRestorable(null);
+      return;
+    }
     const draft = loadDraft();
-    if (draft && draft.text.trim() !== '') setRestorable(draft);
+    if (!draft || draft.text.trim() === '') return;
+    if (takeLeftOpen(DRAFT_ID)) {
+      setTitle((current) => draft.title || current);
+      setText(draft.text);
+    } else {
+      setRestorable(draft);
+    }
   }, [isScratch]);
+
+  // Leaving flushes the buffer and records that it was still open, closing the
+  // window where clicking away within half a second of typing loses the last
+  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
+  // before this runs, so the guard keeps a saved document from resurrecting it.
+  useEffect(() => {
+    return () => {
+      const left = bufferRef.current;
+      if (!left.isScratch || left.text.trim() === '') return;
+      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
+      markLeftOpen(DRAFT_ID);
+    };
+  }, []);
 
   // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
   // nothing. Saved documents live on the server instead.
@@ -278,6 +323,16 @@ export function RunestonePage() {
     } catch {
       fail('Fix the errors first — Copy as JS needs valid JSON.');
     }
+  };
+
+
+  // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
+  // mount and compresses it straight away, so no feature imports another. The
+  // live buffer is sent, never the debounced copy the toolbar's disabled state
+  // is derived from — a snapshot 300ms old is not what the user is looking at.
+  const compressWithBrotli = () => {
+    putBrotliSeed({ text, sourceLabel: 'Runestone' });
+    void navigate('/brotli');
   };
 
   const clearDocument = () => {
@@ -407,7 +462,7 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -437,7 +492,7 @@ export function RunestonePage() {
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/runestone/pensieve')}>
+          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
             Pensieve
           </Button>
         </div>
@@ -548,6 +603,15 @@ export function RunestonePage() {
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
                 Copy
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                title="Send this document to the Brotli page and compress it"
+                onClick={compressWithBrotli}
+              >
+                Brotli
               </Button>
               <Button size="sm" variant="ghost" disabled={empty} onClick={clearDocument}>
                 Clear

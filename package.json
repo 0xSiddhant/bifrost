@@ -11,14 +11,16 @@
   },
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "cli"
   ],
   "scripts": {
     "setup": "tsx scripts/setup.ts",
     "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
-    "build": "npm run build -w client && npm run build -w server",
-    "start": "node --import ./server/dist/otel.js server/dist/bootstrap.js",
+    "build": "npm run build -w client && npm run build -w server && tsx scripts/cli-sync.ts",
+    "start": "tsx scripts/cli-sync.ts && node --import ./server/dist/otel.js server/dist/bootstrap.js",
     "logs": "tail -F storage/logs/current.log | pino-pretty --levelKey logLevel",
+    "db:studio": "npm run db:studio -w server",
     "changelog": "changelogen --output CHANGELOG.md",
     "backup": "tsx scripts/backup.ts",
     "restore": "tsx scripts/restore.ts",
@@ -29,7 +31,10 @@
     "prepare": "husky"
   },
   "overrides": {
-    "brace-expansion": "^5.0.8"
+    "brace-expansion": "^5.0.9",
+    "@esbuild-kit/core-utils": {
+      "esbuild": ">=0.25.0"
+    }
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

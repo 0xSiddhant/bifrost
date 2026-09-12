@@ -48,13 +48,19 @@ describe('boot → health → capabilities', () => {
         'runestone',
         'variant',
         'edda',
+        'groot',
+        'atlas',
         'loki',
+        'brotli',
         'accio',
         'nimbus',
         'portkey',
         'screensaver',
         'client-logs',
         'metrics',
+        'toolbox',
+        'saga',
+        'offline-mode',
       ],
     });
   });
@@ -68,5 +74,58 @@ describe('boot → health → capabilities', () => {
   it('boots with WAL journal mode and the settings table migrated', () => {
     const db = fs.existsSync(path.join(storageRoot, 'data', 'app.db'));
     expect(db).toBe(true);
+  });
+});
+
+/**
+ * The toolbox is capability-only (PLAN-18): the tools are pure client compute,
+ * so this list is the *only* thing standing between a deploy profile and the
+ * Diagon Alley tools rendering. Both profiles are asserted because a cloud
+ * build that silently lost the entry would show an empty hub, not an error.
+ */
+describe('capabilities in the cloud profile', () => {
+  let app: RunningApp;
+  let storageRoot: string;
+
+  beforeAll(async () => {
+    storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-cloud-'));
+    const config = loadConfig({
+      HEIMDALL_PIN: '4321',
+      STORAGE_ROOT: storageRoot,
+      DEPLOY_PROFILE: 'cloud',
+    });
+    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+  });
+
+  afterAll(async () => {
+    await app.shutdown();
+    fs.rmSync(storageRoot, { recursive: true, force: true });
+  });
+
+  it('lists toolbox alongside the other internet-safe modules', async () => {
+    const response = await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.profile).toBe('cloud');
+    expect(body.modules).toContain('toolbox');
+    // Saga is the same class (PLAN-28): a slideshow rendered entirely in the
+    // browser, so a cloud build that lost the entry would hide the Midgard card
+    // and Pensieve's "Present" action with nothing to explain why.
+    expect(body.modules).toContain('saga');
+    // qr-tool stays loaded in both profiles — /sigil became a tool, but
+    // GET /api/qr/server-url is still what Midgard's Join card reads.
+    expect(body.modules).toContain('qr-tool');
+    // The four structured-document workspaces ship in both profiles (PLAN-23).
+    expect(body.modules).toContain('groot');
+    expect(body.modules).toContain('atlas');
+    // Brotli too (PLAN-25): a stateless byte transform bounded by its own two
+    // caps, which is the class those workspaces are in — not file-transfer's.
+    expect(body.modules).toContain('brotli');
+    // Warm-load policy is harmless client mechanism, so it ships in both
+    // profiles too — a cloud build that lost it would show a dead toggle.
+    expect(body.modules).toContain('offline-mode');
+    // Local-only modules must not leak into the cloud manifest.
+    expect(body.modules).not.toContain('file-transfer');
+    expect(body.modules).not.toContain('portkey');
   });
 });

@@ -5,12 +5,12 @@ description: Scaffold a new Bifrost feature module (server vertical slice + clie
 
 # New Module — scaffold a vertical slice
 
-Read `.agent/context/architecture.md` first. The three rules are law: feature-first slices; modules import only `core` (cross-module = event bus only); the profile manifest decides what loads.
+Read `.agents/context/architecture.md` first. The three rules are law: feature-first slices; modules import only `core` (cross-module = event bus only); the profile manifest decides what loads.
 
 ## Server (`server/src/modules/<name>/`)
 
 1. `module.ts` implementing the `FeatureModule` contract `{ name, register(app, deps) }` (see `server/src/core/module.ts`; `name` doubles as commit scope and capability name) — copy the shape from an existing module (e.g. `qr-tool` for simple, `file-transfer` for full).
-2. Subfolders as needed: `routes/` (HTTP only), `usecases/` (business rules — depend on the repository *interfaces* in the module's `ports.ts`, never Drizzle/fs directly), `services/` (concrete impls).
+2. Subfolders as needed: `routes/` (HTTP only), `usecases/` (business rules — depend on the repository _interfaces_ in the module's `ports.ts`, never Drizzle/fs directly), `services/` (concrete impls).
 3. New tables go in the central `server/src/core/db/schema.ts` (drizzle.config reads only that file) with a doc comment naming the owning module — then follow the `db-migration` skill.
 4. New events: add typed names + payloads to `core/bus/events.ts` — dot-namespaced `<module>.<event>`. Never import another module to "notify" it.
 5. Register in `MANIFEST` in `server/src/app.ts` (`local`, `cloud`, or both); `/api/capabilities` exposes it automatically from the manifest.
@@ -20,12 +20,20 @@ Read `.agent/context/architecture.md` first. The three rules are law: feature-fi
 
 7. Feature slice with route-level code splitting; nav renders from `/api/capabilities`, never hardcoded. The client folder name may be a page codename that differs from the server module name (existing mappings: `clipboard`→`hermes`, `qr-tool`→`sigil`, `presence`→`wardens`) — record the mapping in architecture.md's module registry.
    - **New top-level route root?** Add its first segment to `RESERVED_ROOTS` in `server/src/core/reserved-roots.ts` (and the assertion list in `reserved-roots.test.ts`) in the same change — otherwise a Portkey go-link slug could shadow the new page (`rules/coding.md` → Routing). Applies to any new server route outside `/api/` too. Nested/param routes under an existing root need no entry.
+   - **Pure-client page?** If the new module ships a page or tool that keeps working with no server round-trip once its code is loaded, add it to the offline-mode registry — `TARGETS` in `server/src/modules/offline-mode/module.ts` **and** the loader map in `client/src/app/offlineWarmLoad.ts`, which are joined by id at runtime. See [`docs/offline-mode.md`](../../../docs/offline-mode.md).
+   - **Structured-text format?** If the new module's editor understands a text format the app could receive from somewhere else (JSON, XML, YAML, Markdown are there already), register it in `client/src/core/contentFormat/registry.ts` — one array element with a real structural `test()` and a `seed()` into that tool's own session seed. That is what makes Brotli's "Open in `<tool>`" offer, and anything later built on the same registry, know the format exists. Its `test()` must be a genuine check, never "did it parse": an always-true entry would make the offer meaningless for every other format too (PLAN-25).
 8. Styling via tokens only — zero hardcoded colors/sizes (grep for hex before finishing).
 9. Shared logic goes in `client/src/core/`, never imported across feature folders.
 
+## CLI (`cli/`) — ask, don't assume
+
+10. **Does this module deserve a `bifrost` command?** Since PLAN-27 there is a third workspace, and it is a **consumer only**: it calls endpoints that already exist and adds no server surface. A module whose value is a stored artifact or a transfer (documents, files, clipboard, go-links) usually does; a module that is a *page* (an editor, a canvas, a dashboard) usually does not. Decide explicitly and say which, rather than leaving the question unasked.
+11. If it does: a thin `cli/src/commands/<name>.ts` over one flat `cli/src/core/<name>.ts`, reusing `client.ts` (the only HTTP and the whole error table), `output.ts` (every byte printed — colour and progress are TTY-gated there, never in a command) and `discover.ts`'s single remediation wording. Never a second error vocabulary, never a second launcher, never `console.*`. Add the command to `cli/README.md` **and** `cli/man/bifrost.1.md`, which are kept in sync by hand.
+12. Remember the asymmetry that never goes away: the CLI reads the local filesystem freely, a browser page cannot read an arbitrary path at all. Anything that moves real bytes between them needs a stated transport, not a hand-wave.
+
 ## Finish
 
-10. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
-11. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
-12. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
-13. Update `.agent/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
+13. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
+14. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
+15. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
+16. Update `.agents/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.

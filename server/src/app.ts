@@ -33,6 +33,9 @@ import { auditLogModule } from './modules/audit-log/module.js';
 import { runestoneModule } from './modules/runestone/module.js';
 import { variantModule } from './modules/variant/module.js';
 import { eddaModule } from './modules/edda/module.js';
+import { grootModule } from './modules/groot/module.js';
+import { atlasModule } from './modules/atlas/module.js';
+import { brotliModule } from './modules/brotli/module.js';
 import { lokiModule } from './modules/loki/module.js';
 import { accioModule } from './modules/accio/module.js';
 import { nimbusModule } from './modules/nimbus/module.js';
@@ -40,6 +43,9 @@ import { portkeyModule } from './modules/portkey/module.js';
 import { screensaverModule } from './modules/screensaver/module.js';
 import { clientLogsModule } from './modules/client-logs/module.js';
 import { metricsModule } from './modules/metrics/module.js';
+import { toolboxModule } from './modules/toolbox/module.js';
+import { sagaModule } from './modules/saga/module.js';
+import { offlineModeModule } from './modules/offline-mode/module.js';
 
 /**
  * Deployment manifest: which modules each profile loads (architecture rule 3).
@@ -60,7 +66,12 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     runestoneModule,
     variantModule,
     eddaModule,
+    grootModule,
+    atlasModule,
     lokiModule,
+    // Both profiles: a stateless byte transform, bounded by BROTLI_MAX_INPUT_MB
+    // and BROTLI_MAX_OUTPUT_MB rather than by which profile is running (PLAN-25).
+    brotliModule,
     // Local only: a household bookmark shelf has no auth story of its own
     // (PLAN-13 decision) — revisit for cloud when real accounts exist.
     accioModule,
@@ -77,6 +88,16 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     // Both profiles: the snapshot is the durable runtime record, and it has to
     // exist whether or not any container is running (PLAN-16b).
     metricsModule,
+    // Capability-only, both profiles: the toolbox is pure client compute, so
+    // this entry is purely the on/off switch for the Diagon Alley tools.
+    toolboxModule,
+    // Capability-only, both profiles: Saga renders slides in the browser from a
+    // saved edda or a dropped file, so this entry is purely its on/off switch
+    // for the Midgard card and Pensieve's "Present" action (PLAN-28).
+    sagaModule,
+    // Both profiles: policy only for the client-side warm load (PLAN-22) —
+    // harmless mechanism, not a LAN-trust concern.
+    offlineModeModule,
   ],
   cloud: [
     healthModule,
@@ -86,10 +107,16 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     runestoneModule,
     variantModule,
     eddaModule,
+    grootModule,
+    atlasModule,
     lokiModule,
+    brotliModule,
     screensaverModule,
     clientLogsModule,
     metricsModule,
+    toolboxModule,
+    sagaModule,
+    offlineModeModule,
   ],
 };
 

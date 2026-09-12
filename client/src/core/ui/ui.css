@@ -69,32 +69,32 @@
 
 /* ── Card / Portal ──────────────────────────────────────────── */
 .card {
-  background:
-    var(--card-sheen),
-    var(--surface);
+  background: var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   box-shadow: var(--shadow-1);
 }
 
-/* Portal — the one card used on every hub. A doorway to a tool or destination:
-   tone-lit corner, icon chip, title, description, and a footer tagline naming
-   where it leads. Renders as a <Link> normally, a dimmed <div> when `soon`.
+/* ── Tone-lit surface ───────────────────────────────────────────
+   The shared recipe behind every card whose colour follows its position in a
+   grid: a corner radial wash in the card's own hue, the sheen, and — for the
+   interactive ones — a lift, a tone-coloured border/glow, and the bridge accent
+   bar at the foot. `.portal` (hub doors) and `.tool-card` (the Diagon Alley
+   toolbox, PLAN-18) both compose it, so the two cannot drift apart.
    Colour comes from a .card-tone-N class (position-driven); --ct is that hue. */
-.portal {
+.tone-surface {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
   --ct: transparent;
   background:
-    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--ct) 15%, transparent), transparent 55%),
-    var(--card-sheen),
-    var(--surface);
+    radial-gradient(
+      120% 90% at 0% 0%,
+      color-mix(in srgb, var(--ct) 15%, transparent),
+      transparent 55%
+    ),
+    var(--card-sheen), var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
   color: var(--text);
   text-decoration: none;
   overflow: hidden;
@@ -104,17 +104,8 @@
     box-shadow var(--dur-2) var(--ease);
 }
 
-.portal[class*='card-tone-'] .portal__icon {
-  background: color-mix(in srgb, var(--ct) 16%, transparent);
-  color: var(--ct);
-}
-
-.portal[class*='card-tone-'] .portal__go {
-  color: var(--ct);
-}
-
 /* The bridge accent bar slides in at the foot on hover — only for real doors. */
-.portal::after {
+.tone-surface::after {
   content: '';
   position: absolute;
   inset: auto 0 0 0;
@@ -124,32 +115,27 @@
   transition: opacity var(--dur-2) var(--ease);
 }
 
-a.portal:hover {
+/* Opt-in: a surface that actually leads somewhere or opens something. A
+   coming-soon portal deliberately never gets it. */
+.tone-surface--interactive:hover {
   text-decoration: none;
   transform: translateY(-3px);
   box-shadow: var(--shadow-2);
 }
 
-a.portal:hover::after {
+.tone-surface--interactive:hover::after {
   opacity: 1;
 }
 
-a.portal[class*='card-tone-']:hover {
+.tone-surface--interactive[class*='card-tone-']:hover {
   border-color: var(--ct);
   box-shadow:
     var(--shadow-2),
     0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
 }
 
-a.portal[class*='card-tone-']:hover .portal__icon {
-  box-shadow: 0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
-}
-
-a.portal:hover .portal__go {
-  transform: translateX(4px);
-}
-
-.portal__icon {
+/* The icon chip every tone surface carries, tinted by the card's own hue. */
+.tone-chip {
   width: 3rem;
   height: 3rem;
   display: grid;
@@ -158,6 +144,34 @@ a.portal:hover .portal__go {
   background: var(--accent-soft);
   color: var(--accent);
   transition: box-shadow var(--dur-2) var(--ease);
+}
+
+.tone-surface[class*='card-tone-'] .tone-chip {
+  background: color-mix(in srgb, var(--ct) 16%, transparent);
+  color: var(--ct);
+}
+
+.tone-surface--interactive[class*='card-tone-']:hover .tone-chip {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--ct) 32%, transparent);
+}
+
+/* Portal — the hub card. A doorway to a tool or destination: tone-lit corner
+   (from .tone-surface), icon chip, title, description, and a footer tagline
+   naming where it leads. Renders as a <Link> normally, a dimmed <div> when
+   `soon`. */
+.portal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+}
+
+.portal[class*='card-tone-'] .portal__go {
+  color: var(--ct);
+}
+
+a.portal:hover .portal__go {
+  transform: translateX(4px);
 }
 
 .portal__title {
@@ -200,6 +214,209 @@ a.portal:hover .portal__go {
 .portal--soon {
   opacity: 0.55;
   cursor: default;
+}
+
+/* ── ExpandingGrid (Diagon Alley toolbox, PLAN-18) ──────────────
+   Its own grid rather than .portals: tool cards are compact (chip + title +
+   one-line hint) so the track is smaller and more fit per screen, and the
+   expanding-row behaviour stays out of Midgard and Ollivanders, which do not
+   want it. The open panel spans every column at the end of its source card's
+   row, so no card ever changes column when one opens. */
+/* The track is sized so a two-word title and its one-line hint fit without
+   wrapping to three lines — at 14rem "ASCII / Hex / Binary" broke its own
+   title. `auto-fit` then adds columns as the window grows, which is the whole
+   reason the page opts out of the 62rem reading measure. */
+.toolbox-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: var(--space-4);
+  /* Stretch, so a two-line hint doesn't leave its neighbours short — cards in a
+     row share a height the way .portals cards do. */
+  align-items: stretch;
+}
+
+.tool-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tool-card__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+}
+
+.tool-card__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tool-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.tool-card__hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* The open card keeps its tone lit while its panel is up, so the pairing is
+   readable without hovering. */
+.tool-card--open {
+  border-color: var(--ct);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--ct) 22%, transparent);
+}
+
+.tool-card--open::after {
+  opacity: 1;
+}
+
+/* ── the panel ─────────────────────────────────────────────────
+   Full grid width, at the end of the source card's row, tinted by that card's
+   hue (--ct comes from the .card-tone-N class the grid gives it). */
+.tool-panel {
+  grid-column: 1 / -1;
+  padding: var(--space-5);
+  border-color: color-mix(in srgb, var(--ct) 45%, var(--border));
+  /* The caret is drawn outside the top edge. */
+  overflow: visible;
+  animation: tool-panel-in var(--dur-2) var(--ease);
+}
+
+.tool-panel:focus-visible {
+  outline: 2px solid var(--ct);
+  outline-offset: 2px;
+}
+
+@keyframes tool-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* A triangle on the top edge pointing back at the card that opened the panel.
+   --caret-x is measured; when it cannot be, the element is not rendered at all
+   rather than drawn at a wrong position.
+
+   Two stacked border-triangles rather than a rotated square: a square sitting
+   half outside a panel whose background is a gradient shows its own lower edges
+   wherever the two do not match, which reads as a floating diamond (visible in
+   the dark themes). A triangle has no lower half to give itself away. */
+.tool-panel__caret {
+  position: absolute;
+  top: -8px;
+  left: var(--caret-x, 50%);
+  width: 0;
+  height: 0;
+  margin-left: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid color-mix(in srgb, var(--ct) 45%, var(--border));
+}
+
+.tool-panel__caret::after {
+  content: '';
+  position: absolute;
+  top: 1.5px;
+  left: -7px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--surface);
+}
+
+.tool-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.tool-panel__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0;
+  color: var(--ct);
+}
+
+.tool-panel__close {
+  margin-left: auto;
+  flex: none;
+}
+
+/* Two inner layouts, so a full-width panel is never a narrow column floating in
+   dead space. `split` = controls | live output; `full` = content spans it. */
+.tool-panel__body--split {
+  display: grid;
+  grid-template-columns: minmax(18rem, 26rem) 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.tool-panel__body--full {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .tool-panel__body--split {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}
+
+/* Chunk-loading placeholder — a visible shape, never a blank panel. */
+.tool-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.tool-skeleton__bar {
+  height: 0.75rem;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  animation: tool-skeleton-pulse 1.2s var(--ease) infinite;
+}
+
+.tool-skeleton__bar:nth-child(2) {
+  width: 70%;
+}
+
+.tool-skeleton__bar:nth-child(3) {
+  width: 45%;
+}
+
+@keyframes tool-skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-panel {
+    animation: none;
+  }
+
+  .tool-skeleton__bar {
+    animation: none;
+  }
 }
 
 /* ── FileRow ────────────────────────────────────────────────── */
@@ -251,6 +468,11 @@ a.portal:hover .portal__go {
   background: var(--surface-2);
 }
 
+.file-row__icon--folder {
+  color: var(--accent-2);
+  background: var(--accent-soft);
+}
+
 .file-row__body {
   flex: 1;
   min-width: 0;
@@ -262,6 +484,18 @@ a.portal:hover .portal__go {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A row whose name opens something reads as a link on sight: hover is not an
+   affordance on a phone, which is where this app mostly lives. */
+.file-row__link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.file-row__link:hover,
+.file-row__link:focus-visible {
+  text-decoration: underline;
 }
 
 .file-row__meta {
@@ -277,6 +511,93 @@ a.portal:hover .portal__go {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* ── Hover hint ─────────────────────────────────────────────────
+   Icon-only controls say what they do, on hover and on keyboard focus.
+
+   Native `title` is the browser's own answer and was tried first, but it
+   waits about a second before appearing and paints in an OS layer this app
+   cannot style — long enough that people reasonably conclude nothing
+   happens. Same text, shown promptly, in the app's own palette.
+
+   Three details are load-bearing:
+   - `pointer-events: none`, because the bubble overlaps the control it
+     describes and a hint that eats its own click is worse than no hint.
+   - It opens to the **left**: these controls sit at the right edge of a row,
+     so a bubble growing rightwards would run off the screen.
+   - There is **no hover state on a phone at all** — the bubble is a pointer
+     affordance, and the rule below turns it off for genuine touch devices.
+     How that gate is written matters more than it looks: `hover: none` on
+     its own also matches anything that merely fails to report a pointer
+     (headless Chromium reports exactly that), and gating on it alone is how
+     a hover hint silently becomes no hint anywhere. Pairing it with
+     `pointer: coarse` names real touch hardware instead. */
+.tip {
+  position: relative;
+}
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(100% + var(--space-2));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  /* `width` is load-bearing, not decoration: an absolutely positioned box
+     shrink-fits against its containing block, which here is a 33px icon
+     button — without this the bubble renders one character wide and stacks
+     the label vertically. max-content sizes it to the text, and max-width
+     then wraps a long filename instead of running off the screen. */
+  width: max-content;
+  max-width: min(20rem, 55vw);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-1) var(--ease),
+    visibility var(--dur-1) var(--ease);
+}
+
+.tip:hover::after {
+  opacity: 1;
+  visibility: visible;
+  /* Long enough not to flicker while the pointer crosses a row of icons,
+     short enough to feel like an answer rather than a wait. */
+  transition-delay: 140ms;
+}
+
+/* A real touch device only. Tapping sets :hover and keeps it until the next
+   tap, which parks the bubble on top of the very row it describes — visibly
+   wrong on a phone, where the controls are large enough to read anyway.
+   Both conditions are required on purpose: `hover: none` alone also matches
+   anything that simply fails to report a pointer (headless Chromium says
+   exactly that), and suppressing there is how a hover hint silently becomes
+   no hint at all. */
+@media (hover: none) and (pointer: coarse) {
+  .tip:hover::after {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Last, so focus still wins on a touch device driven by a keyboard: someone
+   who has focused the control has already committed to it, and gets no delay. */
+.tip:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
 }
 
 /* ── ProgressBar ────────────────────────────────────────────── */
@@ -420,6 +741,75 @@ a.portal:hover .portal__go {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+}
+
+/* ── Offline mode toggle (shell, PLAN-22) ───────────────────── */
+.offline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.offline-toggle__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    color var(--dur-1) var(--ease),
+    border-color var(--dur-1) var(--ease);
+}
+
+.offline-toggle__switch:hover {
+  color: var(--text);
+}
+
+.offline-toggle__switch:has(input:checked) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.offline-toggle__switch:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.offline-toggle__switch input {
+  accent-color: var(--accent);
+  cursor: inherit;
+}
+
+.offline-toggle__pill {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18rem;
+}
+
+.offline-toggle__pill.is-ready {
+  color: var(--ok);
+}
+
+.offline-toggle__pill.is-partial {
+  color: var(--warn);
+}
+
+/* The pill is the least load-bearing thing in the header: on a narrow screen
+   the switch matters more than the wording. The label stays — a bare checkbox
+   next to a wifi-off glyph reads as nothing at all. */
+@media (max-width: 900px) {
+  .offline-toggle__pill {
+    display: none;
+  }
 }
 
 /* ── Theme switcher (shell) ─────────────────────────────────── */
@@ -578,6 +968,64 @@ a.portal:hover .portal__go {
   padding: var(--space-1) var(--space-2);
 }
 
+/* Since PLAN-20 this surface uses the shared renderer, which also emits links,
+   rules, task checkboxes and anchored headings. */
+.preview-markdown a {
+  color: var(--accent);
+}
+
+.preview-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-4) 0;
+}
+
+.preview-markdown input[type='checkbox'] {
+  accent-color: var(--accent);
+  margin-right: 0.4em;
+}
+
+/* ── Mermaid diagrams (PLAN-20) ─────────────────────────────
+   One rule for both rendered-markdown surfaces — the Edda preview and the
+   file-preview modal — and mirrored in the HTML/PDF export template, since
+   that file carries no Bifrost stylesheet. `max-width` is !important because
+   mermaid writes its own inline max-width in pixels; without this a diagram
+   wider than the pane is clipped rather than scaled. */
+:is(.md-preview, .preview-markdown) figure.mermaid {
+  margin: var(--space-4) 0;
+  text-align: center;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid svg {
+  max-width: 100% !important;
+  height: auto;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  padding: var(--space-3);
+  text-align: left;
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error figcaption {
+  color: var(--danger);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+
+:is(.md-preview, .preview-markdown) figure.mermaid--error pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The export's print-only twin never shows in the app. */
+:is(.md-preview, .preview-markdown) figure.mermaid--print {
+  display: none;
+}
+
 .preview-footer {
   display: flex;
   align-items: center;
@@ -585,41 +1033,32 @@ a.portal:hover .portal__go {
   gap: var(--space-3);
 }
 
-/* highlight.js token colors from design tokens — theme-aware for free. */
-.preview-text .hljs-comment,
-.preview-text .hljs-quote,
-.preview-text .hljs-meta {
+/* highlight.js token colors from design tokens — theme-aware for free. Since
+   PLAN-20 the markdown viewer renders through the shared renderMarkdown, so its
+   fenced code carries hljs classes too and shares this palette. */
+:is(.preview-markdown, .preview-text) :is(.hljs-comment, .hljs-quote, .hljs-meta) {
   color: var(--text-muted);
 }
 
-.preview-text .hljs-keyword,
-.preview-text .hljs-selector-tag,
-.preview-text .hljs-built_in,
-.preview-text .hljs-tag {
+:is(.preview-markdown, .preview-text)
+  :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-tag) {
   color: var(--accent);
 }
 
-.preview-text .hljs-string,
-.preview-text .hljs-regexp,
-.preview-text .hljs-addition {
+:is(.preview-markdown, .preview-text) :is(.hljs-string, .hljs-regexp, .hljs-addition) {
   color: var(--ok);
 }
 
-.preview-text .hljs-number,
-.preview-text .hljs-literal,
-.preview-text .hljs-symbol,
-.preview-text .hljs-attribute,
-.preview-text .hljs-attr {
+:is(.preview-markdown, .preview-text)
+  :is(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-attribute, .hljs-attr) {
   color: var(--tone-violet);
 }
 
-.preview-text .hljs-title,
-.preview-text .hljs-name,
-.preview-text .hljs-section {
+:is(.preview-markdown, .preview-text) :is(.hljs-title, .hljs-name, .hljs-section) {
   color: var(--warn);
 }
 
-.preview-text .hljs-deletion {
+:is(.preview-markdown, .preview-text) .hljs-deletion {
   color: var(--danger);
 }
 
@@ -799,4 +1238,581 @@ a.portal:hover .portal__go {
   color: var(--danger);
   font-size: var(--text-sm);
   word-break: break-word;
+}
+
+/* -------------------------------------------------------------------------
+   Atlas's property-list table (PLAN-23).
+
+   Shaped from the owner's Xcode reference screenshot: a Key/Type/Value header
+   with a thin rule under it and no gridlines anywhere else, a shaded root group
+   row, plain indented leaf rows, and the stepper chevrons pinned to the right
+   edge of the Type and Value cells.
+   ------------------------------------------------------------------------- */
+
+.plist-table {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--panel-font, var(--text-sm));
+}
+
+.plist-row {
+  display: grid;
+  /* Type is fixed so the steppers line up down the page, and sized to its
+     longest label ("Dictionary") rather than generously — real plist keys are
+     long (`CFBundleShortVersionString`) and every pixel Type does not need is
+     a pixel Key does. */
+  grid-template-columns: minmax(10rem, 2fr) 7.5rem minmax(6rem, 1.2fr) 4.4rem;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid transparent;
+}
+
+.plist-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.plist-row--root {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.plist-row:not(.plist-row--head):hover {
+  background: var(--surface-2);
+}
+
+.plist-row.is-dragging {
+  opacity: 0.45;
+}
+
+.plist-row.is-drop-target {
+  border-bottom-color: var(--accent);
+  box-shadow: inset 0 1px 0 0 var(--accent);
+}
+
+.plist-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.plist-cell--type,
+.plist-cell--value {
+  justify-content: space-between;
+}
+
+.plist-cell--actions {
+  justify-content: flex-end;
+  gap: 0;
+  /* The row actions are quiet until the row is under the pointer — Xcode's
+     own behaviour, and it keeps a long plist from reading as a wall of icons. */
+  opacity: 0;
+}
+
+.plist-row:hover .plist-cell--actions,
+.plist-cell--actions:focus-within {
+  opacity: 1;
+}
+
+.plist-disclosure {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.plist-disclosure.is-open {
+  transform: rotate(90deg);
+}
+
+.plist-disclosure--empty {
+  cursor: default;
+}
+
+.plist-keybtn {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.plist-keybtn:hover {
+  color: var(--accent);
+}
+
+.plist-rootname {
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.plist-itemname {
+  color: var(--text-muted);
+}
+
+.plist-typelabel {
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.plist-typelabel:hover {
+  color: var(--accent);
+}
+
+.plist-typelabel.is-disabled {
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Xcode's Type control: the ⌃⌄ glyph, but a real popup behind it. Stepping
+   eight types one click at a time was the right *look* and the wrong control. */
+.plist-typeselect {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+/* The chevron is the part that *looks* like the control, so it has to be part
+   of the control: it is laid over the select and made click-through, which
+   makes the whole cell — name and glyph alike — one hit target. */
+.plist-typeselect__chevron {
+  position: absolute;
+  right: 0;
+  pointer-events: none;
+}
+
+.plist-typeselect__input {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  /* Right padding keeps the longest label ("Dictionary") clear of the chevron
+     it now sits underneath. */
+  padding: 2px 1.25rem 2px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plist-typeselect__input:hover {
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.plist-typeselect__input:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* The open menu is painted by the OS, which does not read our custom
+   properties — without these the options come back white-on-white in every
+   dark theme. */
+.plist-typeselect__input option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.plist-input {
+  width: 100%;
+  min-width: 0;
+  padding: 2px var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+}
+
+.plist-input:hover {
+  border-color: var(--border);
+}
+
+.plist-input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  outline: none;
+}
+
+.plist-input--key {
+  font-weight: inherit;
+}
+
+/* Apple's convention: <true/> and <false/> are the words YES and NO here,
+   never a checkbox and never a switch. */
+.plist-bool {
+  padding: 0 var(--space-1);
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.plist-bool:hover {
+  color: var(--accent);
+}
+
+.plist-count {
+  color: var(--text-muted);
+}
+
+.plist-data {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.plist-linkbtn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+.plist-stepper {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.plist-stepper.is-disabled {
+  opacity: 0.25;
+}
+
+/* The chevron pair is one glyph so the halves cannot drift apart at any font
+   size; the two buttons above it are the hit targets. */
+.plist-stepper__half {
+  position: absolute;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.plist-stepper__half:disabled {
+  cursor: default;
+}
+
+.plist-stepper__half--up {
+  top: 0;
+}
+
+.plist-stepper__half--down {
+  bottom: 0;
+}
+
+.plist-stepper:hover:not(.is-disabled) {
+  color: var(--accent);
+}
+
+.plist-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.plist-action:hover {
+  color: var(--accent);
+}
+
+.plist-grip {
+  cursor: grab;
+  touch-action: none;
+}
+
+.plist-grip:active {
+  cursor: grabbing;
+}
+
+@media (max-width: 767px) {
+  .plist-row {
+    /* Below the split breakpoint the Type column loses its fixed width and the
+       row actions stay visible, since there is no hover on a phone. */
+    grid-template-columns: minmax(6rem, 1.6fr) minmax(4.5rem, 0.8fr) minmax(5rem, 1.2fr) 4rem;
+  }
+
+  .plist-cell--actions {
+    opacity: 1;
+  }
+}
+
+/* ── Code-block copy buttons (PLAN-30) ──────────────────────
+   Injected by core/markdown's copy pass into every MarkdownPreview, so this
+   sits beside the mermaid rules above for the same reason: both style DOM that
+   a pass writes rather than markup any component returns.
+
+   The button is dimmed rather than hidden until hover — a coarse pointer has
+   no hover state to reveal it with, and a copy button nobody can find on a
+   phone is a copy button that does not exist. */
+.md-preview .md-codeblock {
+  position: relative;
+  margin: 0 0 var(--space-3);
+}
+
+/* The wrapper owns the spacing now, so the block inside it must not add more. */
+.md-preview .md-codeblock > pre {
+  margin: 0;
+}
+
+.md-copy {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  opacity: 0.6;
+  cursor: pointer;
+  transition:
+    opacity 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.md-codeblock:hover .md-copy,
+.md-copy:focus-visible {
+  opacity: 1;
+}
+
+.md-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* ── Guide panel (PLAN-30) ──────────────────────────────────
+   Two shapes from one component. On a desktop it is a wide right-edge drawer
+   taking close to half the screen — the guides are prose with code in them,
+   and the earlier narrow column wrapped every example. On a phone it is a
+   bottom sheet, which is the shape a thumb expects and can throw away.
+
+   Both sit over a scrim that dims and slightly blurs the page. That is a
+   deliberate reversal of the plan's non-blocking drawer, at the owner's
+   request: the dimming is what says the sheet is on top of your work rather
+   than part of it, and it also settles the one collision live-verify found —
+   Groot's advisory rail no longer competes with the panel for attention, it
+   is visibly behind it. */
+.guide-button {
+  display: flex;
+}
+
+.guide-scrim {
+  position: fixed;
+  inset: 0;
+  /* Above the page and the mobile bottom nav (10), below the Heimdall modal
+     scrim (50) and the toast host (70) — a reference sheet must never sit on
+     top of a gate or swallow a notification. */
+  z-index: 40;
+  background: var(--scrim);
+  /* The themed scrim is a modal blackout; this is a veil, not a gate. */
+  opacity: 0.55;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: guide-veil 180ms ease-out;
+}
+
+.guide-panel {
+  position: fixed;
+  top: var(--header-h);
+  right: 0;
+  bottom: 0;
+  z-index: 41;
+  /* "Almost half" on a big screen, never narrower than a readable column. */
+  width: max(22rem, 48vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  padding-right: max(var(--space-5), env(safe-area-inset-right));
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  animation: guide-slide-in 200ms ease-out;
+}
+
+@keyframes guide-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.55;
+  }
+}
+
+@keyframes guide-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes guide-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* A drag is a live transform; an entry animation would fight it for the same
+   property and snap the sheet back under the finger. */
+.guide-panel--dragging {
+  animation: none;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-scrim,
+  .guide-panel {
+    animation: none;
+  }
+}
+
+.guide-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex: none;
+}
+
+.guide-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+/* The grab bar is sheet-only: on a drawer there is nothing to drag. */
+.guide-panel__grab {
+  display: none;
+}
+
+/* The drawer is already a bordered surface; a second frame around the prose
+   inside it would just be a box in a box. The scroll behaviour is the part of
+   .md-preview that matters here, and that stays.
+
+   Both class names, deliberately: .md-preview's own border rule carries equal
+   specificity and app.css loads after this file, so a single-class override
+   loses on source order — which is exactly what it did the first time. */
+.md-preview.guide-panel__body {
+  border: 0;
+  padding: 0;
+}
+
+.guide-panel__status {
+  margin: 0;
+}
+
+/* ── The phone shape: a bottom sheet ────────────────────────
+   640px is where the nav moves to the bottom of the screen, so it is also
+   where a right-edge drawer stops making sense. The sheet deliberately covers
+   that nav rather than sitting above it the drawer's way: it is a temporary
+   surface over everything, dismissed by the scrim, the ×, Escape, or a swipe
+   down on its header. */
+@media (max-width: 640px) {
+  .guide-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(82vh, 44rem);
+    padding: var(--space-3) var(--space-4);
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+    border-left: 0;
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    animation: guide-slide-up 220ms ease-out;
+  }
+
+  .guide-panel__head {
+    /* Room for the grab bar, which is absolutely placed above the title row so
+       it stays centred regardless of how wide the title is. */
+    position: relative;
+    padding-top: var(--space-3);
+    /* The whole header is the drag handle, so the browser must not claim the
+       gesture for scrolling first. */
+    touch-action: none;
+  }
+
+  .guide-panel__grab {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2.25rem;
+    height: 0.25rem;
+    border-radius: 999px;
+    background: var(--border);
+  }
 }

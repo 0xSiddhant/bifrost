@@ -1,0 +1,473 @@
+/* Saga (PLAN-28). Tokens only — no literal colours, per rules/coding.md.
+   Saga inherits whichever theme is active, exactly as Edda's preview, public
+   page and PDF export already do; there is no second template system here. */
+
+/* A presentation is a **fixed frame**, not a document that grows: the deck is
+   the thing that scrolls, and it scrolls *inside* the slide. Sizing the text up
+   used to grow the page instead, pushing the controls below the fold — so the
+   one control you reach for while presenting walked away exactly when you used
+   it. The stage takes a definite height, the slide body scrolls within it, and
+   the footer stays put. Same `max(<floor>, calc(100vh - <chrome>))` shape Edda,
+   Loki, Runestone and Atlas already use for their workspaces. */
+.saga {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* The scrim-overlaid footer is positioned against this in fullscreen. */
+  position: relative;
+  --saga-h: max(24rem, calc(100dvh - 14rem));
+  height: var(--saga-h);
+  /* Overwritten inline by SagaPage. Declared here so the slide still has a
+     size if the property is ever missing. */
+  --saga-scale: 1;
+}
+
+/* Full-width breakout (the Edda/Variant/Runestone precedent): a slide is not
+   prose at a 62rem reading measure — it is a screen, and the extra width is
+   what lets the footer carry a real key legend instead of one cramped line. */
+@media (min-width: 1024px) {
+  .saga {
+    --saga-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--saga-w);
+    margin-inline: calc((100% - var(--saga-w)) / 2);
+    --saga-h: max(28rem, calc(100dvh - 12rem));
+  }
+}
+
+.saga-stage {
+  display: flex;
+  gap: var(--space-4);
+  /* `min-height: 0` is what actually lets the slide scroll rather than stretch
+     the stage: a flex item's default `min-height: auto` refuses to shrink below
+     its content, which silently defeats the fixed height above. */
+  min-height: 0;
+  flex: 1;
+}
+
+.saga-slide {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+/* The slide is the reading surface, so it drops `.md-preview`'s own frame and
+   takes the page's measure instead. */
+.saga-slide__body {
+  flex: 1;
+  min-height: 0;
+  /* The deck scrolls here, and only here. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-6);
+  font-size: calc(var(--text-lg) * var(--saga-scale));
+}
+
+.saga-slide__body > :first-child {
+  margin-top: 0;
+}
+
+/* ── a rasterized pdf page (PLAN-29) ────────────────────────────────────── */
+
+/* No padding of its own, deliberately: `SlideView` measures this element to
+   decide what size to rasterize the page at, so the box it measures has to be
+   the box the canvas is allowed to fill. A PDF page brings its own margins. */
+.saga-slide__page {
+  padding: 0;
+  /* Both axes, unlike a markdown slide: a page zoomed past 100% overflows
+     sideways as well as down, and a page whose left edge cannot be reached is
+     worse than one that scrolls. */
+  overflow: auto;
+  display: grid;
+  /* `safe` for the same reason the presenting body uses it — plain `center`
+     keeps centring once the content is larger than the frame, pushing the
+     page's top-left corner where no scrolling can reach it. */
+  place-content: safe center;
+}
+
+/* pdf.js paints the page's own white background onto the canvas, so this needs
+   no ground of its own — and must not be given one, or a page with real
+   transparency in it would sit on a colour the document never specified. */
+.saga-slide__canvas {
+  display: block;
+  border-radius: var(--radius-sm);
+  /* A belt for the one frame before the first render has sized it: an
+     unstyled canvas is displayed at its raster size, which is oversampled to
+     the device pixel ratio and would otherwise overflow the frame. */
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.saga-slide__failed {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+/* ── presenter notes ────────────────────────────────────────────────────── */
+
+.saga-notes {
+  width: min(22rem, 34vw);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  padding: var(--space-4);
+  overflow: auto;
+}
+
+.saga-notes__label {
+  margin: 0 0 var(--space-2);
+}
+
+.saga-notes__empty {
+  margin: 0;
+}
+
+.saga-notes__body {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.6;
+}
+
+/* ── footer ─────────────────────────────────────────────────────────────── */
+
+/* Three zones: where you are · what you can press · what you can change.
+   `flex-shrink: 0` on the outer two and a shrinking legend between them means
+   the bar gives up its hints before it ever squeezes a control. */
+.saga-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+}
+
+.saga-footer__where {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.saga-footer__position {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.saga-footer__nav {
+  display: flex;
+  gap: var(--space-1);
+}
+
+/* Eats the slack so the actions sit hard right at every width. */
+.saga-footer__legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  flex: 1;
+  min-width: 0;
+}
+
+.saga-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.saga-legend__does {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* Dropped one at a time by priority, not by source order, as the bar narrows —
+   so the hint that survives longest is the one worth having. It goes entirely
+   only once the bar is about to wrap, where the controls beside it do the same
+   job and `?` opens the complete list. */
+@media (max-width: 1400px) {
+  .saga-legend[data-rank='5'] {
+    display: none;
+  }
+}
+
+@media (max-width: 1240px) {
+  .saga-legend[data-rank='4'] {
+    display: none;
+  }
+}
+
+@media (max-width: 1100px) {
+  .saga-legend[data-rank='3'] {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .saga-legend[data-rank='2'] {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .saga-footer__legend {
+    display: none;
+  }
+}
+
+.saga-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  /* The actions wrap among themselves, not just against the row above: four
+     controls do not fit one 390px line, and since the size control refuses to
+     compress, without this they push the page sideways instead. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* The three size controls read as one control, not three buttons. */
+.saga-footer__scale {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  /* Never compressed. On a phone the footer wraps and the row runs tight, and
+     an icon button squeezed narrower than its glyph renders as an empty oval —
+     seen on a real 390px viewport, not guessed at. */
+  flex-shrink: 0;
+}
+
+.saga-footer__scale .btn {
+  flex: 0 0 auto;
+}
+
+.saga-footer__scale svg {
+  flex-shrink: 0;
+}
+
+.saga-footer__scale .mono {
+  font-size: var(--text-xs);
+}
+
+/* While presenting, the footer overlays the slide rather than occupying layout
+   space, so the slide's own box does not move when it appears. Background is
+   the theme's own surface faded in from transparent, not `--scrim`: every
+   theme's scrim is a dark wash, which leaves `--text-muted` unreadable on it in
+   the light themes. */
+.saga-footer--overlay {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(180deg, transparent 0%, var(--surface) 45%);
+  padding: var(--space-6) var(--space-4) var(--space-4);
+}
+
+/* **Presenting shows no chrome.** The deck is the whole screen, the bindings
+   drive it, and Esc leaves — which the browser says itself on entering
+   fullscreen.
+   
+   Hidden by default and shown back only for a coarse pointer, rather than
+   hidden only for a fine one. The first attempt keyed on
+   `(hover: hover) and (pointer: fine)`, which fails toward *showing* the bar on
+   anything that reports neither — and the bar duly turned up on a real desktop
+   where it was supposed to be gone. This way the stated intent is the default
+   and only a device that positively reports touch opts back in, because a phone
+   or tablet has no Esc and no arrow keys, so tapping is the only way in. */
+.saga--presenting .saga-footer {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .saga--presenting .saga-footer {
+    display: flex;
+  }
+}
+
+/* ── presenting ─────────────────────────────────────────────────────────── */
+
+/* Driven by a class rather than `:fullscreen`, because there are two ways to be
+   presenting and they must look identical: real browser fullscreen (which is
+   what `requestFullscreen()` on this container buys — the browser hides the app
+   header and nav for free), and the in-page stand-in below, for browsers that
+   have no element fullscreen at all. */
+.saga--presenting {
+  background: var(--bg);
+  padding: var(--space-4);
+  gap: 0;
+  /* The element is the viewport now, so the windowed box's computed height and
+     breakout margins would both be wrong here. */
+  width: 100%;
+  height: 100%;
+  margin-inline: 0;
+}
+
+
+.saga--presenting .saga-slide__body {
+  border: 0;
+  background: transparent;
+  /* The multiplier rides on top of the viewport-relative base, so a deck sized
+     for the room keeps scaling with the projector rather than being pinned. */
+  font-size: calc(clamp(var(--text-lg), 2.2vw, 2rem) * var(--saga-scale));
+  display: flex;
+  flex-direction: column;
+  /* A short slide sits in the middle of the screen; a long one starts at the
+     top. `safe` is what switches between the two — plain `center` keeps
+     centring once the content is taller than the frame, which pushes the first
+     lines off the top edge where no amount of scrolling can reach them. */
+  justify-content: safe center;
+}
+
+/* Flex children shrink below their own content by default, and with a fixed
+   frame that finally had somewhere to bite: every code block on an overflowing
+   slide flattened into nothing but its own horizontal scrollbar. Seen in a
+   fullscreen screenshot at 150%, not reasoned about. */
+.saga--presenting .saga-slide__body > * {
+  flex-shrink: 0;
+}
+
+/* Re-asserted rather than inherited: the two rules above are more specific
+   than `.saga-slide__page`, so without this a page would be laid out by the
+   markdown branch's column flex the moment the deck went fullscreen. */
+.saga--presenting .saga-slide__page {
+  display: grid;
+  place-content: safe center;
+}
+
+/* ── shortcuts overlay ──────────────────────────────────────────────────── */
+
+.saga-shortcuts {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  z-index: 2;
+}
+
+.saga-shortcuts__card {
+  width: min(30rem, 92%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+  padding: var(--space-5);
+}
+
+.saga-shortcuts__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.saga-shortcuts__head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.saga-shortcuts__list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.saga-shortcuts__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.saga-shortcuts__row dt {
+  flex: 0 0 auto;
+  width: 14rem;
+  font-size: var(--text-xs);
+  color: var(--accent);
+}
+
+.saga-shortcuts__row dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+/* ── landing / dropzone ─────────────────────────────────────────────────── */
+
+.saga-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12) var(--space-4);
+  color: var(--text-muted);
+  text-align: center;
+  transition: border-color var(--dur-1) var(--ease);
+}
+
+.saga-drop--over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.saga-drop__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.saga-drop__input {
+  display: none;
+}
+
+.saga-landing__error {
+  margin-top: var(--space-3);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/* ── responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* Notes stack under the slide rather than squeezing it to a column. */
+  .saga-stage {
+    flex-direction: column;
+  }
+
+  .saga-notes {
+    width: auto;
+  }
+
+  .saga-shortcuts__row {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .saga-shortcuts__row dt {
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .saga-drop {
+    transition: none;
+  }
+}

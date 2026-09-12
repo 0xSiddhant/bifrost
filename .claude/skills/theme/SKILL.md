@@ -103,4 +103,4 @@ restart rule as below (schema/`tokens.css` change → restart + rebuild).
   handing off.
 - Per project rule, **leave the work uncommitted until the owner tests it** and
   says to commit. If you introduced a new convention, update `docs/THEME-SPEC.md`
-  / `docs/DESIGN.md` and log it in `.agent/memory/decisions.md`.
+  / `docs/DESIGN.md` and log it in `.agents/memory/decisions.md`.

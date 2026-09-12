@@ -1,4 +1,9 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react';
 import { useId } from 'react';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -15,6 +20,26 @@ export function Input({ label, ...rest }: InputProps) {
         </label>
       )}
       <input id={id} className="field__input" {...rest} />
+    </div>
+  );
+}
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+}
+
+/** Same label/field wiring as Input, for the multi-line inputs the toolbox
+ *  tools are mostly made of. */
+export function Textarea({ label, ...rest }: TextareaProps) {
+  const id = useId();
+  return (
+    <div className="field">
+      {label && (
+        <label className="field__label" htmlFor={id}>
+          {label}
+        </label>
+      )}
+      <textarea id={id} className="field__input" {...rest} />
     </div>
   );
 }

@@ -210,6 +210,16 @@
   padding: var(--space-8) var(--space-6) var(--space-12);
 }
 
+/* Full-window pages. 62rem is a *reading* measure — right for prose, an editor
+   or a form, and wrong for a grid of small cards, which just gets fewer columns
+   and more wrapped titles the narrower it is. The toolbox opts out and takes
+   the same gutters as the sticky header, so the two line up. */
+.shell-main--wide {
+  max-width: none;
+  padding-left: max(var(--space-6), env(safe-area-inset-left));
+  padding-right: max(var(--space-6), env(safe-area-inset-right));
+}
+
 .page-loading {
   text-align: center;
   padding: var(--space-12);
@@ -315,6 +325,15 @@
   min-width: 12rem;
 }
 
+/* The Send page's folder destination: the field, then the sentence that says
+   what choosing one actually does — a row would put the two side by side. */
+.upload-destination {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 32rem;
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -367,8 +386,19 @@
    Alley stalls). Cards are equal-height by nature; footers align via margin. */
 .portals {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  /* 18rem, not 15: on a wide hub the old minimum let `auto-fit` run to six,
+     seven, nine columns, and a card narrower than it is tall reads as squeezed
+     rather than as a card. This keeps four on a 1280 screen and five on
+     anything wider. */
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: var(--space-4);
+  /* The cap is on the **grid**, not the page: `.shell-main--wide` deliberately
+     drops the 62rem reading measure so a hub can use the window, and without a
+     stop of its own the grid keeps adding columns forever. Centring what is
+     left is where a wide window's side margins come from. */
+  width: 100%;
+  max-width: 108rem;
+  margin-inline: auto;
 }
 
 /* Wide onboarding band: the QR sits beside its details instead of stacking a
@@ -429,7 +459,8 @@
 }
 
 /* Card-tone slots — map each card's position to one hue of the 10-tone palette
-   (--card-1..10). The .portal card component (core/ui/ui.css) reads --ct. */
+   (--card-1..10). The .tone-surface base (core/ui/ui.css), which .portal and
+   .tool-card both compose, reads --ct. */
 .card-tone-1 {
   --ct: var(--card-1);
 }
@@ -1496,7 +1527,26 @@
   margin: 0;
 }
 
-.rune-lib-filters {
+/* ── Pensieve · the one document library (PLAN-21) ───────────────────────── */
+
+/* These rules were `rune-lib-*`: Runestone's library styles, which Edda's page
+   reused verbatim — the codebase admitting the two pages were one page twice.
+   Both pages are gone; the shell that replaced them owns the family outright,
+   so the runestone prefix would now be a lie. */
+
+/* Full-width breakout at ≥1024px (Variant/Runestone/Edda/Accio precedent). A
+   document row is long — name, size, two timestamps, a device and its actions —
+   and the 62rem column wrapped every one of them. */
+@media (min-width: 1024px) {
+  .lib-head,
+  .lib-wrap {
+    --lib-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--lib-w);
+    margin-inline: calc((100% - var(--lib-w)) / 2);
+  }
+}
+
+.lib-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1505,7 +1555,7 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rune-lib-search {
+.lib-search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -1514,11 +1564,11 @@
   color: var(--text-muted);
 }
 
-.rune-lib-search .field__input {
+.lib-search .field__input {
   flex: 1;
 }
 
-.rune-lib-select {
+.lib-select {
   width: auto;
   max-width: 12rem;
   padding: var(--space-2) var(--space-3);
@@ -1526,23 +1576,91 @@
 }
 
 @media (max-width: 640px) {
-  .rune-lib-search {
+  .lib-search {
     flex-basis: 100%;
   }
 
-  .rune-lib-select {
+  .lib-select {
     flex: 1;
     min-width: 0;
     max-width: none;
   }
 }
 
-.rune-lib-rows {
+/* Type chips. They scroll rather than wrap on a phone: a filter row that grows
+   to three lines pushes the first row off a 375px screen. */
+.lib-chips {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* The strip scrolls sideways, and its scrollbar is hidden, so an off-screen
+     chip has nothing pointing at it. With two kinds it always fitted; PLAN-19's
+     third one pushed YAML past the right edge at 375, where the only affordance
+     was guessing there was more. Wrapping costs one line of height on a phone
+     and keeps every kind reachable without a swipe. */
+  flex-wrap: wrap;
+}
+
+.lib-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.lib-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.lib-chip:hover:not(:disabled) {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--ct, var(--accent)) 45%, var(--border));
+}
+
+.lib-chip--on {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--ct, var(--accent)) 60%, var(--border));
+  background: color-mix(in srgb, var(--ct, var(--accent)) 14%, transparent);
+}
+
+/* A kind whose endpoint is down: the chip stays visible so the type is still
+   accounted for, but it cannot be selected onto an empty list. */
+.lib-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Non-blocking: the kinds that answered are rendered underneath this. */
+.lib-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  font-size: var(--text-sm);
+}
+
+.lib-rows {
   display: flex;
   flex-direction: column;
 }
 
-.rune-lib-row {
+.lib-row {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1550,27 +1668,61 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rune-lib-row:last-child {
+.lib-row:last-child {
   border-bottom: none;
 }
 
-.rune-lib-row__body {
+/* The badge takes its colour from the kind, not the row's position — a scoped
+   exception to the positional-palette rule (see LibraryEntry.tone). It is what
+   makes a type recognisable while the list is being re-sorted under it. */
+.lib-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--ct, var(--accent)) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ct, var(--accent)) 14%, transparent);
+  color: color-mix(in srgb, var(--ct, var(--accent)) 75%, var(--text));
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.lib-row__body {
   flex: 1;
   min-width: 0;
 }
 
-.rune-lib-row__name {
+.lib-row__name {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.rune-lib-row__meta {
+.lib-row__meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1) var(--space-3);
   margin-top: 2px;
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+/* Below 640px the badge keeps its icon and drops its word: four actions plus a
+   long name plus a spelled-out type is what squeezes the name to nothing. */
+@media (max-width: 640px) {
+  .lib-badge__label {
+    display: none;
+  }
+
+  .lib-row {
+    flex-wrap: wrap;
+  }
+
+  .lib-row__body {
+    flex-basis: calc(100% - 5rem);
+  }
 }
 
 /* ── responsive ─────────────────────────────────────────────── */
@@ -3565,4 +3717,203 @@
       opacity: 0;
     }
   }
+}
+
+/* ── Groot (PLAN-19) — YAML workspace ────────────────────────────────────────
+   Reuses the rune-* editor chrome (the Edda precedent: two editors that do the
+   same job should not drift apart in CSS). These are the parts YAML has and
+   JSON does not — a stream of documents, and a rail of advisories. */
+
+/* The convert group says what a JSON conversion costs before it is clicked,
+   because after the click the comments are already gone from the output. */
+.groot-convert__note {
+  align-self: center;
+  white-space: nowrap;
+}
+
+/* Document switcher for a `---` separated stream. */
+.groot-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.groot-docs__tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-3);
+  cursor: pointer;
+}
+
+.groot-docs__tab:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.groot-docs__tab.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The advisory rail. Deliberately NOT styled as an error list: every row here
+   is a valid document that will read differently somewhere else, and colouring
+   it like a failure would teach people to "fix" documents that are correct. */
+.groot-rail {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.groot-rail__head {
+  margin: 0 0 var(--space-2);
+}
+
+.groot-rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 13rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.groot-rail__list button {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: 2px 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.groot-rail__list button:hover {
+  color: var(--text);
+}
+
+.groot-rail__line {
+  flex: none;
+  color: var(--warn);
+}
+
+.groot-rail__kind {
+  flex: none;
+  font-size: var(--text-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+}
+
+.groot-rail__message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Alias badge in the tree (`*base`). The tree shows resolved values, so this is
+   the only thing distinguishing an alias from a duplicated branch. */
+.rune-tree__note {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--syn-bool);
+}
+
+/* -------------------------------------------------------------------------
+   Atlas (PLAN-23) — code and plist table side by side.
+
+   The same two-panel split Edda uses (core/ui/useSplitPanel owns the ratio,
+   the drag and the breakpoints); these are the widths and heights that hang
+   off it. Non-plist XML gets no second panel at all, so `--codeonly` lets the
+   editor take the full measure rather than leaving an empty half.
+   ------------------------------------------------------------------------- */
+
+.atlas-workspace {
+  --atlas-h: 60vh;
+  display: flex;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .atlas-workspace {
+    --atlas-h: max(30rem, calc(100vh - 22rem));
+  }
+}
+
+.atlas-panes {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+  height: var(--atlas-h);
+}
+
+.atlas-workspace--stacked .atlas-panes {
+  flex-direction: column;
+  gap: var(--space-3);
+  height: auto;
+}
+
+.atlas-code {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+}
+
+.atlas-code .json-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Split mode: the code pane's width comes from the draggable ratio, the table
+   takes the rest. */
+.atlas-workspace--split:not(.atlas-workspace--codeonly) .atlas-code {
+  flex: 0 0 calc(var(--atlas-ratio, 0.5) * 100% - 0.5 * var(--space-3));
+}
+
+.atlas-workspace--stacked:not(.atlas-workspace--codeonly) .atlas-code {
+  height: 50vh;
+}
+
+.atlas-divider {
+  flex: 0 0 6px;
+  align-self: stretch;
+  margin: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.atlas-divider:hover {
+  background: var(--accent);
+}
+
+.atlas-tablewrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-workspace--stacked .atlas-tablewrap {
+  height: 50vh;
 }

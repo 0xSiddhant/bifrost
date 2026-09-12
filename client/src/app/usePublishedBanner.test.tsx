@@ -18,10 +18,10 @@ function Harness() {
 }
 
 /** Deliver a `file.published` frame as the SSE layer would. */
-function publish(name: string, originDeviceId: string | null) {
+function publish(name: string, originDeviceId: string | null, folder?: string) {
   act(() => {
     listeners.forEach((listener) =>
-      listener({ name, size: 10, publishedAt: Date.now(), originDeviceId }),
+      listener({ name, size: 10, publishedAt: Date.now(), originDeviceId, folder }),
     );
   });
 }
@@ -98,6 +98,45 @@ describe('usePublishedBanner', () => {
 
     // Not "3 files" — the count nobody can see any more must not carry over.
     expect(messages()).toEqual(['three.txt is ready in Receive']);
+  });
+
+  // PLAN-24 criterion 15: the banner names the folder when there is one.
+  it('names the folder a file landed in', () => {
+    publish('a.jpg', 'device-other', 'Trip photos');
+    expect(messages()).toEqual(['a.jpg is ready in Trip photos']);
+  });
+
+  it('still stays quiet on the uploading device in folder mode', () => {
+    publish('a.jpg', MY_DEVICE, 'Trip photos');
+    expect(messages()).toEqual([]);
+  });
+
+  /**
+   * Criterion 16: ten files into one folder collapse to one banner, and a
+   * concurrent plain Move keeps its own count rather than merging into it.
+   */
+  it('counts per destination, so a folder wave and a plain Move stay apart', () => {
+    for (let index = 1; index <= 10; index += 1) {
+      publish(`file-${index}.jpg`, 'device-other', 'Trip photos');
+    }
+    publish('loose.txt', 'device-other');
+
+    const { visible } = notifications.getSnapshot();
+    expect(visible).toHaveLength(2);
+    expect(visible.map((entry) => entry.message).sort()).toEqual([
+      '10 files are ready in Trip photos',
+      'loose.txt is ready in Receive',
+    ]);
+  });
+
+  it('keeps two different folders on two banners', () => {
+    publish('a.jpg', 'device-other', 'Trip photos');
+    publish('b.txt', 'device-other', 'Receipts');
+
+    expect(messages().sort()).toEqual([
+      'a.jpg is ready in Trip photos',
+      'b.txt is ready in Receipts',
+    ]);
   });
 
   it('ignores a frame the server could not serialise', () => {

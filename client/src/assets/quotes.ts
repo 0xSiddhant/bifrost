@@ -1,11 +1,11 @@
 /**
  * Quote bank for the Nótt screensaver. One is chosen at random each time the
  * overlay appears (and on rotation). Quotes are drawn from the worlds Bifrost's
- * lore already borrows from — Harry Potter, the MCU, Studio Ghibli, Norse myth,
- * and Greek myth/philosophy. Append freely; keep lines short enough to breathe
- * on a dark full-screen canvas.
+ * lore already borrows from — Harry Potter, the MCU, Naruto, Studio Ghibli,
+ * Norse myth, and Greek myth/philosophy. Append freely; keep lines short
+ * enough to breathe on a dark full-screen canvas.
  */
-export type QuoteWorld = 'harry-potter' | 'mcu' | 'ghibli' | 'norse' | 'greek';
+export type QuoteWorld = 'harry-potter' | 'mcu' | 'naruto' | 'ghibli' | 'norse' | 'greek';
 
 export interface Quote {
   text: string;
@@ -17,6 +17,7 @@ export interface Quote {
 export const WORLD_LABELS: Record<QuoteWorld, string> = {
   'harry-potter': 'Hogwarts',
   mcu: 'The MCU',
+  naruto: 'Naruto',
   ghibli: 'Studio Ghibli',
   norse: 'Norse Myth',
   greek: 'Ancient Greece',
@@ -54,6 +55,17 @@ export const QUOTES: readonly Quote[] = [
     author: 'Albus Dumbledore',
     world: 'harry-potter',
   },
+  {
+    text: 'After all this time? Always.',
+    author: 'Severus Snape',
+    world: 'harry-potter',
+  },
+  {
+    text: 'Fear of a name increases fear of the thing itself.',
+    author: 'Albus Dumbledore',
+    world: 'harry-potter',
+  },
+  { text: 'Mischief managed.', author: 'Harry Potter', world: 'harry-potter' },
 
   // ── The MCU ───────────────────────────────────────────────────
   { text: 'I can do this all day.', author: 'Steve Rogers', world: 'mcu' },
@@ -73,6 +85,36 @@ export const QUOTES: readonly Quote[] = [
     text: 'The hardest choices require the strongest wills.',
     author: 'Thanos',
     world: 'mcu',
+  },
+  { text: 'Wakanda forever!', author: 'T’Challa', world: 'mcu' },
+  { text: 'We are Groot.', author: 'Groot', world: 'mcu' },
+  { text: 'I am Iron Man.', author: 'Tony Stark', world: 'mcu' },
+
+  // ── Naruto ────────────────────────────────────────────────────
+  {
+    text: "Hard work is worthless for those that don't believe in themselves.",
+    author: 'Naruto Uzumaki',
+    world: 'naruto',
+  },
+  {
+    text: 'The true measure of a shinobi is not how he lives but how he dies.',
+    author: 'Jiraiya',
+    world: 'naruto',
+  },
+  {
+    text: 'Those who abandon their friends are worse than scum.',
+    author: 'Kakashi Hatake',
+    world: 'naruto',
+  },
+  {
+    text: 'People’s lives do not end when they die. It ends when they lose faith.',
+    author: 'Itachi Uchiha',
+    world: 'naruto',
+  },
+  {
+    text: 'Wake up to reality. Nothing ever goes as planned in this accursed world.',
+    author: 'Madara Uchiha',
+    world: 'naruto',
   },
 
   // ── Studio Ghibli ─────────────────────────────────────────────

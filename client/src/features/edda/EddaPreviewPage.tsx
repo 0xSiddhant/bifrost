@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../core/ui/Button';
 import { renderMarkdown, outline } from '../../core/markdown';
 import { fetchEdda, type EddaDoc } from '../../core/edda';
-import { MarkdownPreview } from './MarkdownPreview';
+import { MarkdownPreview } from '../../core/ui/MarkdownPreview';
 
 type Phase = 'loading' | 'ready' | 'notfound' | 'error';
 
@@ -55,7 +55,7 @@ export function EddaPreviewPage() {
           <span className="eyebrow eyebrow--amber">the eddas</span>
           <h2>{phase === 'notfound' ? 'This edda was never written' : 'Could not open this edda'}</h2>
           <p>
-            <Link to="/edda/pensieve">Back to the Pensieve</Link>
+            <Link to="/pensieve?type=edda">Back to the Pensieve</Link>
           </p>
         </div>
       </div>

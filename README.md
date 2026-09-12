@@ -2,7 +2,7 @@
 
 # 🌈 Bifrost
 
-**A LAN-only file transfer & sync hub. Your devices, connected by the rainbow bridge.**
+**A private LAN workbench — transfer, sync, and a bridge of dev tools.**
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -39,20 +39,23 @@ Bifrost turns one Mac on your local network into a private file & sync hub for e
 - 👁 In-browser previews — images, PDF, video (seekable), markdown
 - 📋 Hermes — clipboard/text sync across devices
 - 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin built in), addable via JSON
+- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), addable via JSON
 - 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
 - ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
 - 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
+- 🎞 Saga — present a deck fullscreen: drop a `.md` file (`---` splits the slides, `<!-- notes: … -->` feeds the presenter panel) or a `.pdf` (one page per slide, rasterized at a bounded resolution); keyboard navigation, +/− sizing that carries into fullscreen, and a shortcuts overlay. Nothing is uploaded or stored — or open a saved Edda
+- 🌳 Groot — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
 - 🃏 Loki — JavaScript workbench: transforms, regex tester, and a sandboxed Web-Worker runner
 - 🔖 Accio — read-later shelf with tags and best-effort page-title lookup
 - 🚪 Portkey — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
 - 🧹 Nimbus — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
+- 💡 Guide panel — a header bulb opens a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
 - 🌌 Nótt — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
-**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
+**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes / Saga + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki / Pensieve / Groot), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
 
 ## Quick start
 
@@ -99,15 +102,46 @@ sh scripts/observability.sh    # http://localhost:3000  (admin / bifrost)
 See [`docs/observability.md`](docs/observability.md). Back up all state
 (`storage/` + `themes/`) any time with `npm run backup`.
 
+## CLI
+
+`bifrost` is a command-line client for a running hub — push and pull files, read
+and write the shared clipboard, fetch saved documents, resolve go-links, check
+server and device state, run a speed test. It is a third npm workspace
+(`cli/`) that consumes the existing API and adds no server routes of its own.
+
+Install it from the latest release's tarball:
+
+<!-- CLI_INSTALL_START -->
+
+```bash
+npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v1.3.0/bifrost-cli-1.3.0.tgz
+```
+
+<!-- CLI_INSTALL_END -->
+
+```bash
+bifrost push ~/Desktop/notes.pdf     # send a file to the bridge
+bifrost pull                         # list what Downloads is offering
+bifrost clip | pbcopy                # read the shared clipboard
+bifrost doctor                       # check config, host, server, CLI version
+```
+
+Every command, the config file, the `--host`/discovery story, and how to run it
+straight from a checkout without installing: [`cli/README.md`](cli/README.md).
+On the host machine `npm run build` and `npm run start` re-install the global
+`bifrost` from what is checked out, so it never drifts from the server it talks
+to.
+
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run setup` | Creates storage folders, verifies `.env`, runs DB migrations |
 | `npm run dev` | Dev mode with hot reload (server + client) |
-| `npm run build` | Production build (client + server) |
-| `npm start` | Run production build |
+| `npm run build` | Production build (client + server), then re-installs the global `bifrost` CLI |
+| `npm start` | Re-installs the global `bifrost` CLI, then runs the production build |
 | `npm run logs` | Pretty-tail the JSON log file |
+| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data |
 | `npm run backup` | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
 | `npm run restore -- <archive.zip>` | Restore an archive (refuses a live server unless `--force`) |
 | `npm run test:resilience` | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand) |
@@ -118,7 +152,7 @@ Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 
 ## Project docs
 
-Architecture, rules, plans and progress live in [`.agent/`](.agent/). Start with [`.agent/plans/README.md`](.agent/plans/README.md).
+Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`.agents/plans/README.md`](.agents/plans/README.md).
 
 Operating & deploying:
 
@@ -128,6 +162,7 @@ Operating & deploying:
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
+- [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 
 ## License
 

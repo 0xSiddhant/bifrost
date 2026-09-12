@@ -7,6 +7,10 @@ import type { DownloadContent, DownloadReader } from '../ports.js';
  * Streams files out of downloads/ — after proving, via realpath, that the
  * resolved target actually lives inside downloads/ (security default in
  * rules/coding.md). Symlinks pointing elsewhere are refused.
+ *
+ * `name` is the path relative to downloads/, so PLAN-24's one level of
+ * nesting (`Trip/report.pdf`) needed no change here: the prefix check already
+ * generalizes to it.
  */
 export class FsDownloadReader implements DownloadReader {
   constructor(private readonly downloadsDir: string) {}
@@ -26,6 +30,17 @@ export class FsDownloadReader implements DownloadReader {
       stream: fs.createReadStream(resolved, slice ? { start: slice.start, end: slice.end } : {}),
       size: stat.size,
     };
+  }
+
+  /**
+   * The folder flavour of the same check, for the zip route: usecases may not
+   * touch fs, so this is where a folder id becomes a path safe to read from.
+   */
+  async confineFolder(name: string): Promise<string> {
+    const resolved = await this.confine(name);
+    const stat = await fsp.stat(resolved);
+    if (!stat.isDirectory()) throw new Error('not a directory');
+    return resolved;
   }
 
   private async confine(name: string): Promise<string> {

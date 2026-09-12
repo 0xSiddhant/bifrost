@@ -2,7 +2,13 @@ import type { ReactNode } from 'react';
 import { useCapabilities } from '../../core/useCapabilities';
 import { Portal } from '../../core/ui/Portal';
 import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
-import { BookmarkIcon, ClipboardIcon, DownloadIcon, UploadIcon } from '../../core/ui/icons';
+import {
+  BookmarkIcon,
+  ClipboardIcon,
+  DownloadIcon,
+  SlidesIcon,
+  UploadIcon,
+} from '../../core/ui/icons';
 
 /**
  * The transfer doors, plus the shelf. Colour follows position: the Nth *visible*
@@ -49,6 +55,16 @@ const PORTALS: Portal[] = [
     description: 'A shelf for links worth keeping — summon any of them back from any device.',
     go: 'saved · summoned later',
     module: 'accio',
+  },
+  {
+    to: '/saga',
+    icon: <SlidesIcon size={26} />,
+    // Midgard, not Ollivanders: "drop a file, present it on the shared screen"
+    // reads far closer to Send/Receive's audience than to Loki's (PLAN-28).
+    title: 'Saga',
+    description: 'Present a markdown deck on the big screen — drop a file, or open a saved edda.',
+    go: 'a deck · every eye',
+    module: 'saga',
   },
 ];
 

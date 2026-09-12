@@ -14,10 +14,15 @@ describe('reserved roots', () => {
       'metrics',
       'runestone',
       'edda',
+      // PLAN-19: the YAML workspace, its SPA route and its raw data endpoint.
+      'groot',
+      'atlas',
       'variant',
       'loki',
       'accio',
       'nimbus',
+      // PLAN-21 promoted the Pensieve from a nested segment to a first one.
+      'pensieve',
       'portkey',
       'upload',
       'downloads',
@@ -26,6 +31,10 @@ describe('reserved roots', () => {
       'sigil',
       'ollivanders',
       'diagon-alley',
+      // PLAN-25: the Brotli workbench's page.
+      'brotli',
+      // PLAN-28: Saga's slideshow page, at /saga and /saga/:slug.
+      'saga',
     ]) {
       expect(RESERVED_ROOTS.has(root), `${root} is reserved`).toBe(true);
     }

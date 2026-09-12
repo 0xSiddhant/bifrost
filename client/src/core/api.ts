@@ -45,8 +45,21 @@ async function toApiError(method: string, path: string, response: Response): Pro
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(path, { headers: { accept: 'application/json' } });
+export interface ApiGetOptions {
+  /**
+   * Abort after this many ms. Off by default: most reads are behind a UI that
+   * can wait, and a few (Nimbus) are long by design. Pass it where a hung
+   * request leaves a control permanently dead — a vanished host never refuses
+   * the connection, it just never answers.
+   */
+  timeoutMs?: number;
+}
+
+export async function apiGet<T>(path: string, options: ApiGetOptions = {}): Promise<T> {
+  const response = await fetch(path, {
+    headers: { accept: 'application/json' },
+    signal: options.timeoutMs === undefined ? undefined : AbortSignal.timeout(options.timeoutMs),
+  });
   if (!response.ok) {
     throw await toApiError('GET', path, response);
   }
@@ -92,10 +105,16 @@ export function fetchCapabilities(): Promise<Capabilities> {
  */
 export interface DownloadEntry {
   id: string;
+  /** Base name — `parent` carries the folder, so this is never path-qualified. */
   name: string;
+  /** Folders report 0; a folder's size is summed from its children in this feed. */
   size: number;
   mtime: number;
   ext: string;
+  /** PLAN-24: the listing is one level deep, so an entry is a file or a folder. */
+  type: 'file' | 'folder';
+  /** Folder this entry lives in, or null at the root. Folders are always root. */
+  parent: string | null;
 }
 
 export const listDownloads = (): Promise<DownloadEntry[]> =>

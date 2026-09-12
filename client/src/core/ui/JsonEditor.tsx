@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import {
   EditorState,
+  Prec,
   StateEffect,
   StateField,
   type Extension,
@@ -23,12 +24,19 @@ import {
   defaultKeymap,
   history,
   historyKeymap,
+  indentLess,
+  indentMore,
   indentWithTab,
   isolateHistory,
   redo,
   undo,
 } from '@codemirror/commands';
-import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
+  type CompletionContext,
+} from '@codemirror/autocomplete';
 import {
   HighlightStyle,
   bracketMatching,
@@ -46,6 +54,13 @@ import {
 import { json } from '@codemirror/lang-json';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
+import { yaml as yamlLang } from '@codemirror/lang-yaml';
+import {
+  completeFromSchema,
+  xml as xmlLang,
+  xmlLanguage,
+  type ElementSpec,
+} from '@codemirror/lang-xml';
 import { linter, lintGutter, type Diagnostic } from '@codemirror/lint';
 import {
   getSearchQuery,
@@ -56,6 +71,8 @@ import {
 } from '@codemirror/search';
 import { tags } from '@lezer/highlight';
 import { validateJson } from '../json';
+import { validateYaml } from '../yaml';
+import { validateXml } from '../xml';
 
 /**
  * Reusable CodeMirror 6 JSON editor (PLAN-07). Runestone mounts one; PLAN-08's
@@ -75,6 +92,20 @@ export interface DiffHighlight {
   level: 'line' | 'char';
 }
 
+/**
+ * What the editor is editing. One prop rather than a set of booleans: the modes
+ * are mutually exclusive by nature, and as booleans that was enforced only by a
+ * doc comment and a nested ternary that grew a branch per language.
+ *
+ * - `json` (default) — Runestone/Variant: lint, fold, bracket pairing.
+ * - `markdown` — Edda: syntax tinting only.
+ * - `javascript` — Loki: tinting, folding, bracket pairing, no lint.
+ * - `yaml` — Groot: tinting, folding, bracket pairing, YAML lint.
+ * - `xml` — Atlas: tinting, tag folding, bracket pairing, well-formedness lint.
+ * - `plain` — Variant's text panes: nothing, so typing costs nothing.
+ */
+export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain' | 'yaml' | 'xml';
+
 export interface JsonEditorProps {
   value: string;
   onChange?: (value: string) => void;
@@ -86,23 +117,8 @@ export interface JsonEditorProps {
   placeholder?: string;
   /** Diff decorations bound to the --diff-* theme tokens. */
   highlights?: DiffHighlight[];
-  /**
-   * Plain-text mode (Variant's text panes): no JSON parsing, linting,
-   * folding, highlighting, or bracket pairing — typing costs nothing.
-   */
-  plain?: boolean;
-  /**
-   * Markdown mode (Edda): lang-markdown syntax tinting via --syn-* tokens, no
-   * JSON lint/fold/bracket-pairing. Mutually exclusive with `plain`.
-   */
-  markdown?: boolean;
-  /**
-   * JavaScript mode (Loki): lang-javascript syntax tinting via --syn-* tokens,
-   * bracket matching + auto-close, and code folding (no JSON lint). Mutually
-   * exclusive with `plain`/`markdown`. Loki drives transforms through
-   * `applyEdit`.
-   */
-  javascript?: boolean;
+  /** Which language the buffer holds; defaults to JSON. */
+  mode?: EditorMode;
   /**
    * Fires when the in-editor find widget lands on a match (the matched text).
    * Variant uses it to reveal the same string in the opposite pane.
@@ -130,6 +146,17 @@ export interface JsonEditorHandle {
     from: number;
     to: number;
   }): void;
+  /**
+   * Replace a source range (PLAN-23, Atlas's plist table). The table edits the
+   * same buffer the code pane shows, and dispatching a real CodeMirror
+   * transaction is what makes that work with no second source of truth: the
+   * existing Undo/Redo control then covers table edits and typed edits alike,
+   * through one history.
+   *
+   * Each call is its own undo step — a table edit is one action to the person
+   * who made it, however many characters it moved.
+   */
+  replaceRange(from: number, to: number, insert: string): void;
   /** Move the cursor to a doc offset, scroll it into view, and focus. */
   gotoOffset(offset: number): void;
   /** Scroll a doc offset into view without stealing focus (pane sync jumps). */
@@ -228,6 +255,50 @@ const jsHighlight = HighlightStyle.define([
   { tag: tags.variableName, color: 'var(--text)' },
   { tag: tags.typeName, color: 'var(--syn-bool)' },
   { tag: [tags.punctuation, tags.bracket, tags.separator, tags.operator], color: 'var(--syn-punct)' },
+  { tag: tags.invalid, color: 'var(--danger)' },
+]);
+
+/**
+ * YAML token colors (Groot) — every value is a theme token, no hex here.
+ *
+ * The lezer YAML grammar tags every unquoted scalar as `content`, so numbers
+ * and booleans are deliberately not tinted apart from strings: the grammar has
+ * no idea which is which, and guessing here would paint `no` as a boolean —
+ * exactly the confusion this tool exists to warn about.
+ */
+const yamlHighlight = HighlightStyle.define([
+  { tag: tags.definition(tags.propertyName), color: 'var(--syn-key)' },
+  { tag: tags.string, color: 'var(--syn-string)' },
+  { tag: tags.special(tags.string), color: 'var(--syn-string)' },
+  { tag: tags.content, color: 'var(--text)' },
+  // Anchors and aliases are the structural feature that surprises readers most,
+  // so they get their own colour rather than the punctuation grey.
+  { tag: tags.labelName, color: 'var(--syn-bool)' },
+  { tag: tags.typeName, color: 'var(--syn-number)' },
+  { tag: [tags.comment, tags.lineComment], color: 'var(--syn-null)', fontStyle: 'italic' },
+  { tag: tags.keyword, color: 'var(--syn-key)' },
+  { tag: tags.attributeValue, color: 'var(--syn-string)' },
+  { tag: tags.meta, color: 'var(--syn-punct)' },
+  {
+    tag: [tags.separator, tags.punctuation, tags.squareBracket, tags.brace],
+    color: 'var(--syn-punct)',
+  },
+  { tag: tags.invalid, color: 'var(--danger)' },
+]);
+
+const xmlHighlight = HighlightStyle.define([
+  // Tag names carry the structure, so they read as keys do in JSON/YAML;
+  // attribute names and their values are deliberately distinct, because in a
+  // plist `version="1.0"` is metadata and the element name is the type.
+  { tag: [tags.tagName, tags.standard(tags.tagName)], color: 'var(--syn-key)' },
+  { tag: tags.attributeName, color: 'var(--syn-number)' },
+  { tag: [tags.attributeValue, tags.string], color: 'var(--syn-string)' },
+  { tag: tags.content, color: 'var(--text)' },
+  { tag: tags.comment, color: 'var(--syn-null)', fontStyle: 'italic' },
+  // The XML declaration, DOCTYPE and processing instructions: present, and not
+  // the thing being read.
+  { tag: [tags.meta, tags.processingInstruction, tags.documentMeta], color: 'var(--syn-punct)' },
+  { tag: [tags.angleBracket, tags.punctuation, tags.definitionOperator], color: 'var(--syn-punct)' },
   { tag: tags.invalid, color: 'var(--danger)' },
 ]);
 
@@ -529,6 +600,197 @@ function jsonDiagnostics(view: EditorView): Diagnostic[] {
   }));
 }
 
+/**
+ * JSON mode (Runestone, Variant's structured panes). Exported alongside the
+ * JavaScript one so a test can assert against the real configuration.
+ */
+export function jsonModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    // Typing {[" inserts the closing pair; backspacing an empty pair removes
+    // both (closeBracketsKeymap precedes defaultKeymap).
+    closeBrackets(),
+    json(),
+    syntaxHighlighting(jsonHighlight),
+    linter(jsonDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
+/** Markdown mode (Edda) — syntax tinting only, no lint/fold/bracket pairing. */
+function markdownModeExtensions(): Extension[] {
+  return [markdownLang(), syntaxHighlighting(markdownHighlight)];
+}
+
+/** Every blocking YAML problem as a CM diagnostic; an empty doc is not broken. */
+function yamlDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  if (text.trim() === '') return [];
+  return validateYaml(text).map((issue) => ({
+    from: Math.min(issue.offset, text.length),
+    to: Math.min(issue.offset + issue.length, text.length),
+    severity: 'error',
+    message: issue.message,
+  }));
+}
+
+/**
+ * YAML mode (Groot). Exported so the fold test can assert against the real
+ * editor configuration rather than a hand-rolled copy of it.
+ *
+ * Folding needs **no custom `foldService`**: lang-yaml's own `foldNodeProp`
+ * covers `Pair` and `Item` (block mappings and sequence entries, folded from the
+ * end of their first line), `BlockLiteral` (`|` and `>` blocks) and
+ * `FlowMapping`/`FlowSequence`. This is written down because Loki needed one —
+ * lang-javascript has a real `ObjectPattern` gap — and the next person should
+ * not build a speculative YAML equivalent for a gap that is not there.
+ *
+ * A tab character in YAML indentation is a **hard syntax error**, which makes
+ * the editor's own Tab key the easiest way to write a file that cannot be
+ * parsed. Two extensions close that, and both are needed:
+ *
+ * - `indentUnit.of('  ')` is what every indent command inserts.
+ * - the `Tab` binding, at high precedence, because `defaultKeymap` binds Tab to
+ *   CM's `insertTab`, and on an empty selection that inserts a literal `\t`
+ *   regardless of `indentUnit` — the trailing `indentWithTab` never gets a look
+ *   in. (A test drives the real keymap and asserts the document stays tab-free;
+ *   without this binding it inserted one.) JSON and JavaScript keep the stock
+ *   behaviour, where a tab is legal whitespace.
+ */
+export function yamlModeExtensions(): Extension[] {
+  return [
+    Prec.high(keymap.of([{ key: 'Tab', run: indentMore, shift: indentLess }])),
+    foldGutter(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    // Flow style (`{a: 1}`, `[1, 2]`) is real YAML, so pairing helps there and
+    // costs nothing in block style, which has no brackets to pair.
+    closeBrackets(),
+    yamlLang(),
+    syntaxHighlighting(yamlHighlight),
+    linter(yamlDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
+/** Well-formedness as a CM diagnostic; an empty doc is "empty", not broken. */
+function xmlDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  if (text.trim() === '') return [];
+  return validateXml(text).map((issue) => ({
+    from: Math.min(issue.offset, text.length),
+    to: Math.min(issue.offset + issue.length, text.length),
+    severity: 'error',
+    message: issue.message,
+  }));
+}
+
+/**
+ * The plist vocabulary, as an XML schema for completion.
+ *
+ * Deliberately **flat**, though `ElementSpec` offers a `children` field and
+ * Apple's DTD would fill it in exactly. Measured against the real extension
+ * list: at the moment you are actually typing, the tag is incomplete, which
+ * breaks `completeFromSchema`'s walk up to the parent element — so the scoping
+ * never applied, and listing `dict` and `array` both as top-level elements and
+ * as children of `<plist>` put each of them in the menu **twice**. A flat list
+ * offers every element once, which is what the menu should show.
+ */
+const PLIST_SCHEMA: readonly ElementSpec[] = [
+  { name: 'plist', top: true, attributes: [{ name: 'version', values: ['1.0'] }] },
+  { name: 'dict' },
+  { name: 'array' },
+  { name: 'key' },
+  { name: 'string' },
+  { name: 'integer' },
+  { name: 'real' },
+  { name: 'date' },
+  { name: 'data' },
+  { name: 'true' },
+  { name: 'false' },
+];
+
+const completePlist = completeFromSchema(PLIST_SCHEMA, []);
+
+/** Enough of the head to see the root element without reading a 2 MB buffer. */
+const PLIST_SNIFF_CHARS = 4096;
+
+/**
+ * Completion is offered **only for property lists**, which is the same line the
+ * rest of Atlas draws: this editor knows Apple's vocabulary and knows nothing
+ * about anyone's own schema, so proposing `<dict>` inside someone's
+ * `<config>` would be inventing a document shape for them. Non-plist XML keeps
+ * auto-close and folding and gets no menu.
+ */
+const plistCompletion = xmlLanguage.data.of({
+  autocomplete: (context: CompletionContext) => {
+    const head = context.state.doc.sliceString(
+      0,
+      Math.min(PLIST_SNIFF_CHARS, context.state.doc.length),
+    );
+    return /<plist[\s>]/.test(head) ? completePlist(context) : null;
+  },
+});
+
+/**
+ * XML mode (Atlas). Exported alongside the other four so a test can assert
+ * against the real configuration rather than a hand-rolled copy.
+ *
+ * Folding needs **no custom `foldService`**: lang-xml's own `foldNodeProp`
+ * folds an `Element` from the end of its start tag, which is exactly the
+ * behaviour a nested `<dict>` wants. Written down for the same reason the YAML
+ * one is — Loki needed a custom one for a real lang-javascript gap, and the
+ * next reader should not build a speculative XML equivalent for a gap that is
+ * not there.
+ *
+ * `@codemirror/lang-xml`'s upstream repository was archived in April 2026. It
+ * is still published and functionally complete — XML's grammar does not move —
+ * but there is nowhere to file a bug, which is worth knowing before leaning on
+ * it for anything beyond highlighting and folding.
+ */
+export function xmlModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    // Apple writes plists with tabs, but a fresh document has to pick
+    // something; `detectIndentUnit` is what follows the document for the
+    // table's own edits, and this only affects what the Tab key inserts.
+    indentUnit.of('  '),
+    bracketMatching(),
+    closeBrackets(),
+    // `xml()` brings `autoCloseTags` with it by default: typing the `>` of
+    // `<dict>` inserts `</dict>` and leaves the cursor between the two.
+    xmlLang(),
+    plistCompletion,
+    autocompletion(),
+    syntaxHighlighting(xmlHighlight),
+    linter(xmlDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
+function modeExtensionsFor(mode: EditorMode): Extension[] {
+  switch (mode) {
+    case 'markdown':
+      return markdownModeExtensions();
+    case 'javascript':
+      return javascriptModeExtensions();
+    case 'yaml':
+      return yamlModeExtensions();
+    case 'xml':
+      return xmlModeExtensions();
+    // Variant's text panes: no language, no analysis — typing costs nothing.
+    case 'plain':
+      return [];
+    case 'json':
+      return jsonModeExtensions();
+  }
+}
+
 export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function JsonEditor(
   {
     value,
@@ -538,9 +800,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     height = '60vh',
     placeholder,
     highlights,
-    plain = false,
-    markdown = false,
-    javascript: javascriptMode = false,
+    mode = 'json',
     onSearchMatch,
   },
   ref,
@@ -560,31 +820,11 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     const parent = containerRef.current;
     if (!parent) return;
 
-    // Four modes: markdown (Edda), javascript (Loki), plain (Variant text
-    // panes), or JSON (Runestone/Variant).
-    const modeExtensions = markdown
-      ? [markdownLang(), syntaxHighlighting(markdownHighlight)]
-      : javascriptMode
-        ? javascriptModeExtensions()
-        : plain
-          ? []
-          : [
-              foldGutter(),
-              indentOnInput(),
-              indentUnit.of('  '),
-              bracketMatching(),
-              // Typing {[" inserts the closing pair; backspacing an empty pair
-              // removes both (closeBracketsKeymap precedes defaultKeymap).
-              closeBrackets(),
-              json(),
-              syntaxHighlighting(jsonHighlight),
-              linter(jsonDiagnostics, { delay: 300 }),
-              lintGutter(),
-            ];
-    const jsonOnly = !markdown && !plain && !javascriptMode;
-    // Bracket auto-close and folding both apply to JSON and JS; markdown and
-    // plain get neither.
-    const closeBracketsMode = jsonOnly || javascriptMode;
+    const modeExtensions = modeExtensionsFor(mode);
+    // Bracket auto-close and folding both apply to JSON, JS, YAML and XML;
+    // markdown and plain get neither.
+    const closeBracketsMode =
+      mode === 'json' || mode === 'javascript' || mode === 'yaml' || mode === 'xml';
     const foldMode = closeBracketsMode;
     const state = EditorState.create({
       doc: value,
@@ -654,7 +894,7 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
     };
     // The view is created once per structural prop change; `value` flows
     // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, plain, markdown, javascriptMode]);
+  }, [readOnly, height, placeholder, mode]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -723,6 +963,22 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         annotations: isolateHistory.of('full'),
       });
       view.focus();
+    },
+    replaceRange(from: number, to: number, insert: string) {
+      const view = viewRef.current;
+      if (!view) return;
+      const length = view.state.doc.length;
+      // Clamped because the offsets come from an analysis of a *previous*
+      // buffer: a keystroke landing between the parse and the click would
+      // otherwise throw out of CodeMirror rather than simply miss.
+      const start = Math.max(0, Math.min(from, length));
+      const end = Math.max(start, Math.min(to, length));
+      view.dispatch({
+        changes: { from: start, to: end, insert },
+        // Isolated so a table edit never merges into the typing before it —
+        // one edit, one undo.
+        annotations: isolateHistory.of('full'),
+      });
     },
     gotoOffset(offset: number) {
       const view = viewRef.current;

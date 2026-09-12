@@ -22,10 +22,19 @@ interface PortalProps {
  * tagline names where it leads.
  */
 export function Portal({ tone, icon, title, description, go, to, soon }: PortalProps) {
-  const className = `portal ${cardToneClass(tone)}${soon ? ' portal--soon' : ''}`;
+  const navigates = Boolean(to) && !soon;
+  const className = [
+    'tone-surface',
+    navigates ? 'tone-surface--interactive' : '',
+    'portal',
+    cardToneClass(tone),
+    soon ? 'portal--soon' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const inner = (
     <>
-      <span className="portal__icon">{icon}</span>
+      <span className="tone-chip">{icon}</span>
       <span className="portal__title">
         {title}
         {soon && <span className="portal__badge">Coming soon</span>}
@@ -35,7 +44,7 @@ export function Portal({ tone, icon, title, description, go, to, soon }: PortalP
     </>
   );
 
-  if (to && !soon) {
+  if (to && navigates) {
     return (
       <Link to={to} className={className}>
         {inner}

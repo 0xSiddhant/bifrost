@@ -6,15 +6,27 @@
 
 /** One entry of the downloads listing — also the SSE payload for download.* events. */
 export interface DownloadEntry {
-  /** Opaque id derived by the server; the only handle clients may use to fetch content. */
+  /**
+   * Opaque id derived by the server from the path *relative to downloads/*, so
+   * a file inside a folder and a root file of the same name are different
+   * entries. The only handle clients may use to fetch content.
+   */
   id: string;
+  /** Base name — never folder-qualified; `parent` carries the folder. */
   name: string;
-  /** Bytes. */
+  /** Bytes. Folders report 0: the client sums their children from this same feed. */
   size: number;
-  /** Epoch milliseconds. */
+  /** Epoch milliseconds. Folders report the directory's own mtime. */
   mtime: number;
-  /** Lowercased extension including the dot, or '' when the name has none. */
+  /** Lowercased extension including the dot, '' when the name has none or for a folder. */
   ext: string;
+  /** PLAN-24: the listing is one level deep, so an entry is a file or a folder. */
+  type: 'file' | 'folder';
+  /**
+   * Folder this entry lives in, or null at the root. Folders are always at the
+   * root — one level of nesting only, so a folder's own `parent` is never set.
+   */
+  parent: string | null;
 }
 
 export interface FileUploadedEvent {
@@ -53,6 +65,12 @@ export interface FilePublishedEvent {
    * *everyone*, never suppressed for everyone (see `shouldShowForOrigin`).
    */
   originDeviceId: string | null;
+  /**
+   * PLAN-24: set when the file was uploaded straight into `downloads/<folder>/`
+   * rather than moved out of staging. The banner names the folder, and dedupes
+   * per folder so a folder wave and a plain Move don't collapse into one count.
+   */
+  folder?: string;
 }
 
 /**
@@ -82,6 +100,24 @@ export interface ScreensaverSettings {
   mouseReactive: boolean;
   showQuotes: boolean;
   quoteRotateSeconds: number;
+}
+
+/** One warmable page in the offline-mode registry (PLAN-22) — code-owned. */
+export interface OfflineModeTarget {
+  /** Stable id the client maps to its own `import()` loader. */
+  id: string;
+  label: string;
+}
+
+/**
+ * Offline-mode policy as the public config and the SSE payload carry it: the
+ * whole code-owned registry, plus the ids an admin has currently disabled.
+ * Sent whole (rather than as a delta) so a client can replace its copy without
+ * merging.
+ */
+export interface OfflineModeConfig {
+  targets: OfflineModeTarget[];
+  disabled: string[];
 }
 
 /** One validated theme as the listing/SSE payload shows it. */
@@ -139,6 +175,32 @@ export interface RunestoneSummary {
 
 /** A saved Markdown document as the Edda library lists it (PLAN-11). */
 export interface EddaSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
+/** A saved YAML document as the Pensieve lists it (PLAN-19). */
+export interface GrootSummary {
+  id: string;
+  name: string;
+  /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
+  slug: string;
+  /** PLAN-06 device id; display names resolve client-side via core/devices. */
+  authorDeviceId: string | null;
+  sizeBytes: number;
+  createdAt: number;
+  modifiedAt: number;
+}
+
+/** A saved XML document as the Pensieve lists it (PLAN-23). */
+export interface AtlasSummary {
   id: string;
   name: string;
   /** `<kebab-name>-<id>`; regenerates on rename, old id-links still resolve. */
@@ -234,6 +296,12 @@ export interface BifrostEventMap {
   /** Create or update of a saved Markdown document — Edda libraries live-refresh. */
   'edda.saved': { edda: EddaSummary };
   'edda.deleted': { id: string; name: string };
+  /** Create or update of a saved YAML document — the Pensieve live-refreshes. */
+  'groot.saved': { groot: GrootSummary };
+  'groot.deleted': { id: string; name: string };
+  /** Create or update of a saved XML document — the Pensieve live-refreshes. */
+  'atlas.saved': { atlas: AtlasSummary };
+  'atlas.deleted': { id: string; name: string };
   /** A link was added to the read-later shelf — open shelves add the row live. */
   'accio.saved': { link: AccioLink };
   /**
@@ -257,6 +325,8 @@ export interface BifrostEventMap {
   'loki.settingsUpdated': LokiSettings;
   /** Screensaver (Nótt) settings changed in Heimdall — open clients rebind live. */
   'screensaver.settingsUpdated': ScreensaverSettings;
+  /** Offline-mode registry policy changed in Heimdall — open tabs warm the new set. */
+  'offlineMode.settingsUpdated': OfflineModeConfig;
 }
 
 export type BifrostEventName = keyof BifrostEventMap;

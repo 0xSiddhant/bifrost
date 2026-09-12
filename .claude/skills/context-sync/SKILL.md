@@ -3,9 +3,9 @@ name: context-sync
 description: Audit and update Bifrost's .agent knowledge files against the actual codebase so AI context never rots. Use at every release point, after any plan merges with deviations, or when the owner says the docs feel stale.
 ---
 
-# Context Sync — keep `.agent/` truthful
+# Context Sync — keep `.agents/` truthful
 
-Goal: `.agent/context/*.md` and `.agent/rules/*.md` must describe the code as it exists, not as it was planned. Claude Code treats these as ground truth at session start; drift causes contradictions and re-derived decisions.
+Goal: `.agents/context/*.md` and `.agents/rules/*.md` must describe the code as it exists, not as it was planned. Claude Code treats these as ground truth at session start; drift causes contradictions and re-derived decisions.
 
 ## Procedure
 
@@ -20,6 +20,6 @@ Goal: `.agent/context/*.md` and `.agent/rules/*.md` must describe the code as it
    - scripts table in README vs `package.json`
 3. Also check the public mirrors: `docs/ARCHITECTURE.md`, `docs/THEME-SPEC.md` (vs the shipped ajv schema), root `README.md` feature list.
 4. Update files to match reality. **Direction of truth: code wins**, unless the divergence violates a logged decision — in that case report it as a regression instead of documenting it.
-5. Anything that was a real decision drift (not just stale prose) gets a new dated row in `.agent/memory/decisions.md`. Never edit or delete existing rows.
+5. Anything that was a real decision drift (not just stale prose) gets a new dated row in `.agents/memory/decisions.md`. Never edit or delete existing rows.
 6. Do NOT touch plan files (they are historical specs) or session notes.
 7. Output a divergence table in the PR body: file · claim · reality · action taken.

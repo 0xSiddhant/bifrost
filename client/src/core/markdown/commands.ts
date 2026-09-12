@@ -25,7 +25,8 @@ export type MarkdownCommand =
   | 'numberList'
   | 'taskList'
   | 'codeFence'
-  | 'table';
+  | 'table'
+  | 'presenterNote';
 
 /** Toggle an inline wrap (bold/italic/code/strike) around the selection. */
 function toggleWrap(sel: DocSelection, open: string, close: string = open): DocSelection {
@@ -152,6 +153,34 @@ function table(sel: DocSelection): DocSelection {
   return { doc: doc2, from: from + inserted.length, to: from + inserted.length };
 }
 
+const NOTE_OPEN = '<!-- notes: ';
+const NOTE_CLOSE = ' -->';
+
+/**
+ * A presenter note: an HTML comment Saga lifts out and shows beside the slide
+ * (PLAN-28), invisible in every other markdown surface because a comment always
+ * was. Written here rather than in `features/saga/` because it is a markdown
+ * construct and this is the one place markdown edits live — Saga only reads it.
+ *
+ * Always placed on its own line. Inline is legal and parses, but it eats the
+ * spacing either side of it, so the toolbar should not be able to produce that.
+ * The colon is what makes it a note rather than an ordinary comment, so it is
+ * part of the inserted text and never something to remember.
+ */
+function presenterNote(sel: DocSelection): DocSelection {
+  const { doc, from, to } = sel;
+  // A selection becomes the note's text: "say this bit out loud" is a thought
+  // people have about a line they have already written.
+  const selected = doc.slice(from, to).trim();
+  const lead = from === 0 || doc[from - 1] === '\n' ? '' : '\n';
+  const inserted = `${lead}${NOTE_OPEN}${selected}${NOTE_CLOSE}\n`;
+  const doc2 = doc.slice(0, from) + inserted + doc.slice(to);
+  // Caret after the note's own text, so typing continues the note instead of
+  // replacing it — the same rule `blockResult` explains for block commands.
+  const caret = from + lead.length + NOTE_OPEN.length + selected.length;
+  return { doc: doc2, from: caret, to: caret };
+}
+
 export function runCommand(command: MarkdownCommand, sel: DocSelection): DocSelection {
   switch (command) {
     case 'bold':
@@ -182,5 +211,7 @@ export function runCommand(command: MarkdownCommand, sel: DocSelection): DocSele
       return fence(sel);
     case 'table':
       return table(sel);
+    case 'presenterNote':
+      return presenterNote(sel);
   }
 }

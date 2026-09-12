@@ -20,12 +20,17 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   // Public data/preview routes that escape the SPA fallback.
   'runestone',
   'edda',
+  'groot',
+  'atlas',
   'variant',
   'loki',
   'accio',
   'nimbus',
   'heimdall',
   // Client route roots (App.tsx) — a slug must never collide with a real page.
+  // `pensieve` became a first segment in PLAN-21 (it was only ever nested
+  // under /runestone and /edda before the two libraries became one page).
+  'pensieve',
   'portkey',
   'upload',
   'downloads',
@@ -35,6 +40,10 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'sigil',
   'ollivanders',
   'diagon-alley',
+  // PLAN-25: a client route only — the Brotli module publishes nothing outside /api.
+  'brotli',
+  // PLAN-28: a client route only — the Saga module registers no route at all.
+  'saga',
 ]);
 
 /** True when `word` names one of the app's own path roots (already lowercased). */

@@ -262,3 +262,173 @@ export const PencilIcon = (p: IconProps) => (
     <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </svg>
 );
+
+// Diagon Alley toolbox (PLAN-18).
+export const KeyIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="8" cy="12" r="4" />
+    <path d="M12 12h9" />
+    <path d="M17 12v3.5M20 12v2.5" />
+  </svg>
+);
+
+export const ClockIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </svg>
+);
+
+export const SwapIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 8h13m0 0-3.5-3.5M17 8l-3.5 3.5" />
+    <path d="M20 16H7m0 0 3.5-3.5M7 16l3.5 3.5" />
+  </svg>
+);
+
+export const LinkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 1 0-5.7-5.7l-1.6 1.6" />
+    <path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 1 0 5.7 5.7l1.6-1.6" />
+  </svg>
+);
+
+export const BinaryIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="4" width="6" height="7" rx="2" />
+    <rect x="14.5" y="13" width="6" height="7" rx="2" />
+    <path d="M15 4h3v7M14 11h6M6 20h6M9 13v7" />
+  </svg>
+);
+
+export const TicketIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M3 9V7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v2a2.5 2.5 0 0 0 0 5v2a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-2a2.5 2.5 0 0 0 0-5Z" />
+    <path d="M13 6v2M13 11v2M13 16v2" />
+  </svg>
+);
+
+export const DropletIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3.5c3 3.6 5.5 6.4 5.5 9.3a5.5 5.5 0 0 1-11 0c0-2.9 2.5-5.7 5.5-9.3Z" />
+  </svg>
+);
+
+export const NetworkIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="9" y="3" width="6" height="5" rx="1.2" />
+    <rect x="2.5" y="16" width="6" height="5" rx="1.2" />
+    <rect x="15.5" y="16" width="6" height="5" rx="1.2" />
+    <path d="M12 8v4M5.5 16v-2h13v2M12 12v2" />
+  </svg>
+);
+
+export const TypeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M4 6.5V5h9v1.5M8.5 5v14M6.5 19h4" />
+    <path d="M14 12.5V11h6v1.5M17 11v8M15.5 19h3" />
+  </svg>
+);
+
+export const LockIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="4.5" y="10" width="15" height="10" rx="2" />
+    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+  </svg>
+);
+
+export const CalendarIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+
+export const FingerprintIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 11a7 7 0 0 1 14 0v1" />
+    <path d="M8.5 11a3.5 3.5 0 0 1 7 0v3a6 6 0 0 1-.8 3" />
+    <path d="M12 11v4a9 9 0 0 1-1.2 4.5" />
+    <path d="M7.2 15.5A8 8 0 0 1 7 14v-3" />
+  </svg>
+);
+
+/** Groot (PLAN-19) — one trunk, many branches: a literal tree for YAML. */
+export const TreeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 21v-7" />
+    <path d="M12 14 7.5 9.5M12 11l4.5-4.5" />
+    <path d="M9.5 4.5a3 3 0 0 0-2.6 4.4 3 3 0 0 0 1.6 5.1 3 3 0 0 0 5.6 1.4 3 3 0 0 0 4.6-3.6 3 3 0 0 0-1.6-4.8A3 3 0 0 0 12 3.6a3 3 0 0 0-2.5.9Z" />
+  </svg>
+);
+
+/** Atlas (PLAN-23) — the titan holding the structure up: a globe on a shoulder. */
+export const GlobeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="10" r="7" />
+    <path d="M5 10h14M12 3c2 2.2 3 4.6 3 7s-1 4.8-3 7c-2-2.2-3-4.6-3-7s1-4.8 3-7Z" />
+    <path d="M4 21c1.6-1.6 3.4-2.4 5.4-2.4" />
+  </svg>
+);
+
+export const PlusIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+export const MinusIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M5 12h14" />
+  </svg>
+);
+
+/** Drag handle for a reorderable row — the usual two columns of dots. */
+export const GripIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01" strokeWidth="2.6" />
+  </svg>
+);
+
+/**
+ * Xcode's stepper: a chevron pair stacked in one control. Drawn as one icon
+ * rather than two buttons stacked, so the halves stay pinned together at any
+ * font size — the halves are separate hit targets in the markup.
+ */
+export const StepperIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="m8 10 4-3.5 4 3.5" />
+    <path d="m8 14 4 3.5 4-3.5" />
+  </svg>
+);
+
+/** Filled disclosure triangle; CSS rotates it 90° when the row is open. */
+export const DisclosureIcon = (p: IconProps) => (
+  <svg {...base(p)} fill="currentColor" stroke="none">
+    <path d="M9 5.5 16.5 12 9 18.5Z" />
+  </svg>
+);
+
+/**
+ * Saga's slideshow (PLAN-28): a projected frame on a stand. Scanned the whole
+ * export list first — there was no slides/presentation glyph here before, so
+ * this is a genuine addition rather than a near-duplicate of `DocFileIcon`.
+ */
+export const SlidesIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <rect x="3" y="4" width="18" height="12" rx="2" />
+    <path d="M12 16v4m-3 0h6" />
+  </svg>
+);
+
+/**
+ * The guide panel's bulb (PLAN-30) — the one idea the 40-odd icons above had
+ * no shape for. `SparklesIcon` and `FlameIcon` are the nearest neighbours and
+ * neither reads as "here is an explanation".
+ */
+export const LightbulbIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.3.3.5.7.5 1.1h6c0-.4.2-.8.5-1.1A6 6 0 0 0 12 3Z" />
+  </svg>
+);

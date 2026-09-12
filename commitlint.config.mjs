@@ -1,6 +1,6 @@
 /**
  * Conventional Commits, enforced. Scopes = module names + core areas
- * (see .agent/rules/git.md).
+ * (see .agents/rules/git.md).
  */
 export default {
   extends: ['@commitlint/config-conventional'],
@@ -21,16 +21,23 @@ export default {
         'runestone',
         'variant',
         'edda',
+        'groot',
+        'atlas',
         'loki',
         'accio',
+        'brotli',
         'nimbus',
         'portkey',
         'screensaver',
         'client-logs',
         'metrics',
+        'toolbox',
+        'saga',
+        'offline-mode',
         // core areas
         'core',
         'client',
+        'cli',
         'ci',
         'docs',
         'ops',
