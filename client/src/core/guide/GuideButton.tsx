@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button } from '../ui/Button';
 import { LightbulbIcon } from '../ui/icons';
@@ -14,17 +14,17 @@ import { guideForRoute } from './registry';
  * all, not a disabled button: there is no guide to point at, so there is
  * nothing to click.
  *
- * The container wrapping the bulb and the drawer is what makes "click outside
- * to close" work, exactly as it does for ThemeSwitcher's popover next door:
- * the drawer is `position: fixed` but still a DOM descendant, so a click on
- * either is inside, and the bulb's own click stays a plain toggle instead of
- * racing a close.
+ * Closing is split: `Escape` belongs here, because it is a window-level key no
+ * matter what has focus, while "click outside" belongs to the panel's own
+ * scrim, which covers the page and knows exactly what outside means. That is
+ * simpler than ThemeSwitcher's contains()-on-a-container trick next door, and
+ * it has to be — the panel portals out to `document.body`, so it is no longer
+ * a DOM descendant of anything here.
  */
 export function GuideButton() {
   const { pathname } = useLocation();
   const guide = guideForRoute(pathname);
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Navigating away from the page a drawer was opened on closes it: the guide
   // is about *this* page's format, so carrying it to the next one would be
@@ -34,24 +34,17 @@ export function GuideButton() {
 
   useEffect(() => {
     if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setOpen(false);
     };
-    window.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onPointerDown);
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
   if (!guide) return null;
 
   return (
-    <div className="guide-button" ref={containerRef}>
+    <div className="guide-button">
       <Button
         variant="ghost"
         size="icon"

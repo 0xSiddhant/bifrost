@@ -49,7 +49,10 @@ describe('GuideButton', () => {
     );
 
   const bulb = () => container.querySelector<HTMLButtonElement>('.guide-button > button');
-  const panel = () => container.querySelector('.guide-panel');
+  // The panel portals into document.body (it must outrank the mobile bottom
+  // nav's stacking context), so it is never inside the test container.
+  const panel = () => document.querySelector('.guide-panel');
+  const scrim = () => document.querySelector<HTMLDivElement>('.guide-scrim');
 
   /** Open the drawer and wait for it to settle on content or on its error. */
   const openOn = async (pathname: string) => {
@@ -87,6 +90,7 @@ describe('GuideButton', () => {
   it.each(['/', '/pensieve', '/variant'])('renders nothing at all on %s', (pathname) => {
     mount(pathname);
     expect(container.innerHTML).toBe('');
+    expect(panel()).toBeNull();
   });
 
   it('loads no guide content until the bulb is actually clicked', async () => {
@@ -102,7 +106,7 @@ describe('GuideButton', () => {
   it('shows the matching guide for the page', async () => {
     await openOn('/groot');
 
-    expect(container.querySelector('.guide-panel__title')?.textContent).toBe('YAML');
+    expect(document.querySelector('.guide-panel__title')?.textContent).toBe('YAML');
     // Real content from assets/guides/yaml.md, not a placeholder.
     expect(panel()?.textContent).toContain('advisory rail');
   });
@@ -133,18 +137,56 @@ describe('GuideButton', () => {
     expect(panel()).toBeNull();
   });
 
-  it('closes on a click outside, but not on one inside', async () => {
+  it('closes on a click on the scrim, but not on one inside the panel', async () => {
     await openOn('/edda');
+    expect(scrim()).not.toBeNull();
 
     act(() => {
-      panel()?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+      panel()?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(panel()).not.toBeNull();
 
-    act(() => {
-      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
-    });
+    act(() => scrim()?.click());
     expect(panel()).toBeNull();
+    expect(scrim()).toBeNull();
+  });
+
+  it('dismisses the sheet on a downward swipe past the threshold', async () => {
+    // The sheet shape is a media query, and jsdom answers matchMedia false by
+    // default — so the gesture has to be told it is on a phone.
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query === '(max-width: 640px)',
+        media: query,
+        addEventListener() {},
+        removeEventListener() {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      await openOn('/edda');
+      const head = document.querySelector<HTMLElement>('.guide-panel__head');
+      if (!head) throw new Error('no sheet header');
+      head.setPointerCapture = () => {};
+
+      const drag = (type: string, clientY: number) =>
+        act(() => {
+          head.dispatchEvent(new PointerEvent(type, { bubbles: true, clientY, pointerId: 1 }));
+        });
+
+      drag('pointerdown', 100);
+      drag('pointermove', 130);
+      expect(panel()).not.toBeNull(); // 30px is a nudge, not a dismissal
+
+      drag('pointerup', 130);
+      expect(panel()).not.toBeNull(); // released short of the threshold: snaps back
+
+      drag('pointerdown', 100);
+      drag('pointermove', 260);
+      drag('pointerup', 260);
+      expect(panel()).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it('reports a guide that fails to load instead of showing an empty drawer', async () => {
