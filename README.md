@@ -2,7 +2,7 @@
 
 # 🌈 Bifrost
 
-**A private LAN workbench — transfer, sync, and a bridge of dev tools.**
+**A private LAN hub — file transfer & sync, a workbench of dev tools, and a drawer of network utilities.**
 
 ![Node](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -30,32 +30,48 @@
 
 ## What is Bifrost?
 
-Bifrost turns one Mac on your local network into a private file & sync hub for every device in the house — iPhone, Android, iPad, any laptop. No cloud, no public internet, no accounts. Advertised over mDNS at `http://bifrost.local`.
+Bifrost turns one machine on your local network — a Mac natively, or a Linux box (Raspberry Pi included) via Docker — into a private hub for every other device in the house: iPhone, Android, iPad, any laptop. Files move between devices, structured documents get their own workbench, and a handful of everyday utilities live one tap away. No cloud, no public internet, no accounts. Advertised over mDNS at `http://bifrost.local`.
 
-**Features**
+The app is organized into three category tabs, plus a few things that work everywhere.
 
-- 📤 Multi-file upload (streamed, 2 GB configurable limit) into a staging area — preview, rename or delete what you sent, then move it to Downloads and every device gets a banner
-- 📥 Live download page — drop a file into a folder in Finder, it appears on every device instantly (SSE)
-- 👁 In-browser previews — images, PDF, video (seekable), markdown
-- 📋 Hermes — clipboard/text sync across devices
-- 🔳 Sigil — QR generator ("Make a QR"); a scan-to-join QR for the server URL lives on the home page
+### 🌈 Midgard — transfer & sharing
+
+- 📤 **Send** — multi-file upload (streamed, 2 GB configurable limit) into a staging area you can preview, rename or delete before publishing to Downloads — or send straight into a named folder — and every device gets a banner
+- 📥 **Receive** — drop a file into a folder in Finder and it appears on every device instantly (SSE); folders are browsable one level deep and download as a `.zip`
+- 👁 In-browser previews for images, PDF, video (seekable), and Markdown
+- 📋 **Hermes** — clipboard/text sync across devices
+- 🔖 **Accio** — read-later shelf with tags and best-effort page-title lookup
+- 🎞 **Saga** — present a deck fullscreen: drop a `.md` file (`---` splits the slides, `<!-- notes: … -->` feeds the presenter panel) or a `.pdf` (one page per slide), or open a saved Edda; keyboard navigation, resizable text that carries into fullscreen, and a shortcuts overlay — nothing is uploaded or stored
+- A scan-to-join QR for the server URL, right on the home page
+
+### 🪄 Ollivanders — dev tools ("the tool chooses the maker")
+
+- 🧿 **Runestone** — JSON viewer/editor with in-editor find and tree collapse-all
+- ⚖️ **Variant** — structural JSON diff (key order & formatting are noise) with a raw-text fallback and cross-pane reveal; export as an RFC 6902 JSON Patch or a git-shaped unified `.patch`
+- 📖 **Edda** — Markdown editor with live preview (Mermaid diagrams render inline); share as a rendered page, raw `text/markdown`, or a printable HTML/PDF export
+- 🃏 **Loki** — JavaScript workbench: transforms, a regex tester, and a sandboxed Web-Worker runner
+- 🌳 **Groot** — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
+- 🌐 **Atlas** — XML workspace: format, minify, fold; an Apple property list also opens as an editable, Xcode-shaped table
+- 🗜 **Brotli** — compress text or a file, or decompress a `.br`, with a live gzip comparison and a one-click hand-off into whichever editor above the result fits
+- 🗃 **Pensieve** — one saved-document library across Runestone, Edda, Groot and Atlas; every saved doc doubles as a public data URL
+- 💡 A header bulb opens a **guide panel** — a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
+
+### 🎪 Diagon Alley — utilities
+
+- 🔳 **Sigil** — QR generator ("Make a QR")
+- 🧹 **Nimbus** — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
+- 🚪 **Portkey** — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
+- Plus 12 more pure-client utilities that expand in place: Base64, UUID, Unix time, URL encode/decode, ASCII/Hex/Binary, JWT decode, colour tools (Iris), a CIDR calculator, a text-case converter, a password generator, a cron expression explainer, and SHA-256 hashing (host-only — needs a secure context browsers only grant on `localhost`)
+
+### Everywhere
+
 - 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), addable via JSON
-- 🧿 Runestone — JSON viewer/editor with a saved-document library (Pensieve); each saved doc doubles as a public data URL; in-editor find + tree collapse-all
-- ⚖️ Variant — structural JSON diff (key order & formatting are noise) with a raw-text fallback; find with cross-pane reveal
-- 📖 Edda — Markdown editor with live preview and a saved library; share as a rendered page, raw `text/markdown`, or HTML export
-- 🎞 Saga — present a deck fullscreen: drop a `.md` file (`---` splits the slides, `<!-- notes: … -->` feeds the presenter panel) or a `.pdf` (one page per slide, rasterized at a bounded resolution); keyboard navigation, +/− sizing that carries into fullscreen, and a shortcuts overlay. Nothing is uploaded or stored — or open a saved Edda
-- 🌳 Groot — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
-- 🃏 Loki — JavaScript workbench: transforms, regex tester, and a sandboxed Web-Worker runner
-- 🔖 Accio — read-later shelf with tags and best-effort page-title lookup
-- 🚪 Portkey — LAN go-links: `bifrost.local/go/<slug>` redirects, with a QR per link
-- 🧹 Nimbus — LAN speed test: download/upload/latency between a device and the bridge, with per-device history
-- 💡 Guide panel — a header bulb opens a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
-- 🌌 Nótt — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
-- 🛡 Heimdall — hidden admin panel (secret gesture/shortcut + PIN)
-- 📜 Wardens — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
+- 🌌 **Nótt** — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
+- 🛡 **Heimdall** — hidden admin panel (secret gesture/shortcut + PIN)
+- 📜 **Wardens** — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
 - 🔁 Restart-safe: all state survives server stop/start
 
-**Navigation** groups these into three category tabs: **Midgard** (Send / Receive / Hermes / Saga + Join-Bifrost QR), **Ollivanders** (Runestone / Variant / Edda / Loki / Pensieve / Groot), and **Diagon Alley** (Sigil / Nimbus + a coming-soon utility toolbox). Each tool keeps its own URL.
+Each stateful page keeps its own URL; the Diagon Alley utilities open inline at `/diagon-alley/<tool>`.
 
 ## Quick start
 
@@ -134,18 +150,18 @@ to.
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `npm run setup` | Creates storage folders, verifies `.env`, runs DB migrations |
-| `npm run dev` | Dev mode with hot reload (server + client) |
-| `npm run build` | Production build (client + server), then re-installs the global `bifrost` CLI |
-| `npm start` | Re-installs the global `bifrost` CLI, then runs the production build |
-| `npm run logs` | Pretty-tail the JSON log file |
-| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data |
-| `npm run backup` | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
-| `npm run restore -- <archive.zip>` | Restore an archive (refuses a live server unless `--force`) |
-| `npm run test:resilience` | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand) |
-| `npm test` / `npm run lint` / `npm run typecheck` | Quality gates (also run in CI) |
+| Command                                                        | What it does                                                                                   |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `npm run setup`                                                | Creates storage folders, verifies `.env`, runs DB migrations                                   |
+| `npm run dev`                                                  | Dev mode with hot reload (server + client)                                                     |
+| `npm run build`                                                | Production build (client + server), then re-installs the global `bifrost` CLI                  |
+| `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                           |
+| `npm run logs`                                                 | Pretty-tail the JSON log file                                                                  |
+| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data            |
+| `npm run backup`                                               | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
+| `npm run restore -- <archive.zip>`                             | Restore an archive (refuses a live server unless `--force`)                                    |
+| `npm run test:resilience`                                      | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand)                 |
+| `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                 |
 
 Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 `scripts/start-launchd.sh`, `scripts/observability.sh`.
@@ -161,6 +177,7 @@ Operating & deploying:
 - [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
+- [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 
