@@ -1507,6 +1507,10 @@
   align-items: center;
   gap: var(--space-2);
   flex: none;
+  /* New + Save + Pensieve is wider than a 375px head: wrap rather than push the
+     row off the edge. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .rune-404 {
