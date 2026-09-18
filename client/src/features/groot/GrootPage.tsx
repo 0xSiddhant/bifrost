@@ -452,6 +452,31 @@ export function GrootPage() {
     navigate('/groot', { replace: true });
   };
 
+  // A blank buffer without leaving the page. Once a document is saved the
+  // editor is bound to its slug, and reloading /groot/<slug> correctly re-opens
+  // that same document — so the only way to start another one was to leave
+  // Ollivanders and come back in. This is the same reset the 404 does, with a
+  // generated title instead of a slug-derived one, and it *pushes* the scratch
+  // URL rather than replacing it, so Back returns to the document.
+  const startNew = () => {
+    if (dirty && !window.confirm('Start a new document? Unsaved changes to this one are lost.'))
+      return;
+    setPhase('new');
+    setDocId(null);
+    setSnapshot(null);
+    setText('');
+    setTitle(relicTitle());
+    setNotice(null);
+    // The stream tab is clamped on read, not reset — but a new document starts
+    // at its first document, not on whichever tab the last one ended on.
+    setDocIndex(0);
+    // The cached draft backs up the buffer being left behind, so keeping it
+    // would have the restore prompt offer back exactly what New discarded.
+    clearDraft();
+    setRestorable(null);
+    if (slug) navigate('/groot');
+  };
+
   if (phase === 'loading') {
     return <div className="page-loading caption">Reading the rings…</div>;
   }
@@ -500,6 +525,9 @@ export function GrootPage() {
           <p>Write, fold and check YAML. Comments survive every format.</p>
         </div>
         <div className="rune-head-actions">
+          <Button variant="ghost" onClick={startNew} disabled={saving} title="Start a new document">
+            New
+          </Button>
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Growing…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
