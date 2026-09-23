@@ -2,7 +2,7 @@
 
 ## Branches
 
-- `main` — protected. **No direct human commits, ever.** Receives merges from `develop` only, via PR, at release points. The one automated exception: `.github/workflows/release.yml` pushes the `chore(release): vX.Y.Z` commit + tag to `main` (and fast-forwards `develop`) after a develop→main merge, via the `RELEASE_TOKEN` PAT — see docs/releasing.md.
+- `main` — protected. **No direct human commits, ever.** Receives merges from `develop` only, via PR, at release points. The one automated exception: `.github/workflows/release.yml` pushes the `chore(release): vX.Y.Z` commit + tag to `main` (and merges it into `develop`) after a develop→main merge, via the `RELEASE_TOKEN` PAT — see docs/releasing.md. `.github/workflows/sync-develop.yml` also merges (never squashes) any other push to `main` — e.g. a hotfix — into `develop`, so develop never falls behind main.
 - `develop` — integration branch. All plan work lands here via PR.
 - Feature branches — one per plan: `feat/plan-XX-<slug>` (e.g. `feat/plan-02-file-transfer`). Fix branches: `fix/<slug>`.
 

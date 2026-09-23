@@ -122,5 +122,8 @@ jobs:
         run: |
           git fetch origin develop
           git checkout develop
-          git merge --ff-only main
+          # Fast-forwards after a develop→main release; after a hotfix,
+          # sync-develop.yml may already have merged main into develop, so fall
+          # back to a regular merge commit instead of failing.
+          git merge --no-edit main
           git push origin develop
