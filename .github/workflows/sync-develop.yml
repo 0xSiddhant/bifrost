@@ -1,0 +1,64 @@
+name: Sync develop
+
+# Keeps develop in step with main. Any push to main that did NOT come from
+# develop (hotfix PRs into main, direct bot commits, etc.) is merged into
+# develop with a regular merge — never a squash — so develop's history keeps
+# main's commits verbatim and the next develop→main PR has no drift.
+#
+# Skipped on purpose:
+#   - develop→main merges: their content is already on develop.
+#   - chore(release) commits: release.yml back-merges those itself.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: sync-develop
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Same PAT as release.yml — develop is protected, GITHUB_TOKEN can't push.
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Decide whether develop needs main
+        id: check
+        run: |
+          git fetch origin develop
+          # A merge whose second parent is already on develop is a develop→main
+          # merge (whatever GitHub titled it) — nothing new for develop.
+          if git rev-parse -q --verify HEAD^2 >/dev/null \
+            && git merge-base --is-ancestor HEAD^2 origin/develop; then
+            echo "sync=false" >> "$GITHUB_OUTPUT"
+            echo "HEAD is a merge from develop — skipping."
+          elif git merge-base --is-ancestor HEAD origin/develop; then
+            echo "sync=false" >> "$GITHUB_OUTPUT"
+            echo "develop already contains main — skipping."
+          else
+            echo "sync=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge main into develop
+        if: steps.check.outputs.sync == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B develop origin/develop
+          # --no-ff: always a real merge commit, so the sync is visible in history.
+          if ! git merge --no-ff --no-edit -m "Merge branch 'main' into develop" origin/main; then
+            git merge --abort
+            echo "::error::main → develop has conflicts. Merge main into develop manually."
+            exit 1
+          fi
+          git push origin develop

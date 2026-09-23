@@ -25,7 +25,8 @@ edit versions or the changelog yourself.
      **two assets**: the `bifrost-vX.Y.Z.tar.gz` production build (rollback
      artifact / PM2 deployment bundle) and `bifrost-cli-X.Y.Z.tgz`, which is
      what `npm install -g <url>` installs;
-   - fast-forwards **`main` → `develop`** so develop carries the bump.
+   - merges **`main` → `develop`** (a fast-forward when possible) so develop
+     carries the bump.
 
 A `chore:`/`docs:`-only merge to `main` produces **no release** (nothing
 releasable since the last tag).
@@ -71,9 +72,13 @@ git checkout -b fix/urgent main
 # ... fix ...
 ```
 
-Merging the `fix:` PR to `main` triggers a patch release automatically, and the
-back-merge step carries the fix + bump back to `develop`. If the fast-forward
-back-merge fails (develop diverged), merge `main` into `develop` manually.
+Merging the `fix:` PR to `main` triggers a patch release automatically.
+`.github/workflows/sync-develop.yml` merges the fix into `develop` (a regular
+merge commit, never a squash), and the release's back-merge then carries the
+bump. The sync runs on every push to `main` except develop→main merges and
+`chore(release)` commits, so any change that reaches `main` some other way lands
+on `develop` too. If the sync hits a merge conflict the job fails — merge `main`
+into `develop` manually.
 
 ## Deliberately excluded
 
