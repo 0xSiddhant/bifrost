@@ -116,7 +116,12 @@ sh scripts/observability.sh    # http://localhost:3000  (admin / bifrost)
 ```
 
 See [`docs/observability.md`](docs/observability.md). Back up all state
-(`storage/` + `themes/`) any time with `npm run backup`.
+(`storage/` + `themes/`) any time with `npm run backup`, or schedule it
+(macOS): set `BACKUP_CLOUD` (dropbox / icloud / onedrive / gdrive / path) in
+`.env` and run `npm run backup:install` — a launchd agent checks daily and
+backs up every `BACKUP_INTERVAL_DAYS` into the cloud folder, only while the
+server is running. `npm run backup:status` shows the schedule, last run, and
+next due date; `backup:stop` / `backup:start` pause and resume it.
 
 ## CLI
 
@@ -150,18 +155,22 @@ to.
 
 ## Scripts
 
-| Command                                                        | What it does                                                                                   |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `npm run setup`                                                | Creates storage folders, verifies `.env`, runs DB migrations                                   |
-| `npm run dev`                                                  | Dev mode with hot reload (server + client)                                                     |
-| `npm run build`                                                | Production build (client + server), then re-installs the global `bifrost` CLI                  |
-| `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                           |
-| `npm run logs`                                                 | Pretty-tail the JSON log file                                                                  |
-| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data            |
-| `npm run backup`                                               | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`) |
-| `npm run restore -- <archive.zip>`                             | Restore an archive (refuses a live server unless `--force`)                                    |
-| `npm run test:resilience`                                      | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand)                 |
-| `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                 |
+| Command                                                        | What it does                                                                                                                                                                         |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run setup`                                                | Creates storage folders, verifies `.env`, runs DB migrations                                                                                                                         |
+| `npm run dev`                                                  | Dev mode with hot reload (server + client)                                                                                                                                           |
+| `npm run build`                                                | Production build (client + server), then re-installs the global `bifrost` CLI                                                                                                        |
+| `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                                                                                                                 |
+| `npm run logs`                                                 | Pretty-tail the JSON log file                                                                                                                                                        |
+| `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data                                                                                                  |
+| `npm run backup`                                               | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`)                                                                                       |
+| `npm run backup:install` / `backup:uninstall`                  | Install/remove the scheduled-backup launchd agent (macOS; settings in `.env`)                                                                                                        |
+| `npm run backup:status`                                        | Schedule, agent state, last run/success/failure, stored backups, next due date                                                                                                       |
+| `npm run backup:stop` / `backup:start`                         | Pause scheduled backups (stays off across logins) / resume them                                                                                                                      |
+| `npm run backup:run [-- --force]`                              | Run the scheduled job now; `--force` skips the "not due yet" check                                                                                                                   |
+| `npm run restore -- <path>`                                    | Restore a backup: a `.zip`, one backup's folder (exactly that one), or a folder of backups (the newest). Checks `meta.json`'s checksum first; refuses a live server unless `--force` |
+| `npm run test:resilience`                                      | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand)                                                                                                       |
+| `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                                                                                                       |
 
 Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 `scripts/start-launchd.sh`, `scripts/observability.sh`.
