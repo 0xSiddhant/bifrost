@@ -16,6 +16,8 @@ describe('accio module', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-accio-'));
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       // Keep the (unreachable, in tests) title lookup from holding shutdown up.
@@ -181,7 +183,7 @@ describe('accio title enrichment', () => {
 
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-accio-title-'));
     app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ACCIO_TITLE_TIMEOUT_MS: '500' }),
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ACCIO_TITLE_TIMEOUT_MS: '500' }),
       { logger: pino({ level: 'silent' }) },
     );
   });

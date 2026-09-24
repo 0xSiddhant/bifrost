@@ -41,7 +41,7 @@ describe('metrics snapshots', () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-metrics-'));
     const captured = capture(level);
     app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ...env }),
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ...env }),
       { logger: captured.logger },
     );
     return captured;
@@ -153,7 +153,7 @@ describe('prometheus exposition', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-prom-'));
     app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' }),
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' }),
       { logger: capture().logger },
     );
   });

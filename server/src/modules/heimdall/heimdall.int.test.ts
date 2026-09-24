@@ -51,7 +51,7 @@ describe('heimdall auth guard + session', () => {
     // …and one dot-file, which is the OS's, not an upload (criterion 27).
     fs.writeFileSync(path.join(uploads, '.DS_Store'), 'x'.repeat(6144));
 
-    app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
   });
@@ -206,7 +206,7 @@ describe('heimdall auth guard + session', () => {
 describe('heimdall login rate limit', () => {
   it('locks out after 5 failed attempts', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-rl-');
-    const app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    const app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
     try {
@@ -229,7 +229,7 @@ describe('heimdall login rate limit', () => {
 describe('heimdall settings persist across restart', () => {
   it('a persisted shortcut survives a fresh boot', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-persist-');
-    const first = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    const first = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
     const { cookie } = await login(first);
@@ -241,7 +241,7 @@ describe('heimdall settings persist across restart', () => {
     });
     await first.shutdown();
 
-    const second = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    const second = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
     try {

@@ -24,7 +24,7 @@ describe('audit log over HTTP', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-audit-'));
-    app = await createApp(loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
+    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
     // Logging in itself records a heimdall.login event.

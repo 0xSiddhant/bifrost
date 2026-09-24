@@ -27,7 +27,7 @@ describe('uploads staging actions over HTTP', () => {
     downloads = path.join(storageRoot, 'downloads');
     fs.mkdirSync(uploads, { recursive: true });
     fs.mkdirSync(downloads, { recursive: true });
-    app = await createApp(loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
+    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
   });

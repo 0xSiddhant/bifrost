@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { applySettingsOverlay, ConfigError, loadConfig } from './index.js';
 
-const VALID_ENV = { HEIMDALL_PIN: '4321' };
+// The minimal env the server boots on: exactly the required (no-default) keys.
+const VALID_ENV = {
+  HEIMDALL_PIN: '4321',
+  DEPLOY_PROFILE: 'local',
+  STORAGE_ROOT: './storage',
+  PORT: '4646',
+};
 
 describe('loadConfig', () => {
   it('applies documented defaults over a minimal env', () => {
@@ -51,6 +57,19 @@ describe('loadConfig', () => {
     expect(() => loadConfig({})).toThrowError(/HEIMDALL_PIN/);
   });
 
+  it.each(['DEPLOY_PROFILE', 'STORAGE_ROOT', 'PORT', 'HEIMDALL_PIN'])(
+    'refuses to load without the required key %s — missing or blank',
+    (key) => {
+      const missing: Record<string, string> = { ...VALID_ENV };
+      delete missing[key];
+      expect(() => loadConfig(missing)).toThrowError(new RegExp(`${key}: required`));
+      // A blank `KEY=` line is "unset", so it must fail the same way.
+      expect(() => loadConfig({ ...VALID_ENV, [key]: '' })).toThrowError(
+        new RegExp(`${key}: required`),
+      );
+    },
+  );
+
   it('lists every invalid key in one error', () => {
     const attempt = () =>
       loadConfig({ ...VALID_ENV, PORT: 'not-a-number', LOG_LEVEL: 'loud', DEPLOY_PROFILE: 'moon' });
@@ -60,8 +79,8 @@ describe('loadConfig', () => {
   });
 
   it('treats empty strings as unset (falls back to defaults)', () => {
-    const config = loadConfig({ ...VALID_ENV, PORT: '', BACKUP_DIR: '', MDNS_NAME: '' });
-    expect(config.port).toBe(4646);
+    const config = loadConfig({ ...VALID_ENV, LOG_LEVEL: '', BACKUP_DIR: '', MDNS_NAME: '' });
+    expect(config.logLevel).toBe('trace');
     expect(config.mdnsName).toBe('bifrost');
     expect(config.backupDir).toBeNull();
   });

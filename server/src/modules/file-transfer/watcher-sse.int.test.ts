@@ -27,7 +27,7 @@ describe('downloads watcher → bus → sse', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-watch-'));
-    const config = loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
     for (const dir of Object.values(config.storage)) {
       if (!dir.endsWith('.db')) fs.mkdirSync(dir, { recursive: true });
     }

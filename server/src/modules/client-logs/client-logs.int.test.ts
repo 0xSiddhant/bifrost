@@ -33,6 +33,8 @@ describe('client-logs', () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-clientlogs-'));
     app = await createApp(
       loadConfig({
+        DEPLOY_PROFILE: 'local',
+        PORT: '4646',
         HEIMDALL_PIN: '4321',
         STORAGE_ROOT: storageRoot,
         // Small enough that one oversized report trips it, roomy enough that a

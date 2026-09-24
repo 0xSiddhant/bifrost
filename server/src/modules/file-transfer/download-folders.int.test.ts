@@ -84,7 +84,7 @@ describe('download folders over HTTP', () => {
       path.join(storageRoot, 'downloads', 'Dropped in', 'Deeper', 'buried.txt'),
       'invisible',
     );
-    const config = loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
     app = await createApp(config, { logger: pino({ level: 'silent' }) });
     await app.fastify.listen({ port: 0, host: '127.0.0.1' });
     const address = app.fastify.server.address();

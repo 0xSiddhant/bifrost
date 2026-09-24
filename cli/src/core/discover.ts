@@ -14,7 +14,7 @@ import { CliError, EXIT } from './output.js';
  */
 
 export const DEFAULT_HOST = 'bifrost.local';
-/** Matches the server's own PORT default (server/src/core/config). */
+/** Matches the PORT that .env.example ships (the server itself has no default). */
 export const DEFAULT_PORT = 4646;
 export const DEFAULT_BASE_URL = `http://${DEFAULT_HOST}:${DEFAULT_PORT}`;
 

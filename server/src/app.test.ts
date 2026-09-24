@@ -12,7 +12,7 @@ describe('boot → health → capabilities', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-boot-'));
-    const config = loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
     app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 
@@ -90,6 +90,7 @@ describe('capabilities in the cloud profile', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-cloud-'));
     const config = loadConfig({
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       DEPLOY_PROFILE: 'cloud',

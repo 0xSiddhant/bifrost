@@ -21,7 +21,7 @@ describe('screensaver module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-screensaver-'));
-    app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
   });
