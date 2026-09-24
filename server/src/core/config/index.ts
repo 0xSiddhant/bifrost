@@ -118,6 +118,9 @@ const envSchema = z.object({
   BACKUP_DIR: z.string().default(''),
   // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
+  // storage/ folders left out of every archive (comma list). Empty = back up all
+  // of storage/ except tmp/.
+  BACKUP_EXCLUDE: z.string().default(''),
 });
 
 export interface StoragePaths {
@@ -244,6 +247,8 @@ export interface AppConfig {
   backupDir: string | null;
   /** Rotation: keep only the newest N archives (0 = keep all). */
   backupKeep: number;
+  /** storage/ folder names left out of every archive. */
+  backupExclude: readonly string[];
 }
 
 export class ConfigError extends Error {
@@ -399,6 +404,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     backupDir: raw.BACKUP_DIR || null,
     backupKeep: raw.BACKUP_KEEP,
+    backupExclude: raw.BACKUP_EXCLUDE.split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
   };
   return deepFreeze(config);
 }

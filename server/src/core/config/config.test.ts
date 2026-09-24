@@ -24,6 +24,7 @@ describe('loadConfig', () => {
     expect(config.clientLogs.maxBatch).toBe(50);
     expect(config.clientLogs.maxBodyBytes).toBe(64 * 1024);
     expect(config.backupDir).toBeNull();
+    expect(config.backupExclude).toEqual([]);
     expect(config.runestone.maxDocKb).toBe(2048);
   });
 
@@ -64,6 +65,11 @@ describe('loadConfig', () => {
     expect(config.port).toBe(4646);
     expect(config.mdnsName).toBe('bifrost');
     expect(config.backupDir).toBeNull();
+  });
+
+  it('parses BACKUP_EXCLUDE into trimmed folder names', () => {
+    const config = loadConfig({ ...VALID_ENV, BACKUP_EXCLUDE: ' uploads, downloads ,,' });
+    expect(config.backupExclude).toEqual(['uploads', 'downloads']);
   });
 
   it('parses the extension blocklist into normalized entries', () => {

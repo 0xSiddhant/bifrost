@@ -3,7 +3,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { createBackup, listBackups, restoreBackup, type BackupTargets } from './index.js';
+import {
+  createBackup,
+  listBackups,
+  resolveBackupArchive,
+  restoreBackup,
+  type BackupTargets,
+} from './index.js';
 
 const scratch: string[] = [];
 
@@ -98,6 +104,31 @@ describe('createBackup', () => {
     expect(remaining.some((name) => first.file.endsWith(name))).toBe(false);
   });
 
+  it('leaves excluded storage folders out but keeps the db and the rest', () => {
+    const { targets } = makeRepo();
+    fs.mkdirSync(path.join(targets.storageRoot, 'logs'), { recursive: true });
+    fs.writeFileSync(path.join(targets.storageRoot, 'logs', 'app.log'), '{"msg":"hi"}\n');
+    const { file } = createBackup(targets, { exclude: ['uploads'] });
+    const dest = extract(file);
+    expect(fs.existsSync(path.join(dest, 'storage/uploads/photo.bin'))).toBe(false);
+    expect(fs.existsSync(path.join(dest, 'storage/logs/app.log'))).toBe(true);
+    expect(fs.existsSync(path.join(dest, 'storage/data/app.db'))).toBe(true);
+    expect(fs.existsSync(path.join(dest, 'themes/midnight.json'))).toBe(true);
+  });
+
+  it('rejects excluding data/ or a path-like entry', () => {
+    const { targets } = makeRepo();
+    expect(() => createBackup(targets, { exclude: ['data'] })).toThrow(/data/);
+    expect(() => createBackup(targets, { exclude: ['../themes'] })).toThrow(/invalid/);
+  });
+
+  it('reports row counts and size of the archived db snapshot', () => {
+    const { targets } = makeRepo();
+    const { tables, dbBytes } = createBackup(targets);
+    expect(tables).toEqual({ note: 1 });
+    expect(dbBytes).toBeGreaterThan(0);
+  });
+
   it('throws when the database is missing', () => {
     const { targets } = makeRepo();
     fs.rmSync(targets.dbFile);
@@ -121,5 +152,63 @@ describe('restoreBackup', () => {
     expect(() => restoreBackup({ archive: path.join(dest, 'nope.zip'), base: dest })).toThrow(
       /not found/,
     );
+  });
+});
+
+describe('resolveBackupArchive', () => {
+  /** A scheduled-layout backup folder: <dir>/<name>/<name>.zip + meta.json. */
+  function scheduled(dir: string, name: string): string {
+    fs.mkdirSync(path.join(dir, name), { recursive: true });
+    fs.writeFileSync(path.join(dir, name, `${name}.zip`), 'zip');
+    fs.writeFileSync(path.join(dir, name, 'meta.json'), '{}');
+    return path.join(dir, name, `${name}.zip`);
+  }
+
+  it('picks the newest backup from a folder of backup folders', () => {
+    const dir = tmpDir('bkp-cloud');
+    scheduled(dir, 'bifrost-backup-2026-09-01T03-00-00-000Z');
+    const newest = scheduled(dir, 'bifrost-backup-2026-09-15T03-00-00-000Z');
+    scheduled(dir, 'bifrost-backup-2026-08-18T03-00-00-000Z');
+    // A half-moved run and a folder missing its zip never count.
+    fs.mkdirSync(path.join(dir, '.incoming-bifrost-backup-2026-09-29T03-00-00-000Z'));
+    fs.mkdirSync(path.join(dir, 'bifrost-backup-2026-09-30T03-00-00-000Z'));
+
+    const resolved = resolveBackupArchive(dir);
+    expect(resolved.archive).toBe(newest);
+    expect(resolved.metaFile).toBe(path.join(path.dirname(newest), 'meta.json'));
+    expect(resolved.pickedLatest).toBe(true);
+  });
+
+  it('uses exactly the given backup folder, even when it is not the newest', () => {
+    const dir = tmpDir('bkp-cloud');
+    const older = scheduled(dir, 'bifrost-backup-2026-09-01T03-00-00-000Z');
+    scheduled(dir, 'bifrost-backup-2026-09-15T03-00-00-000Z');
+
+    const resolved = resolveBackupArchive(path.dirname(older));
+    expect(resolved.archive).toBe(older);
+    expect(resolved.pickedLatest).toBe(false);
+  });
+
+  it('picks the newest zip from a flat BACKUP_DIR, with its .meta.json', () => {
+    const dir = tmpDir('bkp-flat');
+    fs.writeFileSync(path.join(dir, 'bifrost-backup-2026-09-01T03-00-00-000Z.zip'), 'zip');
+    fs.writeFileSync(path.join(dir, 'bifrost-backup-2026-09-15T03-00-00-000Z.zip'), 'zip');
+    fs.writeFileSync(path.join(dir, 'bifrost-backup-2026-09-15T03-00-00-000Z.meta.json'), '{}');
+
+    const resolved = resolveBackupArchive(dir);
+    expect(path.basename(resolved.archive)).toBe('bifrost-backup-2026-09-15T03-00-00-000Z.zip');
+    expect(resolved.metaFile).toMatch(/2026-09-15T03-00-00-000Z\.meta\.json$/);
+  });
+
+  it('takes a .zip path as-is and rejects other files, empty folders, and missing paths', () => {
+    const dir = tmpDir('bkp-misc');
+    const zip = scheduled(dir, 'bifrost-backup-2026-09-01T03-00-00-000Z');
+    expect(resolveBackupArchive(zip)).toMatchObject({ archive: zip, pickedLatest: false });
+
+    const other = path.join(dir, 'notes.txt');
+    fs.writeFileSync(other, 'x');
+    expect(() => resolveBackupArchive(other)).toThrow(/not a backup archive/);
+    expect(() => resolveBackupArchive(tmpDir('bkp-empty'))).toThrow(/no backups found/);
+    expect(() => resolveBackupArchive(path.join(dir, 'nope'))).toThrow(/not found/);
   });
 });
