@@ -37,7 +37,7 @@ describe('offline-mode module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-offline-mode-'));
-    app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
+    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
       logger: pino({ level: 'silent' }),
     });
   });

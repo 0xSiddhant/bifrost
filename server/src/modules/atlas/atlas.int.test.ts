@@ -14,6 +14,8 @@ describe('atlas module', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-atlas-'));
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       ATLAS_MAX_DOC_KB: '1',

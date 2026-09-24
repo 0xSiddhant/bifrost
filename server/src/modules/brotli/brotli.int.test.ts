@@ -27,6 +27,8 @@ describe('brotli module', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-'));
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       // Small caps keep the byte assertions fast; the arithmetic is identical
@@ -201,6 +203,7 @@ describe('brotli module on the cloud profile', () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-cloud-'));
     app = await createApp(
       loadConfig({
+        PORT: '4646',
         HEIMDALL_PIN: '4321',
         STORAGE_ROOT: storageRoot,
         DEPLOY_PROFILE: 'cloud',

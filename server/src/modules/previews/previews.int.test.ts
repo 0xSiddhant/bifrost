@@ -51,7 +51,7 @@ describe('previews + qr-tool over HTTP', () => {
     seed('junk.bin', Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x00]));
     seed('huge.txt', 'x'.repeat(1024 * 1024 + 10));
     seed('range-target.txt', 'from the host'); // 13 bytes
-    const config = loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
     app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 

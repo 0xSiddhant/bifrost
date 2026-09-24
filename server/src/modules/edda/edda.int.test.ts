@@ -14,6 +14,8 @@ describe('edda module', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-edda-'));
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       EDDA_MAX_DOC_KB: '1',

@@ -35,6 +35,8 @@ describe('file-transfer over HTTP', () => {
     fs.mkdirSync(path.join(storageRoot, 'downloads'), { recursive: true });
     fs.writeFileSync(path.join(storageRoot, 'downloads', 'seeded.txt'), 'from the host');
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       MAX_UPLOAD_SIZE_MB: '1',
@@ -229,6 +231,8 @@ describe('file-transfer over HTTP', () => {
     const limitedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-rl-'));
     const limited = await createApp(
       loadConfig({
+        DEPLOY_PROFILE: 'local',
+        PORT: '4646',
         HEIMDALL_PIN: '4321',
         STORAGE_ROOT: limitedRoot,
         UPLOAD_RATE_LIMIT_PER_MIN: '2',

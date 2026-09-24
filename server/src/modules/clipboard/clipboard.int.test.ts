@@ -33,6 +33,8 @@ describe('clipboard over HTTP', () => {
     storageRoot = tmp('bifrost-clip-');
     app = await createApp(
       loadConfig({
+        DEPLOY_PROFILE: 'local',
+        PORT: '4646',
         HEIMDALL_PIN: '4321',
         STORAGE_ROOT: storageRoot,
         CLIPBOARD_MAX_ENTRIES: '3',
@@ -85,7 +87,7 @@ describe('clipboard survives restart', () => {
   it('entries persist across a fresh boot with no torn rows', async () => {
     const storageRoot = tmp('bifrost-clip-restart-');
     const config = () =>
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, CLIPBOARD_MAX_ENTRIES: '100' });
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, CLIPBOARD_MAX_ENTRIES: '100' });
 
     const first = await createApp(config(), { logger: pino({ level: 'silent' }) });
     for (let i = 0; i < 25; i += 1) await post(first, { text: `entry ${i}` });

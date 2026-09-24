@@ -14,9 +14,31 @@ export const DEFAULT_LOG_RETENTION_FILES = 30;
 
 export type DeployProfile = 'local' | 'cloud';
 
+/** Zod error for a key that must be set: "missing" reads differently from "wrong". */
+function required(what: string, invalid: string) {
+  return (issue: { input?: unknown }) =>
+    issue.input === undefined ? `required — ${what} (set it in .env)` : invalid;
+}
+
+// REQUIRED keys (no default) are the ones where a silent fallback does real
+// harm rather than just picking a tunable value: DEPLOY_PROFILE decides which
+// modules are exposed (defaulting a cloud host to `local` would publish file
+// transfer and code execution to the internet), STORAGE_ROOT decides where the
+// database lives (a lost value would boot on an empty ./storage — looking like
+// data loss, and backing up the empty db), PORT is the address every device,
+// bookmark, QR code and the CLI already point at (a silent change strands them
+// all), HEIMDALL_PIN guards admin. Every
+// other key has a safe default that .env.example repeats.
 const envSchema = z.object({
-  DEPLOY_PROFILE: z.enum(['local', 'cloud']).default('local'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(4646),
+  DEPLOY_PROFILE: z.enum(['local', 'cloud'], {
+    error: required('which modules load: local or cloud', 'must be "local" or "cloud"'),
+  }),
+  // Presence is checked on the raw string: z.coerce turns a missing value into
+  // NaN first, which would read as "must be a number" rather than "required".
+  PORT: z
+    .string({ error: required('the port the server listens on, e.g. 4646', 'must be a number') })
+    .transform(Number)
+    .pipe(z.number({ error: 'must be a number' }).int().min(1).max(65535)),
   MDNS_NAME: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'must be a valid hostname label (lowercase letters, digits, dashes)')
@@ -66,8 +88,12 @@ const envSchema = z.object({
   SCREENSAVER_SHOW_QUOTES: z.enum(['true', 'false']).default('true'),
   SCREENSAVER_QUOTE_ROTATE_SECONDS: z.coerce.number().int().min(4).max(120).default(14),
   THEMES_DIR: z.string().min(1).default('./themes'),
-  STORAGE_ROOT: z.string().min(1).default('./storage'),
-  HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
+  STORAGE_ROOT: z.string({
+    error: required('where the database and files live, e.g. ./storage', 'must be a path'),
+  }),
+  HEIMDALL_PIN: z
+    .string({ error: required('the admin PIN, minimum 4 characters', 'must be text') })
+    .min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
   HEIMDALL_TAP_COUNT: z.coerce.number().int().min(3).max(20).default(7),
   // Encryption key for the admin session cookie (@fastify/secure-session).
@@ -284,6 +310,9 @@ export function resolveStoragePaths(storageRoot: string): StoragePaths {
  * the archive rather than only to a stderr nobody is watching under PM2.
  */
 export function logsDirFromEnv(env: Env = process.env): string {
+  // The './storage' fallback is deliberate even though STORAGE_ROOT is required:
+  // this runs before validation, and a .env missing STORAGE_ROOT still has to
+  // get its fatal "STORAGE_ROOT is required" line written somewhere.
   return resolveStoragePaths(env.STORAGE_ROOT || './storage').logs;
 }
 

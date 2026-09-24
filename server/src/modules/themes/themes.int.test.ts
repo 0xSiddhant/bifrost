@@ -60,6 +60,8 @@ describe('themes over HTTP', () => {
     // One broken file: boot must skip it, not crash.
     fs.writeFileSync(path.join(themesDir, 'broken.json'), '{ "id": "broken" }');
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       THEMES_DIR: themesDir,
@@ -205,7 +207,7 @@ describe('theme writes require a Heimdall session', () => {
     fs.mkdirSync(themesDir, { recursive: true });
     fs.copyFileSync(path.join(REPO_ROOT, 'themes', 'aurora.json'), path.join(themesDir, 'aurora.json'));
     const app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
       { logger: pino({ level: 'silent' }) },
     );
     try {
@@ -252,7 +254,7 @@ describe('theme enable/disable (Heimdall)', () => {
       fs.copyFileSync(path.join(REPO_ROOT, 'themes', name), path.join(themesDir, name));
     }
     app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
+      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
       { logger: pino({ level: 'silent' }) },
     );
     cookie = await adminCookie(app);

@@ -18,6 +18,8 @@ describe('nimbus module', () => {
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-nimbus-'));
     const config = loadConfig({
+      DEPLOY_PROFILE: 'local',
+      PORT: '4646',
       HEIMDALL_PIN: '4321',
       STORAGE_ROOT: storageRoot,
       // A small ceiling keeps the byte-count assertions fast; the arithmetic is
