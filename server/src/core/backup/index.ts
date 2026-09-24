@@ -67,7 +67,13 @@ export interface RestoreOptions {
   archive: string;
   /** Repo root to extract into (storage/ and themes/ are overwritten). */
   base: string;
-  /** Extract even if the server looks live. */
+  /**
+   * The configured storage/ and themes/ folders (absolute, under `base`). An
+   * archive may only write inside these, plus `.env` — see assertSafeArchive.
+   */
+  storageRoot: string;
+  themesDir: string;
+  /** Extract even if the server looks live. Never skips the entry check. */
   force?: boolean;
   /** Whether a server is currently running (computed by the caller). */
   live?: boolean;
@@ -115,6 +121,57 @@ function countRows(dbFile: string): Record<string, number> {
   } finally {
     db.close();
   }
+}
+
+/** Like `run`, but returns stdout (for reading `unzip -Z` listings). */
+function capture(cmd: string, args: string[], cwd: string): string {
+  const result = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (result.error) throw new Error(`${cmd} failed to start: ${result.error.message}`);
+  if (result.status !== 0) {
+    const stderr = result.stderr?.trim();
+    throw new Error(`${cmd} exited ${result.status ?? 'null'}${stderr ? `: ${stderr}` : ''}`);
+  }
+  return result.stdout;
+}
+
+/**
+ * Refuse an archive that could write anywhere a backup never does, BEFORE
+ * extracting it. The checksum only proves an archive matches its meta.json —
+ * restore also accepts archives with no meta, from a cloud folder others may
+ * be able to write to. `unzip` itself already drops absolute paths and `../`,
+ * but happily writes any other repo path (scripts/, server/…) and recreates
+ * symlinks, which a later entry can write through. So every entry must be:
+ * not a symlink, relative with no `..`, and inside the configured storage or
+ * themes folder, or be `.env` exactly.
+ */
+function assertSafeArchive(options: RestoreOptions): void {
+  const allowed = [rel(options.base, options.storageRoot), rel(options.base, options.themesDir)];
+  const names = capture('unzip', ['-Z1', options.archive], options.base).split('\n').filter(Boolean);
+  // Long listing, same order as -Z1; entry lines are the ones whose 2nd field
+  // is the zip version ("3.0"). The first field is the unix mode ("l…" = link).
+  const modes = capture('unzip', ['-Z', '-s', options.archive], options.base)
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .filter((fields) => fields.length >= 9 && /^\d+\.\d+$/.test(fields[1] ?? ''))
+    .map((fields) => fields[0] as string);
+  if (modes.length !== names.length) {
+    throw new Error('could not read the archive listing reliably — refusing to restore');
+  }
+
+  names.forEach((name, i) => {
+    const parts = name.split('/');
+    let problem: string | null = null;
+    if (name.startsWith('/') || /^[A-Za-z]:/.test(name) || name.includes('\\')) {
+      problem = 'is an absolute or non-portable path';
+    } else if (parts.includes('..')) {
+      problem = 'climbs out of the restore folder (..)';
+    } else if (modes[i]?.startsWith('l')) {
+      problem = 'is a symlink';
+    } else if (name !== '.env' && !allowed.some((root) => name === `${root}/` || name.startsWith(`${root}/`))) {
+      problem = `is outside ${allowed.map((root) => `${root}/`).join(', ')} and .env`;
+    }
+    if (problem) throw new Error(`refusing to restore: archive entry "${name}" ${problem}`);
+  });
 }
 
 function run(cmd: string, args: string[], cwd: string): void {
@@ -273,6 +330,7 @@ export function resolveBackupArchive(target: string): ResolvedBackup {
 
 export function restoreBackup(options: RestoreOptions): void {
   if (!fs.existsSync(options.archive)) throw new Error(`archive not found: ${options.archive}`);
+  assertSafeArchive(options);
   if (options.live && !options.force) {
     throw new Error(
       'a server appears to be running — refusing to restore over live state. Stop it first, or pass --force.',

@@ -93,7 +93,14 @@ try {
     console.log('  no meta file beside it — restoring without a checksum check');
   }
 
-  restoreBackup({ archive, base: ROOT, force, live });
+  restoreBackup({
+    archive,
+    base: ROOT,
+    storageRoot: config.storage.root,
+    themesDir: config.themes.dir,
+    force,
+    live,
+  });
   console.log(`✔ restored ${archive}`);
   console.log('  Note: .env is restored only if the archive included it — recreate it otherwise.');
 } catch (error) {
