@@ -1,6 +1,6 @@
 # Bifrost Plans — Index & Gates
 
-Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see below). Each plan file follows the same format: goal → scope in/out → decisions & reasoning → task checklist → touched files → API contracts → acceptance criteria → test checklist.
+Implement strictly in order. One plan = one branch = one PR (except PLAN-00, see below). Each plan file follows the same format: goal → gate → verified against the codebase → scope in/out → decisions & reasoning → API contracts → task checklist → acceptance criteria → test checklist (the `new-plan` skill has the detail).
 
 | #     | Plan                                                                                                                | Gate to start                                                                                                                                 |
 | ----- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
