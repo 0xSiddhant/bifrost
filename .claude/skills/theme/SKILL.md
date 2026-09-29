@@ -44,7 +44,7 @@ The recurring failure mode is a dark theme that *emits light*. Guard against it:
 
 Cards get their colour from a 10-slot palette, **not** the atmospheric `--tone-*`
 (those stay for eyebrows/code highlights/join band). See
-[[project-card-tone-palette]]. Every theme should define its own 10 hues so the
+`.agents/rules/coding.md` → Frontend. Every theme should define its own 10 hues so the
 hub stays on-brand:
 
 - Ten hues that are **mutually distinguishable** as soft corner tints — a
