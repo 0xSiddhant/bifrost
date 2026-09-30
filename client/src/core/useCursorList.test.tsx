@@ -293,4 +293,27 @@ describe('useCursorList', () => {
     expect(fetchPage).toHaveBeenLastCalledWith(ALL, null, expect.objectContaining({ limit: 1 }));
     expect(hook.total).toBe(5);
   });
+
+  it('keeps a batch that lands in the same tick as a live insert', async () => {
+    const base = server(() => rows);
+    let resolveBatch: (() => void) | undefined;
+    const fetchPage = vi.fn(
+      (query: Query, cursor: string | null, options: { signal: AbortSignal; limit?: number }) => {
+        if (!cursor) return base(query, cursor, options);
+        return new Promise<CursorListPage<Row>>((resolve) => {
+          resolveBatch = () => void base(query, cursor, options).then(resolve);
+        });
+      },
+    );
+    await mount(fetchPage as unknown as ReturnType<typeof server>);
+    await act(async () => hook.loadMore());
+    // The batch resolves and, before React commits it, another device saves.
+    await act(async () => {
+      resolveBatch?.();
+      for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+      hook.upsert({ id: 'f', at: 60, tag: 'x' }, true);
+    });
+    await settle();
+    expect(ids()).toEqual(['f', 'e', 'd', 'c', 'b']);
+  });
 });

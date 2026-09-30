@@ -88,6 +88,19 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
   const controllerRef = useRef<AbortController | null>(null);
   const recountTimer = useRef<number | undefined>(undefined);
 
+  /**
+   * Accept a server batch. The refs are written here, synchronously, not only
+   * on the next render: a live SSE row landing between this and React's commit
+   * builds its list from `itemsRef`, and a stale ref would let it overwrite
+   * the batch — rows gone, while the new cursor and total stayed.
+   */
+  const accept = useCallback((next: T[], nextCursor: string | null) => {
+    itemsRef.current = next;
+    cursorRef.current = nextCursor;
+    setItems(next);
+    setCursor(nextCursor);
+  }, []);
+
   const merge = useCallback((current: T[], incoming: readonly T[]): T[] => {
     const { keyOf } = optionsRef.current;
     const seen = new Set(current.map(keyOf));
@@ -104,9 +117,8 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
       .fetchPage(query, null, { signal: controller.signal })
       .then((first) => {
         if (controller.signal.aborted) return;
-        setItems(merge([], first.items));
+        accept(merge([], first.items), first.nextCursor);
         setTotal(first.total);
-        setCursor(first.nextCursor);
         setPage(first);
         setStatus('idle');
       })
@@ -118,7 +130,7 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
         });
       });
     return () => controller.abort();
-  }, [query, generation, merge]);
+  }, [query, generation, merge, accept]);
 
   const loadMore = useCallback(() => {
     const next = cursorRef.current;
@@ -133,9 +145,8 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
       .fetchPage(optionsRef.current.query, next, { signal: controller.signal })
       .then((batch) => {
         if (controller.signal.aborted) return;
-        setItems((current) => merge(current, batch.items));
+        accept(merge(itemsRef.current, batch.items), batch.nextCursor);
         setTotal(batch.total);
-        setCursor(batch.nextCursor);
         setPage(batch);
         setStatus('idle');
       })
@@ -146,7 +157,7 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
           module: optionsRef.current.module,
         });
       });
-  }, [merge]);
+  }, [merge, accept]);
 
   const reload = useCallback(() => setGeneration((n) => n + 1), []);
 
