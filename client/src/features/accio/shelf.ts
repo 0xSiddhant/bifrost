@@ -44,9 +44,12 @@ export function displayTitle(link: AccioLink): string {
   return link.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 }
 
-/** Every tag on the shelf, alphabetical — the chip filter row. */
-export function allTags(links: readonly AccioLink[]): string[] {
-  const tags = new Set<string>();
+/**
+ * The tag chip row: the whole shelf's tags from the server's facet, plus any a
+ * live save introduced since that fetch, alphabetical.
+ */
+export function unionTags(facet: readonly string[], links: readonly AccioLink[]): string[] {
+  const tags = new Set(facet);
   for (const link of links) for (const tag of link.tags) tags.add(tag);
   return [...tags].sort((a, b) => a.localeCompare(b));
 }
@@ -59,33 +62,53 @@ export interface ShelfFilter {
 }
 
 /**
- * Search and tag filter **compose** (acceptance criterion 2): a row must match
- * both to survive. Applied client-side over the SSE-maintained list so a live
- * insert can be placed without a refetch — see decisions.md.
+ * Does one link pass the search and tag filter? Search and tag **compose**
+ * (PLAN-13 criterion 2). Since PLAN-31 the server filters the shelf itself;
+ * this survives only as the predicate for a *live* SSE row, deciding whether it
+ * belongs in the list on screen. For a non-ASCII search its Unicode case
+ * folding can disagree with SQLite's ASCII-only `LIKE`, which at worst
+ * mis-places one live row until the next fetch.
  */
-export function filterLinks(links: readonly AccioLink[], filter: ShelfFilter): AccioLink[] {
+export function linkMatches(link: AccioLink, filter: ShelfFilter): boolean {
+  if (filter.tag && !link.tags.includes(filter.tag)) return false;
   const needle = filter.q.trim().toLowerCase();
-  return links.filter((link) => {
-    if (filter.tag && !link.tags.includes(filter.tag)) return false;
-    if (!needle) return true;
-    return (
-      link.url.toLowerCase().includes(needle) ||
-      (link.title?.toLowerCase().includes(needle) ?? false)
-    );
-  });
+  if (!needle) return true;
+  return (
+    link.url.toLowerCase().includes(needle) || (link.title?.toLowerCase().includes(needle) ?? false)
+  );
 }
 
 export type ShelfSort = 'newest' | 'oldest' | 'title';
 
-/** Newest first by default — a read-later shelf is a stack, not an archive. */
-export function sortLinks(links: readonly AccioLink[], sort: ShelfSort): AccioLink[] {
-  const rows = [...links];
-  if (sort === 'title') {
-    return rows.sort((a, b) =>
-      displayTitle(a).localeCompare(displayTitle(b), undefined, { sensitivity: 'base' }),
-    );
-  }
-  return rows.sort((a, b) => (sort === 'oldest' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt));
+/** The server sort each shelf chip asks for (PLAN-31: one order, the server's). */
+export const SHELF_SORTS: Record<ShelfSort, { sort: 'created' | 'title'; order: 'asc' | 'desc' }> =
+  {
+    newest: { sort: 'created', order: 'desc' },
+    oldest: { sort: 'created', order: 'asc' },
+    title: { sort: 'title', order: 'asc' },
+  };
+
+/** SQLite's `lower()`: ASCII only. */
+const asciiLower = (text: string) =>
+  text.replace(/[A-Z]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) + 32));
+
+/**
+ * The server's paged order, for placing a live row among the loaded ones:
+ * `created_at` or `lower(coalesce(title, url))`, then `id`, both in the sort
+ * direction. Newest-first by default — a read-later shelf is a stack.
+ */
+export function compareLinks(a: AccioLink, b: AccioLink, sort: ShelfSort): number {
+  const { order } = SHELF_SORTS[sort];
+  const direction = order === 'asc' ? 1 : -1;
+  const key =
+    sort === 'title'
+      ? (link: AccioLink) => asciiLower(link.title ?? link.url)
+      : (link: AccioLink) => link.createdAt;
+  const left = key(a);
+  const right = key(b);
+  if (left !== right) return (left < right ? -1 : 1) * direction;
+  if (a.id === b.id) return 0;
+  return (a.id < b.id ? -1 : 1) * direction;
 }
 
 /** Splits a free-text tag field ("recipes, later") into tags for the API. */
