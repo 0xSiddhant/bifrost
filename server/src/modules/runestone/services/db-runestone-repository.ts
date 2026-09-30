@@ -1,12 +1,8 @@
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../../../core/db/index.js';
 import { runestones } from '../../../core/db/schema.js';
 import type { RunestoneSummary } from '../../../core/bus/events.js';
-import type {
-  RunestoneListFilter,
-  RunestoneRecord,
-  RunestoneRepository,
-} from '../ports.js';
+import type { RunestoneListFilter, RunestoneRecord, RunestoneRepository } from '../ports.js';
 
 const SUMMARY_COLUMNS = {
   id: runestones.id,
@@ -21,6 +17,18 @@ const SUMMARY_COLUMNS = {
 /** `%`/`_` are LIKE wildcards — a search for "100%" must not match everything. */
 function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+/** The filters every read shares — the list, its paged form, and the count. */
+function whereFor(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): SQL | undefined {
+  const conditions: SQL[] = [];
+  if (filter.q) {
+    conditions.push(sql`${runestones.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
+  }
+  if (filter.authorDeviceId) {
+    conditions.push(eq(runestones.authorDeviceId, filter.authorDeviceId));
+  }
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
 export class DbRunestoneRepository implements RunestoneRepository {
@@ -57,14 +65,34 @@ export class DbRunestoneRepository implements RunestoneRepository {
   }
 
   list(filter: RunestoneListFilter): RunestoneSummary[] {
-    const conditions: SQL[] = [];
-    if (filter.q) {
-      conditions.push(sql`${runestones.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
-    }
-    if (filter.authorDeviceId) {
-      conditions.push(eq(runestones.authorDeviceId, filter.authorDeviceId));
-    }
+    return this.select(filter, asc(runestones.id));
+  }
 
+  listPage(filter: RunestoneListFilter): RunestoneSummary[] {
+    const direction = filter.order === 'asc' ? asc : desc;
+    return this.select(filter, direction(runestones.id));
+  }
+
+  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): number {
+    const row = this.db
+      .select({ n: sql<number>`count(*)` })
+      .from(runestones)
+      .where(whereFor(filter))
+      .get();
+    return row?.n ?? 0;
+  }
+
+  listAuthors(): string[] {
+    return this.db
+      .selectDistinct({ id: runestones.authorDeviceId })
+      .from(runestones)
+      .where(isNotNull(runestones.authorDeviceId))
+      .orderBy(asc(runestones.authorDeviceId))
+      .all()
+      .flatMap((row) => (row.id ? [row.id] : []));
+  }
+
+  private select(filter: RunestoneListFilter, tiebreak: SQL): RunestoneSummary[] {
     const sortColumn = {
       name: sql`lower(${runestones.name})`,
       created: runestones.createdAt,
@@ -73,10 +101,11 @@ export class DbRunestoneRepository implements RunestoneRepository {
     }[filter.sort];
     const direction = filter.order === 'asc' ? asc : desc;
 
-    let query = this.db.select(SUMMARY_COLUMNS).from(runestones).$dynamic();
-    if (conditions.length > 0) query = query.where(and(...conditions));
-    return query
-      .orderBy(direction(sortColumn), asc(runestones.id))
+    return this.db
+      .select(SUMMARY_COLUMNS)
+      .from(runestones)
+      .where(whereFor(filter))
+      .orderBy(direction(sortColumn), tiebreak)
       .limit(filter.limit)
       .offset(filter.offset)
       .all();

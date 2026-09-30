@@ -40,7 +40,7 @@ export const grootModule: FeatureModule = {
 
     registerGrootRoutes(app, {
       maxDocKb: config.groot.maxDocKb,
-      list: new ListGrootUseCase(repo),
+      list: new ListGrootUseCase(repo, config.paging),
       save: new SaveGrootUseCase({ repo, bus, maxDocBytes }),
       get: new GetGrootUseCase(repo),
       update: new UpdateGrootUseCase({ repo, bus, maxDocBytes }),

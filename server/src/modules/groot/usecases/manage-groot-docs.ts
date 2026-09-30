@@ -1,6 +1,7 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import type { GrootSummary } from '../../../core/bus/events.js';
 import { AppError } from '../../../core/http/index.js';
+import { pageLimit, type DocumentListPage, type PagingConfig } from '../../../core/paging.js';
 import { uniqueRelicTitle } from '../../../core/relics/index.js';
 import type { GrootListFilter, GrootRecord, GrootRepository, GrootSort } from '../ports.js';
 import { idFromSlug, isReservedSlug, makeSlug, newGrootId } from '../slug.js';
@@ -159,9 +160,33 @@ export interface ListGrootInput {
 const SORTS: readonly GrootSort[] = ['name', 'created', 'modified', 'size'];
 
 export class ListGrootUseCase {
-  constructor(private readonly repo: GrootRepository) {}
+  constructor(
+    private readonly repo: GrootRepository,
+    private readonly paging: PagingConfig,
+  ) {}
 
+  /** The legacy bare array — its 200/500 defaults are what installed clients rely on. */
   execute(input: ListGrootInput): GrootSummary[] {
+    return this.repo.list(this.filterFor(input, Math.min(Math.max(input.limit ?? 200, 1), 500)));
+  }
+
+  /**
+   * The paged form (PLAN-31): one page plus the total under the same filters
+   * and the unfiltered author facet. Offset-based, because the Pensieve needs
+   * random access to page k of a merge it computes itself.
+   */
+  executePage(input: ListGrootInput): DocumentListPage<GrootSummary> {
+    const filter = this.filterFor(input, pageLimit(input.limit, this.paging));
+    return {
+      items: this.repo.listPage(filter),
+      total: this.repo.count(filter),
+      limit: filter.limit,
+      offset: filter.offset,
+      authors: this.repo.listAuthors(),
+    };
+  }
+
+  private filterFor(input: ListGrootInput, limit: number): GrootListFilter {
     const sort = SORTS.includes(input.sort as GrootSort) ? (input.sort as GrootSort) : 'modified';
     const order =
       input.order === 'asc' || input.order === 'desc'
@@ -169,15 +194,14 @@ export class ListGrootUseCase {
         : sort === 'name'
           ? 'asc'
           : 'desc';
-    const filter: GrootListFilter = {
+    return {
       q: input.q?.trim() || undefined,
       authorDeviceId: input.author || undefined,
       sort,
       order,
-      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
+      limit,
       offset: Math.max(input.offset ?? 0, 0),
     };
-    return this.repo.list(filter);
   }
 }
 

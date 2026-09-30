@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { pagedQueryProperties } from '../../../core/paging.js';
 import type {
   DeleteGrootUseCase,
   GetGrootUseCase,
@@ -27,6 +28,7 @@ const listQuerySchema = {
     order: { enum: ['asc', 'desc'] },
     limit: { type: 'integer', minimum: 1, maximum: 500 },
     offset: { type: 'integer', minimum: 0 },
+    paged: pagedQueryProperties.paged,
   },
 } as const;
 
@@ -77,6 +79,7 @@ interface ListQuery {
   order?: string;
   limit?: number;
   offset?: number;
+  paged?: boolean;
 }
 
 /**
@@ -103,7 +106,10 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   app.get<{ Querystring: ListQuery }>(
     '/api/groot',
     { schema: { querystring: listQuerySchema } },
-    (request) => deps.list.execute(request.query),
+    // `paged=true` opts into the envelope (PLAN-31); without it the response
+    // is the bare array it always was, so the CLI and scripts are unaffected.
+    (request) =>
+      request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
   app.post<{ Body: { name?: string; content: string } }>(

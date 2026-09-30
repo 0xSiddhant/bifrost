@@ -25,6 +25,17 @@ export interface EddaRepository {
   findById(id: string): EddaRecord | null;
   findBySlug(slug: string): EddaRecord | null;
   list(filter: EddaListFilter): EddaSummary[];
+  /**
+   * The paged form (PLAN-31): ordered by `(sortKey, id)` **both** in the
+   * filter's direction, so `asc` and `desc` are exact mirrors even across ties
+   * — the Pensieve computes its last page by reading the reversed order.
+   * `list` keeps its `asc(id)` tiebreak for the legacy array response.
+   */
+  listPage(filter: EddaListFilter): EddaSummary[];
+  /** Rows matching `q`/`authorDeviceId`, ignoring sort and paging. */
+  count(filter: Pick<EddaListFilter, 'q' | 'authorDeviceId'>): number;
+  /** Every distinct author over the whole table, unfiltered — the dropdown's options. */
+  listAuthors(): string[];
   /** Removes one document; returns it (for the deleted event) or null. */
   delete(id: string): EddaRecord | null;
   /** Every stored name — feeds the collision-safe default-name generator. */

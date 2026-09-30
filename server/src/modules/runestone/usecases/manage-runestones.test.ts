@@ -11,6 +11,8 @@ import {
   UpdateRunestoneUseCase,
 } from './manage-runestones.js';
 
+const PAGING = { pageSize: 30, maxPageSize: 100 };
+
 class MemoryRepo implements RunestoneRepository {
   rows = new Map<string, RunestoneRecord>();
   lastFilter: RunestoneListFilter | null = null;
@@ -41,6 +43,18 @@ class MemoryRepo implements RunestoneRepository {
     const row = this.findById(id);
     if (row) this.rows.delete(id);
     return row;
+  }
+  listPage(filter: RunestoneListFilter): RunestoneSummary[] {
+    return this.list(filter);
+  }
+  count(): number {
+    return this.rows.size;
+  }
+  listAuthors(): string[] {
+    const authors = [...this.rows.values()].flatMap((row) =>
+      row.authorDeviceId ? [row.authorDeviceId] : [],
+    );
+    return [...new Set(authors)];
   }
   listNames(): string[] {
     return [...this.rows.values()].map((row) => row.name);
@@ -164,7 +178,7 @@ describe('GetRunestoneUseCase', () => {
 describe('ListRunestonesUseCase', () => {
   it('clamps and defaults filter parameters', () => {
     const { repo } = harness();
-    const list = new ListRunestonesUseCase(repo);
+    const list = new ListRunestonesUseCase(repo, PAGING);
     list.execute({ sort: 'bogus', order: 'sideways', limit: 9999, offset: -3 });
     expect(repo.lastFilter).toEqual({
       q: undefined,
@@ -189,9 +203,7 @@ describe('DeleteRunestoneUseCase', () => {
     const remove = new DeleteRunestoneUseCase(repo, bus);
     remove.execute(record.id);
     expect(repo.rows.size).toBe(0);
-    expect(events).toEqual([
-      { name: 'deleted', payload: { id: record.id, name: 'Doomed' } },
-    ]);
+    expect(events).toEqual([{ name: 'deleted', payload: { id: record.id, name: 'Doomed' } }]);
     expect(() => remove.execute(record.id)).toThrowError(AppError);
   });
 });

@@ -40,7 +40,7 @@ export const atlasModule: FeatureModule = {
 
     registerAtlasRoutes(app, {
       maxDocKb: config.atlas.maxDocKb,
-      list: new ListAtlasUseCase(repo),
+      list: new ListAtlasUseCase(repo, config.paging),
       save: new SaveAtlasUseCase({ repo, bus, maxDocBytes }),
       get: new GetAtlasUseCase(repo),
       update: new UpdateAtlasUseCase({ repo, bus, maxDocBytes }),

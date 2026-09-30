@@ -34,7 +34,7 @@ export const eddaModule: FeatureModule = {
     registerEddaRoutes(app, {
       maxDocKb: config.edda.maxDocKb,
       livePreviewMaxKb: config.edda.livePreviewMaxKb,
-      list: new ListEddasUseCase(repo),
+      list: new ListEddasUseCase(repo, config.paging),
       save: new SaveEddaUseCase({ repo, bus, maxDocBytes }),
       get: new GetEddaUseCase(repo),
       update: new UpdateEddaUseCase({ repo, bus, maxDocBytes }),
