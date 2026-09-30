@@ -1,42 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
+import type { CursorListPage } from '../../core/api';
 import { bifrostEvents } from '../../core/sse';
-import { listPortkeys, type Portkey } from './api';
+import { useCursorList, type CursorList } from '../../core/useCursorList';
+import { listPortkeysPage, type Portkey } from './api';
+
+interface PortkeyQuery {
+  q: string;
+}
+
+/** Does a live row pass the search? Slug, target and note, case-insensitively. */
+export function portkeyMatches(link: Portkey, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return (
+    link.slug.includes(needle) ||
+    link.url.toLowerCase().includes(needle) ||
+    (link.note ?? '').toLowerCase().includes(needle)
+  );
+}
+
+/** The server's paged order: newest first, then slug, both descending. */
+export function comparePortkeys(a: Portkey, b: Portkey): number {
+  if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
+  if (a.slug === b.slug) return 0;
+  return a.slug < b.slug ? 1 : -1;
+}
 
 /**
- * The go-links list, kept live. One fetch, then SSE deltas — a link created on
- * a phone shows up here without a refetch, and a redirect elsewhere bumps the
- * hit count/last-used within a heartbeat (acceptance criterion 4). Hit updates
- * ride the same `portkey.saved` event a create/edit does.
+ * The go-links list, paged and kept live (PLAN-31). The server searches and
+ * pages; SSE deltas still land without a refetch — a link created on a phone
+ * appears at the top, and a redirect elsewhere bumps a loaded row's hit count
+ * within a heartbeat. `portkey.saved` means create **or** edit, so an unloaded
+ * slug is never assumed new: the hook re-counts rather than guess.
  */
-export function usePortkeys(): { links: Portkey[]; ready: boolean; error: boolean } {
-  const [links, setLinks] = useState<Portkey[]>([]);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState(false);
+export function usePortkeys(q: string): CursorList<Portkey, CursorListPage<Portkey>> {
+  const query = useMemo<PortkeyQuery>(() => ({ q }), [q]);
+  const list = useCursorList<Portkey, PortkeyQuery, CursorListPage<Portkey>>({
+    query,
+    fetchPage: (active, cursor, options) =>
+      listPortkeysPage(active.q.trim() || undefined, cursor, options),
+    keyOf: (link) => link.slug,
+    matches: (link, active) => portkeyMatches(link, active.q),
+    compare: (a, b) => comparePortkeys(a, b),
+    module: 'portkey',
+  });
 
+  const { upsert, remove } = list;
   useEffect(() => {
-    let cancelled = false;
-
-    listPortkeys()
-      .then((rows) => {
-        if (cancelled) return;
-        setLinks(rows);
-        setReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setError(true);
-        setReady(true);
-      });
-
-    const upsert = (link: Portkey) =>
-      setLinks((rows) => {
-        const index = rows.findIndex((row) => row.slug === link.slug);
-        if (index === -1) return [link, ...rows];
-        const next = [...rows];
-        next[index] = link;
-        return next;
-      });
-
     const offs = [
       bifrostEvents.on('portkey.saved', (payload) => {
         const link = (payload as { portkey?: Portkey }).portkey;
@@ -49,15 +59,13 @@ export function usePortkeys(): { links: Portkey[]; ready: boolean; error: boolea
       }),
       bifrostEvents.on('portkey.deleted', (payload) => {
         const { slug } = payload as { slug?: string };
-        if (slug) setLinks((rows) => rows.filter((row) => row.slug !== slug));
+        if (slug) remove(slug);
       }),
     ];
-
     return () => {
-      cancelled = true;
       for (const off of offs) off();
     };
-  }, []);
+  }, [upsert, remove]);
 
-  return { links, ready, error };
+  return list;
 }
