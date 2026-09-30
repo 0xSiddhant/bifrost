@@ -1,11 +1,19 @@
-import { ApiError, apiGet, apiSend } from './api';
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  pagedParams,
+  type DocumentListPage,
+  type OffsetRequest,
+} from './api';
 
 export interface GrootConfig {
   /** Document size cap in KB — from .env via the server, never hardcoded. */
   maxDocKb: number;
 }
 
-export const fetchGrootConfig = (): Promise<GrootConfig> => apiGet<GrootConfig>('/api/groot/config');
+export const fetchGrootConfig = (): Promise<GrootConfig> =>
+  apiGet<GrootConfig>('/api/groot/config');
 
 /** A saved document as the Pensieve lists it (no content). */
 export interface GrootSummary {
@@ -32,14 +40,28 @@ export interface GrootListQuery {
   order?: 'asc' | 'desc';
 }
 
-export function listGroots(query: GrootListQuery = {}): Promise<GrootSummary[]> {
+function listParams(query: GrootListQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.author) params.set('author', query.author);
   if (query.sort) params.set('sort', query.sort);
   if (query.order) params.set('order', query.order);
-  const qs = params.toString();
+  return params;
+}
+
+export function listGroots(query: GrootListQuery = {}): Promise<GrootSummary[]> {
+  const qs = listParams(query).toString();
   return apiGet<GrootSummary[]>(`/api/groot${qs ? `?${qs}` : ''}`);
+}
+
+/** One page of the listing plus its total and author facet (PLAN-31). */
+export function listGrootsPage(
+  query: GrootListQuery,
+  request: OffsetRequest,
+): Promise<DocumentListPage<GrootSummary>> {
+  return apiGet<DocumentListPage<GrootSummary>>(
+    `/api/groot?${pagedParams(listParams(query), request)}`,
+  );
 }
 
 /**

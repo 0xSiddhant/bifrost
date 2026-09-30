@@ -90,6 +90,46 @@ export async function apiSend<T>(method: string, path: string, body?: unknown): 
   return (text ? JSON.parse(text) : null) as T;
 }
 
+/**
+ * The paged list envelopes (PLAN-31) — shared by name with the server's
+ * `core/paging.ts`, since the two workspaces cannot share an import. Only a
+ * request carrying `paged=true` gets one; without it every list endpoint
+ * still answers with a bare array.
+ */
+export interface DocumentListPage<T> {
+  items: T[];
+  /** Rows matching the filters, across every page. */
+  total: number;
+  /** The page size the server used — the client never hardcodes one. */
+  limit: number;
+  offset: number;
+  /** Every author of this kind, unfiltered. */
+  authors: string[];
+}
+
+export interface CursorListPage<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  /** Opaque; null when nothing follows the last row. */
+  nextCursor: string | null;
+}
+
+/** Where to start a document page, and (optionally) how many rows. */
+export interface OffsetRequest {
+  offset: number;
+  /** Omitted = the server's LIST_PAGE_SIZE. */
+  limit?: number;
+}
+
+/** `?paged=true&offset=…[&limit=…]` appended to a document list's own filters. */
+export function pagedParams(params: URLSearchParams, request: OffsetRequest): string {
+  params.set('paged', 'true');
+  params.set('offset', String(request.offset));
+  if (request.limit !== undefined) params.set('limit', String(request.limit));
+  return params.toString();
+}
+
 export interface Capabilities {
   profile: 'local' | 'cloud';
   modules: string[];

@@ -1,11 +1,19 @@
-import { ApiError, apiGet, apiSend } from './api';
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  pagedParams,
+  type DocumentListPage,
+  type OffsetRequest,
+} from './api';
 
 export interface AtlasConfig {
   /** Document size cap in KB — from .env via the server, never hardcoded. */
   maxDocKb: number;
 }
 
-export const fetchAtlasConfig = (): Promise<AtlasConfig> => apiGet<AtlasConfig>('/api/atlas/config');
+export const fetchAtlasConfig = (): Promise<AtlasConfig> =>
+  apiGet<AtlasConfig>('/api/atlas/config');
 
 /** A saved document as the Pensieve lists it (no content). */
 export interface AtlasSummary {
@@ -32,14 +40,28 @@ export interface AtlasListQuery {
   order?: 'asc' | 'desc';
 }
 
-export function listAtlases(query: AtlasListQuery = {}): Promise<AtlasSummary[]> {
+function listParams(query: AtlasListQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.author) params.set('author', query.author);
   if (query.sort) params.set('sort', query.sort);
   if (query.order) params.set('order', query.order);
-  const qs = params.toString();
+  return params;
+}
+
+export function listAtlases(query: AtlasListQuery = {}): Promise<AtlasSummary[]> {
+  const qs = listParams(query).toString();
   return apiGet<AtlasSummary[]>(`/api/atlas${qs ? `?${qs}` : ''}`);
+}
+
+/** One page of the listing plus its total and author facet (PLAN-31). */
+export function listAtlasesPage(
+  query: AtlasListQuery,
+  request: OffsetRequest,
+): Promise<DocumentListPage<AtlasSummary>> {
+  return apiGet<DocumentListPage<AtlasSummary>>(
+    `/api/atlas?${pagedParams(listParams(query), request)}`,
+  );
 }
 
 /**
