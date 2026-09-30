@@ -62,6 +62,10 @@ describe('loadConfig', () => {
       /LIST_PAGE_SIZE: must not exceed LIST_PAGE_MAX/,
     );
     expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '0' })).toThrow(/LIST_PAGE_MAX/);
+    // Above the lowest route ceiling (500) the setting could not be honoured
+    // consistently across the paged endpoints, so it is refused at boot.
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '600' })).toThrow(/LIST_PAGE_MAX/);
+    expect(loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '500' }).paging.maxPageSize).toBe(500);
   });
 
   it('reads RUNESTONE_MAX_DOC_KB', () => {

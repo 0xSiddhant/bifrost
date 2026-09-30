@@ -64,8 +64,11 @@ const envFields = z.object({
   // ask for. GitHub's REST convention: 30 by default, 100 at most. Only the
   // opt-in `paged=true` form uses these; the legacy bare-array responses keep
   // their own defaults so an installed CLI never silently shows fewer rows.
+  // LIST_PAGE_MAX is capped at 500: the document and Accio routes reject a
+  // `limit` above that before the clamp could apply a larger cap, so a higher
+  // value would be honoured by Portkey (1000) and refused everywhere else.
   LIST_PAGE_SIZE: z.coerce.number().int().min(1).default(30),
-  LIST_PAGE_MAX: z.coerce.number().int().min(1).default(100),
+  LIST_PAGE_MAX: z.coerce.number().int().min(1).max(500).default(100),
   // Brotli (PLAN-25) — the two size caps and the per-route rate limit. The
   // OUTPUT cap is the decompression-bomb guard: unlike every other limit here
   // it bounds bytes the server *manufactures*, not bytes a client sent, which
