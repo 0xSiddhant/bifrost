@@ -276,4 +276,21 @@ describe('useCursorList', () => {
     expect(hook.total).toBe(5);
     expect(hook.hasMore).toBe(true);
   });
+
+  it('re-counts, rather than adds one, when an edit moves an unloaded row into the loaded range', async () => {
+    const fetchPage = server(() => rows);
+    await mount(fetchPage);
+    expect(ids()).toEqual(['e', 'd']);
+    expect(hook.total).toBe(5);
+    // 'a' was never loaded; an edit moves it to the top. It was already
+    // counted in the server's total, so the total must not grow.
+    rows = rows.map((row) => (row.id === 'a' ? { ...row, at: 99 } : row));
+    await act(async () => hook.upsert({ id: 'a', at: 99, tag: 'x' }));
+    expect(ids()).toEqual(['a', 'e', 'd']);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(fetchPage).toHaveBeenLastCalledWith(ALL, null, expect.objectContaining({ limit: 1 }));
+    expect(hook.total).toBe(5);
+  });
 });

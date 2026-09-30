@@ -54,7 +54,8 @@ const RECOUNT_DEBOUNCE_MS = 300;
  *   cross the cursor and come back, and the copy already shown wins.
  * - A live insert is placed only where it provably belongs — it passes the
  *   filter and sorts inside the rows already loaded (or nothing is left to
- *   load). Anything else is left for the scroll to reach.
+ *   load). Anything else is left for the scroll to reach. Only a row known to
+ *   be new moves `total` locally; an edit of an unloaded row re-counts.
  * - When the effect on `total` cannot be derived locally (a delete of a row
  *   never loaded, an edit that may cross the filter), one debounced
  *   `limit=1` request re-counts it instead.
@@ -210,12 +211,12 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
       if (placed) {
         itemsRef.current = placed;
         setItems(placed);
-        setTotal((n) => n + 1);
-      } else if (isNew) {
-        setTotal((n) => n + 1);
-      } else {
-        recount();
       }
+      // Only a row that is certainly new adds one. An edit of an unloaded row
+      // was usually already in the server's total — unless the edit is what
+      // moved it into the filter — so whether placed or not, ask the server.
+      if (isNew) setTotal((n) => n + 1);
+      else recount();
     },
     [place, recount],
   );
