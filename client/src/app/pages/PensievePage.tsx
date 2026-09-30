@@ -517,67 +517,71 @@ export function PensievePage() {
                         )}
                       </div>
                     </div>
-                    {entry.readRoute && (
-                      <Link
-                        className="btn btn--ghost btn--sm lib-row__link"
-                        to={entry.readRoute(item)}
-                        aria-label={`Read ${item.name}`}
+                    {/* One wrapper, so the grid can move every action as a unit:
+                        beside the name when there is room, under it when not. */}
+                    <div className="lib-row__actions">
+                      {entry.readRoute && (
+                        <Link
+                          className="btn btn--ghost btn--sm lib-row__link"
+                          to={entry.readRoute(item)}
+                          aria-label={`Read ${item.name}`}
+                        >
+                          <EyeIcon size={15} /> Read
+                        </Link>
+                      )}
+                      {entry.presentRoute && canPresent && (
+                        <Link
+                          className="btn btn--ghost btn--sm lib-row__link"
+                          to={entry.presentRoute(item)}
+                          aria-label={`Present ${item.name}`}
+                        >
+                          <SlidesIcon size={15} /> Present
+                        </Link>
+                      )}
+                      {entry.apiRoute && entry.mimeType && (
+                        /* A ready-to-run curl for the same raw data URL the API
+                           link opens — so it can be tested outside the browser
+                           (a terminal, Postman) without assembling the URL and
+                           the right Accept header by hand. */
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm lib-row__link mono"
+                          onClick={() => void copyCurl(entry, item)}
+                          aria-label={
+                            copiedKey === `${item.kind}:${item.id}`
+                              ? 'Copied'
+                              : `Copy curl command for ${item.name}`
+                          }
+                        >
+                          {copiedKey === `${item.kind}:${item.id}` ? (
+                            <CheckIcon size={15} />
+                          ) : (
+                            <ClipboardIcon size={15} />
+                          )}{' '}
+                          curl
+                        </button>
+                      )}
+                      {entry.apiRoute && (
+                        /* the same document as its tool's raw data URL */
+                        <a
+                          className="btn btn--ghost btn--sm lib-row__link mono"
+                          href={entry.apiRoute(item)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`Open ${item.name} as raw data`}
+                        >
+                          API
+                        </a>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${item.name}`}
+                        onClick={() => void remove(item, entry)}
                       >
-                        <EyeIcon size={15} /> Read
-                      </Link>
-                    )}
-                    {entry.presentRoute && canPresent && (
-                      <Link
-                        className="btn btn--ghost btn--sm lib-row__link"
-                        to={entry.presentRoute(item)}
-                        aria-label={`Present ${item.name}`}
-                      >
-                        <SlidesIcon size={15} /> Present
-                      </Link>
-                    )}
-                    {entry.apiRoute && entry.mimeType && (
-                      /* A ready-to-run curl for the same raw data URL the API
-                         link opens — so it can be tested outside the browser
-                         (a terminal, Postman) without assembling the URL and
-                         the right Accept header by hand. */
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm lib-row__link mono"
-                        onClick={() => void copyCurl(entry, item)}
-                        aria-label={
-                          copiedKey === `${item.kind}:${item.id}`
-                            ? 'Copied'
-                            : `Copy curl command for ${item.name}`
-                        }
-                      >
-                        {copiedKey === `${item.kind}:${item.id}` ? (
-                          <CheckIcon size={15} />
-                        ) : (
-                          <ClipboardIcon size={15} />
-                        )}{' '}
-                        curl
-                      </button>
-                    )}
-                    {entry.apiRoute && (
-                      /* the same document as its tool's raw data URL */
-                      <a
-                        className="btn btn--ghost btn--sm lib-row__link mono"
-                        href={entry.apiRoute(item)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`Open ${item.name} as raw data`}
-                      >
-                        API
-                      </a>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Delete ${item.name}`}
-                      onClick={() => void remove(item, entry)}
-                    >
-                      <CloseIcon size={15} />
-                    </Button>
+                        <CloseIcon size={15} />
+                      </Button>
+                    </div>
                   </div>
                 );
               })}
