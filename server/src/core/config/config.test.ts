@@ -48,6 +48,22 @@ describe('loadConfig', () => {
     expect(config.clientLogs.rateLimitPerMin).toBe(5);
   });
 
+  it('defaults list paging to 30 per page, 100 at most (PLAN-31)', () => {
+    const config = loadConfig(VALID_ENV);
+    expect(config.paging).toEqual({ pageSize: 30, maxPageSize: 100 });
+    expect(loadConfig({ ...VALID_ENV, LIST_PAGE_SIZE: '50', LIST_PAGE_MAX: '50' }).paging).toEqual({
+      pageSize: 50,
+      maxPageSize: 50,
+    });
+  });
+
+  it('refuses a page size above the page maximum, naming the key', () => {
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_SIZE: '120' })).toThrow(
+      /LIST_PAGE_SIZE: must not exceed LIST_PAGE_MAX/,
+    );
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '0' })).toThrow(/LIST_PAGE_MAX/);
+  });
+
   it('reads RUNESTONE_MAX_DOC_KB', () => {
     const config = loadConfig({ ...VALID_ENV, RUNESTONE_MAX_DOC_KB: '512' });
     expect(config.runestone.maxDocKb).toBe(512);
