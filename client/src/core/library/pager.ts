@@ -18,6 +18,16 @@ export interface LibraryPageView {
   failed: LibraryKind[];
 }
 
+/**
+ * Thrown inside a walk that `invalidate()` overtook: its captured boundaries
+ * belong to a list that no longer exists, so `page()` starts it over rather
+ * than finish it on stale offsets or write them back into the fresh cache.
+ */
+class StaleWalk extends Error {}
+
+/** A walk that keeps being overtaken by live changes gives up after this many. */
+const MAX_WALK_ATTEMPTS = 5;
+
 const add = (a: Offsets, b: Offsets, sign: 1 | -1): Offsets => {
   const next: Offsets = { ...a };
   for (const [kind, delta] of Object.entries(b) as Array<[LibraryKind, number]>) {
@@ -49,6 +59,8 @@ export class LibraryPager {
   private authors: string[] = [];
   private active: LibraryEntry[];
   private readonly failed: LibraryKind[] = [];
+  /** Bumped by `invalidate()`; a walk that sees it move is stale. */
+  private epoch = 0;
 
   constructor(
     entries: readonly LibraryEntry[],
@@ -61,6 +73,7 @@ export class LibraryPager {
   invalidate(): void {
     this.starts.clear();
     this.totals = null;
+    this.epoch += 1;
   }
 
   /** Build page `target` (clamped to the real range). */
@@ -68,13 +81,21 @@ export class LibraryPager {
     // A kind that fails mid-walk leaves every cached boundary counting rows
     // from a merge it is no longer part of, so the walk restarts without it.
     // Bounded: each restart removes at least one kind.
-    for (;;) {
+    //
+    // A live change can also land mid-walk (the page calls `invalidate()` from
+    // an SSE handler while a walk is awaiting); that walk is abandoned and
+    // rebuilt from the fresh state instead of painting rows from old offsets.
+    for (let attempt = 1; ; attempt += 1) {
       const failedBefore = this.failed.length;
-      const { rows, page } = await this.build(target);
-      if (this.failed.length === failedBefore || this.active.length === 0) {
-        return this.view(rows, page);
+      try {
+        const { rows, page } = await this.build(target);
+        if (this.failed.length === failedBefore || this.active.length === 0) {
+          return this.view(rows, page);
+        }
+        this.invalidate();
+      } catch (error) {
+        if (!(error instanceof StaleWalk) || attempt >= MAX_WALK_ATTEMPTS) throw error;
       }
-      this.invalidate();
     }
   }
 
@@ -86,9 +107,15 @@ export class LibraryPager {
   async refreshAfterDelete(current: number): Promise<LibraryPageView> {
     for (const page of [...this.starts.keys()]) if (page > current) this.starts.delete(page);
     if (!this.starts.has(current) || this.size === null) return this.page(current);
-    const rows = await this.forward(current);
-    if (rows.length === 0 && current > 1) return this.page(this.count);
-    return this.view(rows, current);
+    try {
+      const rows = await this.forward(current);
+      if (rows.length === 0 && current > 1) return this.page(this.count);
+      return this.view(rows, current);
+    } catch (error) {
+      // Overtaken by a live change: rebuild the same page from scratch.
+      if (error instanceof StaleWalk) return this.page(current);
+      throw error;
+    }
   }
 
   private get total(): number {
@@ -140,7 +167,8 @@ export class LibraryPager {
 
   /** Page p from its known start; learns where page p+1 starts. */
   private async forward(page: number): Promise<LibraryItem[]> {
-    const start = this.starts.get(page) ?? {};
+    const start = this.starts.get(page);
+    if (!start) throw new StaleWalk();
     const result = await this.step(start, this.size ?? undefined, false);
     this.starts.set(page + 1, add(start, result.consumed, 1));
     return result.rows;
@@ -176,7 +204,10 @@ export class LibraryPager {
     reversed: boolean,
   ): Promise<LibraryStep> {
     const query = reversed ? { ...this.query, order: flipOrder(this.query.order) } : this.query;
+    const epoch = this.epoch;
     const result = await loadLibraryStep(this.active, query, offsets, take);
+    // Nothing a stale step learned may reach the fresh cache.
+    if (epoch !== this.epoch) throw new StaleWalk();
     if (result.failed.length > 0) {
       this.failed.push(...result.failed);
       this.active = this.active.filter((entry) => !result.failed.includes(entry.kind));

@@ -163,4 +163,31 @@ describe('LibraryPager', () => {
     const after = await pager.refreshAfterDelete(2);
     expect(after.rows.map((row) => row.id)).toEqual(['d', 'f', 'g']);
   });
+
+  it('abandons a walk that a live change overtakes, and rebuilds from the fresh list', async () => {
+    let rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id, index) => doc('edda', id, 100 - index));
+    const edda = memoryEntry('edda', rows);
+    const runestone = memoryEntry('runestone', []);
+    const pager = new LibraryPager([edda, runestone], { sort: 'modified', order: 'desc' });
+    await pager.page(1);
+
+    // While the walk to page 3 is awaiting its first step, a newer document
+    // lands and the page invalidates — exactly what the SSE handler does.
+    const serve = edda.listPage;
+    let armed = true;
+    edda.listPage = async (query, request) => {
+      const answer = await serve(query, request);
+      if (armed) {
+        armed = false;
+        rows = [doc('edda', 'z', 999), ...rows];
+        edda.listPage = memoryEntry('edda', rows).listPage;
+        pager.invalidate();
+      }
+      return answer;
+    };
+    const three = await pager.page(3);
+    // z, a, b | c, d, e | f, g — computed from the list as it now is.
+    expect(three.rows.map((row) => row.id)).toEqual(['f', 'g']);
+    expect(three.total).toBe(8);
+  });
 });

@@ -248,6 +248,12 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
       }
       if (!dropped) return;
       dropped = false;
+      // The first batch never arrived (the server was what went away): there
+      // is nothing to reconcile, only a load to retry.
+      if (statusRef.current === 'error') {
+        setGeneration((g) => g + 1);
+        return;
+      }
       const controller = controllerRef.current;
       if (!controller) return;
       optionsRef.current
@@ -260,6 +266,14 @@ export function useCursorList<T, Q, P extends CursorListPage<T>>(
             const index = next.findIndex((row) => keyOf(row) === keyOf(item));
             if (index !== -1) next = next.map((row, at) => (at === index ? item : row));
             else next = place(next, item) ?? next;
+          }
+          // The list believed it was complete, but rows added during the
+          // outage reach past what the first batch returned — and there is no
+          // cursor for the end of what is loaded. Start over rather than show
+          // a count with no way to reach the rest.
+          if (cursorRef.current === null && next.length < first.total) {
+            setGeneration((g) => g + 1);
+            return;
           }
           itemsRef.current = next;
           setItems(next);

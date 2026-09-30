@@ -173,20 +173,23 @@ export function PensievePage() {
   );
 
   /** Write `?page=` (page 1 is the bare URL); a clamp or an invalid value replaces. */
-  const setPageParam = useCallback(
-    (page: number, replace: boolean) => {
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          if (page > 1) next.set('page', String(page));
-          else next.delete('page');
-          return next;
-        },
-        { replace },
-      );
-    },
-    [setSearchParams],
-  );
+  // `setSearchParams` changes identity with every location change; read
+  // through a ref, `setPageParam` (and `show`, and the SSE subscriptions that
+  // depend on it) stay put across page changes instead of re-subscribing — and
+  // cancelling a pending page-1 refresh — on every click.
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+  const setPageParam = useCallback((page: number, replace: boolean) => {
+    setSearchParamsRef.current(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (page > 1) next.set('page', String(page));
+        else next.delete('page');
+        return next;
+      },
+      { replace },
+    );
+  }, []);
 
   // Read by `show`, which outlives the render it was created in.
   const searchRef = useRef(searchParams);
@@ -234,6 +237,11 @@ export function PensievePage() {
   // knowing where it landed, so the rows stay put and a chip offers Refresh.
   const pageRef = useRef(pageParam);
   pageRef.current = view?.page ?? pageParam;
+  // The page the reader *asked for*, which leads the one shown while a walk is
+  // in flight: a change arriving just after a click to page 2 must not refetch
+  // page 1 over it (and bounce the URL back).
+  const requestedRef = useRef(pageParam);
+  requestedRef.current = pageParam;
   // Our own delete comes back over SSE too; its echo must not raise the chip.
   const ownDeletes = useRef(new Set<string>());
   useEffect(() => {
@@ -241,7 +249,7 @@ export function PensievePage() {
     let timer: number | undefined;
     const changed = () => {
       pager.invalidate();
-      if (pageRef.current === 1) {
+      if (requestedRef.current === 1 && pageRef.current === 1) {
         window.clearTimeout(timer);
         timer = window.setTimeout(() => void show(pager, () => pager.page(1)), REFRESH_DEBOUNCE_MS);
       } else {

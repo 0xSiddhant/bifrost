@@ -235,4 +235,45 @@ describe('useCursorList', () => {
     expect(hook.status).toBe('idle');
     expect(ids()).toEqual(['e', 'd', 'c', 'b']);
   });
+
+  it('retries the first batch on reconnect when it had failed', async () => {
+    let down = true;
+    const base = server(() => rows);
+    const fetchPage = vi.fn(
+      (query: Query, cursor: string | null, options: { signal: AbortSignal; limit?: number }) =>
+        down ? Promise.reject(new Error('down')) : base(query, cursor, options),
+    );
+    await mount(fetchPage as unknown as ReturnType<typeof server>);
+    expect(hook.status).toBe('error');
+    down = false;
+    await act(async () => {
+      for (const listener of sse.status) listener('closed');
+      for (const listener of sse.status) listener('open');
+    });
+    await settle();
+    expect(hook.status).toBe('idle');
+    expect(ids()).toEqual(['e', 'd']);
+    expect(hook.hasMore).toBe(true);
+  });
+
+  it('starts over on reconnect when a list it thought complete has grown past the first batch', async () => {
+    rows = rows.slice(0, 2); // e, d — one batch, nothing more to load
+    await mount(server(() => rows));
+    expect(hook.hasMore).toBe(false);
+    // During the outage three older rows arrive, past the first batch's end.
+    rows = [
+      ...rows,
+      { id: 'c', at: 30, tag: 'x' },
+      { id: 'b', at: 20, tag: 'y' },
+      { id: 'a', at: 10, tag: 'x' },
+    ];
+    await act(async () => {
+      for (const listener of sse.status) listener('connecting');
+      for (const listener of sse.status) listener('open');
+    });
+    await settle();
+    await settle();
+    expect(hook.total).toBe(5);
+    expect(hook.hasMore).toBe(true);
+  });
 });

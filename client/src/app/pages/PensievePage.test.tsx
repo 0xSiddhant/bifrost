@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => ({
   data: { runestone: [] as Summary[], edda: [] as Summary[] },
   pageSize: 2,
   down: new Set<string>(),
+  /** When set, every list request waits on it — a request held in flight. */
+  gate: null as Promise<void> | null,
   calls: [] as Array<{ kind: string; query: PageQuery; offset: number }>,
   deleteRunestone: vi.fn(),
   deleteEdda: vi.fn(),
@@ -40,8 +42,9 @@ const mocks = vi.hoisted(() => ({
 
 /** A paged list endpoint over `mocks.data[kind]`, ordered the way the servers are. */
 function servePage(kind: 'runestone' | 'edda') {
-  return (query: PageQuery, request: { offset: number; limit?: number }) => {
+  return async (query: PageQuery, request: { offset: number; limit?: number }) => {
     mocks.calls.push({ kind, query, offset: request.offset });
+    if (mocks.gate) await mocks.gate;
     if (mocks.down.has(kind)) return Promise.reject(new Error('502'));
     const direction = query.order === 'asc' ? 1 : -1;
     const keyOf = (row: Summary): number | string =>
@@ -168,6 +171,7 @@ describe('PensievePage', () => {
     };
     mocks.pageSize = 2;
     mocks.down = new Set();
+    mocks.gate = null;
     mocks.calls = [];
     mocks.listeners = new Map();
     mocks.statusListeners = [];
@@ -524,5 +528,28 @@ describe('PensievePage', () => {
     await settle();
     expect(options()).toContain('phone');
     expect(select?.value).toBe('phone');
+  });
+
+  it('does not let a live change on page 1 undo a click to page 2 still in flight', async () => {
+    fiveDocs();
+    await open();
+    const two = container.querySelector<HTMLAnchorElement>('.pager a[aria-label="Page 2"]');
+    let release = () => undefined as void;
+    mocks.gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // The walk to page 2 is now in flight and held there…
+    await act(async () => two?.click());
+    // …when another device saves, and the page-1 refresh window passes.
+    mocks.data.edda.push(summary('e9', 'E9', 99));
+    await act(async () => emit('edda.saved'));
+    await settle();
+    mocks.gate = null;
+    await act(async () => release());
+    await settle();
+    await settle();
+    expect(location).toBe('/pensieve?page=2');
+    // E9, E5 | R4, E3 — page 2 of the list as it now is.
+    expect(rowNames()).toEqual(['R4', 'E3']);
   });
 });
