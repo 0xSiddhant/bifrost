@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../../core/bus/index.js';
 import { AppError } from '../../../core/http/index.js';
-import type { Portkey, PortkeyListFilter, PortkeyRepository } from '../ports.js';
+import type { Portkey, PortkeyListFilter, PortkeyPageFilter, PortkeyRepository } from '../ports.js';
 import {
   CreatePortkeyUseCase,
   DeletePortkeyUseCase,
@@ -12,6 +12,8 @@ import {
 } from './manage-portkeys.js';
 
 /** In-memory stand-in for the Drizzle repo — usecases only know the interface. */
+const PAGING = { pageSize: 2, maxPageSize: 5 };
+
 class FakeRepo implements PortkeyRepository {
   readonly rows = new Map<string, Portkey>();
 
@@ -31,6 +33,19 @@ class FakeRepo implements PortkeyRepository {
   }
   list(filter: PortkeyListFilter): Portkey[] {
     return [...this.rows.values()].slice(filter.offset, filter.offset + filter.limit);
+  }
+  listPage(filter: PortkeyPageFilter): Portkey[] {
+    return [...this.rows.values()]
+      .sort((a, b) => b.createdAt - a.createdAt || (a.slug < b.slug ? 1 : -1))
+      .filter((row) => {
+        if (!filter.after) return true;
+        const key = filter.after.key as number;
+        return row.createdAt < key || (row.createdAt === key && row.slug < filter.after.id);
+      })
+      .slice(0, filter.limit);
+  }
+  count(): number {
+    return this.rows.size;
   }
   delete(slug: string): Portkey | null {
     const row = this.findBySlug(slug);
@@ -63,7 +78,12 @@ describe('CreatePortkeyUseCase', () => {
   it('normalizes the target, defaults hits/last-used and emits portkey.saved', () => {
     const seen = vi.fn();
     bus.on('portkey.saved', seen);
-    const portkey = create().execute({ slug: 'router', url: '192.168.1.1', note: '  admin  ', authorDeviceId: 'd1' });
+    const portkey = create().execute({
+      slug: 'router',
+      url: '192.168.1.1',
+      note: '  admin  ',
+      authorDeviceId: 'd1',
+    });
     expect(portkey).toMatchObject({
       slug: 'router',
       url: 'https://192.168.1.1/',
@@ -77,7 +97,9 @@ describe('CreatePortkeyUseCase', () => {
   });
 
   it('422s a bad slug with the validator reason', () => {
-    expect(() => create().execute({ slug: 'My Router', url: 'x.com', authorDeviceId: null })).toThrow(AppError);
+    expect(() =>
+      create().execute({ slug: 'My Router', url: 'x.com', authorDeviceId: null }),
+    ).toThrow(AppError);
     try {
       create().execute({ slug: 'My Router', url: 'x.com', authorDeviceId: null });
     } catch (error) {
@@ -86,10 +108,12 @@ describe('CreatePortkeyUseCase', () => {
   });
 
   it('422s a reserved slug and a non-web target', () => {
-    expect(() => create().execute({ slug: 'go', url: 'x.com', authorDeviceId: null })).toThrow(/reserved/i);
-    expect(() => create().execute({ slug: 'ok', url: 'javascript:alert(1)', authorDeviceId: null })).toThrow(
-      /http\(s\)/i,
+    expect(() => create().execute({ slug: 'go', url: 'x.com', authorDeviceId: null })).toThrow(
+      /reserved/i,
     );
+    expect(() =>
+      create().execute({ slug: 'ok', url: 'javascript:alert(1)', authorDeviceId: null }),
+    ).toThrow(/http\(s\)/i);
   });
 
   it('409s a duplicate slug', () => {
@@ -160,7 +184,9 @@ describe('resolve vs. record-hit ordering', () => {
     expect(row?.hits).toBe(2);
     expect(row?.lastUsedAt).toBe(5000);
     expect(seen).toHaveBeenCalledTimes(2);
-    expect(seen).toHaveBeenLastCalledWith({ portkey: expect.objectContaining({ slug: 'router', hits: 2 }) });
+    expect(seen).toHaveBeenLastCalledWith({
+      portkey: expect.objectContaining({ slug: 'router', hits: 2 }),
+    });
   });
 
   it('record-hit on a since-deleted slug is a silent no-op (no event)', () => {
@@ -173,8 +199,29 @@ describe('resolve vs. record-hit ordering', () => {
 });
 
 describe('ListPortkeysUseCase', () => {
+  it('pages newest-first by cursor across tied timestamps (PLAN-31)', () => {
+    for (const slug of ['a', 'b', 'c', 'd', 'e'])
+      create().execute({ slug, url: `${slug}.com`, authorDeviceId: null });
+    const list = new ListPortkeysUseCase(repo, PAGING);
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    for (let step = 0; step < 5; step += 1) {
+      const page = list.executePage({ cursor });
+      expect(page.total).toBe(5);
+      expect(page.limit).toBe(2);
+      seen.push(...page.items.map((link) => link.slug));
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+    expect(seen).toEqual(['e', 'd', 'c', 'b', 'a']);
+    expect(list.executePage({ limit: 50 }).limit).toBe(5);
+    expect(() => list.executePage({ cursor: 'garbage' })).toThrow(
+      expect.objectContaining({ code: 'BAD_CURSOR' }),
+    );
+  });
+
   it('clamps limit/offset into range', () => {
-    const list = new ListPortkeysUseCase(repo);
+    const list = new ListPortkeysUseCase(repo, PAGING);
     create().execute({ slug: 'a', url: 'a.com', authorDeviceId: null });
     expect(list.execute({ limit: 0 })).toHaveLength(1);
     expect(list.execute({ limit: 99999 })).toHaveLength(1);
