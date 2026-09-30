@@ -53,12 +53,17 @@ export interface ApiGetOptions {
    * the connection, it just never answers.
    */
   timeoutMs?: number;
+  /** Abort from the caller — a list whose filter changed drops its old request. */
+  signal?: AbortSignal;
 }
 
 export async function apiGet<T>(path: string, options: ApiGetOptions = {}): Promise<T> {
   const response = await fetch(path, {
     headers: { accept: 'application/json' },
-    signal: options.timeoutMs === undefined ? undefined : AbortSignal.timeout(options.timeoutMs),
+    // One or the other: `AbortSignal.any` would combine them, but it is Safari
+    // 17.4+ and the LAN's iPads are not all that new. No caller needs both.
+    signal:
+      options.timeoutMs === undefined ? options.signal : AbortSignal.timeout(options.timeoutMs),
   });
   if (!response.ok) {
     throw await toApiError('GET', path, response);
