@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { pagedQueryProperties } from '../../../core/paging.js';
 import { TAG_MAX_COUNT, TAG_MAX_LENGTH } from '../tags.js';
 import { TITLE_MAX_LENGTH } from '../title.js';
 import { URL_MAX_LENGTH } from '../url.js';
@@ -33,6 +34,7 @@ const listQuerySchema = {
     order: { enum: ['asc', 'desc'] },
     limit: { type: 'integer', minimum: 1, maximum: 500 },
     offset: { type: 'integer', minimum: 0 },
+    ...pagedQueryProperties,
   },
 } as const;
 
@@ -73,13 +75,18 @@ interface ListQuery {
   order?: string;
   limit?: number;
   offset?: number;
+  paged?: boolean;
+  cursor?: string;
 }
 
 export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
     '/api/accio',
     { schema: { querystring: listQuerySchema } },
-    (request) => deps.list.execute(request.query),
+    // `paged=true` opts into the cursor envelope (PLAN-31); without it the
+    // response is the bare array it always was.
+    (request) =>
+      request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
   app.post<{ Body: { url: string; title?: string; tags?: string[] } }>(
