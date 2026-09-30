@@ -1662,6 +1662,45 @@
 .lib-rows {
   display: flex;
   flex-direction: column;
+  transition: opacity 120ms ease;
+}
+
+/* The old page stays on screen, dimmed, until the new one arrives — no blank
+   flash on a LAN round trip (PLAN-31). */
+.lib-rows[aria-busy='true'] {
+  opacity: 0.55;
+}
+
+/* While the pager floats bottom-right, the rows give up an inline-end gutter
+   its width plus a gap, so no row's Delete or API button ever sits under it —
+   at ≥1024px the breakout's own 32px margin is narrower than the pager. */
+.lib-rows--pager-gutter {
+  padding-inline-end: calc(2.25rem + 2 * var(--space-1) + var(--space-4));
+}
+
+.lib-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Another device changed the library while this page (not page 1) was open.
+   The rows do not move under the reader; this offers the refresh instead. */
+.lib-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--text);
 }
 
 .lib-row {
