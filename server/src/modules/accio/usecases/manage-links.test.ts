@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from '../../../core/bus/index.js';
 import { AppError } from '../../../core/http/index.js';
-import type { AccioLink, AccioListFilter, AccioRepository, TitleFetcher } from '../ports.js';
+import type {
+  AccioLink,
+  AccioListFilter,
+  AccioPageFilter,
+  AccioPageRow,
+  AccioRepository,
+  TitleFetcher,
+} from '../ports.js';
 import {
   DeleteLinkUseCase,
   EnrichTitleUseCase,
@@ -9,6 +16,8 @@ import {
   SaveLinkUseCase,
   UpdateLinkUseCase,
 } from './manage-links.js';
+
+const PAGING = { pageSize: 2, maxPageSize: 3 };
 
 /** In-memory stand-in for the Drizzle repo — usecases only know the interface. */
 class FakeRepo implements AccioRepository {
@@ -28,6 +37,29 @@ class FakeRepo implements AccioRepository {
     return [...this.rows.values()]
       .filter((row) => !filter.tag || row.tags.includes(filter.tag))
       .slice(filter.offset, filter.offset + filter.limit);
+  }
+  /** Newest-first only (the `created` sort) — enough to exercise the usecase's cursor loop. */
+  listPage(filter: AccioPageFilter): AccioPageRow[] {
+    const sign = filter.order === 'asc' ? 1 : -1;
+    return [...this.rows.values()]
+      .filter((row) => !filter.tag || row.tags.includes(filter.tag))
+      .sort((a, b) => sign * (a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1)))
+      .filter((row) => {
+        if (!filter.after) return true;
+        const key = filter.after.key as number;
+        const cmp =
+          row.createdAt - key || (row.id < filter.after.id ? -1 : row.id > filter.after.id ? 1 : 0);
+        return sign * cmp > 0;
+      })
+      .slice(0, filter.limit)
+      .map((link) => ({ link, key: link.createdAt }));
+  }
+  count(filter: Pick<AccioListFilter, 'q' | 'tag'>): number {
+    return [...this.rows.values()].filter((row) => !filter.tag || row.tags.includes(filter.tag))
+      .length;
+  }
+  listTags(): string[] {
+    return [...new Set([...this.rows.values()].flatMap((row) => row.tags))].sort();
   }
   delete(id: string): AccioLink | null {
     const row = this.findById(id);
@@ -64,7 +96,9 @@ describe('SaveLinkUseCase', () => {
 
   it('stores a null title when the client sends none — enrichment fills it later', () => {
     expect(save().execute({ url: 'example.com', authorDeviceId: null }).title).toBeNull();
-    expect(save().execute({ url: 'example.com', title: '  ', authorDeviceId: null }).title).toBeNull();
+    expect(
+      save().execute({ url: 'example.com', title: '  ', authorDeviceId: null }).title,
+    ).toBeNull();
   });
 
   it('normalizes tags: lowercased, deduped, capped', () => {
@@ -140,11 +174,51 @@ describe('UpdateLinkUseCase', () => {
 });
 
 describe('ListLinksUseCase', () => {
+  it('pages by cursor: every row once, total under the filter, tags unfiltered (PLAN-31)', () => {
+    let at = 1000;
+    const clock = () => (at += 10);
+    const saver = new SaveLinkUseCase({ repo, bus, now: clock });
+    for (const name of ['a', 'b', 'c', 'd', 'e']) {
+      saver.execute({
+        url: `${name}.com`,
+        tags: name === 'e' ? ['odd'] : ['all'],
+        authorDeviceId: null,
+      });
+    }
+    const list = new ListLinksUseCase(repo, PAGING);
+
+    const first = list.executePage({ tag: 'all' });
+    expect(first.limit).toBe(2);
+    expect(first.total).toBe(4);
+    expect(first.tags).toEqual(['all', 'odd']);
+    expect(first.items.map((link) => link.url)).toEqual(['https://d.com/', 'https://c.com/']);
+    expect(first.nextCursor).not.toBeNull();
+
+    const second = list.executePage({ tag: 'all', cursor: first.nextCursor ?? '' });
+    expect(second.items.map((link) => link.url)).toEqual(['https://b.com/', 'https://a.com/']);
+    // Exactly-full last page: the look-ahead row is what says "no more".
+    expect(second.nextCursor).toBeNull();
+
+    expect(list.executePage({ limit: 50 }).limit).toBe(3);
+  });
+
+  it('refuses a cursor reused under another sort', () => {
+    save().execute({ url: 'a.com', authorDeviceId: null });
+    save().execute({ url: 'b.com', authorDeviceId: null });
+    save().execute({ url: 'c.com', authorDeviceId: null });
+    const list = new ListLinksUseCase(repo, PAGING);
+    const { nextCursor } = list.executePage({});
+    expect(nextCursor).not.toBeNull();
+    expect(() => list.executePage({ cursor: nextCursor ?? '', sort: 'title' })).toThrow(
+      expect.objectContaining({ statusCode: 400, code: 'BAD_CURSOR' }),
+    );
+  });
+
   it('normalizes the tag filter so casing composes with what was stored', () => {
     save().execute({ url: 'a.com', tags: ['Recipes'], authorDeviceId: null });
     save().execute({ url: 'b.com', tags: ['work'], authorDeviceId: null });
 
-    const found = new ListLinksUseCase(repo).execute({ tag: 'RECIPES' });
+    const found = new ListLinksUseCase(repo, PAGING).execute({ tag: 'RECIPES' });
     expect(found).toHaveLength(1);
     expect(found[0]?.url).toBe('https://a.com/');
   });

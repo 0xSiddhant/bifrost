@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { pagedQueryProperties } from '../../../core/paging.js';
 import { SLUG_MAX_LENGTH } from '../slug.js';
 import { NOTE_MAX_LENGTH } from '../usecases/manage-portkeys.js';
 import { TARGET_MAX_LENGTH } from '../target.js';
@@ -32,6 +33,7 @@ const listQuerySchema = {
     q: { type: 'string', maxLength: 120 },
     limit: { type: 'integer', minimum: 1, maximum: 1000 },
     offset: { type: 'integer', minimum: 0 },
+    ...pagedQueryProperties,
   },
 } as const;
 
@@ -76,13 +78,18 @@ interface ListQuery {
   q?: string;
   limit?: number;
   offset?: number;
+  paged?: boolean;
+  cursor?: string;
 }
 
 export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
     '/api/portkey',
     { schema: { querystring: listQuerySchema } },
-    (request) => deps.list.execute(request.query),
+    // `paged=true` opts into the cursor envelope (PLAN-31); without it the
+    // response is the bare array `bifrost portkey ls` still reads.
+    (request) =>
+      request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
   app.post<{ Body: { slug: string; url: string; note?: string } }>(

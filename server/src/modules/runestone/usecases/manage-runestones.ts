@@ -1,6 +1,7 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import type { RunestoneSummary } from '../../../core/bus/events.js';
 import { AppError } from '../../../core/http/index.js';
+import { pageLimit, type DocumentListPage, type PagingConfig } from '../../../core/paging.js';
 import { uniqueRelicTitle } from '../../../core/relics/index.js';
 import type {
   RunestoneListFilter,
@@ -62,8 +63,7 @@ export class SaveRunestoneUseCase {
 
     const sizeBytes = checkContent(input.content, maxDocBytes);
     const name =
-      input.name?.trim().slice(0, NAME_MAX) ||
-      uniqueRelicTitle(new Set(repo.listNames()), rng);
+      input.name?.trim().slice(0, NAME_MAX) || uniqueRelicTitle(new Set(repo.listNames()), rng);
 
     let id = newRunestoneId(rng);
     while (repo.hasId(id)) id = newRunestoneId(rng);
@@ -156,9 +156,33 @@ export interface ListRunestonesInput {
 const SORTS: readonly RunestoneSort[] = ['name', 'created', 'modified', 'size'];
 
 export class ListRunestonesUseCase {
-  constructor(private readonly repo: RunestoneRepository) {}
+  constructor(
+    private readonly repo: RunestoneRepository,
+    private readonly paging: PagingConfig,
+  ) {}
 
+  /** The legacy bare array — its 200/500 defaults are what installed clients rely on. */
   execute(input: ListRunestonesInput): RunestoneSummary[] {
+    return this.repo.list(this.filterFor(input, Math.min(Math.max(input.limit ?? 200, 1), 500)));
+  }
+
+  /**
+   * The paged form (PLAN-31): one page plus the total under the same filters
+   * and the unfiltered author facet. Offset-based, because the Pensieve needs
+   * random access to page k of a merge it computes itself.
+   */
+  executePage(input: ListRunestonesInput): DocumentListPage<RunestoneSummary> {
+    const filter = this.filterFor(input, pageLimit(input.limit, this.paging));
+    return {
+      items: this.repo.listPage(filter),
+      total: this.repo.count(filter),
+      limit: filter.limit,
+      offset: filter.offset,
+      authors: this.repo.listAuthors(),
+    };
+  }
+
+  private filterFor(input: ListRunestonesInput, limit: number): RunestoneListFilter {
     const sort = SORTS.includes(input.sort as RunestoneSort)
       ? (input.sort as RunestoneSort)
       : 'modified';
@@ -168,15 +192,14 @@ export class ListRunestonesUseCase {
         : sort === 'name'
           ? 'asc'
           : 'desc';
-    const filter: RunestoneListFilter = {
+    return {
       q: input.q?.trim() || undefined,
       authorDeviceId: input.author || undefined,
       sort,
       order,
-      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
+      limit,
       offset: Math.max(input.offset ?? 0, 0),
     };
-    return this.repo.list(filter);
   }
 }
 

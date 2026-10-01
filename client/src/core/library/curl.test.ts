@@ -24,7 +24,7 @@ function entry(partial: Partial<LibraryEntry>): LibraryEntry {
     noun: 'stone',
     newRoute: '/runestone',
     newLabel: 'New',
-    list: async () => [],
+    listPage: async () => ({ items: [], total: 0, limit: 30, offset: 0, authors: [] }),
     remove: async () => null,
     editorRoute: (i) => `/runestone/${i.slug}`,
     ...partial,

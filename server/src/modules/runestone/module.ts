@@ -32,7 +32,7 @@ export const runestoneModule: FeatureModule = {
 
     registerRunestoneRoutes(app, {
       maxDocKb: config.runestone.maxDocKb,
-      list: new ListRunestonesUseCase(repo),
+      list: new ListRunestonesUseCase(repo, config.paging),
       save: new SaveRunestoneUseCase({ repo, bus, maxDocBytes }),
       get: new GetRunestoneUseCase(repo),
       update: new UpdateRunestoneUseCase({ repo, bus, maxDocBytes }),

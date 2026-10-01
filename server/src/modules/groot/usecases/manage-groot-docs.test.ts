@@ -11,6 +11,8 @@ import {
   UpdateGrootUseCase,
 } from './manage-groot-docs.js';
 
+const PAGING = { pageSize: 30, maxPageSize: 100 };
+
 class MemoryRepo implements GrootRepository {
   rows = new Map<string, GrootRecord>();
   lastFilter: GrootListFilter | null = null;
@@ -41,6 +43,18 @@ class MemoryRepo implements GrootRepository {
     const row = this.findById(id);
     if (row) this.rows.delete(id);
     return row;
+  }
+  listPage(filter: GrootListFilter): GrootSummary[] {
+    return this.list(filter);
+  }
+  count(): number {
+    return this.rows.size;
+  }
+  listAuthors(): string[] {
+    const authors = [...this.rows.values()].flatMap((row) =>
+      row.authorDeviceId ? [row.authorDeviceId] : [],
+    );
+    return [...new Set(authors)];
   }
   listNames(): string[] {
     return [...this.rows.values()].map((row) => row.name);
@@ -205,7 +219,7 @@ describe('GetGrootUseCase', () => {
 describe('ListGrootUseCase', () => {
   it('clamps and defaults filter parameters', () => {
     const { repo } = harness();
-    const list = new ListGrootUseCase(repo);
+    const list = new ListGrootUseCase(repo, PAGING);
     list.execute({ sort: 'bogus', order: 'sideways', limit: 9999, offset: -3 });
     expect(repo.lastFilter).toEqual({
       q: undefined,

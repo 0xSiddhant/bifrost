@@ -1,4 +1,5 @@
 import type { AccioLink } from '../../core/bus/events.js';
+import type { CursorKey, CursorPosition } from '../../core/paging.js';
 
 export type { AccioLink };
 
@@ -15,12 +16,34 @@ export interface AccioListFilter {
   offset: number;
 }
 
+/** The paged form's filter (PLAN-31): a keyset position instead of an offset. */
+export interface AccioPageFilter extends Omit<AccioListFilter, 'offset'> {
+  /** Return rows strictly after this `(sortKey, id)`; absent = the first page. */
+  after?: CursorPosition;
+}
+
+/** A paged row plus the exact sort key SQLite compared, for minting the next cursor. */
+export interface AccioPageRow {
+  link: AccioLink;
+  key: CursorKey;
+}
+
 /** DB access for the shelf — usecases never touch Drizzle. */
 export interface AccioRepository {
   insert(link: AccioLink): void;
   update(link: AccioLink): void;
   findById(id: string): AccioLink | null;
   list(filter: AccioListFilter): AccioLink[];
+  /**
+   * The paged form: ordered by `(sortKey, id)` **both** in the filter's
+   * direction, which is what lets a keyset cursor be one row-value comparison.
+   * `list` keeps its `asc(id)` tiebreak for the legacy array response.
+   */
+  listPage(filter: AccioPageFilter): AccioPageRow[];
+  /** Rows matching `q`/`tag`, ignoring sort and paging. */
+  count(filter: Pick<AccioListFilter, 'q' | 'tag'>): number;
+  /** Every distinct tag over the whole shelf, unfiltered and alphabetical. */
+  listTags(): string[];
   /** Removes one link; returns it (for the deleted event) or null. */
   delete(id: string): AccioLink | null;
   hasId(id: string): boolean;

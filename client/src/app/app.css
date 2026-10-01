@@ -1662,14 +1662,89 @@
 .lib-rows {
   display: flex;
   flex-direction: column;
+  transition: opacity 120ms ease;
 }
 
-.lib-row {
+/* The old page stays on screen, dimmed, until the new one arrives — no blank
+   flash on a LAN round trip (PLAN-31). */
+.lib-rows[aria-busy='true'] {
+  opacity: 0.55;
+}
+
+/* While the pager floats bottom-right, the rows give up an inline-end gutter
+   its width plus a gap, so no row's Delete or API button ever sits under it —
+   at ≥1024px the breakout's own 32px margin is narrower than the pager. */
+.lib-rows--pager-gutter {
+  padding-inline-end: calc(2.25rem + 2 * var(--space-1) + var(--space-4));
+}
+
+.lib-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Another device changed the library while this page (not page 1) was open.
+   The rows do not move under the reader; this offers the refresh instead. */
+.lib-stale {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* A grid, not a flex row. The badge gets a fixed-minimum column so every
+   name starts at the same x whatever the type's label length ("XML" vs
+   "Markdown"), and the actions are one unit the breakpoints below can move. */
+.lib-row {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) auto;
+  grid-template-areas: 'badge body actions';
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--border);
+}
+
+.lib-row > .lib-badge {
+  grid-area: badge;
+  justify-self: start;
+}
+
+.lib-row__actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Below the ≥1024px breakout (an iPad, a narrow window) there is no room for
+   up to five actions beside the name: kept on one line, they squeezed the name
+   and its details into a column a word wide. They drop under the name, aligned
+   with it, and the body gets the full width. */
+@media (max-width: 1023px) {
+  .lib-row {
+    grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr);
+    grid-template-areas:
+      'badge body'
+      '. actions';
+  }
+
+  .lib-row__actions {
+    justify-content: flex-start;
+  }
 }
 
 .lib-row:last-child {
@@ -1695,7 +1770,7 @@
 }
 
 .lib-row__body {
-  flex: 1;
+  grid-area: body;
   min-width: 0;
 }
 
@@ -1720,12 +1795,13 @@
     display: none;
   }
 
+  /* The badge is icon-only here, so its column shrinks to fit it, and the
+     actions take the row's full width under both. */
   .lib-row {
-    flex-wrap: wrap;
-  }
-
-  .lib-row__body {
-    flex-basis: calc(100% - 5rem);
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'badge body'
+      'actions actions';
   }
 }
 

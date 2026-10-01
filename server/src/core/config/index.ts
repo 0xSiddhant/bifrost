@@ -29,7 +29,7 @@ function required(what: string, invalid: string) {
 // bookmark, QR code and the CLI already point at (a silent change strands them
 // all), HEIMDALL_PIN guards admin. Every
 // other key has a safe default that .env.example repeats.
-const envSchema = z.object({
+const envFields = z.object({
   DEPLOY_PROFILE: z.enum(['local', 'cloud'], {
     error: required('which modules load: local or cloud', 'must be "local" or "cloud"'),
   }),
@@ -59,6 +59,16 @@ const envSchema = z.object({
   // request to a user-pasted address, so neither may be hardcoded.
   ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
+  // List paging (PLAN-31) — rows per page for every paged list the app reads
+  // (Pensieve pages, Accio/Portkey scroll batches), and the most a client may
+  // ask for. GitHub's REST convention: 30 by default, 100 at most. Only the
+  // opt-in `paged=true` form uses these; the legacy bare-array responses keep
+  // their own defaults so an installed CLI never silently shows fewer rows.
+  // LIST_PAGE_MAX is capped at 500: the document and Accio routes reject a
+  // `limit` above that before the clamp could apply a larger cap, so a higher
+  // value would be honoured by Portkey (1000) and refused everywhere else.
+  LIST_PAGE_SIZE: z.coerce.number().int().min(1).default(30),
+  LIST_PAGE_MAX: z.coerce.number().int().min(1).max(500).default(100),
   // Brotli (PLAN-25) — the two size caps and the per-route rate limit. The
   // OUTPUT cap is the decompression-bomb guard: unlike every other limit here
   // it bounds bytes the server *manufactures*, not bytes a client sent, which
@@ -149,6 +159,12 @@ const envSchema = z.object({
   BACKUP_EXCLUDE: z.string().default(''),
 });
 
+// Cross-key rule: a default page larger than the cap could never be served.
+const envSchema = envFields.refine((env) => env.LIST_PAGE_SIZE <= env.LIST_PAGE_MAX, {
+  path: ['LIST_PAGE_SIZE'],
+  message: 'must not exceed LIST_PAGE_MAX',
+});
+
 export interface StoragePaths {
   root: string;
   uploads: string;
@@ -185,6 +201,12 @@ export interface AppConfig {
   };
   atlas: {
     maxDocKb: number;
+  };
+  paging: {
+    /** Rows per page when a paged request names no `limit` (LIST_PAGE_SIZE). */
+    pageSize: number;
+    /** The largest `limit` a paged request may ask for (LIST_PAGE_MAX). */
+    maxPageSize: number;
   };
   accio: {
     /** Per-attempt timeout for the post-save `<title>` lookup. */
@@ -378,6 +400,10 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     atlas: {
       maxDocKb: raw.ATLAS_MAX_DOC_KB,
+    },
+    paging: {
+      pageSize: raw.LIST_PAGE_SIZE,
+      maxPageSize: raw.LIST_PAGE_MAX,
     },
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,

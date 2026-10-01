@@ -1,7 +1,20 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import { AppError } from '../../../core/http/index.js';
+import {
+  decodeCursor,
+  encodeCursor,
+  pageLimit,
+  type CursorListPage,
+  type PagingConfig,
+} from '../../../core/paging.js';
 import { newAccioId } from '../id.js';
-import type { AccioLink, AccioListFilter, AccioRepository, AccioSort, TitleFetcher } from '../ports.js';
+import type {
+  AccioLink,
+  AccioListFilter,
+  AccioRepository,
+  AccioSort,
+  TitleFetcher,
+} from '../ports.js';
 import { normalizeTags } from '../tags.js';
 import { TITLE_MAX_LENGTH } from '../title.js';
 import { isWebUrl, normalizeUrl } from '../url.js';
@@ -97,14 +110,67 @@ export interface ListLinksInput {
   order?: string;
   limit?: number;
   offset?: number;
+  /** Paged form only: where the previous page ended. */
+  cursor?: string;
+}
+
+/** Accio's paged envelope: a cursor page plus the whole shelf's tags. */
+export interface AccioListPage extends CursorListPage<AccioLink> {
+  tags: string[];
 }
 
 const SORTS: readonly AccioSort[] = ['created', 'title', 'url'];
 
 export class ListLinksUseCase {
-  constructor(private readonly repo: AccioRepository) {}
+  constructor(
+    private readonly repo: AccioRepository,
+    private readonly paging: PagingConfig,
+  ) {}
 
+  /** The legacy bare array — its 200/500 defaults are what installed clients rely on. */
   execute(input: ListLinksInput): AccioLink[] {
+    return this.repo.list({
+      ...this.filterFor(input),
+      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
+      offset: Math.max(input.offset ?? 0, 0),
+    });
+  }
+
+  /**
+   * The paged form (PLAN-31): a keyset page, the total under the same filters,
+   * and every tag on the shelf. A cursor rather than an offset because the
+   * shelf changes under an open scroll — a save from a phone would push every
+   * row down one and an offset would then repeat the last row it showed.
+   */
+  executePage(input: ListLinksInput): AccioListPage {
+    const filter = this.filterFor(input);
+    const limit = pageLimit(input.limit, this.paging);
+    const after = input.cursor
+      ? decodeCursor(
+          input.cursor,
+          filter.sort,
+          filter.order,
+          filter.sort === 'created' ? 'number' : 'string',
+        )
+      : undefined;
+    // One row past the page says whether another page exists, without a
+    // second count query per scroll step.
+    const rows = this.repo.listPage({ ...filter, limit: limit + 1, after });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      items: page.map((row) => row.link),
+      total: this.repo.count(filter),
+      limit,
+      nextCursor:
+        rows.length > limit && last
+          ? encodeCursor(filter.sort, filter.order, { key: last.key, id: last.link.id })
+          : null,
+      tags: this.repo.listTags(),
+    };
+  }
+
+  private filterFor(input: ListLinksInput): Omit<AccioListFilter, 'limit' | 'offset'> {
     const sort = SORTS.includes(input.sort as AccioSort) ? (input.sort as AccioSort) : 'created';
     const order =
       input.order === 'asc' || input.order === 'desc'
@@ -115,15 +181,7 @@ export class ListLinksUseCase {
     // The tag filter must match what save/update stored, so it goes through the
     // same normalizer — "Recipes" in the query finds rows tagged "recipes".
     const [tag] = normalizeTags(input.tag ? [input.tag] : []);
-    const filter: AccioListFilter = {
-      q: input.q?.trim() || undefined,
-      tag,
-      sort,
-      order,
-      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
-      offset: Math.max(input.offset ?? 0, 0),
-    };
-    return this.repo.list(filter);
+    return { q: input.q?.trim() || undefined, tag, sort, order };
   }
 }
 

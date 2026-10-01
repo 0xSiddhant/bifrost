@@ -1,4 +1,11 @@
-import { ApiError, apiGet, apiSend } from './api';
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  pagedParams,
+  type DocumentListPage,
+  type OffsetRequest,
+} from './api';
 
 export interface RunestoneConfig {
   /** Document size cap in KB — from .env via the server, never hardcoded. */
@@ -33,14 +40,28 @@ export interface RunestoneListQuery {
   order?: 'asc' | 'desc';
 }
 
-export function listRunestones(query: RunestoneListQuery = {}): Promise<RunestoneSummary[]> {
+function listParams(query: RunestoneListQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.author) params.set('author', query.author);
   if (query.sort) params.set('sort', query.sort);
   if (query.order) params.set('order', query.order);
-  const qs = params.toString();
+  return params;
+}
+
+export function listRunestones(query: RunestoneListQuery = {}): Promise<RunestoneSummary[]> {
+  const qs = listParams(query).toString();
   return apiGet<RunestoneSummary[]>(`/api/runestone${qs ? `?${qs}` : ''}`);
+}
+
+/** One page of the listing plus its total and author facet (PLAN-31). */
+export function listRunestonesPage(
+  query: RunestoneListQuery,
+  request: OffsetRequest,
+): Promise<DocumentListPage<RunestoneSummary>> {
+  return apiGet<DocumentListPage<RunestoneSummary>>(
+    `/api/runestone?${pagedParams(listParams(query), request)}`,
+  );
 }
 
 /**

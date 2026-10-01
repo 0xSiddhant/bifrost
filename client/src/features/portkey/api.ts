@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from '../../core/api';
+import { apiGet, apiSend, type CursorListPage } from '../../core/api';
 
 /**
  * Portkey (LAN go-links) API client. Feature-local — nothing outside this
@@ -17,15 +17,31 @@ export interface Portkey {
   lastUsedAt: number | null;
 }
 
-export function listPortkeys(q?: string): Promise<Portkey[]> {
-  const params = new URLSearchParams({ limit: '1000' });
+/**
+ * One batch of go-links, newest first (PLAN-31). `cursor` null = the first
+ * batch; the server searches slug, target and note, and picks the page size
+ * (LIST_PAGE_SIZE) unless `limit` asks for fewer — the re-count asks for one.
+ */
+export function listPortkeysPage(
+  q: string | undefined,
+  cursor: string | null,
+  options: { signal?: AbortSignal; limit?: number } = {},
+): Promise<CursorListPage<Portkey>> {
+  const params = new URLSearchParams({ paged: 'true' });
   if (q) params.set('q', q);
-  return apiGet<Portkey[]>(`/api/portkey?${params.toString()}`);
+  if (cursor) params.set('cursor', cursor);
+  if (options.limit !== undefined) params.set('limit', String(options.limit));
+  return apiGet<CursorListPage<Portkey>>(`/api/portkey?${params.toString()}`, {
+    signal: options.signal,
+  });
 }
 
 /** Throws ApiError 422 (bad slug/target), 409 (slug taken). */
-export const createPortkey = (input: { slug: string; url: string; note?: string }): Promise<Portkey> =>
-  apiSend<Portkey>('POST', '/api/portkey', input);
+export const createPortkey = (input: {
+  slug: string;
+  url: string;
+  note?: string;
+}): Promise<Portkey> => apiSend<Portkey>('POST', '/api/portkey', input);
 
 /** Slug is immutable — only url/note can change. */
 export const updatePortkey = (

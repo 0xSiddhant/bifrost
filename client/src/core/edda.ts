@@ -1,4 +1,11 @@
-import { ApiError, apiGet, apiSend } from './api';
+import {
+  ApiError,
+  apiGet,
+  apiSend,
+  pagedParams,
+  type DocumentListPage,
+  type OffsetRequest,
+} from './api';
 
 export interface EddaConfig {
   /** Document size cap in KB — from .env via the server, never hardcoded. */
@@ -34,14 +41,28 @@ export interface EddaListQuery {
   order?: 'asc' | 'desc';
 }
 
-export function listEddas(query: EddaListQuery = {}): Promise<EddaSummary[]> {
+function listParams(query: EddaListQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.author) params.set('author', query.author);
   if (query.sort) params.set('sort', query.sort);
   if (query.order) params.set('order', query.order);
-  const qs = params.toString();
+  return params;
+}
+
+export function listEddas(query: EddaListQuery = {}): Promise<EddaSummary[]> {
+  const qs = listParams(query).toString();
   return apiGet<EddaSummary[]>(`/api/edda${qs ? `?${qs}` : ''}`);
+}
+
+/** One page of the listing plus its total and author facet (PLAN-31). */
+export function listEddasPage(
+  query: EddaListQuery,
+  request: OffsetRequest,
+): Promise<DocumentListPage<EddaSummary>> {
+  return apiGet<DocumentListPage<EddaSummary>>(
+    `/api/edda?${pagedParams(listParams(query), request)}`,
+  );
 }
 
 /**
@@ -66,5 +87,4 @@ export const updateEdda = (
   input: { name?: string; content?: string },
 ): Promise<EddaDoc> => apiSend<EddaDoc>('PUT', `/api/edda/${id}`, input);
 
-export const deleteEdda = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/edda/${id}`);
+export const deleteEdda = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/edda/${id}`);

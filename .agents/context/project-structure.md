@@ -36,6 +36,7 @@ bifrost/
 │       ├── core/              # shared kernel — NEVER imports from modules/
 │       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
 │       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
+│       │   ├── paging.ts      #   PLAN-31: page-size clamp, keyset cursor codec, envelopes
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
@@ -87,10 +88,13 @@ bifrost/
 │       │                      #     one thing every plist library throws away — and owns the pure
 │       │                      #     edit computations; advisories.ts is three, not padded to Groot's),
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
-│       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
+│       │                      #     + since PLAN-31 the paging algebra (paging.ts) and the page walk
+│       │                      #     (pager.ts, LibraryPager) behind the Pensieve; a 4th kind is one entry —
 │       │                      #     PLAN-19's groot proved it and PLAN-23's atlas proved it again,
 │       │                      #     one array element and no page change),
 │       │                      #   offlineMode.ts (PLAN-22 — warm-load policy client + status shape),
+│       │                      #   useCursorList.ts + ui/LoadMore.tsx (PLAN-31 — Accio/Portkey infinite
+│       │                      #     scroll), ui/Pager.tsx + useMediaQuery.ts (the Pensieve's pager),
 │       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
 │       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
 │       │                      #     cold route with no bridge off the app-wide crash card),

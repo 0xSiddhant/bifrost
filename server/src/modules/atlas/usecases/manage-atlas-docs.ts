@@ -1,6 +1,7 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import type { AtlasSummary } from '../../../core/bus/events.js';
 import { AppError } from '../../../core/http/index.js';
+import { pageLimit, type DocumentListPage, type PagingConfig } from '../../../core/paging.js';
 import { uniqueRelicTitle } from '../../../core/relics/index.js';
 import type { AtlasListFilter, AtlasRecord, AtlasRepository, AtlasSort } from '../ports.js';
 import { idFromSlug, isReservedSlug, makeSlug, newAtlasId } from '../slug.js';
@@ -165,9 +166,33 @@ export interface ListAtlasInput {
 const SORTS: readonly AtlasSort[] = ['name', 'created', 'modified', 'size'];
 
 export class ListAtlasUseCase {
-  constructor(private readonly repo: AtlasRepository) {}
+  constructor(
+    private readonly repo: AtlasRepository,
+    private readonly paging: PagingConfig,
+  ) {}
 
+  /** The legacy bare array — its 200/500 defaults are what installed clients rely on. */
   execute(input: ListAtlasInput): AtlasSummary[] {
+    return this.repo.list(this.filterFor(input, Math.min(Math.max(input.limit ?? 200, 1), 500)));
+  }
+
+  /**
+   * The paged form (PLAN-31): one page plus the total under the same filters
+   * and the unfiltered author facet. Offset-based, because the Pensieve needs
+   * random access to page k of a merge it computes itself.
+   */
+  executePage(input: ListAtlasInput): DocumentListPage<AtlasSummary> {
+    const filter = this.filterFor(input, pageLimit(input.limit, this.paging));
+    return {
+      items: this.repo.listPage(filter),
+      total: this.repo.count(filter),
+      limit: filter.limit,
+      offset: filter.offset,
+      authors: this.repo.listAuthors(),
+    };
+  }
+
+  private filterFor(input: ListAtlasInput, limit: number): AtlasListFilter {
     const sort = SORTS.includes(input.sort as AtlasSort) ? (input.sort as AtlasSort) : 'modified';
     const order =
       input.order === 'asc' || input.order === 'desc'
@@ -175,15 +200,14 @@ export class ListAtlasUseCase {
         : sort === 'name'
           ? 'asc'
           : 'desc';
-    const filter: AtlasListFilter = {
+    return {
       q: input.q?.trim() || undefined,
       authorDeviceId: input.author || undefined,
       sort,
       order,
-      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
+      limit,
       offset: Math.max(input.offset ?? 0, 0),
     };
-    return this.repo.list(filter);
   }
 }
 
