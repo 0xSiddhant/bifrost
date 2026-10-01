@@ -64,9 +64,13 @@ function whereFor(filter: Pick<AccioListFilter, 'q' | 'tag'>): SQL | undefined {
   }
   if (filter.tag) {
     // Tags are a JSON array; match the exact element rather than a substring,
-    // so "js" never matches a row tagged "jsdoc".
+    // so "js" never matches a row tagged "jsdoc". A hand-corrupted value would
+    // make json_each raise "malformed JSON" and fail the whole query, so it is
+    // guarded — inside CASE, not AND, since SQLite may evaluate WHERE terms in
+    // any order but evaluates CASE branches in order. Such a row then simply
+    // matches no tag, which is how `toLink` already shows it: untagged.
     conditions.push(
-      sql`EXISTS (SELECT 1 FROM json_each(${accioLinks.tags}) WHERE json_each.value = ${filter.tag})`,
+      sql`CASE WHEN json_valid(${accioLinks.tags}) THEN EXISTS (SELECT 1 FROM json_each(${accioLinks.tags}) WHERE json_each.value = ${filter.tag}) ELSE 0 END`,
     );
   }
   return conditions.length > 0 ? and(...conditions) : undefined;

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import Database from 'better-sqlite3';
 import pino from 'pino';
 import type { InjectOptions } from 'fastify';
 import { loadConfig } from './core/config/index.js';
@@ -239,6 +240,38 @@ describe('list paging (PLAN-31)', () => {
       const rows = await getJson('/api/accio');
       expect(Array.isArray(rows)).toBe(true);
       expect(rows).toHaveLength(12);
+    });
+
+    // PR #80 review: since the shelf filters on the server, a tag chip is a
+    // `tag=` query, and one hand-corrupted `tags` value must not turn it into
+    // a 500 — the row degrades to untagged, as `toLink` already shows it.
+    it('a corrupt tags value degrades that row to untagged instead of failing the tag filter', async () => {
+      const raw = new Database(app.config.storage.dbFile);
+      const victim = raw.prepare('SELECT id, tags FROM accio_links WHERE url = ?').get(urls[4]) as {
+        id: string;
+        tags: string;
+      };
+      raw.prepare('UPDATE accio_links SET tags = ? WHERE id = ?').run('{not json', victim.id);
+      try {
+        // This suite caps a page at 5 rows, so `total` is the paged check and
+        // the full legacy array is where the row itself is looked for.
+        const paged = await inject({ method: 'GET', url: '/api/accio?paged=true&tag=all' });
+        expect(paged.statusCode).toBe(200);
+        expect(paged.json().total).toBe(11);
+        expect(paged.json().tags).toEqual(['all', 'four']);
+
+        const legacy = await inject({ method: 'GET', url: '/api/accio?tag=all&limit=500' });
+        expect(legacy.statusCode).toBe(200);
+        expect(legacy.json()).toHaveLength(11);
+        expect(legacy.json().some((link: { id: string }) => link.id === victim.id)).toBe(false);
+
+        // Unfiltered, the row is still listed — untagged.
+        const all: Array<{ id: string; tags: string[] }> = await getJson('/api/accio?limit=500');
+        expect(all.find((link) => link.id === victim.id)?.tags).toEqual([]);
+      } finally {
+        raw.prepare('UPDATE accio_links SET tags = ? WHERE id = ?').run(victim.tags, victim.id);
+        raw.close();
+      }
     });
   });
 
