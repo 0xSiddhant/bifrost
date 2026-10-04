@@ -112,6 +112,8 @@ Both drive the same `e2e/support/server.ts`. It is plain TypeScript with no runn
 
 Scripts: `test:e2e:ui` (Playwright), `test:e2e:cli` (Vitest, `cli/` folder), and `test:e2e`, which runs both. None of them is named `test`, so `npm test` (which runs before the build in CI) never picks them up. Root `npm run test:e2e` runs them after `npm run build`.
 
+The spawned server runs on **production defaults**, overriding only: `OTEL_ENABLED=false` (no exporter traffic), a scratch `STORAGE_ROOT`, a free `PORT`, and `API_CONTRACT_CHECK=strict`. Metrics and `LOG_LEVEL` stay at their defaults, because PLAN-33 reads `/metrics` and journey 18 reads the log file.
+
 Each Playwright worker and each Vitest e2e file gets **its own server process on a free port with its own `mkdtemp` storage**, as a worker-scoped fixture, so tests run in parallel without sharing state. Some journeys change process-wide state: stopping the server (offline mode), revoking every session, tripping the login throttle, or a cloud-profile boot. These take a **test-scoped** server of their own, so they never poison a neighbour.
 
 Pure unit tests of the e2e support code (`*.test.ts`, vitest) form the workspace's `test` script and run in `npm test`. Playwright specs (`*.spec.ts`) and Vitest e2e suites (`*.e2e.ts`) run only under the `test:e2e*` scripts; `vitest.e2e.config.ts` includes only `*.e2e.ts`, and the unit config only `*.test.ts`. The suite never touches `storage/`, the owner's running instance, or the backup agent's paths. The server runs with `API_CONTRACT_CHECK=strict` once 32b exists, so every request the browser makes is also contract-checked. (On `develop` before 32b the key is unknown, and `loadConfig` ignores unknown keys.)
@@ -174,6 +176,8 @@ The journeys:
 
 The **`cloud`** project boots a `DEPLOY_PROFILE=cloud` server and asserts the local-only pages are absent from the nav and their APIs 404.
 
+**CI time:** the journeys run in parallel workers with one server each. Target: the whole `test:e2e` step under 15 minutes on `ubuntu-latest`. If it grows past that, the Playwright projects are sharded across two CI jobs (`--shard`) rather than trimmed; trimming is how coverage rots.
+
 **Coverage cannot rot silently:** `routes.spec.ts` reads `client/src/app/App.tsx` **as text** (not an import) and fails if any route path there has no journey tagged with it. A new page therefore fails CI until it gets a journey.
 
 ### The installed CLI is tested as a user installs it
@@ -186,7 +190,7 @@ The CLI suite (`e2e/cli/*.e2e.ts`, Vitest; no browser, so no Playwright):
 It covers, for every command except `update`:
 - human output **and** `--json` (parsed);
 - the documented exit codes, including server-down;
-- TTY vs pipe, using `script -q` for a real pty: colour and progress bars appear on the TTY and vanish in the pipe;
+- TTY vs pipe, using `script` for a real pty: colour and progress bars appear on the TTY and vanish in the pipe. `script` takes different arguments on macOS (`script -q /dev/null <cmd>`) and Linux (`script -qec <cmd> /dev/null`), so `e2e/support/pty.ts` picks per platform, and a unit test covers both argument shapes;
 - that `--json` never spawns a browser.
 
 `update` is excluded because it calls GitHub; its unit tests stay. `preview` and `open` run with `--no-open`, or `--json`.
@@ -203,7 +207,7 @@ Cross-surface journeys stay in **Playwright** (`e2e/browser/cross-surface.spec.t
 
 1. builds `<ref>` in a temporary `git worktree` (server only);
 2. seeds one scratch storage **through the API** against the base build (documents of every kind with edge-case content: unicode, empty optional fields, `null` titles, maximum-length names; links with and without titles; files and folders; themes; settings);
-3. copies that storage twice;
+3. copies that storage twice, **preserving file timestamps** (`fs.cp` with `preserveTimestamps`). The downloads and uploads listings include each file's `mtime`, so a plain copy would make every listing differ for no reason;
 4. starts base and candidate on the copies;
 5. replays a request corpus against both.
 
@@ -238,7 +242,7 @@ Fastify compiles each response schema into a serializer that writes only what th
   3. the status is one the route declares (5xx and `HEAD` exempt).
 
   A violation becomes `500 CONTRACT_VIOLATION`, naming the route, the status and the ajv error.
-- **`fallback`** (production default from 32b until a clean release). `preSerialization` records the bytes. `onSend` compares, and on a mismatch **sends the recorded bytes instead** (Fastify computes `content-length` after `onSend`) and logs `warn` `contract mismatch` with route, status and the first differing path. No ajv runs, so the cost is one extra `JSON.stringify` per JSON response. A schema mistake can therefore never reach a client, only the log. `observability/` gains a provisioned Loki alert rule on that line.
+- **`fallback`** (production default from 32b until a clean release). `preSerialization` records the bytes. `onSend` compares, and on a mismatch **sends the recorded bytes instead** (Fastify computes `content-length` after `onSend`) and logs `warn` `contract mismatch` with route, status and the JSON pointer of the first differing value. It **never logs the values themselves**, because a document's content does not belong in the log archive. No ajv runs, so the cost is one extra `JSON.stringify` per JSON response. A schema mistake can therefore never reach a client, only the log. `observability/` gains a provisioned Loki alert rule on that line.
 - **`off`:** no hooks; the serializer's speed benefit is fully realised.
 
 Byte-identical rather than "semantically equal": the CLI's `--json` output and `curl | jq` pipelines see bytes, and PLAN-31 set byte-identical as the bar. It is achievable because fast-json-stringify writes properties in schema order, and schemas are written in handler order.

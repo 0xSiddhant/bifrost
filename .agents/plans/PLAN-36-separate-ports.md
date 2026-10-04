@@ -1,0 +1,210 @@
+# PLAN-36 — Separate ports: web host and API server
+
+## Goal
+
+The hub's client and its API run in one process on one port: `PORT` (4646) serves `client/dist`, every API path and the live-updates stream. This plan splits them into **separate processes on separate ports**:
+
+- a small **web host** (a new `web/` workspace) serves the hub client on `PORT`, the address everyone already opens (`bifrost.local:4646`), and forwards the API paths to the API server, the same way Vite already does in development;
+- the **API server** moves to its own `API_PORT`, bound to loopback.
+
+Every way of running Bifrost is updated so it starts and stops both as smoothly as today: `npm run dev`, `npm start`, PM2, launchd, Docker, setup, the backup agent, the observability stack, and the test and load harnesses. Bookmarks, QR codes, home-screen icons, mDNS and the installed CLI all keep working unchanged. Split out of PLAN-35 at the owner's request, because it is a task of its own. The literal name is the name.
+
+## Gate
+
+PLAN-35 merged. Single PR, no parts. **Linear sequence: 32 → 33 → 34 → 35 → 36.**
+
+**Merge condition:**
+- `npm test`;
+- the full `npm run test:e2e` with every suite **going through the web host**;
+- `server/openapi.json` unchanged;
+- a `npm run test:load` comparison before and after this plan (see "Streams, SSE and uploads pass through unbuffered");
+- a hand-run of every start path in "Every way of running Bifrost".
+
+## Verified against the codebase, not assumed
+
+- **Ports today:**
+  - one process listens on `PORT` (required, `.env.example` 4646) at `0.0.0.0` (`app.ts`), serving `client/dist` through `@fastify/static` with an SPA fallback, plus every API path;
+  - `npm start` = `cli-sync` + `node --import server/dist/otel.js server/dist/bootstrap.js`;
+  - `ecosystem.config.cjs` runs one PM2 app; `scripts/start-launchd.sh` writes one plist running `bootstrap.js`; `start-pm2.sh` and `start-launchd.sh` both print `http://<name>.local:$PORT`;
+  - `Dockerfile` `EXPOSE 4646`, `HEALTHCHECK` on `$PORT/api/health`, one `CMD`; `docker-compose.yml` sets `PORT: 4646`;
+  - `observability/prometheus/prometheus.yml` scrapes `host.docker.internal:4646` (`/metrics`);
+  - `scripts/backup-agent.sh` checks `http://127.0.0.1:$PORT/api/health` before backing up.
+- **Dev already splits ports:** `client/vite.config.ts` serves on Vite's default port and proxies `/api`, `/runestone/api`, `/edda/api`, `/groot/api`, `/atlas/api` and `/go` to `PORT`. `npm run dev` runs both through `concurrently`, a root **devDependency**, so it is not available to a production `npm start`.
+- **Who uses the port:**
+  - the join URLs and boot QR (`qr-tool`'s `serverUrls`) and mDNS (`advertiseMdns(name, config.port)`) both use `PORT`;
+  - the CLI defaults to `http://bifrost.local:4646` (`cli/src/core/discover.ts`) and uses that **one** base URL both for API calls and for browser pages it opens (`preview` → `/edda/preview/…`, `/saga…`), and as the allowed origin of its one-shot `localServe`;
+  - an installed CLI can be older than the server.
+- **Client IPs:** five places read `request.ip`: Heimdall's login throttle, presence/SSE, upload attribution, client-log relays, and Nimbus's device fallback. Fastify has no `trustProxy` set, so behind a proxy every request would appear to come from the proxy.
+- **PLAN-35 is in place by then:** the hub client already maps a network-level failure to `HubUnreachableError` and shows "The Bifröst is closed" with "Try again", which is what a proxied `502` from a stopped API server will reach.
+
+## Scope
+
+**In:**
+- a new `web/` workspace: the hub's web host on `PORT`, serving `client/dist` and proxying API paths to `API_PORT`;
+- the API server on `API_PORT`, loopback by default, trusting the proxy's forwarded client IP;
+- every run path updated: dev, `npm start`, PM2, launchd, Docker/compose, setup, the backup agent, Prometheus, the `verify`/`live-verify` skills, the e2e and load harnesses.
+
+**Out:**
+- Any route change: the API surface and `server/openapi.json` are untouched.
+- The browser calling the API port directly (cross-origin): rejected below in favour of the same-origin proxy.
+- Running the web host on a different machine than the API: possible later by pointing it at a non-loopback `API_HOST`, but not set up or tested here.
+- The standalone build (PLAN-35): it has no server and is unaffected.
+
+## Decisions & reasoning
+
+### Separate processes and ports, joined by a same-origin proxy
+
+This plan puts the hub's client and its API in **separate processes on separate ports**:
+- **web host** (new `web/` workspace, `@bifrost/web`, Fastify + `@fastify/static` + `@fastify/http-proxy`): serves `client/dist` with the SPA fallback on `PORT`. It forwards these paths to the API server: `/api`, `/runestone/api`, `/edda/api`, `/groot/api`, `/atlas/api`, `/go` and `/metrics`. That is the exact list `vite.config.ts` already proxies in development, plus `/metrics`.
+- **API server**: the existing server, no longer serving `client/dist`, listening on `API_PORT`.
+
+The web host imports nothing from `server/src`, enforced by the same lint rule as `e2e/`. It is about 100 lines: static files, the proxy, health, logging and graceful shutdown.
+
+**Rejected: the browser calling `API_PORT` directly.** That would need:
+- a configurable API origin in the client;
+- a CORS allowlist on the server;
+- `credentials: 'include'` on every request and on the SSE connection, for the Heimdall cookie;
+- every "API"/"Copy curl"/raw-document/`/go` link and the join QR rebuilt from a second origin;
+- installed CLIs repointed.
+
+That is a large surface for the same result. The proxy keeps the browser on one origin, so none of it is needed. It also makes production the same shape as development, which has run this way since PLAN-00.
+
+### `PORT` keeps its meaning; the API moves to `API_PORT`, loopback-only by default
+
+`PORT` stays the address people and devices open, so the owner's `.env` does not change: it is now the web host's port. Two new keys:
+- `API_PORT`: default `PORT + 1`, so 4647;
+- `API_HOST`: default `127.0.0.1`.
+
+Binding the API to loopback means the only way in from the network is through the web host. There is one door, the rate limits and logs see every request in one place, and nothing can bypass the proxy.
+
+Everything that names the public address stays on `PORT` and is therefore unchanged in value:
+- mDNS advertisement, the join URLs and the boot QR;
+- the CLI's default `bifrost.local:4646`. API calls go through the proxy, and browser pages are the web host's, which is exactly what `preview` and `localServe` already assume.
+
+**An installed, older CLI therefore keeps working with no change.** `npm run setup`'s drift check lists the two new keys. Both have defaults, so nothing is required.
+
+### ⚠️ The API must still see the real client IP
+
+Behind a proxy, `request.ip` becomes `127.0.0.1` for every device. Then:
+- the Heimdall login throttle would lock out the whole household after one person's wrong PINs;
+- presence, upload attribution and client-log relays would all name the proxy;
+- Nimbus would treat every device as one.
+
+So:
+- the web host sets `X-Forwarded-For` (`@fastify/http-proxy`'s default; the spike confirms it, and the web host sets it explicitly if not);
+- the API server sets `trustProxy` to **loopback only**, so a forwarded header is believed only when the request really came from the local web host. A client on the LAN cannot spoof its IP, because it cannot reach the loopback-bound API at all.
+
+A black-box test logs in with wrong PINs from two different forwarded addresses and checks that only one gets throttled.
+
+### Streams, SSE and uploads pass through unbuffered (spiked first)
+
+The proxy sits in front of every byte the hub moves:
+- 2 GB uploads, whose flat memory is promised by `architecture.md`;
+- range downloads and folder `.zip` streams with no `content-length`;
+- Brotli and Nimbus streams;
+- long-lived SSE connections.
+
+**A spike runs before any wiring.** In a scratch project with `@fastify/http-proxy` it checks:
+1. SSE events arrive immediately, with no buffering and no idle timeout cutting a stream between heartbeats;
+2. a 1 GB upload passes with the proxy's RSS flat;
+3. `Range` → `206`/`416` and `Content-Range` pass through;
+4. a streamed zip without `content-length` arrives whole;
+5. `X-Forwarded-For` is set;
+6. closing the proxy mid-upload closes the upstream promptly.
+
+If any of these fails with that library, the fallback is a hand-written proxy on `node:http` `pipeline()` for that path class (the PLAN-25 precedent of owning a stream end to end), and the spike result says which. The proxy's own body limit is off; the API server's existing caps decide.
+
+PLAN-34's `npm run test:load` then measures the cost of the extra hop: `load` and `fanout` before and after this plan, same machine. The report records the throughput and p99 difference, and the upload RSS high-water mark must stay within the flat-memory promise. The extra hop is local loopback, so it should be small. The number decides, not the assumption.
+
+### Every way of running Bifrost starts both, as smoothly as today
+
+| Path | Today | After PLAN-36 |
+|---|---|---|
+| `npm run dev` | Vite (own port) + API on `PORT` | Vite on `PORT` + API on `API_PORT`: dev and production share one URL. `vite.config.ts` proxies to `API_PORT` |
+| `npm start` | `cli-sync` + `node … bootstrap.js` | `cli-sync` + `scripts/start.ts`, which starts both children, prefixes their output, forwards `SIGINT`/`SIGTERM` to both, and exits non-zero if either dies (no `concurrently`, which is a devDependency) |
+| PM2 (`ecosystem.config.cjs`, `start-pm2.sh`) | one app | two apps, `bifrost-api` and `bifrost-web`, each with its own logs and `autorestart`; the script prints the same `open:` URL |
+| launchd (`start-launchd.sh`) | one plist | two plists, `…bifrost.api` and `…bifrost.web`, both `KeepAlive`; re-running the script replaces the old single plist |
+| Docker (`Dockerfile`, compose) | one `CMD`, `EXPOSE 4646` | one image, two commands; compose runs two services on host networking; `EXPOSE` `PORT` only; `HEALTHCHECK` per service |
+| `npm run setup` | — | reports both ports; drift check knows the new keys |
+| Backup agent | `127.0.0.1:$PORT/api/health` | `127.0.0.1:$API_PORT/api/health`: the API's own health, so a stopped web host does not skip backups. When `.env` has no `API_PORT`, the script derives `PORT + 1` exactly as the server's config does, so both agree on the default |
+| Prometheus | `host.docker.internal:4646/metrics` | unchanged: `/metrics` is proxied on `PORT` |
+| CLI | `bifrost.local:4646` | unchanged |
+| `test:resilience` | spawns `server/dist/app.js` on a random port | spawns the API only (it tests SQLite durability) on a random `API_PORT` |
+| e2e harness, load harness | spawn one process | `e2e/support/server.ts` spawns both on free ports; every suite goes through the web host. The load harness also gets an `--direct` flag to measure the API without the proxy |
+| `verify` / `live-verify` skills | one server, one port | start both via `npm start`; restart smoke on both; the documented URL unchanged |
+
+### ⚠️ Upgrading an existing install must not leave the hub dark
+
+The owner's Mac already runs Bifrost under launchd or PM2 with **one** definition that starts `bootstrap.js`. After this plan, that same old definition would start only the API, now on loopback `API_PORT`, and nothing would answer `PORT`. Every device would lose the hub until someone noticed. So:
+
+- **launchd:** re-running `sh scripts/start-launchd.sh` (it takes no subcommands today) detects the old single plist, unloads and removes it, then installs the two new ones.
+- **PM2:** `start-pm2.sh` deletes an old `bifrost` app before starting `bifrost-api` and `bifrost-web`, so the old process cannot hold `API_PORT` and collide with the new one.
+- **A forgotten step is loud:** the API server, at boot, checks whether anything answers on `PORT` after a short grace period. If nothing does, it logs an `error`: "nothing is serving PORT 4646 — the web host is not running; re-run `sh scripts/start-pm2.sh` or `sh scripts/start-launchd.sh`".
+- **Docker:** a compose file from before this plan keeps running its one service, which is now the API only, so the upgrade note says to pull the new `docker-compose.yml`.
+- **Release notes:** the `CHANGELOG` entry and `README.md` carry a short "upgrading from one process to two" section.
+
+The upgrade is tested by hand on the owner's Mac, from the current single-process install to the new pair, under both PM2 and launchd. This is the step most likely to go wrong on a real machine and the one no CI job can run.
+
+Shutdown order: the web host stops accepting first and closes its upstream connections, then the API drains as today (`forceCloseConnections`). `scripts/start.ts` and both PM2 and launchd definitions follow that order.
+
+The web host logs through pino to the same `storage/logs` archive with `source: 'web'`, so Grafana sees both processes. It logs:
+- start, stop and the ports it is using;
+- upstream unreachable;
+- a request aborted mid-stream.
+
+**When the API server is down,** the web host answers proxied API paths with a JSON `502 { error: 'HUB_UNAVAILABLE' }` and **still serves the client**.
+
+⚠️ **That 502 does not trigger PLAN-35's sheet by itself.** PLAN-35 maps only network-level failures (a thrown `TypeError` or timeout) to `HubUnreachableError`, and deliberately treats any HTTP status as `ApiError`, because a 4xx/5xx means the server answered. Behind the web host, the API being down now arrives as an HTTP 502. So this plan extends `core/api.ts`: an `ApiError` with code `HUB_UNAVAILABLE` is mapped to `HubUnreachableError`, and the sheet shows with "Try again" as before. A unit test pins it, and the e2e journey stops only the API to prove it. The SSE stream gets a 502 the same way, so `bifrostEvents.onStatus` reports `closed`/`connecting` and the sheet's auto-close on `'open'` still works.
+
+`/go/<slug>` is followed by people, not by the client, so a JSON 502 would land raw in their browser. For `/go/*` the web host answers a small static HTML "The Bifröst is closed" page (same copy, inline theme-neutral styles) with status 503 and `Retry-After`.
+
+**Offline mode changes meaning, for the better.** PLAN-22 warm-loads pages so they still open when "the server" is gone. Now:
+- **API down:** the web host still serves every chunk, so pages load and only API actions show the sheet;
+- **web host down:** warm-load matters, exactly as before.
+
+PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") is rewritten to stop the **web host**, and a new step stops only the API.
+
+## API contracts
+
+**No route changes.** New env keys `API_PORT` (default `PORT + 1`) and `API_HOST` (default `127.0.0.1`). `PORT` keeps its meaning as the address people open, now served by the web host. A proxied path returns `502 HUB_UNAVAILABLE` from the web host while the API server is down.
+
+## Task checklist
+
+- [ ] Spike first (scratch project, never committed): the six pass-through checks in "Streams, SSE and uploads pass through unbuffered"; record the result and the chosen proxy per path class in `decisions.md`
+- [ ] `web/` workspace (`@bifrost/web`): static `client/dist` + SPA fallback, proxy for the seven path roots, `X-Forwarded-For`, no body limit, `502 HUB_UNAVAILABLE` (an HTML 503 page for `/go/*`), `/healthz` (added to `RESERVED_ROOTS` and its test, per the routing rule), pino `source: 'web'`, graceful shutdown; lint rule banning `server/src`; `tech-stack.md` rows
+- [ ] Server: stop serving `client/dist`; listen on `API_HOST:API_PORT`; `trustProxy` loopback-only; config keys `API_PORT` / `API_HOST` (zod; `API_PORT ≠ PORT`); mDNS, `serverUrls` and the boot QR still on `PORT`
+- [ ] `.env.example` (both keys, documented), `npm run setup` (reports both ports, drift check)
+- [ ] `client/vite.config.ts`: Vite on `PORT`, proxy target `API_PORT`
+- [ ] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (two plists, replacing the old single plist on re-run); `Dockerfile` + `docker-compose.yml` (two services, health checks)
+- [ ] `scripts/backup-agent.sh` → `API_PORT`; `scripts/resilience.ts` → API on a random `API_PORT`
+- [ ] `e2e/support/server.ts`: spawn both on free ports, all suites through the web host; load harness `--direct`
+- [ ] `client/src/core/api.ts`: `ApiError` code `HUB_UNAVAILABLE` → `HubUnreachableError` (unit test); rewrite PLAN-32's journey 17 to stop the web host, plus an API-only-down step
+- [ ] Upgrade path: `start-launchd.sh` replaces the old single plist on re-run; `start-pm2.sh` removes the old `bifrost` app; API boot check for nothing on `PORT`; upgrade section in `CHANGELOG`/`README.md`; hand-tested upgrade under PM2 and launchd
+- [ ] `.claude/skills/verify/SKILL.md`, `.claude/skills/live-verify/SKILL.md`: both processes, the same URL
+- [ ] Docs: `docs/pm2.md`, `docs/launchd.md`, `docs/docker-linux.md`, `docs/observability.md`, `README.md`, `architecture.md` (one process → two, the proxy, `trustProxy`; supersedes the 2026-07-12 one-process decision with a new row), `project-structure.md` (fifth workspace)
+- [ ] Hand-run every row of the "Every way of running Bifrost" table on the owner's Mac (Docker on CI's image build plus a Linux `compose up` if available), with results in `progress.md`
+- [ ] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [ ] Cleanup: the spike stays in the session scratchpad and is never committed; no stray processes, plists or PM2 apps left from testing; the PR lists deletions
+
+## Acceptance criteria
+
+1. `http://bifrost.local:4646` opens the hub exactly as before: same URL, same QR, same mDNS name. The API answers on `API_PORT` on loopback only, and is unreachable from another LAN device.
+2. Every e2e suite (browser, CLI, API) passes **through the web host**, and an installed CLI from before this plan works unchanged against it.
+3. SSE events arrive with no added delay through the proxy. A 1 GB upload keeps the proxy's and the API's RSS within the flat-memory bound. Range, zip and Brotli streams pass through intact.
+4. With two devices behind the proxy, the login throttle, presence and upload attribution see each device's own IP, and a forged `X-Forwarded-For` from the LAN has no effect.
+5. With the API stopped, the web host still serves the client, proxied paths return `502 HUB_UNAVAILABLE`, and the hub shows "The Bifröst is closed" with "Try again". Starting the API again closes it.
+6. `npm run dev`, `npm start`, PM2, launchd and Docker each start both processes with one command, stop both cleanly with one command, and print or serve the same URL as today. The backup agent and Prometheus keep working without any change to their configuration.
+7. `test:load` before and after this plan on the same machine is recorded in `progress.md` (throughput, p99, upload RSS), and shows no 5xx and no flat-memory breach.
+8. Upgrading the owner's existing single-process install (PM2 and launchd) with the documented command leaves `bifrost.local:4646` working, with no old process left behind. If the web host is not running, the API logs an error saying so within its grace period.
+9. With only the API stopped, the hub shows "The Bifröst is closed" (from the web host's 502), and `/go/<slug>` shows the HTML closed page instead of raw JSON.
+
+## Test checklist
+
+- [ ] `web/` unit/integration: proxied paths, SPA fallback, `502 HUB_UNAVAILABLE`, forwarded IP, no body limit (criteria 3–5)
+- [ ] Server: `trustProxy` loopback-only (a non-loopback `X-Forwarded-For` is ignored); config validation `API_PORT ≠ PORT` (criterion 4)
+- [ ] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6)
+- [ ] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
+- [ ] `test:load` before vs after (criterion 7)
+
+**Manual**
+- [ ] The owner's existing bookmarks and home-screen icons still open the hub; `bifrost status` from the installed CLI; PM2 or launchd restart of each process separately (criteria 1, 2 and 6)

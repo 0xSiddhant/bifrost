@@ -63,7 +63,7 @@ The owner runs it before a release or after a performance-sensitive change, on t
 
 ### Measured as configured: production entry, production defaults
 
-The server is the PLAN-33 spawn of `bootstrap.js` with `otel.js` preloaded. Every `.env` default is left alone, **including `LOG_LEVEL=trace`**, because that is what the owner runs. Only rate limits are lifted (set to 1,000,000/min), since they exist to stop abuse and would otherwise turn every write scenario into a 429 measurement. `--log-level info` is offered as a flag so the cost of trace logging can be measured as a difference rather than guessed, and the report states which level was used.
+The server is the PLAN-33 spawn of `bootstrap.js` with `otel.js` preloaded. Every `.env` default is left alone, **including `LOG_LEVEL=trace`**, because that is what the owner runs. ⚠️ The harness **overrides PLAN-32's e2e default of `API_CONTRACT_CHECK=strict`**: strict mode validates every response with ajv, which would make every number meaningless. It runs the production default (`fallback`) unless `--contract off|fallback` says otherwise, and the report states which mode was used. The PLAN-32 before/after comparison is run twice, once with `off` (the serializer's real gain) and once with `fallback` (what production pays until the follow-up flips it off). Only rate limits are lifted (set to 1,000,000/min), since they exist to stop abuse and would otherwise turn every write scenario into a 429 measurement. `--log-level info` is offered as a flag so the cost of trace logging can be measured as a difference rather than guessed, and the report states which level was used.
 
 ### Safety: scratch storage only, enforced
 
@@ -136,7 +136,7 @@ None. The harness is an outside client of existing routes and adds no server cod
 
 **Harness**
 - [ ] `e2e/package.json`: `autocannon` (devDependency); `tech-stack.md` row
-- [ ] `e2e/perf/run.ts`: CLI (`--profile`, `--minutes`, `--connections`, `--baseline`, `--strict`, `--log-level`, `--server-dist`, `--keep`), `dist` presence check, disk-space check, spawn via `e2e/support/server.ts` with rate limits lifted
+- [ ] `e2e/perf/run.ts`: CLI (`--profile`, `--minutes`, `--connections`, `--baseline`, `--strict`, `--log-level`, `--contract`, `--server-dist`, `--keep`), `dist` presence check, disk-space check, spawn via `e2e/support/server.ts` with rate limits lifted
 - [ ] `e2e/perf/seed.ts`: the seeding set, over HTTP, timed
 - [ ] `e2e/perf/metrics.ts`: `/metrics` scraper + parser for the `bifrost_` default metrics and the request histogram; 15 s sampler
 - [ ] `e2e/perf/scenarios.ts`: read/write/mixed scenario definitions with unique-body setup
@@ -169,7 +169,7 @@ None. The harness is an outside client of existing routes and adds no server cod
 5. `soak` fails when resident memory or heap grows faster than 1 MB/min after warm-up, and passes on the current server for a 60-minute run (or the leak it finds is recorded as a finding).
 6. `fanout` delivers every event to all 200 SSE listeners and reports per-listener memory and delivery p99; four concurrent 1 GB uploads complete with the RSS high-water mark reported against the flat-memory promise.
 7. Any 5xx, connection error or timeout in any profile exits non-zero; a regression against `--baseline` is flagged but exits zero unless `--strict` is passed.
-8. `--server-dist` runs the same workload against another build, and the PLAN-32 before/after comparison is recorded in `progress.md`.
+8. `--server-dist` runs the same workload against another build, and the PLAN-32 before/after comparison (contract `off` and `fallback`) is recorded in `progress.md`. No run ever uses `strict`.
 9. No load request reaches the internet: every Accio link is saved with a title, and nothing is sent to an external host.
 10. Any product-code change in this PR passes `npm test`, the full `test:e2e`, and the API diff against `develop` with zero differences, on seeded data.
 11. After the PR, `e2e/api-diff/` and `test:api-diff` no longer exist, no worktree or scratch storage remains, and the PR lists what was deleted. The permanent suites (`test:e2e`, the contract guard, fuzz, security) are untouched.
