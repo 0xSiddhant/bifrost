@@ -34,6 +34,7 @@ PLAN-35 merged. Single PR, no parts. **Linear sequence: 32 → 33 → 34 → 35 
   - the join URLs and boot QR (`qr-tool`'s `serverUrls`) and mDNS (`advertiseMdns(name, config.port)`) both use `PORT`;
   - the CLI defaults to `http://bifrost.local:4646` (`cli/src/core/discover.ts`) and uses that **one** base URL both for API calls and for browser pages it opens (`preview` → `/edda/preview/…`, `/saga…`), and as the allowed origin of its one-shot `localServe`;
   - an installed CLI can be older than the server.
+- **mDNS is a name server, not just an advertisement:** `server/src/core/mdns/index.ts`'s `advertiseMdns(name, port)` publishes the `_http._tcp` service **and** sets `host: '<name>.local'`, which makes the process answer A/AAAA queries for `bifrost.local` (the code's own comment: "the browser resolves the hostname, not the service"). So `bifrost.local` resolves **only while the process running the responder is alive**. The module also holds the hard-won robustness work: a `warn` instead of bonjour-service's default `throw` on send errors, guards on the responder socket, and a 5 s network-change watcher that rebuilds the responder when an interface comes back on the same address. It is started from `app.ts` (`main`, local profile) with `config.port`, and its `lanIPv4Addresses()` helper is also used by `qr-tool`'s `serverUrls` and the boot log lines. Tests: `core/mdns/mdns.test.ts`. Dependency: `bonjour-service`.
 - **Client IPs:** five places read `request.ip`: Heimdall's login throttle, presence/SSE, upload attribution, client-log relays, and Nimbus's device fallback. Fastify has no `trustProxy` set, so behind a proxy every request would appear to come from the proxy.
 - **PLAN-35 is in place by then:** the hub client already maps a network-level failure to `HubUnreachableError` and shows "The Bifröst is closed" with "Try again", which is what a proxied `502` from a stopped API server will reach.
 
@@ -78,10 +79,25 @@ That is a large surface for the same result. The proxy keeps the browser on one 
 Binding the API to loopback means the only way in from the network is through the web host. There is one door, the rate limits and logs see every request in one place, and nothing can bypass the proxy.
 
 Everything that names the public address stays on `PORT` and is therefore unchanged in value:
-- mDNS advertisement, the join URLs and the boot QR;
+- the `bifrost.local` name and its mDNS advertisement (now answered by the web host, see the next decision), the join URLs and the boot QR;
 - the CLI's default `bifrost.local:4646`. API calls go through the proxy, and browser pages are the web host's, which is exactly what `preview` and `localServe` already assume.
 
 **An installed, older CLI therefore keeps working with no change.** `npm run setup`'s drift check lists the two new keys. Both have defaults, so nothing is required.
+
+### ⚠️ The process that answers `PORT` also answers for `bifrost.local`
+
+The mDNS responder does not only advertise; it **is** the name server for `bifrost.local`. If it stayed in the API server, the name would die with the API:
+- with the API down and the web host up, no device could find `bifrost.local`, so the "The Bifröst is closed" page the web host is ready to serve would be unreachable by name, only by typing an IP;
+- every API restart (a deploy, a crash) would briefly take the name away while the site itself never went down.
+
+The name and the port must live and die together. So **the responder moves into the web host:**
+
+- **What moves:** `advertiseMdns`, `watchNetworkChanges`, `mdnsErrorHandler`, `attachResponderGuards` and their tests move from `server/src/core/mdns/` to `web/src/mdns.ts`, with `bonjour-service` moving to `web/package.json`. It is a move, not a rewrite: every robustness fix (warn instead of crash on a lost interface, the socket guards, the same-address rebuild) comes along unchanged, and its tests come along with it.
+- **What stays:** the server keeps only `lanIPv4Addresses()` (five lines, used by `qr-tool`'s join URLs and the boot log), in `server/src/core/net.ts`. The web host has its own copy. That is the deliberate small duplication this project accepts across workspaces, which may not import each other.
+- **What it advertises:** the web host reads `MDNS_NAME`, `PORT` and `DEPLOY_PROFILE` from the shared `.env` and advertises only for the `local` profile, exactly as `main()` does today. It starts after its own listener is up and unpublishes (sending a goodbye) during shutdown, before closing.
+- **Development:** `npm run dev` has no web host (Vite serves the client on `PORT`), so the dev script runs a third, advertiser-only process, `web/src/mdns-dev.ts`, beside Vite and the API. `bifrost.local` keeps working in development as it does today.
+- **One advertiser at a time:** two responders publishing `bifrost` would conflict (bonjour-service probes and errors). The upgrade path below stops the old single process **before** the web host starts, and the web host logs `error` if probing reports the name already taken, naming the likely cause (an old Bifrost process still running).
+- **Docker on Linux:** the web host's compose service keeps `network_mode: host`, which multicast needs. The API service no longer needs host networking for mDNS, only for its loopback bind.
 
 ### ⚠️ The API must still see the real client IP
 
@@ -120,7 +136,7 @@ PLAN-34's `npm run test:load` then measures the cost of the extra hop: `load` an
 
 | Path | Today | After PLAN-36 |
 |---|---|---|
-| `npm run dev` | Vite (own port) + API on `PORT` | Vite on `PORT` + API on `API_PORT`: dev and production share one URL. `vite.config.ts` proxies to `API_PORT` |
+| `npm run dev` | Vite (own port) + API on `PORT` (API advertises mDNS) | Vite on `PORT` + API on `API_PORT` + the advertiser-only `mdns-dev` process: dev and production share one URL and one name. `vite.config.ts` proxies to `API_PORT` |
 | `npm start` | `cli-sync` + `node … bootstrap.js` | `cli-sync` + `scripts/start.ts`, which starts both children, prefixes their output, forwards `SIGINT`/`SIGTERM` to both, and exits non-zero if either dies (no `concurrently`, which is a devDependency) |
 | PM2 (`ecosystem.config.cjs`, `start-pm2.sh`) | one app | two apps, `bifrost-api` and `bifrost-web`, each with its own logs and `autorestart`; the script prints the same `open:` URL |
 | launchd (`start-launchd.sh`) | one plist | two plists, `…bifrost.api` and `…bifrost.web`, both `KeepAlive`; re-running the script replaces the old single plist |
@@ -139,6 +155,7 @@ The owner's Mac already runs Bifrost under launchd or PM2 with **one** definitio
 
 - **launchd:** re-running `sh scripts/start-launchd.sh` (it takes no subcommands today) detects the old single plist, unloads and removes it, then installs the two new ones.
 - **PM2:** `start-pm2.sh` deletes an old `bifrost` app before starting `bifrost-api` and `bifrost-web`, so the old process cannot hold `API_PORT` and collide with the new one.
+- **Order matters for the name:** both scripts stop the old process **before** starting the web host, so the old single process and the new responder never both publish `bifrost` at once.
 - **A forgotten step is loud:** the API server, at boot, checks whether anything answers on `PORT` after a short grace period. If nothing does, it logs an `error`: "nothing is serving PORT 4646 — the web host is not running; re-run `sh scripts/start-pm2.sh` or `sh scripts/start-launchd.sh`".
 - **Docker:** a compose file from before this plan keeps running its one service, which is now the API only, so the upgrade note says to pull the new `docker-compose.yml`.
 - **Release notes:** the `CHANGELOG` entry and `README.md` carry a short "upgrading from one process to two" section.
@@ -172,7 +189,8 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 
 - [ ] Spike first (scratch project, never committed): the six pass-through checks in "Streams, SSE and uploads pass through unbuffered"; record the result and the chosen proxy per path class in `decisions.md`
 - [ ] `web/` workspace (`@bifrost/web`): static `client/dist` + SPA fallback, proxy for the seven path roots, `X-Forwarded-For`, no body limit, `502 HUB_UNAVAILABLE` (an HTML 503 page for `/go/*`), `/healthz` (added to `RESERVED_ROOTS` and its test, per the routing rule), pino `source: 'web'`, graceful shutdown; lint rule banning `server/src`; `tech-stack.md` rows
-- [ ] Server: stop serving `client/dist`; listen on `API_HOST:API_PORT`; `trustProxy` loopback-only; config keys `API_PORT` / `API_HOST` (zod; `API_PORT ≠ PORT`); mDNS, `serverUrls` and the boot QR still on `PORT`
+- [ ] Server: stop serving `client/dist`; listen on `API_HOST:API_PORT`; `trustProxy` loopback-only; config keys `API_PORT` / `API_HOST` (zod; `API_PORT ≠ PORT`); `serverUrls` and the boot QR still on `PORT`; the mDNS responder **removed** from the API server (`app.ts` no longer calls `advertiseMdns`), with `lanIPv4Addresses()` kept in `core/net.ts`
+- [ ] Move the mDNS responder to `web/src/mdns.ts` (+ tests, `bonjour-service` dependency); the web host advertises `MDNS_NAME` on `PORT` for the `local` profile after listening, and unpublishes on shutdown; `web/src/mdns-dev.ts` advertiser-only entry wired into `npm run dev`; `error` log on a name conflict
 - [ ] `.env.example` (both keys, documented), `npm run setup` (reports both ports, drift check)
 - [ ] `client/vite.config.ts`: Vite on `PORT`, proxy target `API_PORT`
 - [ ] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (two plists, replacing the old single plist on re-run); `Dockerfile` + `docker-compose.yml` (two services, health checks)
@@ -197,6 +215,9 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 7. `test:load` before and after this plan on the same machine is recorded in `progress.md` (throughput, p99, upload RSS), and shows no 5xx and no flat-memory breach.
 8. Upgrading the owner's existing single-process install (PM2 and launchd) with the documented command leaves `bifrost.local:4646` working, with no old process left behind. If the web host is not running, the API logs an error saying so within its grace period.
 9. With only the API stopped, the hub shows "The Bifröst is closed" (from the web host's 502), and `/go/<slug>` shows the HTML closed page instead of raw JSON.
+10. `bifrost.local` keeps resolving while the API server is stopped or restarting, because the web host answers for it. With the API down, `http://bifrost.local:4646` still opens the hub and shows "The Bifröst is closed".
+11. After the upgrade, exactly one `bifrost` service and name is on the network (checked with `dns-sd -B _http._tcp` on the Mac). In `npm run dev`, `bifrost.local` resolves as before.
+12. Losing and regaining Wi-Fi on the same address leaves the web host running and re-advertising within the watcher's interval, as the server does today.
 
 ## Test checklist
 
@@ -205,6 +226,9 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 - [ ] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6)
 - [ ] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
 - [ ] `test:load` before vs after (criterion 7)
+- [ ] `web/src/mdns.test.ts` (the moved suite): publish with `host`, error-handler and guard behaviour, the network-change rebuild (criterion 12)
+- [ ] Integration: the web host advertises only for the `local` profile and unpublishes on shutdown; the API server no longer imports a responder (criteria 10 and 11)
 
 **Manual**
+- [ ] On the owner's Mac and an iPhone: stop the API, and `bifrost.local` still resolves and shows the closed sheet; restart it, and the sheet closes; `dns-sd -B _http._tcp` shows one `bifrost` after the upgrade (criteria 10 and 11)
 - [ ] The owner's existing bookmarks and home-screen icons still open the hub; `bifrost status` from the installed CLI; PM2 or launchd restart of each process separately (criteria 1, 2 and 6)

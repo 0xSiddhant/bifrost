@@ -59,7 +59,7 @@ The owner's two conditions from the first discussion were: not exposed to the Bi
 - unreachable from other LAN devices (loopback bind);
 - absent from both client builds.
 
-That is the separate-port design the owner originally asked for, with no new listener. To read the docs from a laptop, the owner uses an SSH tunnel (`ssh -L 4647:127.0.0.1:4647 <mac>`), documented in `docs/api.md`.
+That is the separate-port design the owner originally asked for, with no new listener. ⚠️ **Open them as `http://127.0.0.1:4647/docs` (or `localhost`), never `bifrost.local:4647`.** `bifrost.local` resolves to the Mac's **LAN** address, and the API listens only on loopback, so that URL fails even on the Mac itself. `docs/api.md` and the boot log line both show the loopback URL. To read the docs from a laptop, the owner uses an SSH tunnel (`ssh -L 4647:127.0.0.1:4647 <mac>`), documented in `docs/api.md`.
 
 ### Core, not a feature module
 
@@ -135,7 +135,7 @@ No new `.env` keys.
 - [ ] PLAN-33's API suites and PLAN-37's spec check pass on the merged `/{key}` paths
 
 **Docs & cleanup**
-- [ ] `docs/api.md`: where the docs are, the SSH tunnel recipe, that "Try it out" sends real requests, how to log in for admin calls; linked from `README.md` and `docs/testing.md`
+- [ ] `docs/api.md`: where the docs are (the loopback URL, and why `bifrost.local:4647` does not work), the SSH tunnel recipe, that "Try it out" sends real requests, how to log in for admin calls; linked from `README.md` and `docs/testing.md`
 - [ ] `architecture.md` (docs in core, loopback-only by construction), `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
 - [ ] Cleanup: the spike stays in the scratchpad; no probe scripts committed; the PR lists deletions
 
