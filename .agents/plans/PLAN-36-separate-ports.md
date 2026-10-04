@@ -43,13 +43,16 @@ PLAN-35 merged. Single PR, no parts. **Linear sequence: 32 → 33 → 34 → 35 
 **In:**
 - a new `web/` workspace: the hub's web host on `PORT`, serving `client/dist` and proxying API paths to `API_PORT`;
 - the API server on `API_PORT`, loopback by default, trusting the proxy's forwarded client IP;
-- every run path updated: dev, `npm start`, PM2, launchd, Docker/compose, setup, the backup agent, Prometheus, the `verify`/`live-verify` skills, the e2e and load harnesses.
+- every run path updated: dev, `npm start`, PM2, launchd, Docker/compose, setup, the backup agent, Prometheus, the `verify`/`live-verify` skills, the e2e and load harnesses;
+- **three run modes** behind one switch (`BIFROST_RUN=full|api|web`) and one bind setting for the web host (`WEB_HOST`), so each service runs alone or together on this machine, on the LAN, and (standalone only) on the VPS. With nothing set, the behaviour is exactly the default hub.
 
 **Out:**
 - Any route change: the API surface and `server/openapi.json` are untouched.
 - The browser calling the API port directly (cross-origin): rejected below in favour of the same-origin proxy.
 - Running the web host on a different machine than the API: possible later by pointing it at a non-loopback `API_HOST`, but not set up or tested here.
-- The standalone build (PLAN-35): it has no server and is unaffected.
+- The standalone **container** on the VPS (PLAN-35): unchanged.
+- The hub API on a public VPS: still explicitly rejected (PLAN-99), since `file-transfer` and the shared-PIN admin are LAN-trust features.
+- A web host forwarding to an API on another machine, or an API reachable on the LAN without the web host: not needed for any of the owner's scenarios, so not built. Each is a later, separate decision.
 
 ## Decisions & reasoning
 
@@ -149,6 +152,45 @@ PLAN-34's `npm run test:load` then measures the cost of the extra hop: `load` an
 | e2e harness, load harness | spawn one process | `e2e/support/server.ts` spawns both on free ports; every suite goes through the web host. The load harness also gets an `--direct` flag to measure the API without the proxy |
 | `verify` / `live-verify` skills | one server, one port | start both via `npm start`; restart smoke on both; the documented URL unchanged |
 
+### Run modes: one switch, defaults unchanged, nothing new to learn for the normal case
+
+The owner wants every service usable **alone and together**, on this machine, on the LAN and on the VPS, without making the system complicated. So there are exactly two new settings, and **with neither set, everything behaves as the default hub**:
+
+- **`BIFROST_RUN`** = `full` (default) | `api` | `web`: which processes start;
+- **`WEB_HOST`** = `0.0.0.0` (default) | `127.0.0.1`: where the web host listens.
+
+| Mode | Starts | Serves | `bifrost.local` (mDNS) |
+|---|---|---|---|
+| `full` (default) | web host + API | the **hub** client on `PORT`, forwarding API paths to `API_PORT` | advertised, when `WEB_HOST` is not loopback |
+| `api` | API only, on `API_HOST:API_PORT` (loopback) | the API and its docs (PLAN-38); no client | not advertised (no web host, nothing for a name to point at) |
+| `web` | web host only | the **standalone** client on `PORT`, with no forwarding at all; it is the same client the VPS container serves | advertised, when `WEB_HOST` is not loopback |
+
+Every place that starts Bifrost honours the same switch, so there is one idea and not one per launcher:
+- `scripts/start.ts` starts the processes for the mode;
+- PM2's `ecosystem.config.cjs` starts only the matching apps;
+- `start-launchd.sh` installs only the matching plists, and removes plists of a previous mode;
+- compose uses profiles (`api`, `web`).
+
+Two rules keep the modes from surprising anyone:
+- **`web` always serves the standalone build.** "Client without a server" means the tools-only site that never calls one, not a hub client whose every feature ends in "The Bifröst is closed". So in `web` mode the web host forwards nothing, and `/api/…`, `/go/…` and `/<kind>/api/…` fall to the app, which shows the sheet exactly as the VPS container does. Its fallback, cache and header rules are the **same** as PLAN-35's committed `nginx.conf`, held by the parity test PLAN-35 already has, so the standalone client behaves identically locally, on the LAN and on the VPS.
+- **`npm run build` builds both clients** (`client/dist` and `client/dist-standalone`), so every mode works after one build, with no "forgot to build the other one" step. Vite builds them in sequence; the cost is seconds.
+
+The checks and warnings follow the mode, so no mode logs a false alarm:
+- the API's "nothing is serving `PORT`" error (upgrade safety) runs only in `full` mode;
+- in `api` mode, the boot log prints the docs URL and the CLI hint: "`bifrost --host 127.0.0.1:4647`" (the CLI's default `bifrost.local:4646` has nobody behind it in this mode);
+- with `WEB_HOST=127.0.0.1`, mDNS is switched off with an `info` line, because advertising a name other devices cannot reach would only mislead them;
+- a mode the files cannot serve (for example `web` with no `client/dist-standalone`) refuses to start, with the one command that fixes it.
+- the backup agent reads `BIFROST_RUN` too: in `web` mode there is no hub data in use, so it skips with that reason ("web-only mode: nothing to back up") instead of a daily "server not running";
+- Prometheus scrapes `/metrics` through the web host on `PORT` in `full` mode, as today. In `api` mode `/metrics` is on loopback `API_PORT` only, which `docs/observability.md` notes; `web` mode has no metrics endpoint, by design.
+
+**Where each service can run after this plan:**
+
+| | This machine only (`127.0.0.1`) | LAN (`bifrost.local`) | VPS (Docker, public) |
+|---|---|---|---|
+| Hub (client + API) | `full`, `WEB_HOST=127.0.0.1` | `full` (default) | rejected (LAN-trust features) |
+| API alone | `api` | through `full` | rejected |
+| Standalone client alone | `web`, `WEB_HOST=127.0.0.1` | `web` | PLAN-35's container |
+
 ### ⚠️ Upgrading an existing install must not leave the hub dark
 
 The owner's Mac already runs Bifrost under launchd or PM2 with **one** definition that starts `bootstrap.js`. After this plan, that same old definition would start only the API, now on loopback `API_PORT`, and nothing would answer `PORT`. Every device would lose the hub until someone noticed. So:
@@ -183,7 +225,7 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 
 ## API contracts
 
-**No route changes.** New env keys `API_PORT` (default `PORT + 1`) and `API_HOST` (default `127.0.0.1`). `PORT` keeps its meaning as the address people open, now served by the web host. A proxied path returns `502 HUB_UNAVAILABLE` from the web host while the API server is down.
+**No route changes.** New env keys `API_PORT` (default `PORT + 1`), `API_HOST` (default `127.0.0.1`), `BIFROST_RUN` (default `full`) and `WEB_HOST` (default `0.0.0.0`). With none of them set, the hub behaves exactly as described above. `PORT` keeps its meaning as the address people open, now served by the web host. A proxied path returns `502 HUB_UNAVAILABLE` from the web host while the API server is down.
 
 ## Task checklist
 
@@ -193,8 +235,9 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 - [ ] Move the mDNS responder to `web/src/mdns.ts` (+ tests, `bonjour-service` dependency); the web host advertises `MDNS_NAME` on `PORT` for the `local` profile after listening, and unpublishes on shutdown; `web/src/mdns-dev.ts` advertiser-only entry wired into `npm run dev`; `error` log on a name conflict
 - [ ] `.env.example` (both keys, documented), `npm run setup` (reports both ports, drift check)
 - [ ] `client/vite.config.ts`: Vite on `PORT`, proxy target `API_PORT`
-- [ ] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (two plists, replacing the old single plist on re-run); `Dockerfile` + `docker-compose.yml` (two services, health checks)
-- [ ] `scripts/backup-agent.sh` → `API_PORT`; `scripts/resilience.ts` → API on a random `API_PORT`
+- [ ] Run modes: `BIFROST_RUN` and `WEB_HOST` (zod, shared `.env`); the web host's `web` mode (serves `client/dist-standalone`, forwards nothing, same rules as `nginx.conf`); mode-aware checks and logs (the `PORT` check only in `full`; the CLI hint in `api`; mDNS off on a loopback `WEB_HOST`; a refusal naming the fix when the needed build is missing); `npm run build` builds both clients
+- [ ] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (the plists for the mode, replacing the old single plist and any other mode's plists on re-run); compose profiles `api`/`web`; `Dockerfile` + `docker-compose.yml` (two services, health checks)
+- [ ] `scripts/backup-agent.sh` → `API_PORT`, mode-aware skip in `web` mode; `scripts/resilience.ts` → API on a random `API_PORT`
 - [ ] `e2e/support/server.ts`: spawn both on free ports, all suites through the web host; load harness `--direct`
 - [ ] `client/src/core/api.ts`: `ApiError` code `HUB_UNAVAILABLE` → `HubUnreachableError` (unit test); rewrite PLAN-32's journey 17 to stop the web host, plus an API-only-down step
 - [ ] Upgrade path: `start-launchd.sh` replaces the old single plist on re-run; `start-pm2.sh` removes the old `bifrost` app; API boot check for nothing on `PORT`; upgrade section in `CHANGELOG`/`README.md`; hand-tested upgrade under PM2 and launchd
@@ -218,17 +261,24 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 10. `bifrost.local` keeps resolving while the API server is stopped or restarting, because the web host answers for it. With the API down, `http://bifrost.local:4646` still opens the hub and shows "The Bifröst is closed".
 11. After the upgrade, exactly one `bifrost` service and name is on the network (checked with `dns-sd -B _http._tcp` on the Mac). In `npm run dev`, `bifrost.local` resolves as before.
 12. Losing and regaining Wi-Fi on the same address leaves the web host running and re-advertising within the watcher's interval, as the server does today.
+13. With no new key set, every earlier criterion holds: the default is the full hub on the LAN.
+14. `BIFROST_RUN=api` starts only the API on loopback; the docs open; the CLI works with `--host 127.0.0.1:4647`; no mDNS; no "nothing on `PORT`" error.
+15. `BIFROST_RUN=web` serves the standalone client on `PORT` with zero server requests, `bifrost.local` resolves on the LAN, and its fallback, cache and header behaviour match the VPS container.
+16. `WEB_HOST=127.0.0.1` makes the web page reachable only from the Mac, and mDNS is off with an `info` line saying why.
+17. Every launcher (`npm start`, PM2, launchd, compose) starts exactly the processes of the chosen mode, and switching modes leaves no process from the previous one running.
 
 ## Test checklist
 
 - [ ] `web/` unit/integration: proxied paths, SPA fallback, `502 HUB_UNAVAILABLE`, forwarded IP, no body limit (criteria 3–5)
 - [ ] Server: `trustProxy` loopback-only (a non-loopback `X-Forwarded-For` is ignored); config validation `API_PORT ≠ PORT` (criterion 4)
-- [ ] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6)
+- [ ] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6); the process set per mode (criterion 17)
+- [ ] Mode smoke test (CI, on the build): boot each of `full`, `api`, `web`, plus `WEB_HOST=127.0.0.1`; assert which ports listen, which client is served, that `web` makes no forwarded request, and the mDNS on/off decision (as a unit test of the decision, since CI cannot multicast) (criteria 13–16)
 - [ ] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
 - [ ] `test:load` before vs after (criterion 7)
 - [ ] `web/src/mdns.test.ts` (the moved suite): publish with `host`, error-handler and guard behaviour, the network-change rebuild (criterion 12)
 - [ ] Integration: the web host advertises only for the `local` profile and unpublishes on shutdown; the API server no longer imports a responder (criteria 10 and 11)
 
 **Manual**
+- [ ] On the owner's Mac: each mode by hand under PM2 and launchd, then back to `full` (criteria 13–17)
 - [ ] On the owner's Mac and an iPhone: stop the API, and `bifrost.local` still resolves and shows the closed sheet; restart it, and the sheet closes; `dns-sd -B _http._tcp` shows one `bifrost` after the upgrade (criteria 10 and 11)
 - [ ] The owner's existing bookmarks and home-screen icons still open the hub; `bifrost status` from the installed CLI; PM2 or launchd restart of each process separately (criteria 1, 2 and 6)
