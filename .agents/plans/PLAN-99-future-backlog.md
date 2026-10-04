@@ -1,64 +1,54 @@
 # PLAN-99 — Future Backlog (reference only, never implemented wholesale)
 
-Ideas we deliberately deferred. When one is scheduled, promote it into a new numbered plan file (PLAN-08+) with the standard format, and log the decision in `memory/decisions.md`. Do not implement anything from this file directly.
+Ideas we deliberately deferred. When one is scheduled, promote it into a new numbered plan file with the standard format, remove its row here, and log the decision in `memory/decisions.md`. Do not implement anything from this file directly.
 
 ## Tier A — likely next (natural extensions)
 
-| Idea                      | Notes captured during planning                                                                                                                                                                                                                                               |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Shared markdown notes** | 2–3 persistent scratch notes, editable from any device, autosave + live SSE sync ("LAN Apple Notes"). Cloud-profile candidate. Reuses MarkdownViewer (PLAN-03) + clipboard patterns (PLAN-06). Conflict strategy: last-write-wins with edit lock indicator — keep it simple. |
-| **Send-to-device push**   | Pick a live device from presence → push a file/text directly to it; target shows a toast via its SSE connection. Builds on deviceId + presence (PLAN-06).                                                                                                                    |
-| **Download-all-as-zip (whole-library / multi-select)** | **Partially delivered by PLAN-24** (Download folders, 2026-09-04): a single folder's contents can be downloaded as one `.zip`, streamed via `archiver`, from two places — a direct icon on the folder's root row and an explicit button inside the folder. What's still open is the broader idea this row originally named: selecting an arbitrary set of root-level items (files and/or folders) across the whole Receive listing and zipping that selection — PLAN-24 explicitly scoped that out as "the broader backlog item stays open." |
-
-_(**Upload thumbnails** and **Auto-cleanup policy** — DROPPED 2026-07-26 by owner decision. PLAN-17 makes both moot: it puts **Preview** directly on the upload card, which is what thumbnails were for, and turns `uploads/` into a staging area you actively move or delete from rather than a pile needing retention rules. Do not re-add without a new decision.)_
+| Idea | Notes |
+|---|---|
+| **Shared markdown notes** | 2–3 persistent scratch notes, editable from any device, autosave + live SSE sync ("LAN Apple Notes"). Reuses MarkdownViewer (PLAN-03) + clipboard patterns (PLAN-06). Conflict strategy: last-write-wins with an edit-lock indicator. |
+| **Send-to-device push** | Pick a live device from presence → push a file/text directly to it; the target shows a toast via its SSE connection. Builds on deviceId + presence (PLAN-06). |
+| **Multi-select download as zip** | Select any set of root-level items (files and/or folders) across the Receive listing and download them as one `.zip`. PLAN-24 already zips a single folder (streamed via `archiver`); this is the arbitrary-selection version it scoped out. |
 
 ## Tier B — valuable, larger
 
-| Idea                                  | Notes captured during planning                                                                                                                                                                    |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Edda: paste-image upload**          | Paste/drop an image into the editor → stored server-side, markdown link inserted. Needs an image-storage story (folder, cleanup, size caps) — real scope, own design pass. Listed in coming-soon. |
-
-| Idea                                                  | Notes                                                                                                                              |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| **Variant: three-way merge**                          | Base + left + right with conflict detection and take-left/take-right resolution. Big complexity jump — needs its own spike + plan. |
-| **Variant: language-aware highlighting in text mode** | Auto-detect + lazy-load CM language packages. Deferred as scope creep; plain text + diff colors covers the core job.               |
-| **Variant: diff-annotated tree view**                 | Confirmed still undone (PLAN-08's own `[ ] *(stretch)* Diff-annotated tree view` task is unchecked, and `core/ui/TreeView.tsx` has no diff-tinting code) — not done as the PLAN-08 stretch task after all. Tree nodes tinted by op with badge counts on collapsed branches.  |
-| **Runestone version history**                         | Store diff records per save; reuses the Variant walker output shape.                                                               |
-
-_(**Variant: JSON Patch export (RFC 6902)** and **Variant: unified `.diff`/`.patch` file export** — PROMOTED 2026-09-04 to **PLAN-26**, combined into one plan since the second is explicitly the text-mode sibling of the first. See `PLAN-26-variant-diff-export.md`.)_
-
-| Idea                      | Notes                                                                                                                                                                                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Cloud profile go-live** | Deploy `cloud` manifest (toolbox, notes, qr-tool, themes) to a VPS/PaaS: Postgres repos behind existing interfaces, real auth (not PIN), HTTPS, hardened rate limits. Follow `docs/cloud-profile.md` (PLAN-07). Separate DB from local by design. |
-| **Wake-on-LAN**           | Magic-packet buttons for known MACs on the presence dashboard.                                                                                                                                                                                    |
-| **Shared SSE across browser tabs** | **RCA (2026-07-24):** the app is served over **HTTP/1.1** on the LAN (plain http — no HTTP/2 without TLS), and browsers cap concurrent connections at **~6 per origin, shared across every tab**. Each tab holds **one permanent `EventSource('/api/events')`** for its whole lifetime (`core/sse.ts`, opened in `App.tsx`), so once ~6 tabs are open **every connection slot is consumed by idle-but-open SSE streams**. Any further request then queues forever — critically the lazy `import()` of a code-split route chunk (every page is `lazy()`-loaded) — leaving tabs stuck on the `<Suspense>` **"Crossing the bridge…"** loader (or blank if the shell itself isn't cached). **Reproduced** headless: 6 tabs saturate the pool, a 7th to a fresh route stalls, and **closing a tab instantly unblocks it** — proving connection exhaustion, not a chunk/code error. **Why we want it:** it's a real correctness bug the more tabs you open, and it will only get worse as the app grows more pages/chunks. **Fix (the reason this is a backlog item, not a quick patch):** elect a **single leader tab** — a `SharedWorker`, or `BroadcastChannel` + a Web-Locks/`localStorage` lock — that owns the **one** real `EventSource` and **fans every event out to all tabs over `BroadcastChannel`**; follower tabs render from the broadcast and never open their own connection, so **N tabs cost 1 connection** regardless. That is a cross-cutting rework of `core/sse.ts` (leader election, worker lifecycle, reconnect/heartbeat ownership, per-tab status derivation, presence deviceId accounting) that deserves its own spike + plan. **Interim if it bites first:** pause/close the SSE on `visibilitychange` when `document.hidden` and reopen on visible (~15 lines) — hidden tabs release their slot, covering the common single-focused-tab case. **HTTP/2** would also dissolve the limit but needs HTTPS (self-signed TLS trust on phones), which this offline LAN tool deliberately avoids. |
+| Idea | Notes |
+|---|---|
+| **Edda: paste-image upload** | Paste/drop an image into the editor → stored server-side, markdown link inserted. Needs an image-storage story (folder, cleanup, size caps): its own design pass. Listed in coming-soon. |
+| **Variant: three-way merge** | Base + left + right with conflict detection and take-left/take-right resolution. Big complexity jump: needs its own spike + plan. |
+| **Variant: language-aware highlighting in text mode** | Auto-detect + lazy-load CodeMirror language packages. Plain text + diff colours covers the core job today. |
+| **Variant: diff-annotated tree view** | Tree nodes tinted by operation, with badge counts on collapsed branches (PLAN-08's unchecked stretch task; `core/ui/TreeView.tsx` has no diff tinting). |
+| **Runestone version history** | Store diff records per save; reuses the Variant walker output shape. |
+| **Wake-on-LAN** | Magic-packet buttons for known MACs on the presence dashboard. |
+| **Shared SSE across browser tabs** | **RCA (2026-07-24):** over plain-http HTTP/1.1, browsers allow ~6 connections per origin across all tabs, and each tab holds one permanent `EventSource('/api/events')` (`core/sse.ts`, opened in `App.tsx`). Past ~6 tabs every slot is an idle SSE stream, so further requests (critically, lazy route chunks) queue forever and tabs hang on "Crossing the bridge…". Reproduced headless; closing a tab unblocks it. **Fix:** one leader tab (`SharedWorker`, or `BroadcastChannel` + a Web Locks/`localStorage` lock) owns the single `EventSource` and fans events out over `BroadcastChannel`, so N tabs cost one connection. That is a cross-cutting rework of `core/sse.ts` (election, lifecycle, reconnect/heartbeat ownership, per-tab status, presence accounting) needing its own spike + plan. **Interim:** close the SSE on `visibilitychange` when hidden and reopen when visible (~15 lines). HTTP/2 would also remove the limit but needs HTTPS, which this LAN tool avoids. |
 
 ## Tier C — someday / experiments
 
-| Idea                                 | Notes                                                                                                                                                    |
-| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **WebRTC device-to-device transfer** | Server signals only; bytes go peer-to-peer (huge files without touching the Mac's disk). Significant complexity jump — own plan, own spike first.        |
-| **i18n**                             | Only if the household needs it.                                                                                                                          |
-
-_(**Bifrost CLI** — PROMOTED 2026-09-04 to **PLAN-27**: `npm install -g`, TypeScript, a third workspace at `cli/`, built on the API surface that already exists (push/pull, clipboard, the four documents' public data endpoints, portkey, presence, nimbus) — none of it new server code. The Swift-sibling-project alternative this row originally named was considered and decided against in favor of reusing the existing TS/Node monorepo. See `completed/PLAN-27-cli.md`.)_
+| Idea | Notes |
+|---|---|
+| **WebRTC device-to-device transfer** | Server signals only; bytes go peer-to-peer (huge files without touching the Mac's disk). Significant complexity jump: own plan, own spike first. |
+| **i18n** | Only if the household needs it. |
 
 ## Owner-reviewed additions (2026-07-22 idea round)
 
-Ideas surfaced in the 2026-07-22 review. **Accio · Nimbus · Portkey** from the same round were promoted to **PLAN-13 · PLAN-14 · PLAN-15** (see `decisions.md`); the rest stay parked here.
-
-| Idea | Notes captured during review |
+| Idea | Notes |
 |---|---|
-| **Pythia** (mock API server) | Define `/mock/<slug>` endpoints: status/headers/delay/body — killer synergy: a saved runestone can BE the response body. Dev-fixture server for app work while real backends are down. Pairs with Howler as one "dev endpoints" module. Medium. |
-| **Howler** (webhook/request catcher) | Anything hitting `/hook/<id>` logged (method/headers/body) and streamed live via the SSE hub; the self-hosted webhook.site. JSON bodies render via existing viewers. Small-medium. |
-| **Time-Turner** (shared timers) | Start a timer on one device, it rings on all via SSE; countdowns-to-date. Domestic delight on existing infrastructure. Small. |
+| **Pythia** (mock API server) | Define `/mock/<slug>` endpoints: status/headers/delay/body; a saved runestone can be the response body. A dev-fixture server for while real backends are down. Pairs with Howler as one "dev endpoints" module. Medium. |
+| **Howler** (webhook/request catcher) | Anything hitting `/hook/<id>` is logged (method/headers/body) and streamed live over SSE; a self-hosted webhook.site. JSON bodies render via the existing viewers. Small-medium. |
+| **Time-Turner** (shared timers) | Start a timer on one device, it rings on all via SSE; countdowns-to-date. Small. |
 | **Echo** (voice memos) | MediaRecorder in-browser → library/downloads, playable anywhere via the PLAN-03 range-request audio path. Small-medium. |
-| **Argus** (home services status page) | Ping/HTTP-check a configurable list (router, NAS, printer), up/down tiles + history sparkline. Heimdall watches the bridge; Argus watches the realm. Medium. |
-| **Standalone client logs → log service** | PLAN-35 leaves the standalone build with a no-op `LogSink`. Add a sink that posts browser errors to a log service the owner runs in Docker on Hostinger (that site's own server — never the home hub). One file on the client plus the service itself. |
+| **Argus** (home services status page) | Ping/HTTP-check a configurable list (router, NAS, printer); up/down tiles + history sparkline. Heimdall watches the bridge; Argus watches the realm. Medium. |
 
-_(**Skald** — PROMOTED 2026-09-04 to **PLAN-28**, renamed **Saga** after a same-session naming discussion: fullscreen slideshow over a saved Edda or a dropped `.md` file, `---` breaks (refined so the document's first line never splits), keyboard/touch/WASD nav, fullscreen, presenter notes, a `bifrost saga <file>` CLI command. Deckrun (`arpitbbhayani/deckrun`) was reviewed for inspiration at the owner's request; incremental reveals (`{reveal}`) were deliberately cut, not deferred — they need new per-slide state nothing in this codebase's current standard already does. PDF-as-a-slide-source split out into its own **PLAN-29** rather than folded in, since it reuses none of Saga's markdown pipeline. See `PLAN-28-saga.md` and `PLAN-29-saga-pdf.md`.)_
+## Later follow-ups from PLAN-32–38
+
+| Idea | Notes |
+|---|---|
+| **Standalone client logs → log service** | PLAN-35 leaves the standalone build with a no-op `LogSink`. Add a sink that posts browser errors to a log service running as another container on the same Docker network as the standalone site (never the home hub). One client file plus the service. |
 
 ## Explicitly rejected (do not resurrect without a new decision)
 
-- Public internet exposure of `file-transfer` — never; it's local-profile by design.
-- WebSockets replacing SSE — revisit only if a truly bidirectional feature ships.
-- Postgres locally / Docker as the macOS run mode — see decision log for reasoning.
+- Public internet exposure of `file-transfer`: never; it is local-profile by design.
+- Taking the hub server live on the internet (the old "cloud profile go-live" row): the owner does not plan to; the public face is PLAN-35's standalone build, which talks to no server.
+- WebSockets replacing SSE: revisit only if a truly bidirectional feature ships.
+- Postgres locally / Docker as the macOS run mode: see the decision log for the reasoning.
+- Upload thumbnails and an uploads auto-cleanup policy (dropped 2026-07-26): PLAN-17 put Preview on the upload card and made `uploads/` a staging area you act on, which made both moot.
