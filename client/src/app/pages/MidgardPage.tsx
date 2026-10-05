@@ -32,6 +32,7 @@ const PORTALS: Portal[] = [
     title: 'Send files',
     description: 'Drop files from this device into the hub. They land in a write-only vault on the host.',
     go: 'midgard → asgard',
+    module: 'file-transfer',
   },
   {
     to: '/downloads',
@@ -39,6 +40,7 @@ const PORTALS: Portal[] = [
     title: 'Receive files',
     description: 'Everything shared from the host appears here, live — on every device at once.',
     go: 'asgard → midgard',
+    module: 'file-transfer',
   },
   {
     to: '/hermes',
@@ -46,6 +48,7 @@ const PORTALS: Portal[] = [
     title: 'Hermes',
     description: 'A shared clipboard for the bridge — paste text on one device, read it on every other.',
     go: 'one board · every device',
+    module: 'clipboard',
   },
   {
     to: '/accio',
