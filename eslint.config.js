@@ -15,6 +15,8 @@ export default tseslint.config(
       'server/drizzle/**',
       'storage/**',
       'client/public/pdfjs-wasm/**',
+      'e2e/test-results/**',
+      'e2e/playwright-report/**',
     ],
   },
   eslint.configs.recommended,
@@ -116,11 +118,39 @@ export default tseslint.config(
     },
   },
   {
+    // The e2e workspace sees the system only from outside (PLAN-32a): the
+    // built server over HTTP, the built client in a browser, the packed CLI as
+    // an installed binary. Importing product source would test the source, not
+    // what ships — the same isolation modules get from each other.
+    files: ['e2e/**/*.ts'],
+    rules: {
+      // Playwright reads a fixture's dependencies from its first parameter's
+      // destructuring pattern, so a fixture that needs none must write `{}`.
+      'no-empty-pattern': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**'],
+              message: 'e2e drives the built system from outside — never import product source.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // CommonJS config files (PM2's ecosystem.config.cjs) — Node globals.
     files: ['**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
-      globals: { module: 'writable', require: 'readonly', __dirname: 'readonly', process: 'readonly' },
+      globals: {
+        module: 'writable',
+        require: 'readonly',
+        __dirname: 'readonly',
+        process: 'readonly',
+      },
     },
   },
   prettier,
