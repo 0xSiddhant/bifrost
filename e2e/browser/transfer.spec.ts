@@ -1,7 +1,7 @@
 import { test, expect } from '../support/fixtures.js';
 import { downloadBytes, textFile, zipEntryNames } from '../support/files.js';
 import { routes } from '../support/journey.js';
-import { openReceive, press, waitForLive } from '../support/ui.js';
+import { press, waitForLive } from '../support/ui.js';
 
 /**
  * Journey 2 — transfer: upload → staging → preview → rename (with the
@@ -19,8 +19,9 @@ test.describe('transfer', () => {
       const body = `hello across the bridge ${stamp}\n`;
 
       const deviceB = await newDevice();
-      await openReceive(deviceB, '/downloads');
+      await deviceB.goto('/downloads');
       await expect(deviceB.getByRole('heading', { name: 'Receive files' })).toBeVisible();
+      await waitForLive(deviceB);
 
       await page.goto('/upload');
       await waitForLive(page);
@@ -89,19 +90,15 @@ test.describe('transfer', () => {
   test(
     'a folder upload goes live in Receive and downloads as a zip',
     routes('/downloads/folder/:folderId', '/downloads/folder/:folderId/:id/preview'),
-    async ({ page, newDevice, ownServer }) => {
-      // KNOWN BUG (found by this suite, reported in PLAN-32a): after a server
-      // has taken two browser folder uploads, the third folder's files are
-      // written and accepted but never indexed by the downloads watcher — not
-      // live, not on reload, not 30 seconds later. The first folder on a fresh
-      // server always indexes, so this journey takes a server of its own and
-      // tests the path that works; the bug is reported, not hidden.
-      const server = await ownServer();
+    async ({ page, newDevice }) => {
+      // On the shared worker server on purpose: a folder created after others
+      // is the case the downloads watcher used to miss (fixed after PLAN-32a).
       const folder = `Holiday ${Date.now().toString(36)}`;
-      const deviceB = await newDevice({ baseURL: server.baseUrl });
-      await openReceive(deviceB, '/downloads');
+      const deviceB = await newDevice();
+      await deviceB.goto('/downloads');
+      await waitForLive(deviceB);
 
-      await page.goto(`${server.baseUrl}/upload`);
+      await page.goto('/upload');
       await waitForLive(page);
       await page.getByLabel('Folder in Receive (optional)').fill(folder);
       await page

@@ -1,6 +1,6 @@
 import { test, expect } from '../support/fixtures.js';
 import { routes } from '../support/journey.js';
-import { mainNav, navigate, press, waitForLive } from '../support/ui.js';
+import { mainNav, navigate, waitForLive } from '../support/ui.js';
 
 /** Journey 1 — the shell: Midgard, the three hubs, nav, themes, guides, deep links, 404. */
 
@@ -80,7 +80,9 @@ test.describe('shell', () => {
       await page.getByRole('button', { name: `${title} guide` }).click();
       const panel = page.getByRole('complementary', { name: `${title} guide` });
       await expect(panel.getByRole('heading', { name: title, exact: true }).first()).toBeVisible();
-      await press(page, page.getByRole('button', { name: 'Close guide' }));
+      // A mouse click, on phone viewports too: below 640px it used to be
+      // swallowed by the sheet's drag header (fixed after PLAN-32a).
+      await page.getByRole('button', { name: 'Close guide' }).click();
       await expect(panel).toBeHidden();
     }
     await page.goto('/');
