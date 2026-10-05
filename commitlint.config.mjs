@@ -38,6 +38,8 @@ export default {
         'core',
         'client',
         'cli',
+        // the out-of-process test workspace (PLAN-32a)
+        'e2e',
         'ci',
         'docs',
         'ops',
