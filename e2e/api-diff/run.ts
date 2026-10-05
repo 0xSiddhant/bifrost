@@ -138,7 +138,11 @@ async function main(): Promise<number> {
       snapshotDatabase(source, path.join(seedRoot, 'data', 'app.db'));
       log(`  rows: ${JSON.stringify(rowCounts(path.join(seedRoot, 'data', 'app.db')))}`);
     }
-    log(readsOnly ? '▸ opening an admin session on the snapshot (base build)' : '▸ seeding through the base build');
+    log(
+      readsOnly
+        ? '▸ opening an admin session on the snapshot (base build)'
+        : '▸ seeding through the base build',
+    );
     const seedServer = await startServer({
       buildRoot: base.buildRoot,
       storageRoot: seedRoot,

@@ -66,11 +66,13 @@ export const CONNECTION_LOSS: AllowEntry = {
     'The test stopped the server on purpose (offline mode): a refused connection is the expected state, and the browser logs each one.',
   matches: (v) =>
     (v.kind === 'requestfailed' &&
-      /ERR_CONNECTION_REFUSED|Could not connect|Connection refused|network connection was lost/i.test(
+      /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|Could not connect|Connection refused|network connection was lost/i.test(
         v.detail,
       )) ||
     (v.kind === 'console.error' &&
-      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|Could not connect)/i.test(v.detail)) ||
+      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE|Could not connect)/i.test(
+        v.detail,
+      )) ||
     // Vite's own preload helper reports a lazy chunk's stylesheet it could not
     // fetch; the app catches the import failure itself (RouteBoundary).
     (v.kind === 'console.error' && /^Error: Unable to preload CSS for /.test(v.detail)),

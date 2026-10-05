@@ -65,13 +65,11 @@ test.describe('brotli', () => {
         .getByRole('group', { name: 'Mode' })
         .getByRole('button', { name: 'Decompress', exact: true })
         .click();
-      await page
-        .locator('input[type="file"]')
-        .setInputFiles({
-          name: 'doc.json.br',
-          mimeType: 'application/octet-stream',
-          buffer: compressed,
-        });
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'doc.json.br',
+        mimeType: 'application/octet-stream',
+        buffer: compressed,
+      });
       await page
         .locator('.brotli-panel')
         .getByRole('button', { name: 'Decompress', exact: true })

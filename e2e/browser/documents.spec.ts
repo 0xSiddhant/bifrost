@@ -194,13 +194,11 @@ for (const kind of KINDS) {
           kind.kind === 'runestone'
             ? `{"pad":"${'x'.repeat(2100 * 1024)}"}`
             : 'x'.repeat(2100 * 1024);
-        await page
-          .locator(`input[type="file"][accept*="${kind.ext}"]`)
-          .setInputFiles({
-            name: `huge${kind.ext}`,
-            mimeType: kind.mime,
-            buffer: Buffer.from(big),
-          });
+        await page.locator(`input[type="file"][accept*="${kind.ext}"]`).setInputFiles({
+          name: `huge${kind.ext}`,
+          mimeType: kind.mime,
+          buffer: Buffer.from(big),
+        });
         await expect(
           page.getByRole('status').filter({ hasText: /That file is over the 2\.0 MB limit\./ }),
         ).toBeVisible();

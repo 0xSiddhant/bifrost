@@ -75,25 +75,25 @@ export async function showCode(page: Page): Promise<void> {
 }
 
 /**
- * Open the Receive listing (`/downloads` or a folder) and wait until it is
- * live AND no listing request is still in flight.
+ * Open a page that shows a live list and wait until it is live AND no fetch
+ * of that list is still in flight.
  *
- * KNOWN BUG (found by this suite, reported in PLAN-32a): `useDownloads`
- * re-fetches the whole listing on mount and on every SSE `open`, and replaces
- * its state with the answer — so a refresh computed before a `download.added`
- * but delivered after it silently drops that live row until a reload. A
- * journey that publishes while that refresh is in flight would be testing the
- * race, not the live update, so it settles first.
+ * KNOWN BUG (found by this suite, reported in PLAN-32a): `useDownloads` and
+ * `useClipboard` each fetch their whole list on mount (Receive also on every
+ * SSE `open`) and *replace* their state with the answer — so a fetch computed
+ * before a live event but delivered after it silently drops that row until a
+ * reload. A journey that triggers a live event while that fetch is in flight
+ * would be testing the race, not the live update, so it settles first.
  */
-export async function openReceive(page: Page, url: string): Promise<void> {
+export async function openSettled(page: Page, url: string, listPath: string): Promise<void> {
   let inflight = 0;
   let finished = 0;
-  const isListing = (requestUrl: string) => new URL(requestUrl).pathname === '/api/downloads';
+  const isList = (requestUrl: string) => new URL(requestUrl).pathname === listPath;
   const started = (request: { url(): string }) => {
-    if (isListing(request.url())) inflight += 1;
+    if (isList(request.url())) inflight += 1;
   };
   const ended = (request: { url(): string }) => {
-    if (!isListing(request.url())) return;
+    if (!isList(request.url())) return;
     inflight -= 1;
     finished += 1;
   };
@@ -112,4 +112,14 @@ export async function openReceive(page: Page, url: string): Promise<void> {
     page.off('requestfinished', ended);
     page.off('requestfailed', ended);
   }
+}
+
+/** The Receive listing, settled (see `openSettled`). */
+export function openReceive(page: Page, url: string): Promise<void> {
+  return openSettled(page, url, '/api/downloads');
+}
+
+/** The Hermes board, settled (see `openSettled`). */
+export function openHermes(page: Page, url = '/hermes'): Promise<void> {
+  return openSettled(page, url, '/api/clipboard');
 }

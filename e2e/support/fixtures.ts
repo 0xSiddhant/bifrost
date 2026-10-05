@@ -189,13 +189,17 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     for (const context of contexts) await context.close();
   },
 
-  ownServer: async ({}, use) => {
+  ownServer: async ({ guard }, use) => {
     const servers: E2EServer[] = [];
     await use(async (options = {}) => {
       const server = await startServer(options);
       servers.push(server);
       return server;
     });
+    // The test is over, but its pages may still be open on these servers:
+    // their last favicon or SSE retry is refused once a server stops, which
+    // is teardown, not a bug. Page errors still count.
+    if (servers.length > 0) guard.allowConnectionLoss();
     for (const server of servers) await server.stop();
   },
 });
