@@ -14,7 +14,8 @@ export interface ApiResponse {
 
 export interface RequestOptions {
   json?: unknown;
-  body?: BodyInit;
+  /** A raw body; a Buffer is sent as its bytes. */
+  body?: BodyInit | Buffer;
   headers?: Record<string, string>;
   /** Statuses that do not throw. Default: any 2xx/3xx. */
   expect?: number[];
@@ -34,7 +35,9 @@ export class Api {
     const headers: Record<string, string> = { ...options.headers };
     if (this.deviceId) headers['x-bifrost-device'] = this.deviceId;
     if (this.cookie) headers.cookie = this.cookie;
-    let body = options.body;
+    let body: BodyInit | undefined = Buffer.isBuffer(options.body)
+      ? new Uint8Array(options.body)
+      : options.body;
     if (options.json !== undefined) {
       headers['content-type'] = 'application/json';
       body = JSON.stringify(options.json);
@@ -88,13 +91,14 @@ export class Api {
   async upload(
     files: { name: string; content: string | Buffer }[],
     query = '',
+    options: Pick<RequestOptions, 'expect'> = {},
   ): Promise<ApiResponse> {
     const form = new FormData();
     for (const file of files) {
       const content = typeof file.content === 'string' ? Buffer.from(file.content) : file.content;
       form.append('files', new Blob([new Uint8Array(content)]), file.name);
     }
-    return this.request('POST', `/api/files${query}`, { body: form });
+    return this.request('POST', `/api/files${query}`, { body: form, ...options });
   }
 }
 
