@@ -2,15 +2,19 @@
 
 Every kind of test this repo runs, how to run and replay each one, and which of them are permanent. `.agents/rules/coding.md` says what each change must ship; this page says how to run what is already here.
 
-| Kind | Where | Command | Needs a build? | In CI |
-|---|---|---|---|---|
-| Unit + integration | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test` | no | yes, before Build |
-| End-to-end: browser | `e2e/browser/`, `e2e/cloud/` (Playwright) | `npm run test:e2e:ui -w e2e` | yes | yes, after Build |
-| End-to-end: installed CLI | `e2e/cli/` (Vitest, `*.e2e.ts`) | `npm run test:e2e:cli -w e2e` | yes | yes, after Build |
-| Both of the above | | `npm run test:e2e` | yes | yes |
-| Old-vs-new API diff | `e2e/api-diff/` | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
-| Restart resilience | `scripts/resilience.ts` | `npm run test:resilience` | no | no (on demand) |
-| Live verification | `.claude/skills/live-verify` | the skill | yes | no (manual) |
+**One command runs them all:** `npm run test:all`. It runs lint → typecheck → `npm test` → build → `test:e2e`, stopping at the first failure: the same gate as CI and the `verify` skill. Use the narrower commands below to run or replay one slice.
+
+**Why tests live in more than one place.** Unit and integration tests sit beside the code they test, in `server/`, `client/` and `cli/`. They import that code directly, run without a build, and come first in CI because they are fast. End-to-end tests live in `e2e/` and are _forbidden_ from importing product code: that rule is what proves they test what actually ships. Merging the two would lose that guarantee.
+
+| Kind                      | Where                                                                 | Command                                 | Needs a build?     | In CI                  |
+| ------------------------- | --------------------------------------------------------------------- | --------------------------------------- | ------------------ | ---------------------- |
+| Unit + integration        | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no                 | yes, before Build      |
+| End-to-end: browser       | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes                | yes, after Build       |
+| End-to-end: installed CLI | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes                | yes, after Build       |
+| Both of the above         |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
+| Old-vs-new API diff       | `e2e/api-diff/`                                                       | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
+| Restart resilience        | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no                 | no (on demand)         |
+| Live verification         | `.claude/skills/live-verify`                                          | the skill                               | yes                | no (manual)            |
 
 ## Unit and integration tests
 
@@ -49,12 +53,12 @@ Where Playwright's own browser download is unavailable but a Chromium is install
 
 ### Projects
 
-| Project | What | Why |
-|---|---|---|
-| `chromium-desktop` | 1280×900 | the Mac on the desk |
-| `chromium-mobile` | Pixel 7, 390×844, touch | phones, and the layouts below 640/768px |
-| `webkit-mobile` | iPhone 14 | the household's iPads and iPhones are WebKit, and Safari-only bugs have shipped before |
-| `cloud` | Chromium against a `DEPLOY_PROFILE=cloud` server | the deployment manifest, seen from outside |
+| Project            | What                                             | Why                                                                                    |
+| ------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| `chromium-desktop` | 1280×900                                         | the Mac on the desk                                                                    |
+| `chromium-mobile`  | Pixel 7, 390×844, touch                          | phones, and the layouts below 640/768px                                                |
+| `webkit-mobile`    | iPhone 14                                        | the household's iPads and iPhones are WebKit, and Safari-only bugs have shipped before |
+| `cloud`            | Chromium against a `DEPLOY_PROFILE=cloud` server | the deployment manifest, seen from outside                                             |
 
 ### Isolation
 
@@ -131,15 +135,15 @@ For each request it compares the status, `content-type`, `location`, `content-di
 
 **Excluded by nature**, each with its reason in `corpus.ts`:
 
-| Endpoint | Why |
-|---|---|
-| `/metrics` | runtime gauges of this process |
-| `/api/events` | an endless SSE stream |
-| `/api/heimdall/stats` | uptime and live counters |
-| `/api/heimdall/about` | each build's own commit and build date |
-| `/api/presence` | connection times |
-| `/api/health` | process uptime |
-| `/api/nimbus/down` | a random payload pool generated at each boot |
+| Endpoint              | Why                                          |
+| --------------------- | -------------------------------------------- |
+| `/metrics`            | runtime gauges of this process               |
+| `/api/events`         | an endless SSE stream                        |
+| `/api/heimdall/stats` | uptime and live counters                     |
+| `/api/heimdall/about` | each build's own commit and build date       |
+| `/api/presence`       | connection times                             |
+| `/api/health`         | process uptime                               |
+| `/api/nimbus/down`    | a random payload pool generated at each boot |
 
 **Intended differences** go in `e2e/api-diff/expected-differences.ts`, each with its plan and reason. Any other difference fails the run (exit 1). Exit 2 means the tool itself could not run.
 
@@ -149,9 +153,9 @@ Every worktree, scratch storage and snapshot is removed before the tool exits, p
 
 ## What stays and what is temporary
 
-| Item | Fate |
-|---|---|
-| `e2e/` browser, cloud and CLI suites, and the CI step | **Permanent**: the regression net for every later change |
-| `npm run test:api-diff` and `e2e/api-diff/` | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it |
-| Worktrees, scratch storages and snapshots of each diff run | Removed by the tool at the end of every run |
-| Probe and spike scripts | Never committed |
+| Item                                                       | Fate                                                                                          |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `e2e/` browser, cloud and CLI suites, and the CI step      | **Permanent**: the regression net for every later change                                      |
+| `npm run test:api-diff` and `e2e/api-diff/`                | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it |
+| Worktrees, scratch storages and snapshots of each diff run | Removed by the tool at the end of every run                                                   |
+| Probe and spike scripts                                    | Never committed                                                                               |

@@ -35,6 +35,7 @@
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e",
     "prepare": "husky",
     "test:e2e": "npm run test:e2e -w e2e",
     "test:api-diff": "npm run test:api-diff -w e2e --"

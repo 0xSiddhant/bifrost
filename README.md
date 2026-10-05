@@ -170,10 +170,19 @@ to.
 | `npm run backup:run [-- --force]`                              | Run the scheduled job now; `--force` skips the "not due yet" check                                                                                                                   |
 | `npm run restore -- <path>`                                    | Restore a backup: a `.zip`, one backup's folder (exactly that one), or a folder of backups (the newest). Checks `meta.json`'s checksum first; refuses a live server unless `--force` |
 | `npm run test:resilience`                                      | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand)                                                                                                       |
+| `npm run test:all`                                             | **Every test, one command:** lint → typecheck → `npm test` → build → `test:e2e` (the same gate CI and the `verify` skill run). See [Testing](#testing)                               |
 | `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                                                                                                       |
+| `npm run test:e2e`                                             | End-to-end: every page in real browsers + the installed CLI, against the build (needs `npm run build`)                                                                               |
+| `npm run test:api-diff -- --base <ref>`                        | Old-vs-new API diff: replays every read route against `<ref>` and this build, byte for byte                                                                                          |
 
 Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 `scripts/start-launchd.sh`, `scripts/observability.sh`.
+
+## Testing
+
+**One command runs everything:** `npm run test:all` (lint, typecheck, unit + integration tests, build, end-to-end). The first time, install Playwright's browsers once: `cd e2e && npx playwright install chromium webkit`.
+
+Tests live in two kinds of place, on purpose. Unit and integration tests sit **beside the code they test**, in `server/`, `client/` and `cli/`. End-to-end tests live in **`e2e/`** and only ever drive the built app from outside. [`docs/testing.md`](docs/testing.md) is the map: every kind of test, where it lives, how to run and replay one, and what each one protects.
 
 ## Project docs
 
@@ -189,6 +198,7 @@ Operating & deploying:
 - [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
+- [`docs/testing.md`](docs/testing.md) — every kind of test, where it lives and how to run it
 
 ## License
 
