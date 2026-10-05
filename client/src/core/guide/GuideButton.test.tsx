@@ -189,6 +189,35 @@ describe('GuideButton', () => {
     }
   });
 
+  it('never captures the pointer for a press that starts on the Close button', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      ({
+        matches: query === '(max-width: 640px)',
+        media: query,
+        addEventListener() {},
+        removeEventListener() {},
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      await openOn('/edda');
+      const head = document.querySelector<HTMLElement>('.guide-panel__head');
+      const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close guide"]');
+      if (!head || !close) throw new Error('no sheet header');
+      const capture = vi.fn();
+      head.setPointerCapture = capture;
+      act(() => {
+        close.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 10, pointerId: 1 }));
+      });
+      // Captured, the browser would retarget the click to the header and the
+      // sheet would stay open — a mouse click below 640px did exactly that.
+      expect(capture).not.toHaveBeenCalled();
+      act(() => close.click());
+      expect(panel()).toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('reports a guide that fails to load instead of showing an empty drawer', async () => {
     const registry = await import('./registry');
     const guide = registry.GUIDES.find((entry) => entry.route === '/loki');

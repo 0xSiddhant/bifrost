@@ -71,6 +71,11 @@ export function GuidePanel({ guide, onClose }: { guide: Guide; onClose: () => vo
   // would fight the scroll of the very text the sheet exists to show.
   const startDrag = (event: ReactPointerEvent<HTMLElement>) => {
     if (!window.matchMedia(SHEET_QUERY).matches) return;
+    // A press that starts on a control is a click on that control, not a drag:
+    // capturing the pointer here would retarget its click to the header, and
+    // the Close button ignored every mouse click below 640px (found by
+    // PLAN-32a's e2e net; a touch tap happened to work).
+    if ((event.target as Element).closest('button')) return;
     dragFrom.current = event.clientY;
     event.currentTarget.setPointerCapture(event.pointerId);
   };
