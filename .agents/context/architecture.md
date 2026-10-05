@@ -202,7 +202,7 @@ Dockerfile sets `CI=true` for its build), and PM2 never runs it at all, since
 
 A global guard fails any test on a page error, a `console.error`, a 5xx, a failed request, or any non-loopback request. `routes.spec.ts` reads `App.tsx` as text, so a page without a journey fails CI.
 
-Bugs the net finds in product code are pinned with `test.fail` rather than fixed in the same PR, so each pin flips red when its bug is fixed. A temporary `test:api-diff` tool proves a change is wire-neutral by replaying every read route and one write sequence against a worktree build of a base ref and this checkout, byte for byte. Detail: [`docs/testing.md`](../../docs/testing.md).
+A bug the net finds outside a PR's scope is pinned with `test.fail` (or, if racy, worked around with a comment) rather than skipped, and the pin comes out with its fix. PLAN-32a's seven findings were fixed in a follow-up PR and none are pinned today. A temporary `test:api-diff` tool proves a change is wire-neutral by replaying every read route and one write sequence against a worktree build of a base ref and this checkout, byte for byte. Detail: [`docs/testing.md`](../../docs/testing.md).
 
 ## Restart safety (server is stopped/started constantly)
 

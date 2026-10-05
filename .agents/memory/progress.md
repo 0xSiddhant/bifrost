@@ -51,13 +51,24 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 
 Recent activity holds the sessions since the latest release tag, one entry per session. Older sessions, and the full detail behind any entry here (test evidence, live-verify runs, deviations), live in [`history.md`](history.md) — the `context-sync` skill moves entries there at each release.
 
+- 2026-10-05 — **The seven PLAN-32a findings fixed** on `fix/plan-32a-findings`, stacked on the unmerged 32a PR at the owner's direction (32b and 32c stack on it in turn; decisions.md). Owner side asks on PR #81 first: `npm run test:all` (lint → typecheck → test → build → e2e) and a README Testing section linking `docs/testing.md`, which now explains why tests live beside their code *and* in `e2e/`. Fixes:
+  1. **Atlas:** a table edit lands in the buffer when the code pane is hidden.
+  2. **Midgard:** the doors follow `file-transfer` and `clipboard`.
+  3. **Guide sheet:** a press on a button never starts a drag.
+  4. **Receive and Hermes:** they merge live changes into a late fetch via the new `core/liveList.ts` (6 unit tests).
+  5. **Folder zip:** files listed in name order.
+  6. **Downloads watcher:** a one-time rescan of each new folder plus an announce-once dedupe (4 unit tests).
+  7. **Editor imports:** they await the cap.
+
+  Every pin and workaround came out of the net in the same PR: the folder journeys are back on the shared worker server, the guide is closed with a mouse click on every project, the size-cap test picks its file straight after load, and live lists are no longer settled before an event. The folder race had also stopped reproducing *without* the fix in late runs here, so the original reproduction passing (24/24 across 4 workers) supports the fix but does not prove it; the rescan's unit tests are the proof.
+
 - 2026-10-05 — **PLAN-32a (the end-to-end safety net) implemented** on `feat/plan-32a-e2e-safety-net`. **No file under `server/src`, `client/src` or `cli/src` changed.** A fourth workspace `e2e/` (`@playwright/test` 1.63 for the UI only; Vitest for the out-of-process CLI suite) drives the production server entry, `client/dist` and the packed CLI from outside. It is lint-banned from importing product source.
   - **Browser:** journeys 1–18 plus cross-surface. Each server gets scratch storage, a scratch themes folder and every `.env` key blanked to default. A guard fails any test on a page error, console error, 5xx, failed request or external request; `guard.spec.ts` proves each kind still fires. `routes.spec.ts` reads `App.tsx` as text and found all 42 routes covered.
   - **Evidence:** Chromium desktop + mobile + cloud: 138 passed (counting 4 guard self-tests and 2 known-bug pins, which are expected failures), 7 skipped (Heimdall below 768px; one-project harness checks), 0 failed, ~4.1 min on 4 cores, twice in a row. The live-update journeys also ran 4× repeated with no failure. WebKit could not be installed in the session container (Playwright browser download not available there), so **CI's run is WebKit's first**.
   - **CLI:** 19 tests over every command but `update`: human + `--json`, exit codes 0/1/3/4/5, TTY (through `script`) vs pipe, `--json` never launching a browser (a PATH spy for `xdg-open`/`open`/`$BROWSER`), and the owner's config untouched (temp `HOME`/`XDG_CONFIG_HOME`).
   - **API diff:** `test:api-diff -- --base develop` compares 890 reads and 114 write-sequence responses. Zero differences four runs in a row, and zero for `--candidate develop` too. A planted one-field change was caught as exactly one difference, twice. `--data` was exercised on a synthetic database only: reads only, the source's md5 unchanged, the snapshot deleted. **The real-data run is 32c's, not this one's.** No worktree or scratch left behind.
   - **CI:** after Build, cached Playwright browsers plus `npm run test:e2e`, with the report uploaded on failure. The `verify` skill gains the same step. The Dockerfile is unchanged: its `npm ci` simply leaves the e2e workspace out (reproduced locally).
-  - **Seven product findings, reported not fixed** (decisions.md 2026-10-05):
+  - **Seven product findings, reported in 32a and fixed in the follow-up `fix/plan-32a-findings` PR** (decisions.md 2026-10-05):
     1. Atlas plist-table edits are silently dropped on a phone: the table pane replaces the code pane, so `editorRef` is null. Pinned with `test.fail`.
     2. Midgard shows Send/Receive/Hermes on the cloud profile, though those modules are not served. Pinned with `test.fail`.
     3. The guide sheet's Close button ignores a *mouse* click below 640px, because the drag header's pointer capture swallows it; a touch tap works.
