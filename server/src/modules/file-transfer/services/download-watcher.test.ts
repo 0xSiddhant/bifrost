@@ -129,3 +129,75 @@ describe('DownloadWatcherService at depth 1', () => {
     expect(watcher.list()).toEqual([]);
   }, 15_000);
 });
+
+/**
+ * The new-folder race (found by PLAN-32a's e2e net): chokidar lists a new
+ * directory and then watches it, so a file that lands in between produces no
+ * event and would never be listed. A one-time rescan of each new folder
+ * closes it. The race itself cannot be forced from a test, so these drive the
+ * rescan directly and pin the rules around it.
+ */
+describe('DownloadWatcherService new-folder rescan', () => {
+  let downloads: string;
+  let watcher: DownloadWatcherService;
+  let added: DownloadEntry[];
+
+  beforeEach(async () => {
+    downloads = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-watch-rescan-'));
+    added = [];
+    const bus = new EventBus();
+    bus.on('download.added', (entry) => added.push(entry));
+    // A rescan delay far longer than any test, so only the explicit calls run.
+    watcher = new DownloadWatcherService(downloads, bus, log, { folderRescanMs: 600_000 });
+    await watcher.start();
+  });
+
+  afterEach(async () => {
+    await watcher.stop();
+    fs.rmSync(downloads, { recursive: true, force: true });
+  });
+
+  const settledFile = (relative: string, content = 'x') => {
+    const file = path.join(downloads, relative);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, content);
+    const past = new Date(Date.now() - 10_000);
+    fs.utimesSync(file, past, past);
+    return file;
+  };
+
+  it('indexes a file the watch has not announced, exactly once even when chokidar catches up', async () => {
+    settledFile('Holiday/day-one.txt', 'sun');
+    const found = await watcher.rescanFolder(path.join(downloads, 'Holiday'));
+    expect(found).toBe(1);
+    expect(watcher.list().some((entry) => entry.name === 'day-one.txt' && entry.parent === 'Holiday')).toBe(true);
+
+    // chokidar's own (late) event for the same unchanged file must not announce it twice.
+    await new Promise((resolve) => setTimeout(resolve, 2_500));
+    expect(added.filter((entry) => entry.name === 'day-one.txt')).toHaveLength(1);
+    expect(await watcher.rescanFolder(path.join(downloads, 'Holiday'))).toBe(0);
+  });
+
+  it('leaves a file that is still being written to chokidar', async () => {
+    const file = path.join(downloads, 'Fresh', 'copying.bin');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, 'partial');
+    expect(await watcher.rescanFolder(path.dirname(file))).toBe(0);
+  });
+
+  it('skips hidden files and answers 0 for a folder that is already gone', async () => {
+    settledFile('Holiday/.DS_Store');
+    expect(await watcher.rescanFolder(path.join(downloads, 'Holiday'))).toBe(0);
+    expect(await watcher.rescanFolder(path.join(downloads, 'Nope'))).toBe(0);
+  });
+
+  it('schedules a rescan when a new folder appears', async () => {
+    await watcher.stop();
+    const bus = new EventBus();
+    watcher = new DownloadWatcherService(downloads, bus, log, { folderRescanMs: 20 });
+    const rescan = vi.spyOn(watcher, 'rescanFolder');
+    await watcher.start();
+    fs.mkdirSync(path.join(downloads, 'Brand new'));
+    await vi.waitFor(() => expect(rescan).toHaveBeenCalledWith(path.join(downloads, 'Brand new')), { timeout: 5_000 });
+  });
+});
