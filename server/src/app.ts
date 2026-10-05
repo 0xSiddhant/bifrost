@@ -20,6 +20,7 @@ import { buildHttp } from './core/http/index.js';
 import { AuthService, registerAuth } from './core/auth/index.js';
 import { advertiseMdns, lanIPv4Addresses, type MdnsHandle } from './core/mdns/index.js';
 import { fromRepoRoot } from './core/paths.js';
+import { getBuildInfo } from './core/build-info.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
@@ -168,7 +169,13 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
-  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist'), bus });
+  const fastify = await buildHttp({
+    logger,
+    clientDistDir: fromRepoRoot('client', 'dist'),
+    bus,
+    contractCheck: config.http.contractCheck,
+    apiVersion: getBuildInfo().version,
+  });
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 

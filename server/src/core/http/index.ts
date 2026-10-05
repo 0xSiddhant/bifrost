@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import type { EventBus } from '../bus/index.js';
+import type { ContractCheckMode } from '../config/index.js';
 import type { Logger } from '../logger/index.js';
+import { registerContractCheck } from './contract.js';
+import { registerOpenApi } from './openapi.js';
 
 /**
  * Domain errors carry their HTTP status; everything else becomes an opaque
@@ -37,6 +40,10 @@ export interface HttpOptions {
    * (PLAN-16b). Optional: tests that build a bare instance need not care.
    */
   bus?: EventBus;
+  /** The response contract guard's mode (PLAN-32). Absent: `off`, for bare test instances. */
+  contractCheck?: ContractCheckMode;
+  /** The `info.version` of the generated OpenAPI description. */
+  apiVersion?: string;
 }
 
 export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> {
@@ -49,6 +56,11 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     loggerInstance: options.logger,
     forceCloseConnections: true,
   }) as unknown as FastifyInstance;
+
+  // Both before auth and every module: swagger's route collector and the
+  // contract guard's hooks only see routes registered after them (PLAN-32).
+  await registerOpenApi(app, { version: options.apiVersion ?? '0.0.0' });
+  registerContractCheck(app, options.contractCheck ?? 'off', options.logger);
 
   // Registered on the ROOT instance, which is the point: hooks are scoped to
   // the encapsulation context they are added in, and every module lives in its

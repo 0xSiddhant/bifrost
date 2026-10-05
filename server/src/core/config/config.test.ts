@@ -68,6 +68,14 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '500' }).paging.maxPageSize).toBe(500);
   });
 
+  it('defaults the response contract guard to fallback and reads every mode (PLAN-32)', () => {
+    expect(loadConfig(VALID_ENV).http.contractCheck).toBe('fallback');
+    for (const mode of ['off', 'fallback', 'strict'] as const) {
+      expect(loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: mode }).http.contractCheck).toBe(mode);
+    }
+    expect(() => loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: 'loud' })).toThrow(/API_CONTRACT_CHECK/);
+  });
+
   it('reads RUNESTONE_MAX_DOC_KB', () => {
     const config = loadConfig({ ...VALID_ENV, RUNESTONE_MAX_DOC_KB: '512' });
     expect(config.runestone.maxDocKb).toBe(512);

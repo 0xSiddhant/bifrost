@@ -151,6 +151,12 @@ const envFields = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4318'),
   OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   OTEL_SERVICE_NAME: z.string().min(1).default('bifrost'),
+  // The response contract guard (PLAN-32). `fallback` (the default until one
+  // release shows zero `contract mismatch` warnings) sends the pre-schema
+  // bytes whenever a response schema would have changed them, and logs where;
+  // `strict` (every test and e2e server) turns any such change into a 500;
+  // `off` runs no hooks at all.
+  API_CONTRACT_CHECK: z.enum(['off', 'fallback', 'strict']).default('fallback'),
   BACKUP_DIR: z.string().default(''),
   // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
@@ -174,6 +180,8 @@ export interface StoragePaths {
   logs: string;
   dbFile: string;
 }
+
+export type ContractCheckMode = 'off' | 'fallback' | 'strict';
 
 export interface AppConfig {
   profile: DeployProfile;
@@ -291,6 +299,10 @@ export interface AppConfig {
     snapshotIntervalSec: number;
     /** Seconds between the (expensive, synchronous) disk walks. */
     diskIntervalSec: number;
+  };
+  http: {
+    /** The response contract guard's mode (PLAN-32): see core/http/contract.ts. */
+    contractCheck: ContractCheckMode;
   };
   backupDir: string | null;
   /** Rotation: keep only the newest N archives (0 = keep all). */
@@ -456,6 +468,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
       enabled: raw.METRICS_ENABLED === 'true',
       snapshotIntervalSec: raw.METRICS_SNAPSHOT_INTERVAL_SEC,
       diskIntervalSec: raw.METRICS_DISK_INTERVAL_SEC,
+    },
+    http: {
+      contractCheck: raw.API_CONTRACT_CHECK,
     },
     backupDir: raw.BACKUP_DIR || null,
     backupKeep: raw.BACKUP_KEEP,
