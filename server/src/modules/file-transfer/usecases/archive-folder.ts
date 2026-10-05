@@ -52,7 +52,12 @@ export class ArchiveFolderUseCase {
     const files = this.registry
       .list()
       .filter((child) => child.type === 'file' && child.parent === entry.name)
-      .map((child) => child.name);
+      .map((child) => child.name)
+      // Name order, by code point: the registry's own order is the watcher's
+      // insertion order, which follows chokidar's boot scan — so without
+      // this the same folder zipped differently after a restart (found by
+      // PLAN-32a's API diff).
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
     this.log.info({ folder: entry.name, files: files.length }, 'streaming a folder archive');
     // Zero children is a valid, empty zip rather than an error — nothing to
