@@ -32,6 +32,44 @@ jobs:
       - name: Build
         run: npm run build
 
+      # PLAN-32a: the end-to-end safety net runs against the build above —
+      # the production server, the built client in real browsers (Chromium
+      # desktop + mobile, WebKit for the household's iOS devices), and the
+      # packed CLI installed into a temporary prefix.
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium webkit
+        working-directory: e2e
+
+      - name: Install Playwright system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium webkit
+        working-directory: e2e
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
       - name: Backup smoke test
         env:
           HEIMDALL_PIN: ci-smoke-pin
