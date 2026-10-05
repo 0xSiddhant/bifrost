@@ -11,9 +11,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const BOUNDARY = 'BifrostFolderBoundary';
 const MULTIPART_HEADERS = { 'content-type': `multipart/form-data; boundary=${BOUNDARY}` };
@@ -84,8 +83,7 @@ describe('download folders over HTTP', () => {
       path.join(storageRoot, 'downloads', 'Dropped in', 'Deeper', 'buried.txt'),
       'invisible',
     );
-    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
     await app.fastify.listen({ port: 0, host: '127.0.0.1' });
     const address = app.fastify.server.address();
     origin = typeof address === 'object' && address ? `http://127.0.0.1:${address.port}` : '';

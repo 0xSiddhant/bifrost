@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 async function adminCookie(app: RunningApp): Promise<string> {
   const res = await app.fastify.inject({
@@ -24,9 +23,7 @@ describe('audit log over HTTP', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-audit-'));
-    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
     // Logging in itself records a heimdall.login event.
     cookie = await adminCookie(app);
     // And a clipboard post records a clipboard.updated event.

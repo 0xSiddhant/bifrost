@@ -3,9 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 
@@ -59,14 +58,7 @@ describe('themes over HTTP', () => {
     }
     // One broken file: boot must skip it, not crash.
     fs.writeFileSync(path.join(themesDir, 'broken.json'), '{ "id": "broken" }');
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
-      STORAGE_ROOT: storageRoot,
-      THEMES_DIR: themesDir,
-    });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir });
     cookie = await adminCookie(app);
   });
 
@@ -206,10 +198,7 @@ describe('theme writes require a Heimdall session', () => {
     const themesDir = path.join(storageRoot, 'themes');
     fs.mkdirSync(themesDir, { recursive: true });
     fs.copyFileSync(path.join(REPO_ROOT, 'themes', 'aurora.json'), path.join(themesDir, 'aurora.json'));
-    const app = await createApp(
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    const app = await createTestApp({ STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir });
     try {
       const post = await app.fastify.inject({
         method: 'POST',
@@ -253,10 +242,7 @@ describe('theme enable/disable (Heimdall)', () => {
     for (const name of ['aurora.json', 'daybreak.json']) {
       fs.copyFileSync(path.join(REPO_ROOT, 'themes', name), path.join(themesDir, name));
     }
-    app = await createApp(
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, THEMES_DIR: themesDir });
     cookie = await adminCookie(app);
   });
 

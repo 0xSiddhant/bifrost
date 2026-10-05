@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 function tmp(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -31,17 +30,11 @@ describe('clipboard over HTTP', () => {
 
   beforeAll(async () => {
     storageRoot = tmp('bifrost-clip-');
-    app = await createApp(
-      loadConfig({
-        DEPLOY_PROFILE: 'local',
-        PORT: '4646',
-        HEIMDALL_PIN: '4321',
-        STORAGE_ROOT: storageRoot,
-        CLIPBOARD_MAX_ENTRIES: '3',
-        CLIPBOARD_MAX_TEXT_KB: '1',
-      }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    app = await createTestApp({
+      STORAGE_ROOT: storageRoot,
+      CLIPBOARD_MAX_ENTRIES: '3',
+      CLIPBOARD_MAX_TEXT_KB: '1',
+    });
   });
 
   afterAll(async () => {
@@ -86,15 +79,14 @@ describe('clipboard over HTTP', () => {
 describe('clipboard survives restart', () => {
   it('entries persist across a fresh boot with no torn rows', async () => {
     const storageRoot = tmp('bifrost-clip-restart-');
-    const config = () =>
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, CLIPBOARD_MAX_ENTRIES: '100' });
+    const env = { STORAGE_ROOT: storageRoot, CLIPBOARD_MAX_ENTRIES: '100' };
 
-    const first = await createApp(config(), { logger: pino({ level: 'silent' }) });
+    const first = await createTestApp(env);
     for (let i = 0; i < 25; i += 1) await post(first, { text: `entry ${i}` });
     const before = await list(first);
     await first.shutdown();
 
-    const second = await createApp(config(), { logger: pino({ level: 'silent' }) });
+    const second = await createTestApp(env);
     try {
       const after = await list(second);
       expect(after).toHaveLength(before.length);

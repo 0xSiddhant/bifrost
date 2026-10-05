@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from './core/config/index.js';
-import { createApp, type RunningApp } from './app.js';
+import type { RunningApp } from './app.js';
+import { createTestApp } from './testing/app.js';
 
 describe('boot → health → capabilities', () => {
   let app: RunningApp;
@@ -12,8 +11,7 @@ describe('boot → health → capabilities', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-boot-'));
-    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {
@@ -89,13 +87,7 @@ describe('capabilities in the cloud profile', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-cloud-'));
-    const config = loadConfig({
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
-      STORAGE_ROOT: storageRoot,
-      DEPLOY_PROFILE: 'cloud',
-    });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, DEPLOY_PROFILE: 'cloud' });
   });
 
   afterAll(async () => {

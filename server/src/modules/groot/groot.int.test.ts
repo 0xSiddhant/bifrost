@@ -2,10 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
 import type { InjectOptions } from 'fastify';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 describe('groot module', () => {
   let app: RunningApp;
@@ -13,14 +12,7 @@ describe('groot module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-groot-'));
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
-      STORAGE_ROOT: storageRoot,
-      GROOT_MAX_DOC_KB: '1',
-    });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, GROOT_MAX_DOC_KB: '1' });
   });
 
   afterAll(async () => {

@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 /** Real files (a genuine 1x1 PNG) so file-type sniffing works on tiny fixtures. */
 const PNG_BYTES = Buffer.from(
@@ -51,8 +50,7 @@ describe('previews + qr-tool over HTTP', () => {
     seed('junk.bin', Buffer.from([0x00, 0x01, 0x02, 0xff, 0xfe, 0x00]));
     seed('huge.txt', 'x'.repeat(1024 * 1024 + 10));
     seed('range-target.txt', 'from the host'); // 13 bytes
-    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {
