@@ -117,3 +117,56 @@ export const pagedQueryProperties = {
   paged: { type: 'boolean' },
   cursor: { type: 'string', maxLength: 512 },
 } as const;
+
+/**
+ * Response schema of a `DocumentListPage<T>` (PLAN-32). Properties are in the
+ * order the usecases build the envelope — the serializer writes schema order,
+ * and the contract guard holds it to the handler's bytes.
+ */
+export function documentListPageSchema<const Item extends object>(item: Item) {
+  return {
+    type: 'object',
+    required: ['items', 'total', 'limit', 'offset', 'authors'],
+    properties: {
+      items: { type: 'array', items: item },
+      total: { type: 'integer', description: 'Rows matching the filters, across every page' },
+      limit: { type: 'integer', description: 'The page size the server used' },
+      offset: { type: 'integer' },
+      authors: {
+        type: 'array',
+        items: { type: 'string' },
+        description: "Every author device id over the kind's whole table, unfiltered",
+      },
+    },
+  } as const;
+}
+
+/**
+ * Response schema of a `CursorListPage<T>`, plus a module's own extras
+ * (Accio's `tags`), which its usecase appends after `nextCursor`.
+ */
+export function cursorListPageSchema<
+  const Item extends object,
+  const Extra extends Record<string, object> = Record<never, never>,
+>(item: Item, extra: Extra = {} as Extra) {
+  return {
+    type: 'object',
+    required: [
+      'items',
+      'total',
+      'limit',
+      'nextCursor',
+      ...(Object.keys(extra) as Array<keyof Extra & string>),
+    ],
+    properties: {
+      items: { type: 'array', items: item },
+      total: { type: 'integer', description: 'Rows matching the filters, across every page' },
+      limit: { type: 'integer', description: 'The page size the server used' },
+      nextCursor: {
+        type: ['string', 'null'],
+        description: 'Opaque; null when there is nothing after the last row',
+      },
+      ...extra,
+    },
+  } as const;
+}
