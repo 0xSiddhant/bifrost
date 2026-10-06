@@ -2,6 +2,7 @@ import type { Readable } from 'node:stream';
 import { Readable as NodeReadable } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '../../../core/http/index.js';
+import { errorResponses, rawBody } from '../../../core/http/schemas.js';
 import type { Logger } from '../../../core/logger/index.js';
 import {
   BROTLI_QUALITY,
@@ -33,6 +34,10 @@ const qualityQuerySchema = {
   },
 } as const;
 
+const TAGS = ['brotli'];
+
+const bytesResponse = rawBody('application/octet-stream', 'The result, streamed; never cached');
+
 export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDeps): void {
   /**
    * Both routes move raw bytes, so the body is never parsed or buffered — the
@@ -48,17 +53,45 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
   );
 
   /** Limits live in .env, so the page reads them instead of hardcoding a menu. */
-  app.get('/api/brotli/config', () => ({
-    maxInputMb: deps.maxInputMb,
-    maxOutputMb: deps.maxOutputMb,
-    qualities: BROTLI_QUALITY_NAMES,
-    defaultQuality: 'balanced' satisfies BrotliQualityName,
-  }));
+  app.get(
+    '/api/brotli/config',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The input and output caps and the quality presets',
+        operationId: 'getBrotliConfig',
+        response: {
+          200: {
+            type: 'object',
+            required: ['maxInputMb', 'maxOutputMb', 'qualities', 'defaultQuality'],
+            properties: {
+              maxInputMb: { type: 'integer' },
+              maxOutputMb: { type: 'integer' },
+              qualities: { type: 'array', items: { type: 'string', enum: BROTLI_QUALITY_NAMES } },
+              defaultQuality: { type: 'string', enum: BROTLI_QUALITY_NAMES },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      maxInputMb: deps.maxInputMb,
+      maxOutputMb: deps.maxOutputMb,
+      qualities: BROTLI_QUALITY_NAMES,
+      defaultQuality: 'balanced' satisfies BrotliQualityName,
+    }),
+  );
 
   app.post<{ Querystring: { quality?: BrotliQualityName } }>(
     '/api/brotli/compress',
     {
-      schema: { querystring: qualityQuerySchema },
+      schema: {
+        tags: TAGS,
+        summary: 'Brotli-compress the request body (application/octet-stream)',
+        operationId: 'brotliCompress',
+        querystring: qualityQuerySchema,
+        response: { 200: bytesResponse, ...errorResponses(400, 413, 415, 429) },
+      },
       // Compress and decompress each get their own budget: a route-level config
       // gets its own store, so a long decompress session cannot spend the
       // allowance the other route needs.
@@ -88,7 +121,15 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
 
   app.post(
     '/api/brotli/decompress',
-    { config: { rateLimit: { max: deps.rateLimitPerMinute, timeWindow: 60_000 } } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Decompress a Brotli request body (application/octet-stream)',
+        operationId: 'brotliDecompress',
+        response: { 200: bytesResponse, ...errorResponses(400, 413, 415, 422, 429) },
+      },
+      config: { rateLimit: { max: deps.rateLimitPerMinute, timeWindow: 60_000 } },
+    },
     async (request, reply) => {
       // No pre-check exists on this side, by the nature of the risk: a
       // compressed size says nothing about the size it expands to. The output
@@ -142,12 +183,14 @@ async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): 
     log.warn({ err }, 'brotli: stream failed after headers; connection destroyed'),
   );
 
-  return reply
-    .header('content-type', 'application/octet-stream')
-    // Deliberately no content-disposition: the client already holds the bytes
-    // and names the download itself, so the server never invents a filename.
-    .header('cache-control', 'no-store')
-    .send(body);
+  return (
+    reply
+      .header('content-type', 'application/octet-stream')
+      // Deliberately no content-disposition: the client already holds the bytes
+      // and names the download itself, so the server never invents a filename.
+      .header('cache-control', 'no-store')
+      .send(body)
+  );
 }
 
 /** Pulls one chunk, then hands back a stream that replays it and the rest. */

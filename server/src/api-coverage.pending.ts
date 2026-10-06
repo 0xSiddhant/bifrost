@@ -4,9 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'GET /api/brotli/config',
-  'POST /api/brotli/compress',
-  'POST /api/brotli/decompress',
   'GET /api/accio',
   'POST /api/accio',
   'PATCH /api/accio/:id',
