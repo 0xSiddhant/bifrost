@@ -9678,6 +9678,12 @@
     },
     "/api/accio": {
       "get": {
+        "operationId": "listLinks",
+        "summary": "List saved links",
+        "tags": [
+          "accio"
+        ],
+        "description": "Search (`q`), filter by `tag` and sort. `paged=true` opts into the keyset envelope (PLAN-31), walked with `cursor`; without it the response is the legacy bare array.",
         "parameters": [
           {
             "schema": {
@@ -9759,11 +9765,182 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Without `paged=true`, the bare array it always was; with it, one keyset page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Without `paged=true`, the bare array it always was; with it, one keyset page",
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "url",
+                          "title",
+                          "tags",
+                          "authorDeviceId",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Normalized absolute http(s) URL"
+                          },
+                          "title": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "null until one is given or the background lookup finds one"
+                          },
+                          "tags": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Lowercased, deduped"
+                          },
+                          "authorDeviceId": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "total",
+                        "limit",
+                        "nextCursor",
+                        "tags"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "url",
+                              "title",
+                              "tags",
+                              "authorDeviceId",
+                              "createdAt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string",
+                                "description": "Normalized absolute http(s) URL"
+                              },
+                              "title": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ],
+                                "description": "null until one is given or the background lookup finds one"
+                              },
+                              "tags": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Lowercased, deduped"
+                              },
+                              "authorDeviceId": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "integer",
+                                "description": "Unix epoch milliseconds"
+                              }
+                            }
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the filters, across every page"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "The page size the server used"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Opaque; null when there is nothing after the last row"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Every tag on the shelf"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "post": {
+        "operationId": "saveLink",
+        "summary": "Save a link",
+        "tags": [
+          "accio"
+        ],
+        "description": "Without a title, one is looked up in the background and arrives by event.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9798,14 +9975,179 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "url",
+                    "title",
+                    "tags",
+                    "authorDeviceId",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Normalized absolute http(s) URL"
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "null until one is given or the background lookup finds one"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Lowercased, deduped"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Well-formed but refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Well-formed but refused",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/accio/{id}": {
       "patch": {
+        "operationId": "updateLink",
+        "summary": "Change a link's title or tags",
+        "tags": [
+          "accio"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -9846,11 +10188,176 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "url",
+                    "title",
+                    "tags",
+                    "authorDeviceId",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Normalized absolute http(s) URL"
+                    },
+                    "title": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "null until one is given or the background lookup finds one"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Lowercased, deduped"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "delete": {
+        "operationId": "deleteLink",
+        "summary": "Delete a link",
+        "tags": [
+          "accio"
+        ],
         "parameters": [
           {
             "schema": {
@@ -9864,8 +10371,64 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
