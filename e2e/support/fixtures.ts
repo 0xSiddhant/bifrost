@@ -10,6 +10,8 @@ import {
   formatViolations,
   isAllowed,
   isExternal,
+  isNavigationCancelShaped,
+  NavigationCancels,
   type Violation,
 } from './guards.js';
 import { startServer, type E2EServer, type StartServerOptions } from './server.js';
@@ -30,6 +32,8 @@ import { startServer, type E2EServer, type StartServerOptions } from './server.j
 
 export interface GuardState {
   violations: Violation[];
+  /** WebKit's navigation-cancel reports, held until a navigation explains them. */
+  cancels: NavigationCancels<Page>;
   /** Stop recording (a test that deliberately takes the server away). */
   pause(): void;
   resume(): void;
@@ -68,11 +72,24 @@ const DEVICE_OPTION_KEYS = [
 ] as const;
 
 function attachGuard(context: BrowserContext, state: GuardState): void {
-  const record = (violation: Violation) => {
+  const record = (violation: Violation, page?: Page | null) => {
     if (!state.isRecording() || isAllowed(violation)) return;
     if (state.connectionLossAllowed() && CONNECTION_LOSS.matches(violation)) return;
+    if (page && isNavigationCancelShaped(violation)) {
+      state.cancels.offer(page, violation, Date.now());
+      return;
+    }
     state.violations.push(violation);
   };
+  const watchNavigations = (page: Page) => {
+    page.on('request', (request) => {
+      if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+        state.cancels.navigated(page, Date.now());
+    });
+    page.on('close', () => state.cancels.navigated(page, Date.now()));
+  };
+  context.pages().forEach(watchNavigations);
+  context.on('page', watchNavigations);
   const external = new Set<string>();
 
   void context.route(
@@ -90,11 +107,14 @@ function attachGuard(context: BrowserContext, state: GuardState): void {
   );
   context.on('weberror', (webError) => {
     const error = webError.error();
-    record({
-      kind: 'pageerror',
-      page: webError.page()?.url() ?? '',
-      detail: `${error.name}: ${error.message}`,
-    });
+    record(
+      {
+        kind: 'pageerror',
+        page: webError.page()?.url() ?? '',
+        detail: `${error.name}: ${error.message}`,
+      },
+      webError.page(),
+    );
   });
   context.on('console', (message) => {
     if (message.type() !== 'error') return;
@@ -103,7 +123,10 @@ function attachGuard(context: BrowserContext, state: GuardState): void {
     // stale slug or a 422 for a refused name is the API working as designed,
     // and the response itself is checked (≥ 500 is the failure that matters).
     if (/^Failed to load resource: the server responded with a status of 4\d\d/.test(text)) return;
-    record({ kind: 'console.error', page: message.page()?.url() ?? '', detail: text });
+    record(
+      { kind: 'console.error', page: message.page()?.url() ?? '', detail: text },
+      message.page(),
+    );
   });
   context.on('response', (response) => {
     if (response.status() >= 500) {
@@ -147,6 +170,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     let connectionLoss = false;
     const state: GuardState = {
       violations: [],
+      cancels: new NavigationCancels<Page>(),
       pause: () => {
         recording = false;
       },
@@ -160,6 +184,9 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       connectionLossAllowed: () => connectionLoss,
     };
     await use(state);
+    // Every page has closed by now, so anything still held was never explained
+    // by a navigation.
+    state.violations.push(...state.cancels.unexplained());
     if (state.violations.length > 0 && testInfo.status === 'passed') {
       throw new Error(
         `the page reported errors the user would never see:\n${formatViolations(state.violations)}`,

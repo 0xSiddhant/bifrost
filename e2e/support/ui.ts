@@ -45,9 +45,13 @@ export async function press(page: Page, target: Locator): Promise<void> {
  */
 export async function typeIntoEditor(page: Page, text: string, index = 0): Promise<void> {
   const editor = page.locator('.cm-content').filter({ visible: true }).nth(index);
-  await editor.click();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.insertText(text);
+  // fill() selects the editor's whole content itself and inserts the text, as
+  // a paste would. A select-all shortcut depends on the engine and the
+  // emulated platform: on CI's WebKit with an iPhone profile, Ctrl+A selected
+  // nothing, so the text was appended to Atlas's starting skeleton.
+  await editor.fill(text);
+  const firstLine = text.split('\n').find((line) => line.trim() !== '');
+  if (firstLine) await expect(editor).toContainText(firstLine.trim());
 }
 
 /** The text of the page's (first visible) CodeMirror editor. */
