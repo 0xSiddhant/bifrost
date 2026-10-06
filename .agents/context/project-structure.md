@@ -5,10 +5,10 @@ bifrost/
 ├── CLAUDE.md                  # entry point for AI agents → points to .agents/
 ├── README.md
 ├── .agents/                    # plans, context, rules, memory (this folder)
-├── .github/workflows/         # ci.yml (lint/typecheck/test/build + docker build + backup smoke)
+├── .github/workflows/         # ci.yml (lint/typecheck/test/build + e2e + docker build + backup smoke)
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
-├── package.json               # npm workspaces: server, client, cli
+├── package.json               # npm workspaces: server, client, cli, e2e
 ├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
 ├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
 ├── docker-compose.yml         # run on a Linux host (host networking)
@@ -25,6 +25,7 @@ bifrost/
 │   ├── cloud-profile.md       # internet-deployment checklist
 │   ├── releasing.md           # automated release flow
 │   ├── offline-mode.md        # warm-load for the pure-client pages (PLAN-22)
+│   ├── testing.md             # every kind of test, how to run and replay each (PLAN-32)
 │   └── assets/                # screenshots for README
 ├── server/
 │   ├── drizzle/               # generated migrations
@@ -142,6 +143,19 @@ bifrost/
 │       ├── commands/          #   thin: parse args, call core/, print. No usecase tier —
 │       │                      #     there is no rule here the server does not already enforce
 │       └── test/              #   liveServer (spawns a REAL server per int suite) + runCli
+├── e2e/                       # FOURTH workspace (PLAN-32a): sees only the BUILT system, from
+│   │                          #   outside — lint-banned from importing server/client/cli src
+│   ├── playwright.config.ts   #   UI only: chromium-desktop, chromium-mobile, webkit-mobile, cloud
+│   ├── vitest.config.ts       #   unit tests of the support code (`npm test`)
+│   ├── vitest.e2e.config.ts   #   out-of-process suites without a browser (`*.e2e.ts`)
+│   ├── support/               #   server.ts (production entry, scratch storage, blanked .env),
+│   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
+│   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,
+│   │                          #   pty.ts, sink.ts, pdf.ts, files.ts
+│   ├── browser/               #   journeys 1–18, cross-surface, routes.spec.ts, guard.spec.ts
+│   ├── cloud/                 #   DEPLOY_PROFILE=cloud gating
+│   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
+│   └── api-diff/              #   TEMPORARY old-vs-new diff (deleted in PLAN-34's final PR)
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
 │                              #   gen-build-info, gen-man, cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,

@@ -12,7 +12,8 @@
   "workspaces": [
     "server",
     "client",
-    "cli"
+    "cli",
+    "e2e"
   ],
   "scripts": {
     "setup": "tsx scripts/setup.ts",
@@ -34,7 +35,10 @@
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
-    "prepare": "husky"
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e",
+    "prepare": "husky",
+    "test:e2e": "npm run test:e2e -w e2e",
+    "test:api-diff": "npm run test:api-diff -w e2e --"
   },
   "overrides": {
     "brace-expansion": "^5.0.9",

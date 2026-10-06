@@ -196,6 +196,14 @@ hide until release day. It skips the global install under `CI` (and the
 Dockerfile sets `CI=true` for its build), and PM2 never runs it at all, since
 `ecosystem.config.cjs` execs `server/dist/bootstrap.js` directly.
 
+## The end-to-end safety net (PLAN-32a)
+
+`e2e/` is a fourth workspace that tests **what ships, from outside**: the production server entry over HTTP, `client/dist` in real browsers, and the CLI as a packed tarball installed into a temporary prefix. It may not import product source (eslint `no-restricted-imports`). Each Playwright worker and each Vitest e2e file runs its own server on a free port with scratch storage, a scratch themes folder, and every `.env` key blanked to its default. The server's dotenv never overrides a set key, so a developer's real `.env` would otherwise leak in.
+
+A global guard fails any test on a page error, a `console.error`, a 5xx, a failed request, or any non-loopback request. `routes.spec.ts` reads `App.tsx` as text, so a page without a journey fails CI.
+
+Bugs the net finds in product code are pinned with `test.fail` rather than fixed in the same PR, so each pin flips red when its bug is fixed. A temporary `test:api-diff` tool proves a change is wire-neutral by replaying every read route and one write sequence against a worktree build of a base ref and this checkout, byte for byte. Detail: [`docs/testing.md`](../../docs/testing.md).
+
 ## Restart safety (server is stopped/started constantly)
 
 - SQLite in **WAL mode**, `synchronous=NORMAL`, `busy_timeout` set; better-sqlite3 is synchronous so no half-finished async writes.
