@@ -41,7 +41,15 @@ export class Recorder {
   /** Requests to no operation in the spec (the SPA fallback, assets, a deliberate `/api/nope`). */
   readonly unmatched: string[] = [];
 
-  record(entry: Recorded, { contract = true }: { contract?: boolean } = {}): void {
+  /**
+   * `body` is the whole response text for the contract check; the entry keeps
+   * only its head (`text`) for the hygiene scan, so a 2 MB document is
+   * validated whole without being held for the rest of the file.
+   */
+  record(
+    entry: Recorded,
+    { contract = true, body = entry.text }: { contract?: boolean; body?: string } = {},
+  ): void {
     this.responses.push(entry);
     const pathname = entry.path.split('?')[0] ?? entry.path;
     const op = this.spec.find(entry.method, pathname);
@@ -57,7 +65,7 @@ export class Recorder {
       entry.method,
       entry.status,
       entry.headers.get('content-type') ?? '',
-      entry.text,
+      body,
     );
     if (problem)
       this.problems.push(`${entry.method} ${entry.path} (${op.operationId}): ${problem}`);
@@ -124,7 +132,10 @@ export class Client {
       text: bytes.subarray(0, KEEP_TEXT).toString('utf8'),
       headers: response.headers,
     };
-    this.recorder.record(entry, { contract: options.contract ?? true });
+    this.recorder.record(entry, {
+      contract: options.contract ?? true,
+      body: bytes.length > KEEP_TEXT ? bytes.toString('utf8') : entry.text,
+    });
     return {
       ...entry,
       bytes,
