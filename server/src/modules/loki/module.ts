@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { FeatureModule, ModuleDeps } from '../../core/module.js';
 import type { LokiSettings } from '../../core/bus/events.js';
 import { AppError } from '../../core/http/index.js';
+import { adminSecurity, errorResponses } from '../../core/http/schemas.js';
 import { readSettings, writeSetting } from '../../core/db/index.js';
 
 /**
@@ -32,6 +33,23 @@ const TIMEOUT_MAX = 30000;
 const BUDGET_MIN = 10;
 const BUDGET_MAX = 5000;
 
+/** `LokiSettings`, in the order `effective()` builds it. */
+const settingsProperties = {
+  executionEnabled: { type: 'boolean', description: 'Whether the Run UI is offered at all' },
+  fetchAllowed: { type: 'boolean', description: 'Whether a run may call fetch()' },
+  runTimeoutMs: { type: 'integer', description: 'The watchdog that stops a run' },
+  consoleMaxEntries: { type: 'integer', description: 'Console lines kept per run' },
+} as const;
+
+const settingsRequired = [
+  'executionEnabled',
+  'fetchAllowed',
+  'runTimeoutMs',
+  'consoleMaxEntries',
+] as const;
+
+const TAGS = ['loki'];
+
 export const lokiModule: FeatureModule = {
   name: 'loki',
   register(app: FastifyInstance, deps: ModuleDeps) {
@@ -52,7 +70,12 @@ export const lokiModule: FeatureModule = {
       return {
         executionEnabled: bool(SETTING_KEYS.executionEnabled, config.loki.executionEnabled),
         fetchAllowed: bool(SETTING_KEYS.fetchAllowed, config.loki.fetchAllowed),
-        runTimeoutMs: int(SETTING_KEYS.runTimeoutMs, config.loki.runTimeoutMs, TIMEOUT_MIN, TIMEOUT_MAX),
+        runTimeoutMs: int(
+          SETTING_KEYS.runTimeoutMs,
+          config.loki.runTimeoutMs,
+          TIMEOUT_MIN,
+          TIMEOUT_MAX,
+        ),
         consoleMaxEntries: int(
           SETTING_KEYS.consoleMaxEntries,
           config.loki.consoleMaxEntries,
@@ -65,11 +88,32 @@ export const lokiModule: FeatureModule = {
     // Public: the page reads this to gate the Run UI and pass the runner its
     // limits. Read-only; carries no secrets. Also exposes the caps so the
     // per-run timeout control can clamp itself.
-    app.get('/api/loki/config', () => ({
-      ...effective(),
-      timeoutMin: TIMEOUT_MIN,
-      timeoutMax: TIMEOUT_MAX,
-    }));
+    app.get(
+      '/api/loki/config',
+      {
+        schema: {
+          tags: TAGS,
+          summary: "The runner's policy and the timeout bounds the page clamps to",
+          operationId: 'getLokiConfig',
+          response: {
+            200: {
+              type: 'object',
+              required: [...settingsRequired, 'timeoutMin', 'timeoutMax'],
+              properties: {
+                ...settingsProperties,
+                timeoutMin: { type: 'integer' },
+                timeoutMax: { type: 'integer' },
+              },
+            },
+          },
+        },
+      },
+      () => ({
+        ...effective(),
+        timeoutMin: TIMEOUT_MIN,
+        timeoutMax: TIMEOUT_MAX,
+      }),
+    );
 
     const guard = { preHandler: app.requireAdmin };
     const patchSchema = {
@@ -90,27 +134,44 @@ export const lokiModule: FeatureModule = {
         runTimeoutMs: number;
         consoleMaxEntries: number;
       }>;
-    }>('/api/loki/settings', { ...guard, schema: { body: patchSchema } }, (request) => {
-      const patch = request.body;
-      if (Object.keys(patch).length === 0) {
-        throw new AppError('empty settings patch', 400, 'EMPTY_PATCH');
-      }
-      if (patch.executionEnabled !== undefined) {
-        writeSetting(db, SETTING_KEYS.executionEnabled, String(patch.executionEnabled));
-      }
-      if (patch.fetchAllowed !== undefined) {
-        writeSetting(db, SETTING_KEYS.fetchAllowed, String(patch.fetchAllowed));
-      }
-      if (patch.runTimeoutMs !== undefined) {
-        writeSetting(db, SETTING_KEYS.runTimeoutMs, String(patch.runTimeoutMs));
-      }
-      if (patch.consoleMaxEntries !== undefined) {
-        writeSetting(db, SETTING_KEYS.consoleMaxEntries, String(patch.consoleMaxEntries));
-      }
-      const updated = effective();
-      bus.emit('loki.settingsUpdated', updated);
-      return updated;
-    });
+    }>(
+      '/api/loki/settings',
+      {
+        ...guard,
+        schema: {
+          tags: TAGS,
+          summary: "Change the runner's policy; open pages rebind live",
+          operationId: 'updateLokiSettings',
+          security: adminSecurity,
+          body: patchSchema,
+          response: {
+            200: { type: 'object', required: settingsRequired, properties: settingsProperties },
+            ...errorResponses(400, 401, 413, 415),
+          },
+        },
+      },
+      (request) => {
+        const patch = request.body;
+        if (Object.keys(patch).length === 0) {
+          throw new AppError('empty settings patch', 400, 'EMPTY_PATCH');
+        }
+        if (patch.executionEnabled !== undefined) {
+          writeSetting(db, SETTING_KEYS.executionEnabled, String(patch.executionEnabled));
+        }
+        if (patch.fetchAllowed !== undefined) {
+          writeSetting(db, SETTING_KEYS.fetchAllowed, String(patch.fetchAllowed));
+        }
+        if (patch.runTimeoutMs !== undefined) {
+          writeSetting(db, SETTING_KEYS.runTimeoutMs, String(patch.runTimeoutMs));
+        }
+        if (patch.consoleMaxEntries !== undefined) {
+          writeSetting(db, SETTING_KEYS.consoleMaxEntries, String(patch.consoleMaxEntries));
+        }
+        const updated = effective();
+        bus.emit('loki.settingsUpdated', updated);
+        return updated;
+      },
+    );
 
     // Live rebind: broadcast changes so open Loki pages + the Heimdall card
     // reflect them without a reload (same pattern as theme/settings updates).

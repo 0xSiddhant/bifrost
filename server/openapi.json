@@ -9071,15 +9071,64 @@
     },
     "/api/loki/config": {
       "get": {
+        "operationId": "getLokiConfig",
+        "summary": "The runner's policy and the timeout bounds the page clamps to",
+        "tags": [
+          "loki"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "executionEnabled",
+                    "fetchAllowed",
+                    "runTimeoutMs",
+                    "consoleMaxEntries",
+                    "timeoutMin",
+                    "timeoutMax"
+                  ],
+                  "properties": {
+                    "executionEnabled": {
+                      "type": "boolean",
+                      "description": "Whether the Run UI is offered at all"
+                    },
+                    "fetchAllowed": {
+                      "type": "boolean",
+                      "description": "Whether a run may call fetch()"
+                    },
+                    "runTimeoutMs": {
+                      "type": "integer",
+                      "description": "The watchdog that stops a run"
+                    },
+                    "consoleMaxEntries": {
+                      "type": "integer",
+                      "description": "Console lines kept per run"
+                    },
+                    "timeoutMin": {
+                      "type": "integer"
+                    },
+                    "timeoutMax": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/loki/settings": {
       "patch": {
+        "operationId": "updateLokiSettings",
+        "summary": "Change the runner's policy; open pages rebind live",
+        "tags": [
+          "loki"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -9109,9 +9158,157 @@
             }
           }
         },
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "executionEnabled",
+                    "fetchAllowed",
+                    "runTimeoutMs",
+                    "consoleMaxEntries"
+                  ],
+                  "properties": {
+                    "executionEnabled": {
+                      "type": "boolean",
+                      "description": "Whether the Run UI is offered at all"
+                    },
+                    "fetchAllowed": {
+                      "type": "boolean",
+                      "description": "Whether a run may call fetch()"
+                    },
+                    "runTimeoutMs": {
+                      "type": "integer",
+                      "description": "The watchdog that stops a run"
+                    },
+                    "consoleMaxEntries": {
+                      "type": "integer",
+                      "description": "Console lines kept per run"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No admin session, or it was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No admin session, or it was revoked",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
