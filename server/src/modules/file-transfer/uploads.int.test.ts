@@ -40,6 +40,42 @@ describe('uploads staging actions over HTTP', () => {
     }
   });
 
+  describe('long names (found by PLAN-33\'s fuzzer)', () => {
+    // A stored name may be 180 characters (the sanitizer's cap), but
+    // Fastify's router refused any path parameter over 100 (`maxParamLength`)
+    // with a 414 — so a file uploaded with a long name could not be
+    // published, previewed, renamed or deleted. Percent-encoding multiplies a
+    // non-ASCII name further.
+    const longest = `${'a'.repeat(176)}.txt`;
+    const accented = `${'ö'.repeat(120)}.txt`;
+
+    it.each([
+      ['the longest storable name', longest],
+      ['a long accented name', accented],
+    ])('%s can be read, previewed, renamed and deleted', async (_label, name) => {
+      seed(name);
+      const url = `/api/files/${encodeURIComponent(name)}`;
+      expect((await app.fastify.inject({ url: `${url}/content` })).statusCode).toBe(200);
+      expect((await app.fastify.inject({ url: `${url}/preview` })).statusCode).toBe(200);
+      const renamed = await app.fastify.inject({ method: 'PATCH', url, payload: { name: `b${name.slice(1)}` } });
+      expect(renamed.statusCode).toBe(200);
+      const deleted = await app.fastify.inject({
+        method: 'DELETE',
+        url: `/api/files/${encodeURIComponent(`b${name.slice(1)}`)}`,
+      });
+      expect(deleted.statusCode).toBe(204);
+    });
+
+    it('the longest name can be published', async () => {
+      seed(longest);
+      const res = await app.fastify.inject({
+        method: 'POST',
+        url: `/api/files/${encodeURIComponent(longest)}/publish`,
+      });
+      expect(res.statusCode).toBe(200);
+    });
+  });
+
   describe('publish', () => {
     it('moves the file to downloads/', async () => {
       seed('report.pdf', 'the report');
