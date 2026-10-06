@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowed, isExternal, type Violation } from './guards.js';
+import {
+  isAllowed,
+  isExternal,
+  isNavigationCancelShaped,
+  NAVIGATION_CANCEL_WINDOW_MS,
+  NavigationCancels,
+  type Violation,
+} from './guards.js';
 
 describe('isExternal', () => {
   it.each([
@@ -50,5 +57,63 @@ describe('isAllowed', () => {
       isAllowed({ kind: 'external', page: '', url: 'https://example.com/', detail: 'blocked' }),
     ).toBe(false);
     expect(isAllowed({ kind: 'console.error', page: '', detail: 'boom' })).toBe(false);
+  });
+});
+
+describe('navigation cancels (WebKit)', () => {
+  // The exact shapes CI's WebKit reported, including Playwright splitting the
+  // message at the URL's colon.
+  const fetchCancel: Violation = {
+    kind: 'pageerror',
+    page: 'http://127.0.0.1:46257/edda/x',
+    detail: 'Fetch API cannot load http: /127.0.0.1:46257/api/edda/x due to access control checks.',
+  };
+  const importCancel: Violation = {
+    kind: 'console.error',
+    page: 'http://127.0.0.1:36455/pensieve?type=runestone',
+    detail: 'TypeError: Importing a module script failed.',
+  };
+
+  it('recognises only the two WebKit shapes, and only for loopback fetches', () => {
+    expect(isNavigationCancelShaped(fetchCancel)).toBe(true);
+    expect(isNavigationCancelShaped(importCancel)).toBe(true);
+    expect(
+      isNavigationCancelShaped({
+        ...fetchCancel,
+        detail: 'Fetch API cannot load https://example.com/x due to access control checks.',
+      }),
+    ).toBe(false);
+    expect(isNavigationCancelShaped({ ...importCancel, kind: 'http5xx' })).toBe(false);
+    expect(isNavigationCancelShaped({ ...fetchCancel, detail: 'TypeError: x is undefined' })).toBe(
+      false,
+    );
+  });
+
+  it('explains a cancel that lands just after a navigation starts', () => {
+    const page = {};
+    const cancels = new NavigationCancels<object>();
+    cancels.navigated(page, 1_000);
+    expect(cancels.offer(page, fetchCancel, 1_200)).toBe(true);
+    expect(cancels.unexplained()).toEqual([]);
+  });
+
+  it('explains a held cancel once the navigation comes, or the page closes', () => {
+    const page = {};
+    const cancels = new NavigationCancels<object>();
+    expect(cancels.offer(page, importCancel, 1_000)).toBe(false);
+    cancels.navigated(page, 1_500);
+    expect(cancels.unexplained()).toEqual([]);
+  });
+
+  it('keeps a cancel no navigation explains, or one on another page, or one too old', () => {
+    const page = {};
+    const other = {};
+    const cancels = new NavigationCancels<object>();
+    cancels.offer(page, fetchCancel, 1_000);
+    cancels.offer(other, importCancel, 1_000);
+    cancels.navigated(other, 1_000 + NAVIGATION_CANCEL_WINDOW_MS + 1);
+    cancels.navigated(page, 9_000);
+    expect(cancels.unexplained()).toEqual([fetchCancel, importCancel]);
+    expect(cancels.offer(page, fetchCancel, 9_000 + NAVIGATION_CANCEL_WINDOW_MS + 1)).toBe(false);
   });
 });

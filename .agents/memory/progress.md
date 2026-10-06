@@ -51,6 +51,11 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 
 Recent activity holds the sessions since the latest release tag, one entry per session. Older sessions, and the full detail behind any entry here (test evidence, live-verify runs, deviations), live in [`history.md`](history.md) — the `context-sync` skill moves entries there at each release.
 
+- 2026-10-06 — **PLAN-32a: CI's first full run fixed** on `feat/plan-32a-e2e-safety-net` (PR #81). Lint, typecheck, build and every unit suite were green; 5 e2e tests failed, 4 of them in WebKit's first-ever run. All were test-side:
+  1. **Hermes TTL** (Chromium + WebKit): a 1 s TTL expired before CI's slower first list arrived. Now 5 s, with the wait measured from the post.
+  2. **Atlas create/save** (WebKit mobile): on CI's WebKit with the iPhone profile, Ctrl+A selected nothing, so the XML was appended to Atlas's starting skeleton and Save stayed disabled. `typeIntoEditor` now uses `fill()`, which selects the editor's content itself, and asserts the first line landed. Probed in Chromium on iPhone, Pixel and desktop profiles: exact replacement.
+  3. **Edda specials and shell deep links** (WebKit): navigation-cancelled same-origin fetches and imports surface as page errors in WebKit. The guard now allows exactly those, only when a navigation by the same page explains them (decisions.md).
+  - Verified locally on Chromium desktop + mobile and cloud: 138 passed. e2e unit tests 36 (4 new for the rule). WebKit cannot launch here, so CI re-checks fixes 2 and 3.
 - 2026-10-05 — **The seven PLAN-32a findings fixed** on `fix/plan-32a-findings`, stacked on the unmerged 32a PR at the owner's direction (32b and 32c stack on it in turn; decisions.md). Owner side asks on PR #81 first: `npm run test:all` (lint → typecheck → test → build → e2e) and a README Testing section linking `docs/testing.md`, which now explains why tests live beside their code *and* in `e2e/`. Fixes:
   1. **Atlas:** a table edit lands in the buffer when the code pane is hidden.
   2. **Midgard:** the doors follow `file-transfer` and `clipboard`.
