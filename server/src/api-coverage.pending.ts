@@ -4,17 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'GET /api/heimdall/access',
-  'POST /api/heimdall/login',
-  'POST /api/heimdall/logout',
-  'GET /api/heimdall/session',
-  'POST /api/heimdall/revoke',
-  'GET /api/heimdall/settings',
-  'PATCH /api/heimdall/settings',
-  'GET /api/heimdall/uploads',
-  'GET /api/heimdall/stats',
-  'GET /api/heimdall/about',
-  'GET /api/heimdall/changelog',
   'GET /api/clipboard',
   'POST /api/clipboard',
   'DELETE /api/clipboard/:id',
