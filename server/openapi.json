@@ -1449,6 +1449,11 @@
     },
     "/api/downloads/{id}/meta": {
       "get": {
+        "operationId": "getDownloadPreviewMeta",
+        "summary": "What a download is, and whether the browser can preview it",
+        "tags": [
+          "previews"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1462,13 +1467,117 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "previewable",
+                    "kind",
+                    "mime",
+                    "name",
+                    "size"
+                  ],
+                  "properties": {
+                    "previewable": {
+                      "type": "boolean",
+                      "description": "False when the browser cannot show it, or it is too big"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "pdf",
+                        "markdown",
+                        "text",
+                        "none"
+                      ]
+                    },
+                    "mime": {
+                      "type": "string",
+                      "description": "Sniffed from the bytes first, then the extension"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The base name, never folder-qualified"
+                    },
+                    "size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/files/{name}/preview": {
       "get": {
+        "operationId": "getUploadPreviewMeta",
+        "summary": "What a staged upload is, and whether the browser can preview it",
+        "tags": [
+          "previews"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1484,7 +1593,106 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "previewable",
+                    "kind",
+                    "mime",
+                    "name",
+                    "size"
+                  ],
+                  "properties": {
+                    "previewable": {
+                      "type": "boolean",
+                      "description": "False when the browser cannot show it, or it is too big"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "image",
+                        "video",
+                        "audio",
+                        "pdf",
+                        "markdown",
+                        "text",
+                        "none"
+                      ]
+                    },
+                    "mime": {
+                      "type": "string",
+                      "description": "Sniffed from the bytes first, then the extension"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The base name, never folder-qualified"
+                    },
+                    "size": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
