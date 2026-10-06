@@ -5,9 +5,10 @@ import type { Seeded } from './seed.js';
 /**
  * The read corpus: every read route with every query shape — all sorts ×
  * orders × filters, legacy and `paged=true`, cursors walked to the end, every
- * record by slug and by stale slug, raw endpoints, `?download`, and the admin
- * reads with a session. Discovered from the base side once and replayed,
- * request for request, against both.
+ * record by slug and by stale slug, raw endpoints, `?download`, file content
+ * as an attachment and `?inline=1`, and the admin reads with and without a
+ * session. Discovered from the base side once and replayed, request for
+ * request, against both.
  */
 
 export interface ReadRequest {
