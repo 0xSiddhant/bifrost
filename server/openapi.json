@@ -1699,9 +1699,33 @@
     },
     "/api/qr/server-url": {
       "get": {
+        "operationId": "getServerUrls",
+        "summary": "Every URL that reaches this server, LAN IPs first",
+        "tags": [
+          "qr-tool"
+        ],
+        "description": "Android cannot resolve `.local`, so the IP URLs lead; the mDNS name is last (local profile only).",
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "urls"
+                  ],
+                  "properties": {
+                    "urls": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
