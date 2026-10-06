@@ -17,7 +17,7 @@ import { PENDING_ROUTES } from './api-coverage.pending.js';
  */
 
 /** The pending list's current size: lower it as entries come off, never raise it. */
-const PENDING_CEILING = 78;
+const PENDING_CEILING = 71;
 
 type Schema = Record<string, unknown>;
 
