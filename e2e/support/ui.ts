@@ -29,9 +29,7 @@ export function isMobile(page: Page): boolean {
 
 /**
  * Activate a control the way this device would: a touch tap on a phone-sized
- * viewport, a mouse click on a desktop. Not cosmetic — the guide sheet's drag
- * header takes pointer capture, which retargets a *mouse* click below 640px
- * while a real tap still lands (found by this suite, reported in PLAN-32a).
+ * viewport, a mouse click on a desktop.
  */
 export async function press(page: Page, target: Locator): Promise<void> {
   if (isMobile(page)) await target.tap();
@@ -109,54 +107,4 @@ export async function showCode(page: Page): Promise<void> {
     }
     await expect(editor).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 15_000 });
-}
-
-/**
- * Open a page that shows a live list and wait until it is live AND no fetch
- * of that list is still in flight.
- *
- * KNOWN BUG (found by this suite, reported in PLAN-32a): `useDownloads` and
- * `useClipboard` each fetch their whole list on mount (Receive also on every
- * SSE `open`) and *replace* their state with the answer — so a fetch computed
- * before a live event but delivered after it silently drops that row until a
- * reload. A journey that triggers a live event while that fetch is in flight
- * would be testing the race, not the live update, so it settles first.
- */
-export async function openSettled(page: Page, url: string, listPath: string): Promise<void> {
-  let inflight = 0;
-  let finished = 0;
-  const isList = (requestUrl: string) => new URL(requestUrl).pathname === listPath;
-  const started = (request: { url(): string }) => {
-    if (isList(request.url())) inflight += 1;
-  };
-  const ended = (request: { url(): string }) => {
-    if (!isList(request.url())) return;
-    inflight -= 1;
-    finished += 1;
-  };
-  page.on('request', started);
-  page.on('requestfinished', ended);
-  page.on('requestfailed', ended);
-  try {
-    await page.goto(url);
-    await waitForLive(page);
-    for (let settled = 0; settled < 2; settled += 1) {
-      await expect.poll(() => inflight === 0 && finished > 0).toBe(true);
-      await page.waitForTimeout(250);
-    }
-  } finally {
-    page.off('request', started);
-    page.off('requestfinished', ended);
-    page.off('requestfailed', ended);
-  }
-}
-
-/** The Receive listing, settled (see `openSettled`). */
-export function openReceive(page: Page, url: string): Promise<void> {
-  return openSettled(page, url, '/api/downloads');
-}
-
-/** The Hermes board, settled (see `openSettled`). */
-export function openHermes(page: Page, url = '/hermes'): Promise<void> {
-  return openSettled(page, url, '/api/clipboard');
 }

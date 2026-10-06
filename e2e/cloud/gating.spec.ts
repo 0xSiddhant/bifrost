@@ -97,11 +97,7 @@ test('Loki offers no sandboxed run in the cloud profile', async ({ page }) => {
 test('Midgard hides the transfer doors whose modules this profile does not serve', async ({
   page,
 }) => {
-  // KNOWN GAP (found by this suite, reported in PLAN-32a): Midgard's Send,
-  // Receive and Hermes portals carry no `module` gate, so a cloud server shows
-  // three doors into pages whose APIs answer 404. Pinned as an expected failure
-  // so the suite stays honest: the day they are gated this flips red.
-  test.fail(true, 'Midgard shows Send/Receive/Hermes on the cloud profile');
+  // Found by this suite (PLAN-32a): these three carried no module gate.
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Your devices/ })).toBeVisible();
   for (const door of ['Send files', 'Receive files', 'Hermes']) {

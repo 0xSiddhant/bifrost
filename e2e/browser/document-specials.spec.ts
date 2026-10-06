@@ -72,15 +72,8 @@ test(
   'Atlas: a plist table edit lands in the code and survives a save',
   routes('/atlas/:slug'),
   async ({ page, server }) => {
-    // KNOWN BUG (found by this suite, reported in PLAN-32a): on a phone the
-    // table pane *replaces* the code pane, so AtlasPage's editorRef is null and
-    // applyTableEdit's replaceRange silently does nothing — every table edit is
-    // dropped. Pinned as an expected failure so the suite stays honest: the day
-    // it is fixed this flips red and the annotation comes out.
-    test.fail(
-      isMobile(page),
-      'Atlas plist table edits are dropped on a phone (single-pane layout)',
-    );
+    // On a phone the table pane replaces the code pane: the edit must still
+    // land (it was silently dropped until the PLAN-32a fixes).
     const doc = await saveDocument(
       new Api(server.baseUrl),
       'atlas',

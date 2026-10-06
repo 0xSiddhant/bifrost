@@ -183,13 +183,9 @@ for (const kind of KINDS) {
       'a file over the size cap is refused with a message',
       kind.editorRoutes,
       async ({ page }) => {
-        // The cap comes from the server; picking a file before it has arrived
-        // would test the page's loading state, not the cap.
-        const config = page.waitForResponse((response) =>
-          response.url().endsWith(`/api/${kind.kind}/config`),
-        );
+        // Picked straight after load, on purpose: an import made before the
+        // cap arrived used to skip the check (fixed after PLAN-32a).
         await page.goto(`/${kind.kind}`);
-        await config;
         const big =
           kind.kind === 'runestone'
             ? `{"pad":"${'x'.repeat(2100 * 1024)}"}`

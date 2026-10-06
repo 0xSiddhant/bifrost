@@ -5,9 +5,10 @@ import type { Seeded } from './seed.js';
 /**
  * The read corpus: every read route with every query shape — all sorts ×
  * orders × filters, legacy and `paged=true`, cursors walked to the end, every
- * record by slug and by stale slug, raw endpoints, `?download`, and the admin
- * reads with a session. Discovered from the base side once and replayed,
- * request for request, against both.
+ * record by slug and by stale slug, raw endpoints, `?download`, file content
+ * as an attachment and `?inline=1`, and the admin reads with and without a
+ * session. Discovered from the base side once and replayed, request for
+ * request, against both.
  */
 
 export interface ReadRequest {
@@ -107,6 +108,7 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
   }
   for (const path of [
     '/api/heimdall/session',
+    '/api/heimdall/changelog',
     '/api/heimdall/settings',
     '/api/themes/manage',
     '/api/heimdall/uploads',
@@ -199,6 +201,8 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
       add(`/api/downloads/${entry.id}/content`);
     } else {
       add(`/api/downloads/${entry.id}/content`);
+      // `inline=1` swaps the attachment headers for a browser preview's.
+      add(`/api/downloads/${entry.id}/content?inline=1`);
       add(`/api/downloads/${entry.id}/meta`);
       add(`/api/downloads/${entry.id}/archive`);
     }
@@ -207,6 +211,7 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
   for (const name of ['staged notes.txt', 'Völuspá.md', 'data.json', 'missing.txt']) {
     add(`/api/files/${encodeURIComponent(name)}/preview`);
     add(`/api/files/${encodeURIComponent(name)}/content`);
+    add(`/api/files/${encodeURIComponent(name)}/content?inline=1`);
   }
 
   // Go-links last: following one is a read with a side effect (the hit count).

@@ -1,7 +1,7 @@
 import { test, expect } from '../support/fixtures.js';
 import { Api } from '../support/api.js';
 import { routes } from '../support/journey.js';
-import { openHermes, waitForLive } from '../support/ui.js';
+import { waitForLive } from '../support/ui.js';
 
 /** Journeys 3 (Hermes, the shared clipboard) and 4 (Wardens, the devices). */
 
@@ -12,7 +12,8 @@ test.describe('hermes', () => {
     async ({ page, newDevice }) => {
       const text = `meet at the bridge ${Date.now().toString(36)}`;
       const deviceB = await newDevice();
-      await openHermes(deviceB);
+      await deviceB.goto('/hermes');
+      await waitForLive(deviceB);
 
       await page.goto('/hermes');
       await waitForLive(page);

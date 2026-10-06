@@ -115,6 +115,7 @@ export function GrootPage() {
   );
   const [docIndex, setDocIndex] = useState(0);
   const [config, setConfig] = useState<GrootConfig | null>(null);
+  const configRequest = useRef<Promise<GrootConfig | null> | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [restorable, setRestorable] = useState<GrootDraft | null>(null);
   const [cursor, setCursor] = useState(0);
@@ -123,7 +124,11 @@ export function GrootPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchGrootConfig()
+    const request = fetchGrootConfig();
+    // An import picked before this answers must still be checked against the
+    // cap (found by PLAN-32a's e2e net): it awaits this rather than skipping.
+    configRequest.current = request.catch(() => null);
+    request
       .then((cfg) => {
         if (!cancelled) setConfig(cfg);
       })
@@ -392,7 +397,9 @@ export function GrootPage() {
     if (target) gotoOffset(target.offset);
   };
 
-  const importText = (name: string, content: string, sizeBytes: number) => {
+  const importText = async (name: string, content: string, sizeBytes: number) => {
+    const loaded = config ?? (await configRequest.current);
+    const maxBytes = loaded ? loaded.maxDocKb * 1024 : null;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
@@ -406,7 +413,7 @@ export function GrootPage() {
   const onPickFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (file) importText(file.name, await file.text(), file.size);
+    if (file) await importText(file.name, await file.text(), file.size);
   };
 
   const onDrop = async (event: DragEvent) => {
@@ -417,7 +424,7 @@ export function GrootPage() {
       fail('Only .yaml or .yml files can be dropped here.');
       return;
     }
-    importText(file.name, await file.text(), file.size);
+    await importText(file.name, await file.text(), file.size);
   };
 
   const exportDocument = () => {

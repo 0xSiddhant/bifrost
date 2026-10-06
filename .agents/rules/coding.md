@@ -40,7 +40,7 @@
 - Every plan's acceptance criteria get at least one automated test where feasible; manual steps go in the PR description.
 - A "kill test" (SIGINT mid-operation, restart, assert no corruption) is required for any plan touching storage.
 - **A new client page ships with a journey** in `e2e/browser/` that declares its route with `routes('/the/path')` (written literally). `routes.spec.ts` reads `App.tsx` as text and fails CI for any route no journey names (PLAN-32a).
-- `npm run test:e2e` must stay green after `npm run build`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped. See `docs/testing.md`.
+- `npm run test:e2e` must stay green after `npm run build`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped; the pin comes out in the PR that fixes it. See `docs/testing.md`.
 
 ## Frontend
 

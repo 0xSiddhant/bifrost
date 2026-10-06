@@ -60,6 +60,19 @@ describe('ArchiveFolderUseCase', () => {
     expect(result.zipName).toBe('Trip photos.zip');
   });
 
+  it('lists entries in name order whatever order the registry holds them in', async () => {
+    const shuffled = [
+      FOLDER,
+      entry({ id: 'c', name: 'c.jpg', parent: 'Trip photos' }),
+      entry({ id: 'a', name: 'a.jpg', parent: 'Trip photos' }),
+      entry({ id: 'B', name: 'B.jpg', parent: 'Trip photos' }),
+    ];
+    const { usecase, archiver } = build({ list: shuffled });
+    await usecase.execute('folder-1');
+    // Code-point order, so a restart's different scan order cannot change the bytes.
+    expect(archiver.stream).toHaveBeenCalledWith('/safe/Trip photos', ['B.jpg', 'a.jpg', 'c.jpg']);
+  });
+
   it('404s an unknown id', async () => {
     const { usecase } = build();
     await expect(usecase.execute('nope')).rejects.toMatchObject({ statusCode: 404 });

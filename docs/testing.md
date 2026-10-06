@@ -98,16 +98,16 @@ The exceptions are an explicit allowlist, each with its reason:
 
 `browser/routes.spec.ts` reads `client/src/app/App.tsx` **as text** and fails if any `<Route path>` there has no journey tagged with it. A journey declares its routes with `routes('/edda', '/edda/:slug')`, written literally so the check can read them. **A new page fails CI until it has a journey.**
 
-### Known bugs the net pins
+### When the net finds a bug
 
-32a changes no product code, so bugs found while writing it are reported, not fixed:
+A bug the net finds that is out of the current PR's scope is never skipped:
 
-- **Deterministic ones are pinned** with `test.fail(...)` and a comment. Each pin turns red the day its bug is fixed, so it cannot outlive the bug.
-- **Racy ones are worked around**, again with a comment naming the bug, because a pin on a flaky failure would flake itself:
-  - `openSettled` waits for a live list's own fetch to finish before triggering an event;
-  - the folder journeys take a server of their own.
+- **A deterministic one is pinned** with `test.fail(...)` and a comment naming it. The pin turns red the day the bug is fixed, so it cannot outlive the bug.
+- **A racy one is worked around** with a comment naming it, because a pin on a flaky failure would flake itself.
 
-They are listed in `progress.md` (PLAN-32a entry).
+When the fix lands, the pin or workaround comes out in the same PR. The test then exercises the fixed path and catches a regression.
+
+All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
 
 ## The old-vs-new API diff
 
@@ -127,7 +127,7 @@ Base and candidate then run **one at a time, on the same port, with the same ses
 - all sorts × orders × filters;
 - legacy and `paged=true`, with cursors walked to the end;
 - every record by slug and by stale slug;
-- raw endpoints and `?download`;
+- raw endpoints, `?download`, and file content both as an attachment and `?inline=1` (a browser preview's headers);
 - admin reads with and without a session.
 
 For each request it compares the status, `content-type`, `location`, `content-disposition`, `access-control-allow-origin` and **the body bytes**. A zip is compared by its sorted entries (name, CRC-32, size), because a folder archive lists its files in the watcher's boot-scan order, which can differ between two boots of the same build.

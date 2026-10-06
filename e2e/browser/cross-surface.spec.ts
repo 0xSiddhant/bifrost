@@ -3,7 +3,7 @@ import path from 'node:path';
 import { test, expect } from '../support/fixtures.js';
 import { cliHome, runCli, type CliHome } from '../support/cli-install.js';
 import { routes } from '../support/journey.js';
-import { openHermes, openReceive, typeIntoEditor } from '../support/ui.js';
+import { typeIntoEditor, waitForLive } from '../support/ui.js';
 
 /**
  * Cross-surface journeys: the installed CLI only triggers, and the assertion
@@ -28,7 +28,8 @@ test.describe('cross-surface', () => {
     routes('/downloads'),
     async ({ page, server }) => {
       const folder = `FromCli${Date.now().toString(36)}`;
-      await openReceive(page, '/downloads');
+      await page.goto('/downloads');
+      await waitForLive(page);
       fs.writeFileSync(path.join(home.dir, 'log.txt'), 'pushed from a terminal');
       const run = await bifrost(server.baseUrl, [
         'push',
@@ -70,7 +71,8 @@ test.describe('cross-surface', () => {
     async ({ server, newDevice }) => {
       const text = `from the terminal ${Date.now().toString(36)}`;
       const deviceB = await newDevice();
-      await openHermes(deviceB);
+      await deviceB.goto('/hermes');
+      await waitForLive(deviceB);
       const run = await bifrost(server.baseUrl, ['clip', text]);
       expect(run.code, run.stderr).toBe(0);
       await expect(deviceB.locator('.clip-entry').filter({ hasText: text })).toBeVisible();
