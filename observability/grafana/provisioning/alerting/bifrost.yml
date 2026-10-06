@@ -101,3 +101,50 @@ groups:
                 - evaluator:
                     type: gt
                     params: [100]
+
+      # PLAN-32: the response contract guard in `fallback` mode. A mismatch
+      # means a route's schema would have changed what a client receives; the
+      # client still got the original bytes, but the schema is wrong. One line
+      # is enough to act on, so there is no threshold and no `for`. Deleted with
+      # fallback mode itself, after one release with no such line.
+      - uid: bifrost-contract-mismatch
+        title: Bifrost contract mismatch
+        condition: THRESHOLD
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        annotations:
+          summary: >-
+            A response schema disagreed with what its handler sent. The line
+            names the route, method, status and the JSON pointer of the first
+            difference (never the values). Fix that route's schema, then run
+            its tests: they run the guard in strict mode.
+        labels:
+          severity: warning
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: bifrost-loki
+            model:
+              refId: QUERY
+              expr: sum(count_over_time({job="bifrost", logLevel="warn"} | json | msg="contract mismatch" [15m]))
+              queryType: range
+          - refId: REDUCE
+            datasourceUid: __expr__
+            model:
+              refId: REDUCE
+              type: reduce
+              reducer: last
+              expression: QUERY
+          - refId: THRESHOLD
+            datasourceUid: __expr__
+            model:
+              refId: THRESHOLD
+              type: threshold
+              expression: REDUCE
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
