@@ -120,14 +120,17 @@ function documentSteps(kind: DocumentKind): Step[] {
       ['name'],
     ],
     [
-      `POST /api/${kind} (1.2 MB)`,
+      // Over the 2048 KB cap, so every build refuses it and nothing is saved.
+      // (Until PLAN-33 a 1.2 MB document was refused too, by Fastify's 1 MiB
+      // default body limit; it now saves, which the 413 path no longer tests.)
+      `POST /api/${kind} (over the cap)`,
       (c) =>
         postEarlyAnswered(
           c.api,
           `/api/${kind}`,
           JSON.stringify({
             content:
-              kind === 'runestone' ? `{"pad":"${'x'.repeat(1_200_000)}"}` : 'x'.repeat(1_200_000),
+              kind === 'runestone' ? `{"pad":"${'x'.repeat(2_100_000)}"}` : 'x'.repeat(2_100_000),
           }),
         ),
     ],

@@ -81,6 +81,18 @@ const KINDS: Kind[] = [
   },
 ];
 
+/** A valid document of each kind, padded to `bytes` bytes of ASCII. */
+function bigDocument(kind: Kind['kind'], bytes: number): string {
+  const wrap: Record<Kind['kind'], [string, string]> = {
+    runestone: ['{"pad":"', '"}'],
+    edda: ['# Big\n\n', '\n'],
+    groot: ['pad: ', '\n'],
+    atlas: ['<?xml version="1.0" encoding="UTF-8"?>\n<pad>', '</pad>\n'],
+  };
+  const [head, tail] = wrap[kind];
+  return `${head}${'x'.repeat(bytes - head.length - tail.length)}${tail}`;
+}
+
 function slugFrom(page: Page, kind: string): string {
   return new URL(page.url()).pathname.replace(`/${kind}/`, '');
 }
@@ -176,6 +188,33 @@ for (const kind of KINDS) {
         await expect(row).toBeHidden();
         const gone = await page.request.get(`${server.baseUrl}${href}`, { maxRedirects: 0 });
         expect(gone.status()).toBe(404);
+      },
+    );
+
+    test(
+      'a 1.5 MB document, imported from a file, saves whole',
+      kind.editorRoutes,
+      async ({ page, server }) => {
+        // Over Fastify's default 1 MiB body limit and under the 2048 KB cap:
+        // refused with a 413 until PLAN-33 sized the route's limit from the cap.
+        await page.goto(`/${kind.kind}`);
+        await page
+          .getByLabel('Document title')
+          .fill(`E2E big ${kind.kind} ${Date.now().toString(36)}`);
+        const big = bigDocument(kind.kind, 1_500_000);
+        await page.locator(`input[type="file"][accept*="${kind.ext}"]`).setInputFiles({
+          name: `big${kind.ext}`,
+          mimeType: kind.mime,
+          buffer: Buffer.from(big),
+        });
+        await page.getByRole('button', { name: 'Save to Pensieve' }).click();
+        await expect(page.getByRole('status').filter({ hasText: kind.created })).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`/${kind.kind}/[a-z0-9-]+$`));
+        const raw = await page.request.get(
+          `${server.baseUrl}/${kind.kind}/api/${slugFrom(page, kind.kind)}`,
+        );
+        expect(raw.status()).toBe(200);
+        expect((await raw.body()).length).toBe(Buffer.byteLength(big));
       },
     );
 

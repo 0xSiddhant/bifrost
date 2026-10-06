@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { bodyTooLargeAs, documentBodyLimit } from '../../../core/http/body-limit.js';
 import {
   corsHeader,
   errorResponses,
@@ -139,6 +140,10 @@ interface ListQuery {
 }
 
 export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRoutesDeps): void {
+  // PLAN-33: a document up to the cap must fit in the body (see body-limit.ts),
+  // and one over Fastify's limit is refused with the usecase's own code.
+  const bodyLimit = documentBodyLimit(deps.maxDocKb);
+  const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   // Part A contract: the client reads the doc-size cap, never hardcodes it.
   app.get(
     '/api/runestone/config',
@@ -176,6 +181,8 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   app.post<{ Body: { name?: string; content: string } }>(
     '/api/runestone',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Save a new JSON document',
@@ -262,6 +269,8 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
     '/api/runestone/:id',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Rename a JSON document or replace its content',

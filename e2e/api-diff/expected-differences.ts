@@ -4,9 +4,7 @@ import type { Difference } from './compare.js';
  * Intended differences between base and candidate, each with the plan that
  * makes it and why. A difference that matches no entry fails the run.
  *
- * PLAN-32 has none: every route must answer byte for byte as it did. PLAN-33's
- * fix for documents over 1 MiB being refused despite the 2048 KB caps is the
- * first expected entry; it is added in that plan's PR, not before.
+ * PLAN-32 had none: every route had to answer byte for byte as it did.
  */
 export interface ExpectedDifference {
   plan: string;
@@ -14,4 +12,15 @@ export interface ExpectedDifference {
   matches(difference: Difference): boolean;
 }
 
-export const EXPECTED_DIFFERENCES: ExpectedDifference[] = [];
+export const EXPECTED_DIFFERENCES: ExpectedDifference[] = [
+  {
+    plan: 'PLAN-33',
+    reason:
+      'A document over its cap is refused by the usecase with the documented ' +
+      "`413 PAYLOAD_TOO_LARGE`, no longer by Fastify's default 1 MiB body limit with " +
+      '`FST_ERR_CTP_BODY_TOO_LARGE`: the document routes size their bodyLimit from the cap.',
+    matches: (difference) =>
+      difference.what === 'body' &&
+      /^POST \/api\/(runestone|edda|groot|atlas) \(over the cap\)/.test(difference.request),
+  },
+];
