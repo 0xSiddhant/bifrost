@@ -107,6 +107,7 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
   }
   for (const path of [
     '/api/heimdall/session',
+    '/api/heimdall/changelog',
     '/api/heimdall/settings',
     '/api/themes/manage',
     '/api/heimdall/uploads',
@@ -199,6 +200,8 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
       add(`/api/downloads/${entry.id}/content`);
     } else {
       add(`/api/downloads/${entry.id}/content`);
+      // `inline=1` swaps the attachment headers for a browser preview's.
+      add(`/api/downloads/${entry.id}/content?inline=1`);
       add(`/api/downloads/${entry.id}/meta`);
       add(`/api/downloads/${entry.id}/archive`);
     }
@@ -207,6 +210,7 @@ export async function discoverCorpus(api: Api, seeded: Seeded | null): Promise<R
   for (const name of ['staged notes.txt', 'Völuspá.md', 'data.json', 'missing.txt']) {
     add(`/api/files/${encodeURIComponent(name)}/preview`);
     add(`/api/files/${encodeURIComponent(name)}/content`);
+    add(`/api/files/${encodeURIComponent(name)}/content?inline=1`);
   }
 
   // Go-links last: following one is a read with a side effect (the hit count).
