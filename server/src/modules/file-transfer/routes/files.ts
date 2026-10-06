@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../../core/http/index.js';
+import { errorResponses } from '../../../core/http/schemas.js';
 import type { IncomingFile, UploadRejectionReason } from '../ports.js';
 import type { UploadFilesUseCase } from '../usecases/upload-files.js';
+import { TAGS, uploadResultSchema, uploadTooLargeResponse } from './schemas.js';
 
 export interface FileRoutesDeps {
   uploadFiles: UploadFilesUseCase;
@@ -33,7 +35,21 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
   app.post<{ Querystring: { folder?: string } }>(
     '/api/files',
     {
-      schema: { querystring: uploadQuerySchema },
+      schema: {
+        tags: TAGS,
+        summary: 'Upload files (multipart/form-data)',
+        description:
+          'Each file part is streamed to tmp and placed under its sanitized name. Without ' +
+          '`folder` the files are staged in uploads/; with it they land in downloads/<folder>/. ' +
+          'A mixed batch is 201 with per-file rejections.',
+        operationId: 'uploadFiles',
+        querystring: uploadQuerySchema,
+        response: {
+          201: uploadResultSchema,
+          413: uploadTooLargeResponse,
+          ...errorResponses(400, 409, 415, 429),
+        },
+      },
       config: {
         rateLimit: { max: deps.rateLimitPerMinute, timeWindow: 60_000 },
       },
@@ -61,17 +77,17 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
           originDeviceId: typeof header === 'string' && header !== '' ? header : null,
         })
         .catch((error) => {
-        // Busboy aborts the whole request past the files cap — surface it as a
-        // clean 413 instead of the generic opaque 500.
-        if ((error as { code?: string }).code === 'FST_FILES_LIMIT') {
-          throw new AppError(
-            `at most ${deps.maxFilesPerUpload} files per upload`,
-            413,
-            'TOO_MANY_FILES',
-          );
-        }
-        throw error;
-      });
+          // Busboy aborts the whole request past the files cap — surface it as a
+          // clean 413 instead of the generic opaque 500.
+          if ((error as { code?: string }).code === 'FST_FILES_LIMIT') {
+            throw new AppError(
+              `at most ${deps.maxFilesPerUpload} files per upload`,
+              413,
+              'TOO_MANY_FILES',
+            );
+          }
+          throw error;
+        });
       if (result.accepted.length === 0 && result.rejected.length === 0) {
         throw new AppError('no files in request', 400, 'BAD_REQUEST');
       }
@@ -96,11 +112,32 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
 
   // The client reads its pre-flight validation limits from here instead of
   // hardcoding values that actually live in .env.
-  app.get('/api/files/config', () => ({
-    maxUploadSizeMb: deps.maxUploadSizeMb,
-    maxFilesPerUpload: deps.maxFilesPerUpload,
-    blockedExtensions: deps.blockedExtensions,
-  }));
+  app.get(
+    '/api/files/config',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The upload limits the client checks before sending',
+        operationId: 'getUploadConfig',
+        response: {
+          200: {
+            type: 'object',
+            required: ['maxUploadSizeMb', 'maxFilesPerUpload', 'blockedExtensions'],
+            properties: {
+              maxUploadSizeMb: { type: 'integer' },
+              maxFilesPerUpload: { type: 'integer' },
+              blockedExtensions: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      maxUploadSizeMb: deps.maxUploadSizeMb,
+      maxFilesPerUpload: deps.maxFilesPerUpload,
+      blockedExtensions: deps.blockedExtensions,
+    }),
+  );
 }
 
 async function* incomingFiles(request: FastifyRequest): AsyncIterable<IncomingFile> {

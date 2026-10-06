@@ -4,15 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'POST /api/files',
-  'GET /api/files/config',
-  'GET /api/downloads',
-  'GET /api/downloads/:id/content',
-  'GET /api/downloads/:id/archive',
-  'POST /api/files/:name/publish',
-  'PATCH /api/files/:name',
-  'DELETE /api/files/:name',
-  'GET /api/files/:name/content',
   'GET /api/downloads/:id/meta',
   'GET /api/files/:name/preview',
   'GET /api/qr/server-url',

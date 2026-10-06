@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ManageUploadsUseCase } from '../usecases/manage-uploads.js';
+import { errorResponses, noContent } from '../../../core/http/schemas.js';
 import { respondWithFile } from './file-response.js';
+import { TAGS, fileContentResponses, publishResultSchema } from './schemas.js';
 
 export interface UploadRoutesDeps {
   manageUploads: ManageUploadsUseCase;
@@ -40,7 +42,15 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
   // Move to downloads/ — the one action that makes a file visible to the LAN.
   app.post<{ Params: { name: string } }>(
     '/api/files/:name/publish',
-    { schema: { params: nameParamSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Move a staged upload into downloads/, offering it to the LAN',
+        operationId: 'publishUpload',
+        params: nameParamSchema,
+        response: { 200: publishResultSchema, ...errorResponses(400, 404, 409) },
+      },
+    },
     (request) => {
       // Attribution only: it decides whose browser skips the banner, and the
       // client can lie about it — see the plan on why that is fine.
@@ -52,13 +62,33 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
 
   app.patch<{ Params: { name: string }; Body: { name: string } }>(
     '/api/files/:name',
-    { schema: { params: nameParamSchema, body: renameBodySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Rename a staged upload',
+        description:
+          'A name the sanitizer would change is refused with 422 and `details.suggestion`, ' +
+          'the name it would have used.',
+        operationId: 'renameUpload',
+        params: nameParamSchema,
+        body: renameBodySchema,
+        response: { 200: publishResultSchema, ...errorResponses(400, 404, 409, 413, 415, 422) },
+      },
+    },
     (request) => deps.manageUploads.rename(request.params.name, request.body.name),
   );
 
   app.delete<{ Params: { name: string } }>(
     '/api/files/:name',
-    { schema: { params: nameParamSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Delete a staged upload',
+        operationId: 'deleteUpload',
+        params: nameParamSchema,
+        response: { 204: noContent, ...errorResponses(400, 404, 409) },
+      },
+    },
     async (request, reply) => {
       await deps.manageUploads.remove(request.params.name);
       return reply.code(204).send();
@@ -68,7 +98,16 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
   // Bytes for the preview (`previews` serves the metadata for the same file).
   app.get<{ Params: { name: string }; Querystring: { inline?: string } }>(
     '/api/files/:name/content',
-    { schema: { params: nameParamSchema, querystring: contentQuerySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: "A staged upload's bytes, with range support",
+        operationId: 'getUploadContent',
+        params: nameParamSchema,
+        querystring: contentQuerySchema,
+        response: fileContentResponses,
+      },
+    },
     async (request, reply) => {
       const { name } = request.params;
       const { size } = await deps.manageUploads.stat(name);

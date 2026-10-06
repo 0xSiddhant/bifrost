@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { DOWNLOAD_ID_PATTERN } from '../../../core/download-id.js';
+import { errorResponses, rawBody } from '../../../core/http/schemas.js';
 import { dispositionFilename, respondWithFile } from './file-response.js';
+import { TAGS, downloadEntrySchema, fileContentResponses } from './schemas.js';
 import type { ArchiveFolderUseCase } from '../usecases/archive-folder.js';
 import type { GetDownloadStreamUseCase } from '../usecases/get-download-stream.js';
 import type { ListDownloadsUseCase } from '../usecases/list-downloads.js';
@@ -31,11 +33,31 @@ const contentSchema = {
 } as const;
 
 export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoutesDeps): void {
-  app.get('/api/downloads', () => deps.listDownloads.execute());
+  app.get(
+    '/api/downloads',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Everything on offer in downloads/, newest first',
+        description: 'One level deep: root files, folders, and the files inside each folder.',
+        operationId: 'listDownloads',
+        response: { 200: { type: 'array', items: downloadEntrySchema } },
+      },
+    },
+    () => deps.listDownloads.execute(),
+  );
 
   app.get<{ Params: { id: string }; Querystring: { inline?: string } }>(
     '/api/downloads/:id/content',
-    { schema: contentSchema },
+    {
+      schema: {
+        tags: TAGS,
+        summary: "A download's bytes, with range support",
+        operationId: 'getDownloadContent',
+        ...contentSchema,
+        response: fileContentResponses,
+      },
+    },
     async (request, reply) => {
       const { id } = request.params;
       const { name, size } = await deps.getDownloadStream.resolve(id);
@@ -52,7 +74,23 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
   // id already resolves to an entry that knows whether it is a folder.
   app.get<{ Params: { id: string } }>(
     '/api/downloads/:id/archive',
-    { schema: { params: idParamsSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: "A folder's files as a zip, streamed",
+        operationId: 'getDownloadArchive',
+        params: idParamsSchema,
+        response: {
+          200: rawBody('application/zip', 'Entries in code-point name order; no content-length', {
+            'content-disposition': {
+              type: 'string',
+              description: '`attachment` with `<folder>.zip`',
+            },
+          }),
+          ...errorResponses(400, 404),
+        },
+      },
+    },
     async (request, reply) => {
       const { stream, zipName } = await deps.archiveFolder.execute(request.params.id);
       return (
