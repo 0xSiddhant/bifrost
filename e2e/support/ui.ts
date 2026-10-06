@@ -46,22 +46,26 @@ const normalised = (text: string): string => text.replace(/\n+/g, '\n').replace(
 
 export async function typeIntoEditor(page: Page, text: string, index = 0): Promise<void> {
   const editor = page.locator('.cm-content').filter({ visible: true }).nth(index);
-  // Select-all is the platform's own shortcut, as a person would press it:
-  // CodeMirror binds ⌘A on Apple devices (the iPhone and iPad profiles too)
-  // and Ctrl+A elsewhere — on CI's WebKit iPhone profile, Ctrl+A selected
-  // nothing and the text was appended to Atlas's starting skeleton.
-  // `fill()` was tried instead and is worse: under Chromium's Android
-  // emulation it sometimes appends rather than replaces.
-  const apple = await page.evaluate(() =>
-    /Mac|iPhone|iPad|iPod/.test(`${navigator.platform} ${navigator.userAgent}`),
-  );
+  // Each engine gets the input method proven on it in CI:
+  // - WebKit (the iPhone profile): `fill()`, which selects the editor's
+  //   content itself. Ctrl+A selected nothing there, and ⌘A then typing left
+  //   the editor empty.
+  // - Chromium: select-all with the keyboard, then typing. `fill()` under
+  //   Chromium's Android emulation sometimes appended instead of replacing
+  //   (1 run in 6), and the page saved the mangled result.
+  // Either way the editor must hold exactly the text, now and a moment later,
+  // or the step is retried — an input slip fails here, not three steps on.
+  const webkit = page.context().browser()?.browserType().name() === 'webkit';
   for (let attempt = 1; ; attempt += 1) {
-    await editor.click();
-    await page.keyboard.press(apple ? 'Meta+a' : 'Control+a');
-    await page.keyboard.press('Backspace');
-    await page.keyboard.insertText(text);
+    if (webkit) {
+      await editor.fill(text);
+    } else {
+      await editor.click();
+      await page.keyboard.press('ControlOrMeta+a');
+      await page.keyboard.press('Backspace');
+      await page.keyboard.insertText(text);
+    }
     try {
-      // Exactly the text, and still exactly it a moment later.
       await expect
         .poll(async () => normalised(await editor.innerText()), { timeout: 2_000 })
         .toBe(normalised(text));
