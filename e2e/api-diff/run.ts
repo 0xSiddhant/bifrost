@@ -26,6 +26,7 @@ import { REPO_ROOT } from '../support/paths.js';
 import { E2E_PIN, startServer, type E2EServer } from '../support/server.js';
 import { compareRuns, type Captured, type Difference } from './compare.js';
 import { discoverCorpus, EXCLUDED, replay, type ReadRequest } from './corpus.js';
+import { readSpec, uncoveredReads } from './corpus-check.js';
 import { EXPECTED_DIFFERENCES } from './expected-differences.js';
 import { seed, settle, type Seeded } from './seed.js';
 import {
@@ -192,6 +193,27 @@ async function main(): Promise<number> {
       baseRun.corpus,
       !readsOnly,
     );
+
+    // Seeded runs only: the seed is built to reach every read route, while a
+    // snapshot of someone's data may simply hold no folder or no go-link.
+    if (!readsOnly) {
+      const spec = readSpec(path.join(candidate.buildRoot, 'server', 'openapi.json'));
+      if (spec) {
+        const gaps = uncoveredReads(
+          spec,
+          baseRun.corpus.map((request) => request.path),
+          EXCLUDED.map((entry) => entry.path.replace(/:(\w+)/g, '{$1}')),
+        );
+        if (gaps.length > 0) {
+          log(`✗ the corpus never reads ${gaps.length} GET route(s) in openapi.json:`);
+          for (const gap of gaps) log(`  - GET ${gap}`);
+          return 1;
+        }
+        log('  corpus check: every GET in openapi.json is read or excluded');
+      } else {
+        log('  corpus check skipped: the candidate has no server/openapi.json');
+      }
+    }
 
     const all = [
       ...compareRuns(baseRun.reads, candidateRun.reads),
