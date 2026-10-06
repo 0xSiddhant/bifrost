@@ -11172,6 +11172,12 @@
     },
     "/api/portkey": {
       "get": {
+        "operationId": "listPortkeys",
+        "summary": "List go-links",
+        "tags": [
+          "portkey"
+        ],
+        "description": "Search with `q`. `paged=true` opts into the keyset envelope (PLAN-31), walked with `cursor`; without it the response is the legacy bare array.",
         "parameters": [
           {
             "schema": {
@@ -11221,11 +11227,183 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Without `paged=true`, the bare array it always was; with it, one keyset page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Without `paged=true`, the bare array it always was; with it, one keyset page",
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "slug",
+                          "url",
+                          "note",
+                          "hits",
+                          "authorDeviceId",
+                          "createdAt",
+                          "lastUsedAt"
+                        ],
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "description": "The memorable word; never changes"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "Normalized absolute http(s) target"
+                          },
+                          "note": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "hits": {
+                            "type": "integer",
+                            "description": "Redirects so far, counted after each hop"
+                          },
+                          "authorDeviceId": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          },
+                          "lastUsedAt": {
+                            "type": [
+                              "null",
+                              "integer"
+                            ],
+                            "description": "null if never used"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "total",
+                        "limit",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "slug",
+                              "url",
+                              "note",
+                              "hits",
+                              "authorDeviceId",
+                              "createdAt",
+                              "lastUsedAt"
+                            ],
+                            "properties": {
+                              "slug": {
+                                "type": "string",
+                                "description": "The memorable word; never changes"
+                              },
+                              "url": {
+                                "type": "string",
+                                "description": "Normalized absolute http(s) target"
+                              },
+                              "note": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "hits": {
+                                "type": "integer",
+                                "description": "Redirects so far, counted after each hop"
+                              },
+                              "authorDeviceId": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "integer",
+                                "description": "Unix epoch milliseconds"
+                              },
+                              "lastUsedAt": {
+                                "type": [
+                                  "null",
+                                  "integer"
+                                ],
+                                "description": "null if never used"
+                              }
+                            }
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the filters, across every page"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "The page size the server used"
+                        },
+                        "nextCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "Opaque; null when there is nothing after the last row"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "post": {
+        "operationId": "createPortkey",
+        "summary": "Create a go-link: /go/<slug> → url",
+        "tags": [
+          "portkey"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -11258,14 +11436,212 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "slug",
+                    "url",
+                    "note",
+                    "hits",
+                    "authorDeviceId",
+                    "createdAt",
+                    "lastUsedAt"
+                  ],
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "The memorable word; never changes"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Normalized absolute http(s) target"
+                    },
+                    "note": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "hits": {
+                      "type": "integer",
+                      "description": "Redirects so far, counted after each hop"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    },
+                    "lastUsedAt": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ],
+                      "description": "null if never used"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with something that already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflicts with something that already exists",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Well-formed but refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Well-formed but refused",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/portkey/{slug}": {
       "patch": {
+        "operationId": "updatePortkey",
+        "summary": "Change a go-link's target or note",
+        "tags": [
+          "portkey"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -11303,11 +11679,209 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "slug",
+                    "url",
+                    "note",
+                    "hits",
+                    "authorDeviceId",
+                    "createdAt",
+                    "lastUsedAt"
+                  ],
+                  "properties": {
+                    "slug": {
+                      "type": "string",
+                      "description": "The memorable word; never changes"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Normalized absolute http(s) target"
+                    },
+                    "note": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "hits": {
+                      "type": "integer",
+                      "description": "Redirects so far, counted after each hop"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    },
+                    "lastUsedAt": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ],
+                      "description": "null if never used"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Well-formed but refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Well-formed but refused",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "delete": {
+        "operationId": "deletePortkey",
+        "summary": "Delete a go-link",
+        "tags": [
+          "portkey"
+        ],
         "parameters": [
           {
             "schema": {
@@ -11321,14 +11895,76 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/go/{slug}": {
       "get": {
+        "operationId": "followPortkey",
+        "summary": "Follow a go-link",
+        "tags": [
+          "portkey"
+        ],
+        "description": "A known slug redirects to its target (`cache-control: no-store`, so a changed target takes effect at once). An unknown one redirects to `/portkey?go=<slug>` to create it.",
         "parameters": [
           {
             "schema": {
@@ -11342,8 +11978,49 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "302": {
+            "description": "To the target, or to the create form for an unknown slug",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "cache-control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "`no-store` on a known slug"
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
