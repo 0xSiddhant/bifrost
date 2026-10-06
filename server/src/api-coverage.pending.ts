@@ -4,9 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'GET /api/presence',
-  'POST /api/presence/prune',
-  'PATCH /api/presence/name',
   'GET /api/heimdall/audit',
   'GET /api/loki/config',
   'PATCH /api/loki/settings',

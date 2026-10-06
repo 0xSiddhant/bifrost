@@ -4332,24 +4332,241 @@
     },
     "/api/presence": {
       "get": {
+        "operationId": "listPresence",
+        "summary": "Every known device, online first, then most recently seen",
+        "tags": [
+          "presence"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "devices"
+                  ],
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "deviceId",
+                          "name",
+                          "charName",
+                          "label",
+                          "online",
+                          "lastSeen"
+                        ],
+                        "properties": {
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The friendly name the device claimed"
+                          },
+                          "charName": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The auto-assigned alias, the default display name"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "From the user agent, e.g. \"iPhone · Safari\""
+                          },
+                          "online": {
+                            "type": "boolean",
+                            "description": "Holds an open event stream right now"
+                          },
+                          "lastSeen": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/presence/prune": {
       "post": {
+        "operationId": "prunePresence",
+        "summary": "Forget devices offline for more than 7 days",
+        "tags": [
+          "presence"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "removed",
+                    "devices"
+                  ],
+                  "properties": {
+                    "removed": {
+                      "type": "integer"
+                    },
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "deviceId",
+                          "name",
+                          "charName",
+                          "label",
+                          "online",
+                          "lastSeen"
+                        ],
+                        "properties": {
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The friendly name the device claimed"
+                          },
+                          "charName": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The auto-assigned alias, the default display name"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "From the user agent, e.g. \"iPhone · Safari\""
+                          },
+                          "online": {
+                            "type": "boolean",
+                            "description": "Holds an open event stream right now"
+                          },
+                          "lastSeen": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/presence/name": {
       "patch": {
+        "operationId": "claimDeviceName",
+        "summary": "Claim (or clear, with null) a friendly name for a device",
+        "tags": [
+          "presence"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4380,7 +4597,176 @@
         },
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "devices"
+                  ],
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "deviceId",
+                          "name",
+                          "charName",
+                          "label",
+                          "online",
+                          "lastSeen"
+                        ],
+                        "properties": {
+                          "deviceId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The friendly name the device claimed"
+                          },
+                          "charName": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The auto-assigned alias, the default display name"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "From the user agent, e.g. \"iPhone · Safari\""
+                          },
+                          "online": {
+                            "type": "boolean",
+                            "description": "Holds an open event stream right now"
+                          },
+                          "lastSeen": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
