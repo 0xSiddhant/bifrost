@@ -50,14 +50,18 @@ test.describe('hermes', () => {
     routes('/hermes'),
     async ({ page, server }) => {
       // Expiry is the server's clock, not the page's — so this waits out a real
-      // one-second TTL (set through the API, as `bifrost clip --ttl` does)
-      // rather than faking time in the browser, which the server never sees.
+      // TTL (set through the API, as `bifrost clip --ttl` does) rather than
+      // faking time in the browser, which the server never sees. The TTL must
+      // outlast a slow page load: at one second, CI's first list arrived after
+      // the entry had already expired. So the wait is measured from the post.
+      const TTL_SECONDS = 5;
       const text = `self-destructing ${Date.now().toString(36)}`;
-      await new Api(server.baseUrl).post('/api/clipboard', { text, ttlSeconds: 1 });
+      const postedAt = Date.now();
+      await new Api(server.baseUrl).post('/api/clipboard', { text, ttlSeconds: TTL_SECONDS });
       await page.goto('/hermes');
       const entry = page.locator('.clip-entry').filter({ hasText: text });
       await expect(entry).toBeVisible();
-      await page.waitForTimeout(1_200);
+      await page.waitForTimeout(Math.max(0, postedAt + TTL_SECONDS * 1_000 + 300 - Date.now()));
       await page.reload();
       await expect(page.getByRole('heading', { name: 'Hermes' })).toBeVisible();
       await expect(entry).toBeHidden();

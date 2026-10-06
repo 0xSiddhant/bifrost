@@ -78,6 +78,66 @@ export const CONNECTION_LOSS: AllowEntry = {
     (v.kind === 'console.error' && /^Error: Unable to preload CSS for /.test(v.detail)),
 };
 
+/**
+ * WebKit's report of a same-origin request cut off by the page navigating
+ * away. Chromium drops such a request silently; WebKit rejects its `fetch`
+ * (or dynamic `import()`) promise in the old document first, which surfaces as
+ * a page error ("Fetch API cannot load … due to access control checks") or a
+ * console line ("Importing a module script failed"). For a loopback URL that
+ * text cannot be a real CORS failure: every request here is same-origin.
+ *
+ * Shape alone is not enough to allow it — the same words would describe a
+ * chunk that really failed to load — so `NavigationCancels` allows one only
+ * when the same page starts a navigation (or closes) within
+ * `NAVIGATION_CANCEL_WINDOW_MS` of it.
+ */
+const LOOPBACK_FETCH_CANCEL =
+  /Fetch API cannot load https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/].* due to access control checks/;
+
+export function isNavigationCancelShaped(violation: Violation): boolean {
+  if (violation.kind !== 'pageerror' && violation.kind !== 'console.error') return false;
+  return (
+    LOOPBACK_FETCH_CANCEL.test(violation.detail) ||
+    /^TypeError: Importing a module script failed\.$/.test(violation.detail)
+  );
+}
+
+export const NAVIGATION_CANCEL_WINDOW_MS = 3_000;
+
+/**
+ * Holds navigation-cancel-shaped violations per page until it is known whether
+ * a navigation explains them. The order differs by engine and timing — the
+ * rejection can land just before or just after the navigation starts — so
+ * both are checked: a violation shortly after a navigation is dropped at
+ * once, one shortly before is dropped when the navigation comes. Whatever is
+ * still held at the end is a real violation.
+ */
+export class NavigationCancels<PageKey extends object> {
+  private readonly lastNavigation = new WeakMap<PageKey, number>();
+  private held: { page: PageKey; at: number; violation: Violation }[] = [];
+
+  /** True when the violation is explained already (and so is not held). */
+  offer(page: PageKey, violation: Violation, now: number): boolean {
+    const last = this.lastNavigation.get(page);
+    if (last !== undefined && now - last <= NAVIGATION_CANCEL_WINDOW_MS) return true;
+    this.held.push({ page, at: now, violation });
+    return false;
+  }
+
+  /** The page started a navigation or closed: it cancels what it had in flight. */
+  navigated(page: PageKey, now: number): void {
+    this.lastNavigation.set(page, now);
+    this.held = this.held.filter(
+      (entry) => entry.page !== page || now - entry.at > NAVIGATION_CANCEL_WINDOW_MS,
+    );
+  }
+
+  /** What no navigation explained. */
+  unexplained(): Violation[] {
+    return this.held.map((entry) => entry.violation);
+  }
+}
+
 export function isAllowed(violation: Violation, allowlist: AllowEntry[] = ALLOWLIST): boolean {
   return allowlist.some((entry) => entry.matches(violation));
 }
