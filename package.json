@@ -32,6 +32,7 @@
     "backup:status": "sh scripts/backup-agent.sh status",
     "backup:run": "sh scripts/backup-agent.sh run",
     "test:resilience": "tsx scripts/resilience.ts",
+    "api:spec": "tsx scripts/gen-openapi.ts",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",

@@ -193,10 +193,33 @@ export async function createApp(
     logger.info({ module: mod.name }, 'module loaded');
   }
 
-  fastify.get('/api/capabilities', () => ({
-    profile: config.profile,
-    modules: modules.map((mod) => mod.name),
-  }));
+  fastify.get(
+    '/api/capabilities',
+    {
+      schema: {
+        tags: ['core'],
+        summary: 'The deployment profile and the modules it loaded',
+        description:
+          'The client builds its navigation from this: a module absent here has no routes ' +
+          'on this hub.',
+        operationId: 'getCapabilities',
+        response: {
+          200: {
+            type: 'object',
+            required: ['profile', 'modules'],
+            properties: {
+              profile: { type: 'string', enum: ['local', 'cloud'] },
+              modules: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      profile: config.profile,
+      modules: modules.map((mod) => mod.name),
+    }),
+  );
 
   let closed = false;
   const shutdown = async (reason = 'unspecified'): Promise<void> => {

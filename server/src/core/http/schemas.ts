@@ -39,7 +39,10 @@ const ERROR_DESCRIPTIONS: Record<number, string> = {
 /** `errorResponses(400, 404)` → the shared envelope under each status, with a description. */
 export function errorResponses<const C extends number>(...codes: C[]) {
   return Object.fromEntries(
-    codes.map((code) => [code, { description: ERROR_DESCRIPTIONS[code] ?? 'Error', ...errorResponseSchema }]),
+    codes.map((code) => [
+      code,
+      { description: ERROR_DESCRIPTIONS[code] ?? 'Error', ...errorResponseSchema },
+    ]),
   ) as Record<C, typeof errorResponseSchema & { description: string }>;
 }
 
@@ -54,3 +57,20 @@ export function redirect(description: string) {
     headers: { location: { type: 'string', description: 'Where the resource now lives' } },
   } as const;
 }
+
+/**
+ * A body sent as a string or stream (raw document text, an archive): no
+ * serializer runs, so the schema only names the media type for the spec.
+ */
+export function rawBody(mediaType: string, description: string, headers?: Record<string, object>) {
+  return {
+    description,
+    content: { [mediaType]: { schema: { type: 'string' } } },
+    ...(headers ? { headers } : {}),
+  };
+}
+
+/** The wide-open CORS header the public raw-document endpoints send. */
+export const corsHeader = {
+  'access-control-allow-origin': { type: 'string', description: 'Always `*`' },
+} as const;
