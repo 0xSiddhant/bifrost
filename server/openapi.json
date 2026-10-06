@@ -4773,6 +4773,11 @@
     },
     "/api/heimdall/audit": {
       "get": {
+        "operationId": "listAudit",
+        "summary": "The audit history, newest first, filterable by event and time",
+        "tags": [
+          "audit-log"
+        ],
         "parameters": [
           {
             "schema": {
@@ -4821,9 +4826,140 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "items",
+                    "events"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "description": "Rows matching the filters"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "ts",
+                          "event",
+                          "deviceId",
+                          "ip",
+                          "summary"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "ts": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          },
+                          "event": {
+                            "type": "string",
+                            "description": "A bus event name, e.g. heimdall.login"
+                          },
+                          "deviceId": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "ip": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "summary": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Every distinct event name present, for the filter"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No admin session, or it was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No admin session, or it was revoked",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
