@@ -3889,15 +3889,42 @@
     },
     "/api/atlas/config": {
       "get": {
+        "operationId": "getAtlasConfig",
+        "summary": "The limits the editor must respect",
+        "tags": [
+          "atlas"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "maxDocKb"
+                  ],
+                  "properties": {
+                    "maxDocKb": {
+                      "type": "integer",
+                      "description": "The largest document the server accepts, in KiB"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/atlas": {
       "get": {
+        "operationId": "listAtlasDocs",
+        "summary": "List saved XML documents",
+        "tags": [
+          "atlas"
+        ],
+        "description": "Filter by name (`q`) or author device (`author`) and sort. `paged=true` opts into the offset envelope (PLAN-31); without it the response is the legacy bare array.",
         "parameters": [
           {
             "schema": {
@@ -3971,11 +3998,176 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Without `paged=true`, the bare array it always was; with it, one page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Without `paged=true`, the bare array it always was; with it, one page",
+                  "anyOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "authorDeviceId",
+                          "sizeBytes",
+                          "createdAt",
+                          "modifiedAt"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "slug": {
+                            "type": "string",
+                            "description": "`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301"
+                          },
+                          "authorDeviceId": {
+                            "type": [
+                              "null",
+                              "string"
+                            ],
+                            "description": "The saving device, or null when it was not known"
+                          },
+                          "sizeBytes": {
+                            "type": "integer",
+                            "description": "UTF-8 bytes of the content"
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          },
+                          "modifiedAt": {
+                            "type": "integer",
+                            "description": "Unix epoch milliseconds"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "items",
+                        "total",
+                        "limit",
+                        "offset",
+                        "authors"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "name",
+                              "slug",
+                              "authorDeviceId",
+                              "sizeBytes",
+                              "createdAt",
+                              "modifiedAt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "slug": {
+                                "type": "string",
+                                "description": "`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301"
+                              },
+                              "authorDeviceId": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ],
+                                "description": "The saving device, or null when it was not known"
+                              },
+                              "sizeBytes": {
+                                "type": "integer",
+                                "description": "UTF-8 bytes of the content"
+                              },
+                              "createdAt": {
+                                "type": "integer",
+                                "description": "Unix epoch milliseconds"
+                              },
+                              "modifiedAt": {
+                                "type": "integer",
+                                "description": "Unix epoch milliseconds"
+                              }
+                            }
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "Rows matching the filters, across every page"
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "description": "The page size the server used"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "authors": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Every author device id over the kind's whole table, unfiltered"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "post": {
+        "operationId": "createAtlasDoc",
+        "summary": "Save a new XML document",
+        "tags": [
+          "atlas"
+        ],
+        "description": "An omitted or blank name gets a generated, collision-free one.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4000,14 +4192,156 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "authorDeviceId",
+                    "sizeBytes",
+                    "createdAt",
+                    "modifiedAt",
+                    "content"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The document text exactly as saved"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "The saving device, or null when it was not known"
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "description": "UTF-8 bytes of the content"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    },
+                    "modifiedAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/atlas/api/{slug}": {
       "get": {
+        "operationId": "getAtlasDocRaw",
+        "summary": "The raw document text, as a public data URL",
+        "tags": [
+          "atlas"
+        ],
+        "description": "Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL for other tools. `?download` adds an attachment `content-disposition`.",
         "parameters": [
           {
             "schema": {
@@ -4030,13 +4364,112 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "The stored text, byte for byte",
+            "headers": {
+              "access-control-allow-origin": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Always `*`"
+              },
+              "content-disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "With `?download`: `attachment; filename=\"<name>.xml\"`"
+              }
+            },
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "301": {
+            "description": "A stale slug: the canonical raw URL",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the resource now lives"
+              },
+              "access-control-allow-origin": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Always `*`"
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/atlas/{slug}": {
       "get": {
+        "operationId": "getAtlasDoc",
+        "summary": "Read one XML document by slug",
+        "tags": [
+          "atlas"
+        ],
         "parameters": [
           {
             "schema": {
@@ -4051,13 +4484,138 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "authorDeviceId",
+                    "sizeBytes",
+                    "createdAt",
+                    "modifiedAt",
+                    "content"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The document text exactly as saved"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "The saving device, or null when it was not known"
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "description": "UTF-8 bytes of the content"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    },
+                    "modifiedAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "301": {
+            "description": "A stale slug whose id still matches: the canonical URL",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Where the resource now lives"
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/atlas/{id}": {
       "put": {
+        "operationId": "updateAtlasDoc",
+        "summary": "Rename a XML document or replace its content",
+        "tags": [
+          "atlas"
+        ],
+        "description": "A rename regenerates the slug; links to the old one keep resolving.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4094,11 +4652,180 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "authorDeviceId",
+                    "sizeBytes",
+                    "createdAt",
+                    "modifiedAt",
+                    "content"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string",
+                      "description": "`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301"
+                    },
+                    "content": {
+                      "type": "string",
+                      "description": "The document text exactly as saved"
+                    },
+                    "authorDeviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "The saving device, or null when it was not known"
+                    },
+                    "sizeBytes": {
+                      "type": "integer",
+                      "description": "UTF-8 bytes of the content"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    },
+                    "modifiedAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "delete": {
+        "operationId": "deleteAtlasDoc",
+        "summary": "Delete a XML document",
+        "tags": [
+          "atlas"
+        ],
         "parameters": [
           {
             "schema": {
@@ -4112,8 +4839,64 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
