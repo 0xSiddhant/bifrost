@@ -34,6 +34,14 @@
 - Never serve a type the browser will execute same-origin: `core/http/mime.ts` maps `.html` **and `.svg`** to `text/plain` for both folders.
 - Validate all request bodies/params with Fastify JSON schemas.
 
+## HTTP API (PLAN-32)
+
+- **Every route ships described**: `tags` (its module), a `summary`, a unique `operationId`, a response entry for **every status it can answer** (the shared `errorResponses(...)` envelope for 4xx; a `400` wherever a request schema exists; `415`/`413` on body routes), and `security: [{ adminSession: [] }]` exactly when `requireAdmin` guards it. `api-coverage.test.ts` enforces all of it.
+- **A response schema rewrites bytes**, it is not documentation: Fastify's serializer drops undeclared fields, turns `null` under `string` into `""`, and empties a bare `object`. So nullable fields are type arrays (`['string', 'null']`), free-form objects say `additionalProperties: true`, and properties are listed **in the order the handler builds them**. Server tests run the contract guard in `strict` mode and fail on any byte the schema changed.
+- Strings and streams (raw documents, archives, SSE) are not serialized: describe them with `rawBody(mediaType, …)`. Redirects use `redirect(…)`, empty answers `noContent`.
+- After changing a route, run **`npm run api:spec`** and commit `server/openapi.json`; `npm test` fails while it is stale.
+- A server test builds its app with `createTestApp(overrides)` from `server/src/testing/app.ts`, never `createApp(loadConfig(...))` by hand.
+
 ## Testing
 
 - Vitest. Every usecase gets unit tests (repos mocked via interfaces). Routes tested with `fastify.inject`.

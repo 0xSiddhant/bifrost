@@ -29,15 +29,24 @@ bifrost/
 │   └── assets/                # screenshots for README
 ├── server/
 │   ├── drizzle/               # generated migrations
+│   ├── openapi.json           # GENERATED API description (PLAN-32, `npm run api:spec`); committed,
+│   │                          #   and `openapi.test.ts` fails while it is stale
 │   └── src/
 │       ├── app.ts             # composition root: reads DEPLOY_PROFILE manifest, registers modules
+│       ├── openapi-spec.ts    # builds the spec from the app itself (local profile, scratch storage)
+│       ├── api-coverage.test.ts  # every route described: tags/summary/operationId/responses/security
+│       ├── testing/app.ts     # testConfig/createTestApp: the one way a server test builds an app
+│       │                      #   (required keys, temp storage, contract guard `strict`)
 │       ├── bootstrap.ts       # production entry (always starts; PM2/launchd/Docker/npm start use it)
 │       ├── otel.ts            # OpenTelemetry SDK — loaded via `node --import`, BEFORE the app
 │       │                      #   (ESM hoists, so starting it from app code instruments nothing)
 │       ├── core/              # shared kernel — NEVER imports from modules/
 │       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
+│       │   │                  #   http/: schemas.ts (shared response pieces), contract.ts (the
+│       │   │                  #   response contract guard), openapi.ts (swagger + routeCatalog)
 │       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
 │       │   ├── paging.ts      #   PLAN-31: page-size clamp, keyset cursor codec, envelopes
+│       │   │                  #   (+ their response schemas, PLAN-32)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
 │           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
@@ -157,7 +166,7 @@ bifrost/
 │   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
 │   └── api-diff/              #   TEMPORARY old-vs-new diff (deleted in PLAN-34's final PR)
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
-│                              #   gen-build-info, gen-man, cli-sync (pack + npm install -g,
+│                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,
 │                              #   observability.sh
 ├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
