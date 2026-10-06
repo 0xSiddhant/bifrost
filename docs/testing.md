@@ -138,7 +138,7 @@ Base and candidate then run **one at a time, on the same port, with the same ses
 - all sorts × orders × filters;
 - legacy and `paged=true`, with cursors walked to the end;
 - every record by slug and by stale slug;
-- raw endpoints and `?download`;
+- raw endpoints, `?download`, and file content both as an attachment and `?inline=1` (a browser preview's headers);
 - admin reads with and without a session.
 
 For each request it compares the status, `content-type`, `location`, `content-disposition`, `access-control-allow-origin` and **the body bytes**. A zip is compared by its sorted entries (name, CRC-32, size), because a folder archive lists its files in the watcher's boot-scan order, which can differ between two boots of the same build.
