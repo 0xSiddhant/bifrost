@@ -4,8 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'GET /api/screensaver/config',
-  'PATCH /api/screensaver/settings',
   'GET /api/client-logs/config',
   'POST /api/client-logs',
   'GET /metrics',

@@ -12027,15 +12027,95 @@
     },
     "/api/screensaver/config": {
       "get": {
+        "operationId": "getScreensaverConfig",
+        "summary": "The idle screensaver settings and the bounds the settings form clamps to",
+        "tags": [
+          "screensaver"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "enabled",
+                    "idleSeconds",
+                    "density",
+                    "motion",
+                    "connectLines",
+                    "mouseReactive",
+                    "showQuotes",
+                    "quoteRotateSeconds",
+                    "idleMin",
+                    "idleMax",
+                    "rotateMin",
+                    "rotateMax"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "idleSeconds": {
+                      "type": "integer",
+                      "description": "Idle time before Nótt starts"
+                    },
+                    "density": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "motion": {
+                      "type": "string",
+                      "enum": [
+                        "calm",
+                        "normal",
+                        "lively"
+                      ]
+                    },
+                    "connectLines": {
+                      "type": "boolean"
+                    },
+                    "mouseReactive": {
+                      "type": "boolean"
+                    },
+                    "showQuotes": {
+                      "type": "boolean"
+                    },
+                    "quoteRotateSeconds": {
+                      "type": "integer"
+                    },
+                    "idleMin": {
+                      "type": "integer"
+                    },
+                    "idleMax": {
+                      "type": "integer"
+                    },
+                    "rotateMin": {
+                      "type": "integer"
+                    },
+                    "rotateMax": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/screensaver/settings": {
       "patch": {
+        "operationId": "updateScreensaverSettings",
+        "summary": "Change the screensaver settings; open clients rebind live",
+        "tags": [
+          "screensaver"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -12087,9 +12167,180 @@
             }
           }
         },
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "enabled",
+                    "idleSeconds",
+                    "density",
+                    "motion",
+                    "connectLines",
+                    "mouseReactive",
+                    "showQuotes",
+                    "quoteRotateSeconds"
+                  ],
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "idleSeconds": {
+                      "type": "integer",
+                      "description": "Idle time before Nótt starts"
+                    },
+                    "density": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "motion": {
+                      "type": "string",
+                      "enum": [
+                        "calm",
+                        "normal",
+                        "lively"
+                      ]
+                    },
+                    "connectLines": {
+                      "type": "boolean"
+                    },
+                    "mouseReactive": {
+                      "type": "boolean"
+                    },
+                    "showQuotes": {
+                      "type": "boolean"
+                    },
+                    "quoteRotateSeconds": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No admin session, or it was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No admin session, or it was revoked",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
