@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,6 +38,23 @@ export interface StartServerOptions {
   env?: Record<string, string>;
   /** Leave storage on disk after `stop()` (the caller owns its cleanup). */
   keepStorage?: boolean;
+  /**
+   * PLAN-33's traversal canary: put `STORAGE_ROOT` inside a scratch "jail"
+   * whose other entry is a file of random contents. A path that escapes the
+   * storage root by one level reaches the canary, so its bytes appearing in a
+   * response proves the escape. Ignored when `storageRoot` is given.
+   */
+  canary?: boolean;
+}
+
+export interface Canary {
+  path: string;
+  contents: string;
+}
+
+export interface ExitStatus {
+  code: number | null;
+  signal: NodeJS.Signals | null;
 }
 
 export interface E2EServer {
@@ -48,8 +66,12 @@ export interface E2EServer {
   profile: 'local' | 'cloud';
   /** The active pino file (`current.log` is pino-roll's symlink to it). */
   logFile: string;
+  /** Present when started with `canary: true`. */
+  canary: Canary | null;
   /** Everything the process wrote to stdout/stderr — attached to failure reports. */
   output(): string;
+  /** How the process ended, or null while it runs. */
+  exitStatus(): ExitStatus | null;
   /** SIGTERM, wait for a clean exit, then remove scratch storage unless kept. */
   stop(): Promise<void>;
   /** Stop the process but keep its storage, so `start` can bring it back. */
@@ -95,7 +117,23 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
 
   const profile = options.profile ?? 'local';
   const port = options.port ?? (await freePort());
-  const storageRoot = options.storageRoot ?? scratchDir('bifrost-e2e-storage-');
+  let jail: string | null = null;
+  let canary: Canary | null = null;
+  let storageRoot: string;
+  if (options.storageRoot) {
+    storageRoot = options.storageRoot;
+  } else if (options.canary) {
+    jail = scratchDir('bifrost-e2e-jail-');
+    storageRoot = path.join(jail, 'storage');
+    fs.mkdirSync(storageRoot);
+    canary = {
+      path: path.join(jail, 'canary.txt'),
+      contents: `canary-${crypto.randomBytes(24).toString('hex')}`,
+    };
+    fs.writeFileSync(canary.path, canary.contents);
+  } else {
+    storageRoot = scratchDir('bifrost-e2e-storage-');
+  }
   // Themes are state too (Heimdall uploads and deletes them), and THEMES_DIR's
   // default is the repo's own themes/ — a theme journey would edit the checkout.
   let themesDir = options.themesDir;
@@ -126,6 +164,10 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     cwd: buildRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let exit: ExitStatus | null = null;
+  child.once('exit', (code, signal) => {
+    exit = { code, signal };
   });
   const append = (chunk: Buffer) => {
     output += chunk.toString();
@@ -163,13 +205,15 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     themesDir,
     pin: E2E_PIN,
     profile,
+    canary,
     logFile: path.join(storageRoot, 'logs', 'current.log'),
     output: () => output,
+    exitStatus: () => exit,
     halt,
     async stop() {
       await halt();
       if (!options.keepStorage) {
-        if (!options.storageRoot) fs.rmSync(storageRoot, { recursive: true, force: true });
+        if (!options.storageRoot) fs.rmSync(jail ?? storageRoot, { recursive: true, force: true });
         if (!options.themesDir) fs.rmSync(themesDir, { recursive: true, force: true });
       }
     },
