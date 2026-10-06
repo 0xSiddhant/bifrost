@@ -40,6 +40,7 @@
 - **A response schema rewrites bytes**, it is not documentation: Fastify's serializer drops undeclared fields, turns `null` under `string` into `""`, and empties a bare `object`. So nullable fields are type arrays (`['string', 'null']`), free-form objects say `additionalProperties: true`, and properties are listed **in the order the handler builds them**. Server tests run the contract guard in `strict` mode and fail on any byte the schema changed.
 - Strings and streams (raw documents, archives, SSE) are not serialized: describe them with `rawBody(mediaType, …)`. Redirects use `redirect(…)`, empty answers `noContent`.
 - After changing a route, run **`npm run api:spec`** and commit `server/openapi.json`; `npm test` fails while it is stale.
+- A new route joins the black-box suite on its own: the fuzzer and the security sweep read it from the spec. It needs one success in `e2e/api/contract.e2e.ts` (a `GET` is covered automatically if `seed.ts` can fill its parameters), because the coverage report fails on any operation that never succeeded (PLAN-33).
 - A server test builds its app with `createTestApp(overrides)` from `server/src/testing/app.ts`, never `createApp(loadConfig(...))` by hand.
 
 ## Testing
