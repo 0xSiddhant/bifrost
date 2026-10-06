@@ -43,15 +43,37 @@ export async function press(page: Page, target: Locator): Promise<void> {
  * (default the first) with `text`, as one paste-like insert — some editors
  * open on a starter document.
  */
+/** Editor text compared loosely: CodeMirror renders a blank line as an extra newline. */
+const normalised = (text: string): string => text.replace(/\n+/g, '\n').replace(/\s+$/, '');
+
 export async function typeIntoEditor(page: Page, text: string, index = 0): Promise<void> {
   const editor = page.locator('.cm-content').filter({ visible: true }).nth(index);
-  // fill() selects the editor's whole content itself and inserts the text, as
-  // a paste would. A select-all shortcut depends on the engine and the
-  // emulated platform: on CI's WebKit with an iPhone profile, Ctrl+A selected
-  // nothing, so the text was appended to Atlas's starting skeleton.
-  await editor.fill(text);
-  const firstLine = text.split('\n').find((line) => line.trim() !== '');
-  if (firstLine) await expect(editor).toContainText(firstLine.trim());
+  // Select-all is the platform's own shortcut, as a person would press it:
+  // CodeMirror binds ⌘A on Apple devices (the iPhone and iPad profiles too)
+  // and Ctrl+A elsewhere — on CI's WebKit iPhone profile, Ctrl+A selected
+  // nothing and the text was appended to Atlas's starting skeleton.
+  // `fill()` was tried instead and is worse: under Chromium's Android
+  // emulation it sometimes appends rather than replaces.
+  const apple = await page.evaluate(() =>
+    /Mac|iPhone|iPad|iPod/.test(`${navigator.platform} ${navigator.userAgent}`),
+  );
+  for (let attempt = 1; ; attempt += 1) {
+    await editor.click();
+    await page.keyboard.press(apple ? 'Meta+a' : 'Control+a');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.insertText(text);
+    try {
+      // Exactly the text, and still exactly it a moment later.
+      await expect
+        .poll(async () => normalised(await editor.innerText()), { timeout: 2_000 })
+        .toBe(normalised(text));
+      await page.waitForTimeout(250);
+      expect(normalised(await editor.innerText())).toBe(normalised(text));
+      return;
+    } catch (error) {
+      if (attempt === 3) throw error;
+    }
+  }
 }
 
 /** The text of the page's (first visible) CodeMirror editor. */
