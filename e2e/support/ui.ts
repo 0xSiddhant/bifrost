@@ -92,16 +92,23 @@ export function acceptNextDialog(page: Page): void {
 
 /**
  * Bring a JSON/YAML/XML page's code editor on screen. On a phone those pages
- * can open in Tree (or Table) view, with Code a tap away as it is for a person;
- * Atlas offers the toggle only for a property list, so this waits for
- * whichever of editor or toggle shows up rather than for the toggle itself.
+ * can open in Tree (or Table) view, with Code a tap away as it is for a person.
+ * Atlas offers the toggle only for a property list, judged from a debounced
+ * copy of the buffer: on a reload it flashes up for the plist skeleton the page
+ * starts from, then vanishes once the loaded document is analysed. So a toggle
+ * seen once may be gone by the tap; this retries until the editor shows.
  */
 export async function showCode(page: Page): Promise<void> {
+  const editor = editorText(page);
   const code = page.getByRole('group', { name: 'View mode' }).getByRole('button', { name: 'Code' });
-  await expect(editorText(page).or(code).first()).toBeVisible();
-  if (await editorText(page).isVisible()) return;
-  await press(page, code);
-  await expect(editorText(page)).toBeVisible();
+  await expect(async () => {
+    if (await editor.isVisible()) return;
+    if (await code.isVisible()) {
+      if (isMobile(page)) await code.tap({ timeout: 1_000 });
+      else await code.click({ timeout: 1_000 });
+    }
+    await expect(editor).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
 }
 
 /**
