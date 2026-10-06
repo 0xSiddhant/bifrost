@@ -101,6 +101,7 @@ The exceptions are an explicit allowlist, each with its reason:
 - a request the page aborted itself;
 - the browser's own console line for a 4xx answer;
 - connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose.
+- WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
 
 `browser/guard.spec.ts` proves the guard still fires for each kind.
 

@@ -51,6 +51,11 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 
 Recent activity holds the sessions since the latest release tag, one entry per session. Older sessions, and the full detail behind any entry here (test evidence, live-verify runs, deviations), live in [`history.md`](history.md) — the `context-sync` skill moves entries there at each release.
 
+- 2026-10-06 — **PLAN-32a: CI's first full run fixed** on `feat/plan-32a-e2e-safety-net` (PR #81). Lint, typecheck, build and every unit suite were green; 5 e2e tests failed, 4 of them in WebKit's first-ever run. All were test-side:
+  1. **Hermes TTL** (Chromium + WebKit): a 1 s TTL expired before CI's slower first list arrived. Now 5 s, with the wait measured from the post.
+  2. **Atlas create/save** (WebKit mobile): on CI's WebKit with the iPhone profile, Ctrl+A selected nothing, so the XML was appended to Atlas's starting skeleton and Save stayed disabled. `typeIntoEditor` now uses `fill()`, which selects the editor's content itself, and asserts the first line landed. Probed in Chromium on iPhone, Pixel and desktop profiles: exact replacement.
+  3. **Edda specials and shell deep links** (WebKit): navigation-cancelled same-origin fetches and imports surface as page errors in WebKit. The guard now allows exactly those, only when a navigation by the same page explains them (decisions.md).
+  - Verified locally on Chromium desktop + mobile and cloud: 138 passed. e2e unit tests 36 (4 new for the rule). WebKit cannot launch here, so CI re-checks fixes 2 and 3.
 - 2026-10-06 — **PLAN-32c implemented** on `feat/plan-32c-api-schema-rest`, stacked on 32b (PR #83). **No wire change**, proven again by the strict guard in every server test, the e2e net and the API diff.
   - **The remaining 64 routes described**, one commit per module: file-transfer, previews, qr-tool, themes, heimdall, clipboard, presence, audit-log, loki, brotli, accio, nimbus, portkey (+ `/go`), screensaver, client-logs, metrics, offline-mode. Every admin route declares `adminSecurity` and 401. Every POST/PUT/PATCH declares 400/413/415. Two-shape answers are `anyOf` (upload 413, theme 422). Ranged file content declares 206 and 416.
   - **New integration tests**: `presence.int.test.ts` (a real event stream held open on a listening server) and `qr-tool.int.test.ts` (local and cloud profiles).
