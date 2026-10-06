@@ -12590,9 +12590,22 @@
     },
     "/metrics": {
       "get": {
+        "operationId": "getMetrics",
+        "summary": "Prometheus exposition: live gauges and the request-duration histogram",
+        "tags": [
+          "metrics"
+        ],
+        "description": "Unauthenticated on purpose: Prometheus carries no session, and the endpoint exposes counters and gauges, never content.",
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Prometheus text format, version 0.0.4",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

@@ -1,4 +1,5 @@
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { rawBody } from '../../core/http/schemas.js';
 import type { FeatureModule } from '../../core/module.js';
 import { diskUsage, totalBytes } from '../../core/disk-usage.js';
 import { createMetricsRegistry } from './registry.js';
@@ -92,10 +93,24 @@ export const metricsModule: FeatureModule = {
     // requireAdmin would simply break scraping. This matches the existing LAN
     // trust model — a bearer token from .env is the escape hatch if that
     // changes. It exposes counters and gauges, never any content.
-    app.get('/metrics', async (_request, reply) => {
-      reply.header('content-type', registry.contentType);
-      return registry.scrape();
-    });
+    app.get(
+      '/metrics',
+      {
+        schema: {
+          tags: ['metrics'],
+          summary: 'Prometheus exposition: live gauges and the request-duration histogram',
+          description:
+            'Unauthenticated on purpose: Prometheus carries no session, and the endpoint ' +
+            'exposes counters and gauges, never content.',
+          operationId: 'getMetrics',
+          response: { 200: rawBody('text/plain', 'Prometheus text format, version 0.0.4') },
+        },
+      },
+      async (_request, reply) => {
+        reply.header('content-type', registry.contentType);
+        return registry.scrape();
+      },
+    );
 
     // The latency histogram has to see EVERY route, and a Fastify hook only
     // ever sees the encapsulation context it was added in — each module lives
