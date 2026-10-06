@@ -4,13 +4,6 @@
  * empties the list and deletes this file.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  'GET /api/nimbus/config',
-  'GET /api/nimbus/ping',
-  'GET /api/nimbus/down',
-  'POST /api/nimbus/up',
-  'POST /api/nimbus/release',
-  'POST /api/nimbus/results',
-  'GET /api/nimbus/results',
   'GET /api/portkey',
   'POST /api/portkey',
   'PATCH /api/portkey/:slug',

@@ -10435,24 +10435,88 @@
     },
     "/api/nimbus/config": {
       "get": {
+        "operationId": "getNimbusConfig",
+        "summary": "Test sizes, ping sample count, and whether a test is running now",
+        "tags": [
+          "nimbus"
+        ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "maxTestMb",
+                    "sizes",
+                    "pingSamples",
+                    "busy",
+                    "holder",
+                    "since"
+                  ],
+                  "properties": {
+                    "maxTestMb": {
+                      "type": "integer"
+                    },
+                    "sizes": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "Offered sizes, MB"
+                    },
+                    "pingSamples": {
+                      "type": "integer"
+                    },
+                    "busy": {
+                      "type": "boolean",
+                      "description": "One test at a time on the LAN"
+                    },
+                    "holder": {
+                      "type": [
+                        "null",
+                        "string"
+                      ],
+                      "description": "The device testing, if any"
+                    },
+                    "since": {
+                      "type": [
+                        "null",
+                        "integer"
+                      ],
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/nimbus/ping": {
       "get": {
+        "operationId": "pingNimbus",
+        "summary": "An empty round trip for latency sampling",
+        "tags": [
+          "nimbus"
+        ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "204": {
+            "description": "No content"
           }
         }
       }
     },
     "/api/nimbus/down": {
       "get": {
+        "operationId": "downloadTestPayload",
+        "summary": "Download test: `mb` megabytes of incompressible bytes",
+        "tags": [
+          "nimbus"
+        ],
+        "description": "Takes the LAN-wide test lease; 409 while another device holds it.",
         "parameters": [
           {
             "schema": {
@@ -10474,31 +10538,335 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "The payload, never compressed or cached",
+            "headers": {
+              "x-nimbus-bytes": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "The payload size"
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with something that already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflicts with something that already exists",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/nimbus/up": {
       "post": {
+        "operationId": "uploadTestPayload",
+        "summary": "Upload test: send an application/octet-stream body; the server times it",
+        "tags": [
+          "nimbus"
+        ],
+        "description": "Takes the LAN-wide test lease; 409 while another device holds it.",
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "bytes",
+                    "ms"
+                  ],
+                  "properties": {
+                    "bytes": {
+                      "type": "integer",
+                      "description": "Bytes received"
+                    },
+                    "ms": {
+                      "type": "number",
+                      "description": "Server-side receive time, to 0.01 ms"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with something that already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflicts with something that already exists",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/nimbus/release": {
       "post": {
+        "operationId": "releaseNimbusLease",
+        "summary": "Give up this device's test lease early",
+        "tags": [
+          "nimbus"
+        ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/api/nimbus/results": {
       "post": {
+        "operationId": "saveNimbusResult",
+        "summary": "Record a finished test",
+        "tags": [
+          "nimbus"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -10532,12 +10900,173 @@
           }
         },
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "deviceId",
+                    "downMbps",
+                    "upMbps",
+                    "latencyMs",
+                    "testMb",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "deviceId": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "downMbps": {
+                      "type": "number"
+                    },
+                    "upMbps": {
+                      "type": "number"
+                    },
+                    "latencyMs": {
+                      "type": "number",
+                      "description": "Median ping round trip"
+                    },
+                    "testMb": {
+                      "type": "integer"
+                    },
+                    "createdAt": {
+                      "type": "integer",
+                      "description": "Unix epoch milliseconds"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Over the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Over the size limit",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported media type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Unsupported media type",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Well-formed but refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Well-formed but refused",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       "get": {
+        "operationId": "listNimbusResults",
+        "summary": "Recorded tests, newest first, optionally for one device",
+        "tags": [
+          "nimbus"
+        ],
         "parameters": [
           {
             "schema": {
@@ -10561,7 +11090,82 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "deviceId",
+                      "downMbps",
+                      "upMbps",
+                      "latencyMs",
+                      "testMb",
+                      "createdAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "integer"
+                      },
+                      "deviceId": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "downMbps": {
+                        "type": "number"
+                      },
+                      "upMbps": {
+                        "type": "number"
+                      },
+                      "latencyMs": {
+                        "type": "number",
+                        "description": "Median ping round trip"
+                      },
+                      "testMb": {
+                        "type": "integer"
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "description": "Unix epoch milliseconds"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
