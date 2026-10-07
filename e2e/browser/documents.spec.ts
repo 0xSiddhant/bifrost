@@ -82,15 +82,23 @@ const KINDS: Kind[] = [
 ];
 
 /** A valid document of each kind, padded to `bytes` bytes of ASCII. */
+/**
+ * A valid document of exactly `bytes` ASCII bytes. The filler is prose, with
+ * line breaks where the format allows them: one unbroken 1.5 MB word is
+ * nothing a person writes, and WebKit spends minutes laying it out.
+ */
 function bigDocument(kind: Kind['kind'], bytes: number): string {
-  const wrap: Record<Kind['kind'], [string, string]> = {
-    runestone: ['{"pad":"', '"}'],
-    edda: ['# Big\n\n', '\n'],
-    groot: ['pad: ', '\n'],
-    atlas: ['<?xml version="1.0" encoding="UTF-8"?>\n<pad>', '</pad>\n'],
+  const wrap: Record<Kind['kind'], [string, string, string]> = {
+    runestone: ['{"pad":"', '"}', ' '],
+    edda: ['# Big\n\n', '\n', '\n'],
+    groot: ['pad: ', '\n', ' '],
+    atlas: ['<?xml version="1.0" encoding="UTF-8"?>\n<pad>', '</pad>\n', '\n'],
   };
-  const [head, tail] = wrap[kind];
-  return `${head}${'x'.repeat(bytes - head.length - tail.length)}${tail}`;
+  const [head, tail, lineEnd] = wrap[kind];
+  const line = `${'the bridge holds every word of a long saga '.repeat(2).trimEnd()}${lineEnd}`;
+  const length = bytes - head.length - tail.length;
+  const filler = line.repeat(Math.ceil(length / line.length)).slice(0, length);
+  return `${head}${filler.replace(/\s$/, 'x')}${tail}`;
 }
 
 function slugFrom(page: Page, kind: string): string {
