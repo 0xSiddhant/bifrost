@@ -224,4 +224,4 @@ No new routes. One behaviour fix: `POST`/`PUT` on `/api/{runestone,edda,groot,at
 - [x] A deliberate `server/src` import in a scratch `e2e/api` suite fails `npm run lint`, then is removed (criterion 2)
 
 **CI**
-- [ ] The PR's CI run shows the e2e step green and the API suite's duration (criterion 12) — _pending the PR's first CI run; locally the API suite takes ~30 s_
+- [x] The PR's CI run shows the e2e step green and the API suite's duration (criterion 12) — _CI run 37591644092 on `4aadb19`: e2e step green; the API suite plus its coverage report took 24 s, inside the three-minute budget_
