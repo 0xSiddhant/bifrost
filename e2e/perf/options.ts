@@ -85,7 +85,11 @@ function positive(flag: string, raw: string | undefined): number {
   return value;
 }
 
-export function parseArgs(argv: string[]): RunOptions {
+/**
+ * Paths are resolved against `cwd`: the directory the caller ran npm from
+ * (npm's `INIT_CWD`), not `e2e/`, which `npm run -w e2e` switches to.
+ */
+export function parseArgs(argv: string[], cwd = process.env.INIT_CWD ?? process.cwd()): RunOptions {
   const options: RunOptions = { ...DEFAULTS };
   for (let index = 0; index < argv.length; index += 1) {
     const [flag = '', inline] = (argv[index] ?? '').split(/=(.*)/s, 2) as [
@@ -125,7 +129,7 @@ export function parseArgs(argv: string[]): RunOptions {
         break;
       }
       case '--baseline':
-        options.baseline = path.resolve(value());
+        options.baseline = path.resolve(cwd, value());
         break;
       case '--strict':
         options.strict = true;
@@ -149,7 +153,7 @@ export function parseArgs(argv: string[]): RunOptions {
         break;
       }
       case '--server-dist':
-        options.serverDist = path.resolve(value());
+        options.serverDist = path.resolve(cwd, value());
         break;
       case '--keep':
         options.keep = true;

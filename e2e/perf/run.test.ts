@@ -50,6 +50,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['--baseline', 'r.json']).baseline).toMatch(/\/r\.json$/);
   });
 
+  it('resolves paths from where npm was run, not from e2e/', () => {
+    const options = parseArgs(
+      ['--baseline', 'load-results/a.json', '--server-dist', '../before'],
+      '/home/me/bifrost',
+    );
+    expect(options.baseline).toBe('/home/me/bifrost/load-results/a.json');
+    expect(options.serverDist).toBe('/home/me/before');
+  });
+
   it('refuses a storage root or a port, however spelled (criterion 2)', () => {
     for (const argv of [
       ['--storage-root', '/home/user/bifrost/storage'],

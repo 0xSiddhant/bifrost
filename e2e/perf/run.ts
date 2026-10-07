@@ -73,6 +73,16 @@ function machine(): Machine {
 const log = (line: string) => process.stdout.write(`${line}\n`);
 
 export async function run(options: RunOptions): Promise<number> {
+  // Read before anything runs: a bad path must not cost a whole run.
+  let baseline: RunResult | null = null;
+  if (options.baseline) {
+    try {
+      baseline = readResult(options.baseline);
+    } catch (error) {
+      process.stderr.write(`cannot use --baseline: ${(error as Error).message}\n`);
+      return 2;
+    }
+  }
   const buildRoot = options.serverDist ? buildRootOf(options.serverDist) : REPO_ROOT;
   const env = serverOverrides(options);
   log(`▸ load harness: profile ${options.profile}`);
@@ -163,8 +173,8 @@ export async function run(options: RunOptions): Promise<number> {
   log(`summary: ${JSON.stringify(shown, null, 2)}`);
 
   let flagged = 0;
-  if (options.baseline) {
-    const rows = compareToBaseline(result, readResult(options.baseline));
+  if (options.baseline && baseline) {
+    const rows = compareToBaseline(result, baseline);
     flagged = rows.filter((row) => row.flagged).length;
     log('');
     log(`against ${options.baseline}:`);
