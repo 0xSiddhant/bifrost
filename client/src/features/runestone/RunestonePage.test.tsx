@@ -23,7 +23,7 @@ vi.mock('react-router-dom', () => ({
 
 const wire = vi.hoisted(() => ({
   fetchRunestone: vi.fn(),
-  fetchRunestoneConfig: vi.fn(),
+  RUNESTONE_CONFIG: { maxDocKb: 2048 },
   saveRunestone: vi.fn(),
   updateRunestone: vi.fn(),
 }));
@@ -81,7 +81,6 @@ describe('RunestonePage — New', () => {
     // jsdom's own confirm() is a not-implemented stub; every test says
     // explicitly what the person answered.
     vi.stubGlobal('confirm', vi.fn(() => true));
-    wire.fetchRunestoneConfig.mockResolvedValue({ maxDocKb: 2048 });
     wire.fetchRunestone.mockResolvedValue(DOC);
     params.slug = DOC.slug;
     container = document.createElement('div');

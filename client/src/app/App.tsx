@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { hasCategory, type FeatureCategory } from '../core/features';
+import { hasCategory, needsHubForPath, type FeatureCategory } from '../core/features';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { log } from '../core/log';
@@ -20,6 +20,7 @@ import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { RouteBoundary } from '../core/ui/RouteBoundary';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
+import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
 import { GuideButton } from '../core/guide/GuideButton';
 import { usePublishedBanner } from './usePublishedBanner';
 import { runWarmLoad } from './offlineWarmLoad';
@@ -30,6 +31,21 @@ import { MidgardPage } from './pages/MidgardPage';
 import { OllivandersPage } from './pages/OllivandersPage';
 import { DiagonAlleyPage } from './pages/DiagonAlleyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+
+/**
+ * Standalone's last route (PLAN-35): a server path the container's fallback
+ * handed to the app (`/go/…`, `/api/…`, `/<kind>/api/…`) or a hub-only page
+ * gets the Bifröst sheet; anything else is the ordinary 404.
+ */
+function StandaloneFallback() {
+  const { pathname } = useLocation();
+  return needsHubForPath(pathname) ? <BridgeClosedPage /> : <NotFoundPage />;
+}
+
+/** A route that shows a saved document needs the hub; the standalone site explains instead. */
+function hubRoute(element: ReactNode): ReactNode {
+  return __HUB__ ? element : <BridgeClosedPage />;
+}
 
 /**
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
@@ -49,6 +65,15 @@ interface NavCategory {
   /** The features that put this tab in the nav. */
   category: FeatureCategory;
 }
+
+/** Nótt on the standalone site: the build's baked defaults and the server's bounds. */
+const STANDALONE_SCREENSAVER: ScreensaverConfig = {
+  ...__BIFROST_DEFAULTS__.screensaver,
+  idleMin: 5,
+  idleMax: 3600,
+  rotateMin: 4,
+  rotateMax: 120,
+};
 
 const NAV: NavCategory[] = [
   {
@@ -100,6 +125,11 @@ export function App() {
 
   useEffect(() => {
     if (!isDesktop) return;
+    if (!__HUB__) {
+      // No hub policy to read on the standalone site: the build's own defaults.
+      setScreensaverConfig(STANDALONE_SCREENSAVER);
+      return;
+    }
     let cancelled = false;
     fetchScreensaverConfig()
       .then((cfg) => {
@@ -127,6 +157,8 @@ export function App() {
   const [warmStatus, setWarmStatus] = useState<WarmLoadStatus>(OFF_STATUS);
 
   useEffect(() => {
+    // A static site has nothing to warm against: the toggle is hub-only.
+    if (!__HUB__) return;
     let cancelled = false;
     fetchOfflineModeConfig()
       .then((cfg) => {
@@ -312,7 +344,7 @@ export function App() {
               {/* pre-rename URLs (shipped as "library", then "mimir") */}
               <Route path="/runestone/library" element={<Navigate to="/pensieve?type=runestone" replace />} />
               <Route path="/runestone/mimir" element={<Navigate to="/pensieve?type=runestone" replace />} />
-              <Route path="/runestone/:slug" element={<pages.RunestonePage />} />
+              <Route path="/runestone/:slug" element={hubRoute(<pages.RunestonePage />)} />
               <Route path="/variant" element={<pages.VariantPage />} />
               {/* literal segments beat the :slug param — declared first */}
               <Route path="/edda" element={<pages.EddaPage />} />
@@ -320,16 +352,16 @@ export function App() {
               {/* pre-rename URL (development-only "library") */}
               <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
               <Route path="/edda/preview/:slug" element={<pages.EddaPreviewPage />} />
-              <Route path="/edda/:slug" element={<pages.EddaPage />} />
+              <Route path="/edda/:slug" element={hubRoute(<pages.EddaPage />)} />
               {/* literal segments beat the :slug param — declared first */}
               <Route path="/groot" element={<pages.GrootPage />} />
               <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
               <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
-              <Route path="/groot/:slug" element={<pages.GrootPage />} />
+              <Route path="/groot/:slug" element={hubRoute(<pages.GrootPage />)} />
               <Route path="/atlas" element={<pages.AtlasPage />} />
               <Route path="/atlas/pensieve" element={<Navigate to="/pensieve?type=atlas" replace />} />
               <Route path="/atlas/library" element={<Navigate to="/pensieve?type=atlas" replace />} />
-              <Route path="/atlas/:slug" element={<pages.AtlasPage />} />
+              <Route path="/atlas/:slug" element={hubRoute(<pages.AtlasPage />)} />
               <Route path="/loki" element={<pages.LokiPage />} />
               <Route path="/brotli" element={<pages.BrotliPage />} />
               <Route path="/wardens" element={<pages.WardensPage />} />
@@ -341,10 +373,10 @@ export function App() {
                   or `?source=` for the terminal hand-off) or a saved edda.
                   One component serves both, as EddaPage already does. */}
               <Route path="/saga" element={<pages.SagaPage />} />
-              <Route path="/saga/:slug" element={<pages.SagaPage />} />
+              <Route path="/saga/:slug" element={hubRoute(<pages.SagaPage />)} />
               <Route path="/nimbus" element={<pages.NimbusPage />} />
               <Route path="/portkey" element={<pages.PortkeyPage />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="*" element={__HUB__ ? <NotFoundPage /> : <StandaloneFallback />} />
             </Routes>
           </Suspense>
         </RouteBoundary>
@@ -353,6 +385,8 @@ export function App() {
       {/* Outside <Routes> on purpose: a notification raised on one page must
           survive navigating to another, so it cannot live inside the router. */}
       <NotificationHost />
+      {/* One sheet for every "needs the hub" moment, in either build (PLAN-35). */}
+      <BridgeClosedHost />
 
       {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
           Opened by the gesture/shortcut only (≥768px). */}

@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
+import { hubNavigate } from '../../core/bridge';
 import { useNavigate } from 'react-router-dom';
 import {
   beautifyJs,
@@ -298,7 +299,7 @@ export function LokiPage() {
   const compressWithBrotli = () => {
     saveLokiDraft({ code, mode, rxPattern, rxFlags, rxSubject });
     putBrotliSeed({ text: code, sourceLabel: 'Loki' });
-    void navigate('/brotli');
+    hubNavigate(navigate, '/brotli');
   };
 
   const clearAll = () => {

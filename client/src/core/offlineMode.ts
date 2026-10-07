@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './api';
+import { apiGet, apiSend, hubOnly } from './api';
 
 /**
  * Offline mode (PLAN-22) — the policy half.
@@ -31,10 +31,10 @@ export interface OfflineModeConfig {
  */
 const CONFIG_TIMEOUT_MS = 8_000;
 
-export const fetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
+const hubFetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
   apiGet<OfflineModeConfig>('/api/offline-mode/config', { timeoutMs: CONFIG_TIMEOUT_MS });
 
-export const setOfflineModeTargetEnabled = (
+const hubSetOfflineModeTargetEnabled = (
   id: string,
   enabled: boolean,
 ): Promise<OfflineModeConfig> =>
@@ -64,3 +64,7 @@ export interface WarmLoadStatus {
 }
 
 export const OFF_STATUS: WarmLoadStatus = { state: 'off', loaded: 0, failed: [] };
+
+// Hub-only: on the standalone site each is a stub that makes no request (PLAN-35).
+export const fetchOfflineModeConfig: typeof hubFetchOfflineModeConfig = __HUB__ ? hubFetchOfflineModeConfig : hubOnly('fetchOfflineModeConfig');
+export const setOfflineModeTargetEnabled: typeof hubSetOfflineModeTargetEnabled = __HUB__ ? hubSetOfflineModeTargetEnabled : hubOnly('setOfflineModeTargetEnabled');

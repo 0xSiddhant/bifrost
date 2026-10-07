@@ -108,4 +108,31 @@ export class BifrostEvents {
   }
 }
 
-export const bifrostEvents = new BifrostEvents();
+/** What every page uses: the live stream in the hub build, a silent one standalone. */
+export interface EventsHub {
+  readonly status: SseStatus;
+  connect(): void;
+  on(event: string, listener: EventListener): () => void;
+  onStatus(listener: StatusListener): () => void;
+  close(): void;
+}
+
+/**
+ * The standalone site holds no live connection (PLAN-35): subscriptions are
+ * accepted and simply never fire, and the status stays `closed`. Pages need no
+ * branch of their own, and the real `BifrostEvents`, `EventSource` and all,
+ * is dropped from that bundle.
+ */
+class SilentEvents implements EventsHub {
+  readonly status: SseStatus = 'closed';
+  connect(): void {}
+  on(): () => void {
+    return () => undefined;
+  }
+  onStatus(): () => void {
+    return () => undefined;
+  }
+  close(): void {}
+}
+
+export const bifrostEvents: EventsHub = __HUB__ ? new BifrostEvents() : new SilentEvents();

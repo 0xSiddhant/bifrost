@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type DragEvent,
 } from 'react';
+import { hubNavigate, showBridgeClosed } from '../../core/bridge';
 import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
@@ -26,7 +27,7 @@ import { putBrotliSeed } from '../../core/brotliSeed';
 import { takeGrootSeed } from '../../core/grootSeed';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
-import { ApiError } from '../../core/api';
+import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
@@ -37,10 +38,9 @@ import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchGroot,
-  fetchGrootConfig,
+  GROOT_CONFIG,
   saveGroot,
   updateGroot,
-  type GrootConfig,
 } from '../../core/groot';
 import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
 
@@ -114,31 +114,13 @@ export function GrootPage() {
     window.innerWidth < 768 ? 'tree' : 'code',
   );
   const [docIndex, setDocIndex] = useState(0);
-  const [config, setConfig] = useState<GrootConfig | null>(null);
-  const configRequest = useRef<Promise<GrootConfig | null> | null>(null);
+  // Baked in at build time (PLAN-35): known before the first render.
+  const config = GROOT_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [restorable, setRestorable] = useState<GrootDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const request = fetchGrootConfig();
-    // An import picked before this answers must still be checked against the
-    // cap (found by PLAN-32a's e2e net): it awaits this rather than skipping.
-    configRequest.current = request.catch(() => null);
-    request
-      .then((cfg) => {
-        if (!cancelled) setConfig(cfg);
-      })
-      .catch(() => {
-        // cap check degrades gracefully; the server still enforces it on save
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Load (or fail to find) the document a slug URL names.
   useEffect(() => {
@@ -255,7 +237,7 @@ export function GrootPage() {
   const activeIndex = docCount === 0 ? 0 : Math.min(docIndex, docCount - 1);
   const activeDoc = analysis.documents[activeIndex];
 
-  const maxBytes = config ? config.maxDocKb * 1024 : null;
+  const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
   const dirty =
@@ -288,6 +270,15 @@ export function GrootPage() {
         ok('Saved');
       }
     } catch (error) {
+      if (isHubClosed(error)) {
+        // The sheet already explains; on the standalone site its "Download
+        // instead" is this editor's own export, the local answer to "save".
+        showBridgeClosed({
+          reason: error instanceof HubUnavailableError ? 'standalone' : 'unreachable',
+          download: exportDocument,
+        });
+        return;
+      }
       fail(
         error instanceof ApiError && error.status === 413
           ? 'The server refused it — over the size limit.'
@@ -350,7 +341,7 @@ export function GrootPage() {
   // is derived from — a snapshot 300ms old is not what the user is looking at.
   const compressWithBrotli = () => {
     putBrotliSeed({ text, sourceLabel: 'Groot' });
-    void navigate('/brotli');
+    hubNavigate(navigate, '/brotli');
   };
 
   const clearDocument = () => {
@@ -398,8 +389,7 @@ export function GrootPage() {
   };
 
   const importText = async (name: string, content: string, sizeBytes: number) => {
-    const loaded = config ?? (await configRequest.current);
-    const maxBytes = loaded ? loaded.maxDocKb * 1024 : null;
+    const maxBytes = config.maxDocKb * 1024;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
@@ -505,7 +495,7 @@ export function GrootPage() {
             </p>
             <div className="row">
               <Button onClick={growFromSlug}>Grow it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
+              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=groot')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -538,7 +528,7 @@ export function GrootPage() {
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Growing…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
+          <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=groot')}>
             Pensieve
           </Button>
         </div>
