@@ -44,6 +44,7 @@ Ideas we deliberately deferred. When one is scheduled, promote it into a new num
 | Idea | Notes |
 |---|---|
 | **Standalone client logs → log service** | PLAN-35 leaves the standalone build with a no-op `LogSink`. Add a sink that posts browser errors to a log service running as another container on the same Docker network as the standalone site (never the home hub). One client file plus the service. |
+| **Index the document lists** | PLAN-34's finding (decisions.md, 2026-10-07): every runestone, Edda, Groot and Atlas list reads the whole table, content included, because nothing indexes the sort columns or `author_device_id` and `content` is stored before the summary columns. The paged form scans twice (rows, then the author facet). Measured on 2,000 documents (4-core Xeon): a `(modified_at, id)` index takes the Edda paged list from 43 to 1,363 req/s, a covering index to 1,556; the mixed scenario goes from 130 to 1,181 req/s, and at 200 connections from 45 req/s with 171 timeouts to 1,208 with none, which is what makes `spike` fail today. Choose between per-sort-key indexes (modified, created, size, `lower(name)`), covering indexes, or rebuilding the four tables with `content` last or in its own table. A migration, so it needs the full `test:e2e` and a `test:load` before/after. |
 
 ## Explicitly rejected (do not resurrect without a new decision)
 
