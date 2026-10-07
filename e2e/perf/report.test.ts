@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { MetricsSnapshot } from './metrics.js';
 import {
+  badCount,
   compareToBaseline,
   correctnessFailures,
   formatComparison,
@@ -187,6 +188,15 @@ describe('correctness', () => {
       'bad: 2 timeouts',
       'bad: 3 unexpected statuses (200×10 404×2 503×1)',
     ]);
+  });
+
+  it('counts a 5xx once, though it is also an unexpected status', () => {
+    // The forced-5xx run: every 500 was both, and the table showed twice the count.
+    expect(badCount(scenario('a', { statusCounts: { '500': 7 }, unexpected: 7 }))).toBe(7);
+    expect(
+      badCount(scenario('b', { statusCounts: { '200': 5, '404': 2, '500': 1 }, unexpected: 3 })),
+    ).toBe(3);
+    expect(badCount(scenario('c', { errors: 1, timeouts: 2 }))).toBe(3);
   });
 });
 

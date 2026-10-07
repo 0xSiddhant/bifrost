@@ -69,6 +69,17 @@ export function serverErrors(scenario: ScenarioResult): number {
     .reduce((total, [, count]) => total + count, 0);
 }
 
+/**
+ * Requests that did not get a good, expected answer, each counted once. No
+ * step expects a 5xx, so 5xx responses are already among the unexpected;
+ * `max` keeps them counted even if a step ever did.
+ */
+export function badCount(scenario: ScenarioResult): number {
+  return (
+    scenario.errors + scenario.timeouts + Math.max(scenario.unexpected, serverErrors(scenario))
+  );
+}
+
 /** Why a scenario failed on correctness, one line per reason; empty when it did not. */
 export function correctnessFailures(scenario: ScenarioResult): string[] {
   const failures: string[] = [];
@@ -210,7 +221,7 @@ export function formatScenarios(scenarios: ScenarioResult[]): string {
       fixed(scenario.latencyMs.p99),
       fixed(scenario.latencyMs.max),
       fixed(scenario.bytesPerSecond / 2 ** 20, 2),
-      String(serverErrors(scenario) + scenario.errors + scenario.timeouts + scenario.unexpected),
+      String(badCount(scenario)),
     ]),
   );
 }

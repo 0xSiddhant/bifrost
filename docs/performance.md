@@ -84,7 +84,7 @@ npm run test:load -- --baseline load-results/load-<before timestamp>.json   # af
 git worktree remove --force /tmp/bifrost-before         # git worktree list shows only the main checkout
 ```
 
-Run the two back to back, on an otherwise idle machine, and compare like with like: the same `--contract` and `--log-level`. A build from before PLAN-32b ignores `API_CONTRACT_CHECK`, so compare it against both `off` (the serializer's own effect) and `fallback` (what production pays today).
+Latencies are whole milliseconds, so a ⚠ on a single-digit p50 (1 → 2 ms reads +100%) is one rounding step, not a regression; judge the req/s and the larger latencies. Run the two back to back, on an otherwise idle machine, and compare like with like: the same `--contract` and `--log-level`. A build from before PLAN-32b ignores `API_CONTRACT_CHECK`, so compare it against both `off` (the serializer's own effect) and `fallback` (what production pays today).
 
 ## Why it is not in CI
 

@@ -1,4 +1,4 @@
-import { serverErrors, type ScenarioResult } from '../report.js';
+import { badCount, serverErrors, type ScenarioResult } from '../report.js';
 import { fire, mixedScenario } from '../scenarios.js';
 import type { ProfileDefinition } from './types.js';
 
@@ -9,7 +9,7 @@ export const ERROR_LIMIT = 0.01;
 
 /** Everything that is not a good, expected answer, as a share of the requests. */
 export function badShare(step: ScenarioResult): number {
-  const bad = serverErrors(step) + step.errors + step.timeouts + step.unexpected;
+  const bad = badCount(step);
   return step.requests + step.errors + step.timeouts === 0
     ? 1
     : bad / (step.requests + step.errors + step.timeouts);
