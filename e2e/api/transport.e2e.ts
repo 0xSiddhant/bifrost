@@ -163,7 +163,10 @@ describe('transport', () => {
         expect(server.exitStatus()).toEqual({ code: 0, signal: null });
         release();
         await upload;
-        expect(leftovers()).not.toEqual([]);
+        // Whether the partial is still here is a race the server may win: the
+        // closed connection makes the upload discard its own tmp file. A crash
+        // gets no such chance, so leave its leftover for the sweep to clear.
+        fs.writeFileSync(path.join(tmp, 'left-by-a-crash'), 'partial');
 
         const again = await startServer({
           storageRoot: server.storageRoot,
