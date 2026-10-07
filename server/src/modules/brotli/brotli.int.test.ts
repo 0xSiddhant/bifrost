@@ -3,10 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
-import pino from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp, type RunningApp } from '../../app.js';
-import { loadConfig } from '../../core/config/index.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const MAX_INPUT_MB = 1;
 const MAX_OUTPUT_MB = 4;
@@ -26,17 +25,13 @@ describe('brotli module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-'));
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       // Small caps keep the byte assertions fast; the arithmetic is identical
       // at the shipped 256/512 MB.
       BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
       BROTLI_MAX_OUTPUT_MB: String(MAX_OUTPUT_MB),
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
     await app.fastify.listen({ port: 0, host: '127.0.0.1' });
     const address = app.fastify.server.address();
     origin = typeof address === 'object' && address ? `http://127.0.0.1:${address.port}` : '';
@@ -201,16 +196,11 @@ describe('brotli module on the cloud profile', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-cloud-'));
-    app = await createApp(
-      loadConfig({
-        PORT: '4646',
-        HEIMDALL_PIN: '4321',
-        STORAGE_ROOT: storageRoot,
-        DEPLOY_PROFILE: 'cloud',
-        BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
-      }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    app = await createTestApp({
+      STORAGE_ROOT: storageRoot,
+      DEPLOY_PROFILE: 'cloud',
+      BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
+    });
   }, 30_000);
 
   afterAll(async () => {

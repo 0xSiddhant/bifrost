@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
 import { LEVEL_FORMATTER } from '../../core/logger/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 interface Line {
   logLevel: string;
@@ -40,10 +40,7 @@ describe('metrics snapshots', () => {
   async function boot(env: Record<string, string>, level: pino.Level = 'trace') {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-metrics-'));
     const captured = capture(level);
-    app = await createApp(
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ...env }),
-      { logger: captured.logger },
-    );
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, ...env }, { logger: captured.logger });
     return captured;
   }
 
@@ -152,8 +149,8 @@ describe('prometheus exposition', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-prom-'));
-    app = await createApp(
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' }),
+    app = await createTestApp(
+      { STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' },
       { logger: capture().logger },
     );
   });

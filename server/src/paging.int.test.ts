@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import pino from 'pino';
 import type { InjectOptions } from 'fastify';
-import { loadConfig } from './core/config/index.js';
-import { createApp, type RunningApp } from './app.js';
+import type { RunningApp } from './app.js';
+import { createTestApp } from './testing/app.js';
 
 /**
  * PLAN-31 — the opt-in paged form on the six list endpoints, proved over HTTP
@@ -20,15 +19,11 @@ describe('list paging (PLAN-31)', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-paging-'));
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       LIST_PAGE_SIZE: '3',
       LIST_PAGE_MAX: '5',
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 
   afterAll(async () => {

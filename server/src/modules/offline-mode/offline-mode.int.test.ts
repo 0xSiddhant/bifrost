@@ -4,13 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
 import { EventBus } from '../../core/bus/index.js';
 import { checkpointAndClose, openDb, runMigrations, type DbHandle } from '../../core/db/index.js';
 import type { ModuleDeps } from '../../core/module.js';
 import type { OfflineModeConfig } from '../../core/bus/events.js';
 import { offlineModeModule } from './module.js';
+import { createTestApp } from '../../testing/app.js';
 
 const PIN = '4321';
 
@@ -37,9 +37,7 @@ describe('offline-mode module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-offline-mode-'));
-    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {

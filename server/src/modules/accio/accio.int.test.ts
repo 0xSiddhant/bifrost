@@ -3,11 +3,10 @@ import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
 import type { InjectOptions } from 'fastify';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
 import type { AccioLink } from '../../core/bus/events.js';
+import { createTestApp } from '../../testing/app.js';
 
 describe('accio module', () => {
   let app: RunningApp;
@@ -15,15 +14,11 @@ describe('accio module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-accio-'));
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       // Keep the (unreachable, in tests) title lookup from holding shutdown up.
       ACCIO_TITLE_TIMEOUT_MS: '150',
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 
   afterAll(async () => {
@@ -182,10 +177,7 @@ describe('accio title enrichment', () => {
     siteUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
 
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-accio-title-'));
-    app = await createApp(
-      loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ACCIO_TITLE_TIMEOUT_MS: '500' }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, ACCIO_TITLE_TIMEOUT_MS: '500' });
   });
 
   afterAll(async () => {

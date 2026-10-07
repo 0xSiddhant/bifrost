@@ -1,6 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
-import { pagedQueryProperties } from '../../../core/paging.js';
+import {
+  corsHeader,
+  errorResponses,
+  noContent,
+  rawBody,
+  redirect,
+} from '../../../core/http/schemas.js';
+import { documentListPageSchema, pagedQueryProperties } from '../../../core/paging.js';
 import type {
   DeleteEddaUseCase,
   GetEddaUseCase,
@@ -66,6 +73,73 @@ const idParamsSchema = {
   properties: { id: { type: 'string', minLength: 1, maxLength: 16 } },
 } as const;
 
+// Response shapes (PLAN-32). Properties are listed in the order the repository
+// and usecases build them: the serializer writes schema order, and the
+// contract guard holds every response to the handler's exact bytes.
+const summaryProperties = {
+  id: { type: 'string' },
+  name: { type: 'string' },
+  slug: {
+    type: 'string',
+    description: '`<kebab-name>-<id>`; changes on rename, and a stale slug answers 301',
+  },
+  authorDeviceId: {
+    type: ['string', 'null'],
+    description: 'The saving device, or null when it was not known',
+  },
+  sizeBytes: { type: 'integer', description: 'UTF-8 bytes of the content' },
+  createdAt: { type: 'integer', description: 'Unix epoch milliseconds' },
+  modifiedAt: { type: 'integer', description: 'Unix epoch milliseconds' },
+} as const;
+
+const summarySchema = {
+  type: 'object',
+  required: ['id', 'name', 'slug', 'authorDeviceId', 'sizeBytes', 'createdAt', 'modifiedAt'],
+  properties: summaryProperties,
+} as const;
+
+const recordSchema = {
+  type: 'object',
+  required: [...summarySchema.required, 'content'],
+  properties: {
+    id: summaryProperties.id,
+    name: summaryProperties.name,
+    slug: summaryProperties.slug,
+    content: { type: 'string', description: 'The document text exactly as saved' },
+    authorDeviceId: summaryProperties.authorDeviceId,
+    sizeBytes: summaryProperties.sizeBytes,
+    createdAt: summaryProperties.createdAt,
+    modifiedAt: summaryProperties.modifiedAt,
+  },
+} as const;
+
+const configResponseSchema = {
+  type: 'object',
+  required: ['maxDocKb', 'livePreviewMaxKb'],
+  properties: {
+    maxDocKb: { type: 'integer', description: 'The largest document the server accepts, in KiB' },
+    livePreviewMaxKb: {
+      type: 'integer',
+      description: 'Above this size the editor stops rendering the preview on every keystroke',
+    },
+  },
+} as const;
+
+const listResponseSchema = {
+  description: 'Without `paged=true`, the bare array it always was; with it, one page',
+  anyOf: [{ type: 'array', items: summarySchema }, documentListPageSchema(summarySchema)],
+} as const;
+
+const rawHeaders = {
+  ...corsHeader,
+  'content-disposition': {
+    type: 'string',
+    description: 'With `?download`: `attachment; filename="<name>.md"`',
+  },
+};
+
+const TAGS = ['edda'];
+
 const rawQuerySchema = {
   type: 'object',
   additionalProperties: false,
@@ -101,14 +175,36 @@ function downloadFilename(name: string): string {
 
 export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): void {
   // The client reads the doc-size cap + the live-preview threshold, never hardcodes them.
-  app.get('/api/edda/config', () => ({
-    maxDocKb: deps.maxDocKb,
-    livePreviewMaxKb: deps.livePreviewMaxKb,
-  }));
+  app.get(
+    '/api/edda/config',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The limits the editor must respect',
+        operationId: 'getEddaConfig',
+        response: { 200: configResponseSchema },
+      },
+    },
+    () => ({
+      maxDocKb: deps.maxDocKb,
+      livePreviewMaxKb: deps.livePreviewMaxKb,
+    }),
+  );
 
   app.get<{ Querystring: ListQuery }>(
     '/api/edda',
-    { schema: { querystring: listQuerySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'List saved Markdown documents',
+        description:
+          'Filter by name (`q`) or author device (`author`) and sort. `paged=true` opts into the ' +
+          'offset envelope (PLAN-31); without it the response is the legacy bare array.',
+        operationId: 'listEddas',
+        querystring: listQuerySchema,
+        response: { 200: listResponseSchema, ...errorResponses(400) },
+      },
+    },
     // `paged=true` opts into the envelope (PLAN-31); without it the response
     // is the bare array it always was, so the CLI and scripts are unaffected.
     (request) =>
@@ -117,7 +213,16 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
 
   app.post<{ Body: { name?: string; content: string } }>(
     '/api/edda',
-    { schema: { body: saveBodySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Save a new Markdown document',
+        description: 'An omitted or blank name gets a generated, collision-free one.',
+        operationId: 'createEdda',
+        body: saveBodySchema,
+        response: { 201: recordSchema, ...errorResponses(400, 413, 415) },
+      },
+    },
     async (request, reply) => {
       const record = deps.save.execute({
         name: request.body.name,
@@ -135,7 +240,26 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   // nothing but the document the URL names. `?download=1` → attachment.
   app.get<{ Params: { slug: string }; Querystring: { download?: string } }>(
     '/edda/api/:slug',
-    { schema: { params: slugParamsSchema, querystring: rawQuerySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The raw document text, as a public data URL',
+        description:
+          'Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL ' +
+          'for other tools. `?download` adds an attachment `content-disposition`.',
+        operationId: 'getEddaRaw',
+        params: slugParamsSchema,
+        querystring: rawQuerySchema,
+        response: {
+          200: rawBody('text/markdown', 'The stored text, byte for byte', rawHeaders),
+          301: {
+            ...redirect('A stale slug: the canonical raw URL'),
+            headers: { ...redirect('').headers, ...corsHeader },
+          },
+          ...errorResponses(400, 404),
+        },
+      },
+    },
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       reply.header('access-control-allow-origin', '*');
@@ -158,7 +282,19 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
     '/api/edda/:slug',
-    { schema: { params: slugParamsSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Read one Markdown document by slug',
+        operationId: 'getEdda',
+        params: slugParamsSchema,
+        response: {
+          200: recordSchema,
+          301: redirect('A stale slug whose id still matches: the canonical URL'),
+          ...errorResponses(400, 404),
+        },
+      },
+    },
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       if (!canonical) {
@@ -170,7 +306,17 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
     '/api/edda/:id',
-    { schema: { params: idParamsSchema, body: updateBodySchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Rename a Markdown document or replace its content',
+        description: 'A rename regenerates the slug; links to the old one keep resolving.',
+        operationId: 'updateEdda',
+        params: idParamsSchema,
+        body: updateBodySchema,
+        response: { 200: recordSchema, ...errorResponses(400, 404, 413, 415) },
+      },
+    },
     (request) =>
       deps.update.execute({
         id: request.params.id,
@@ -181,7 +327,15 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
 
   app.delete<{ Params: { id: string } }>(
     '/api/edda/:id',
-    { schema: { params: idParamsSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Delete a Markdown document',
+        operationId: 'deleteEdda',
+        params: idParamsSchema,
+        response: { 204: noContent, ...errorResponses(400, 404) },
+      },
+    },
     async (request, reply) => {
       deps.remove.execute(request.params.id);
       return reply.code(204).send();

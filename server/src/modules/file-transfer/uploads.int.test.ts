@@ -7,9 +7,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 describe('uploads staging actions over HTTP', () => {
   let app: RunningApp;
@@ -27,9 +26,7 @@ describe('uploads staging actions over HTTP', () => {
     downloads = path.join(storageRoot, 'downloads');
     fs.mkdirSync(uploads, { recursive: true });
     fs.mkdirSync(downloads, { recursive: true });
-    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {

@@ -168,10 +168,13 @@ halves of a feature and adding `source="client"` narrows it to the browser.
   `observability/grafana/dashboards/bifrost.json` to keep it provisioned.
 - Change the Grafana admin password (`GF_SECURITY_ADMIN_PASSWORD`) before
   exposing port 3000 anywhere but localhost.
-- Two alert rules ship provisioned (`observability/grafana/provisioning/
-  alerting/`): error rate and event-loop lag. Both query **Loki**, not
-  Prometheus, so they keep meaning something over an archive that backfills —
-  a rule against a scraped series would silently evaluate over holes.
+- Three alert rules ship provisioned (`observability/grafana/provisioning/
+  alerting/`): error rate, event-loop lag, and **contract mismatch** (PLAN-32:
+  any `contract mismatch` line from the response contract guard's `fallback`
+  mode, which means a route's schema is wrong; that rule goes when fallback
+  mode does). All query **Loki**, not Prometheus, so they keep meaning
+  something over an archive that backfills — a rule against a scraped series
+  would silently evaluate over holes.
 - `/metrics` is unauthenticated on the LAN. Prometheus carries no session, so a
   guard would not secure anything, it would just stop the scrape; the endpoint
   exposes counters and gauges, never content.

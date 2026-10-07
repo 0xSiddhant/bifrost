@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const PIN = '4321';
 const BOUNDARY = 'BifrostHeimdallBoundary';
@@ -51,9 +50,7 @@ describe('heimdall auth guard + session', () => {
     // …and one dot-file, which is the OS's, not an upload (criterion 27).
     fs.writeFileSync(path.join(uploads, '.DS_Store'), 'x'.repeat(6144));
 
-    app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {
@@ -206,9 +203,7 @@ describe('heimdall auth guard + session', () => {
 describe('heimdall login rate limit', () => {
   it('locks out after 5 failed attempts', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-rl-');
-    const app = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const app = await createTestApp({ STORAGE_ROOT: storageRoot });
     try {
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const res = await login(app, 'wrong');
@@ -229,9 +224,7 @@ describe('heimdall login rate limit', () => {
 describe('heimdall settings persist across restart', () => {
   it('a persisted shortcut survives a fresh boot', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-persist-');
-    const first = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const first = await createTestApp({ STORAGE_ROOT: storageRoot });
     const { cookie } = await login(first);
     await first.fastify.inject({
       method: 'PATCH',
@@ -241,9 +234,7 @@ describe('heimdall settings persist across restart', () => {
     });
     await first.shutdown();
 
-    const second = await createApp(loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const second = await createTestApp({ STORAGE_ROOT: storageRoot });
     try {
       const access = await second.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
       expect(access.json()).toMatchObject({ shortcut: 'ctrl+alt+k' });

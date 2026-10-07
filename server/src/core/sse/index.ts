@@ -1,5 +1,6 @@
 import type { ServerResponse } from 'node:http';
 import type { FastifyInstance } from 'fastify';
+import { rawBody } from '../http/schemas.js';
 import type { Logger } from '../logger/index.js';
 
 const HEARTBEAT_MS = 25_000;
@@ -23,6 +24,21 @@ export interface ConnectionInfo {
 }
 
 /**
+ * The stream is hijacked, so nothing here serializes or validates: the schema
+ * describes it for the spec. `deviceId` is read leniently from the raw query
+ * (a request schema would start refusing a malformed one with a 400).
+ */
+const eventsRouteSchema = {
+  tags: ['core'],
+  summary: 'The live event stream (Server-Sent Events)',
+  description:
+    'One stream for every module. Pass `?deviceId=` to appear in presence. Each event is ' +
+    '`event: <name>` with a JSON `data:` line; a `: hb` comment every 25 s keeps it open.',
+  operationId: 'streamEvents',
+  response: { 200: rawBody('text/event-stream', 'An endless event stream') },
+};
+
+/**
  * Single SSE endpoint for the whole app (`GET /api/events`). Modules never
  * touch this directly — they emit on the event bus and wiring code decides
  * what gets broadcast. The hub also knows every open connection, which the
@@ -34,7 +50,7 @@ export class SseHub {
   private heartbeat: NodeJS.Timeout | null = null;
 
   register(app: FastifyInstance, log: Logger): void {
-    app.get('/api/events', (request, reply) => {
+    app.get('/api/events', { schema: eventsRouteSchema }, (request, reply) => {
       reply.hijack();
       const res = reply.raw;
       res.writeHead(200, {

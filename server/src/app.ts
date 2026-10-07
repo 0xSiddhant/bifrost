@@ -20,6 +20,7 @@ import { buildHttp } from './core/http/index.js';
 import { AuthService, registerAuth } from './core/auth/index.js';
 import { advertiseMdns, lanIPv4Addresses, type MdnsHandle } from './core/mdns/index.js';
 import { fromRepoRoot } from './core/paths.js';
+import { getBuildInfo } from './core/build-info.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
@@ -168,7 +169,13 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
-  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist'), bus });
+  const fastify = await buildHttp({
+    logger,
+    clientDistDir: fromRepoRoot('client', 'dist'),
+    bus,
+    contractCheck: config.http.contractCheck,
+    apiVersion: getBuildInfo().version,
+  });
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 
@@ -186,10 +193,33 @@ export async function createApp(
     logger.info({ module: mod.name }, 'module loaded');
   }
 
-  fastify.get('/api/capabilities', () => ({
-    profile: config.profile,
-    modules: modules.map((mod) => mod.name),
-  }));
+  fastify.get(
+    '/api/capabilities',
+    {
+      schema: {
+        tags: ['core'],
+        summary: 'The deployment profile and the modules it loaded',
+        description:
+          'The client builds its navigation from this: a module absent here has no routes ' +
+          'on this hub.',
+        operationId: 'getCapabilities',
+        response: {
+          200: {
+            type: 'object',
+            required: ['profile', 'modules'],
+            properties: {
+              profile: { type: 'string', enum: ['local', 'cloud'] },
+              modules: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      profile: config.profile,
+      modules: modules.map((mod) => mod.name),
+    }),
+  );
 
   let closed = false;
   const shutdown = async (reason = 'unspecified'): Promise<void> => {

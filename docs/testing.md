@@ -6,19 +6,30 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 
 **Why tests live in more than one place.** Unit and integration tests sit beside the code they test, in `server/`, `client/` and `cli/`. They import that code directly, run without a build, and come first in CI because they are fast. End-to-end tests live in `e2e/` and are _forbidden_ from importing product code: that rule is what proves they test what actually ships. Merging the two would lose that guarantee.
 
-| Kind                      | Where                                                                 | Command                                 | Needs a build?     | In CI                  |
-| ------------------------- | --------------------------------------------------------------------- | --------------------------------------- | ------------------ | ---------------------- |
-| Unit + integration        | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no                 | yes, before Build      |
-| End-to-end: browser       | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes                | yes, after Build       |
-| End-to-end: installed CLI | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes                | yes, after Build       |
-| Both of the above         |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
-| Old-vs-new API diff       | `e2e/api-diff/`                                                       | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
-| Restart resilience        | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no                 | no (on demand)         |
-| Live verification         | `.claude/skills/live-verify`                                          | the skill                               | yes                | no (manual)            |
+| Kind                       | Where                                                                 | Command                                 | Needs a build?     | In CI                  |
+| -------------------------- | --------------------------------------------------------------------- | --------------------------------------- | ------------------ | ---------------------- |
+| Unit + integration         | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no                 | yes, before Build      |
+| API description is current | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no                 | yes, in `npm test`     |
+| End-to-end: browser        | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes                | yes, after Build       |
+| End-to-end: installed CLI  | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes                | yes, after Build       |
+| Both of the above          |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
+| Old-vs-new API diff        | `e2e/api-diff/`                                                       | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
+| Restart resilience         | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no                 | no (on demand)         |
+| Live verification          | `.claude/skills/live-verify`                                          | the skill                               | yes                | no (manual)            |
 
 ## Unit and integration tests
 
 `npm test` runs every workspace's Vitest suite. Server routes are tested with `fastify.inject`; the CLI's `*.int.test.ts` files spawn a real server from source through `tsx`. None of them needs `dist/`, which is why CI runs them before the build.
+
+A server test builds its app with `createTestApp(overrides)` (`server/src/testing/app.ts`): the four required keys, a fresh temp storage root, a silent logger and the response contract guard in **strict** mode. Pass only the keys the suite cares about; pass `STORAGE_ROOT` yourself to seed files before boot or to restart over the same data.
+
+## Response contracts and the API description (PLAN-32b)
+
+A route's response schema is compiled into its serializer, so a wrong one changes what a client receives without failing anything. Three checks keep schemas honest:
+
+- **The contract guard in strict mode** runs in every server test and every e2e server. A response whose serialized bytes differ from `JSON.stringify` of what the handler returned, a payload that fails the schema, or a status the route does not declare becomes `500 CONTRACT_VIOLATION` and names the route and the JSON pointer. `core/http/contract.test.ts` proves it catches each way a schema rewrites bytes: a dropped field, `null` → `""`/`0`, an emptied object, coercion, key order and an undeclared status.
+- **`server/src/openapi.test.ts`** fails when the committed `server/openapi.json` is stale (`info.version` is ignored) and validates it as OpenAPI 3.1. Fix it with `npm run api:spec`.
+- **`server/src/api-coverage.test.ts`** fails for any route without `tags`, a `summary`, a unique `operationId`, a success entry, a `400` entry where a request schema exists, or with `security` that does not match `requireAdmin`. Until PLAN-32c, `api-coverage.pending.ts` lists the routes not yet described; it can only shrink.
 
 ## The end-to-end safety net (PLAN-32a)
 
@@ -154,9 +165,12 @@ Every worktree, scratch storage and snapshot is removed before the tool exits, p
 
 ## What stays and what is temporary
 
-| Item                                                       | Fate                                                                                          |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `e2e/` browser, cloud and CLI suites, and the CI step      | **Permanent**: the regression net for every later change                                      |
-| `npm run test:api-diff` and `e2e/api-diff/`                | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it |
-| Worktrees, scratch storages and snapshots of each diff run | Removed by the tool at the end of every run                                                   |
-| Probe and spike scripts                                    | Never committed                                                                               |
+| Item                                                                                               | Fate                                                                                             |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `e2e/` browser, cloud and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                         |
+| `npm run test:api-diff` and `e2e/api-diff/`                                                        | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it    |
+| Contract guard `strict` mode, `openapi.json` and its staleness and coverage tests, `createTestApp` | **Permanent**                                                                                    |
+| `server/src/api-coverage.pending.ts` (the ratchet list)                                            | Temporary: emptied and deleted in PLAN-32c                                                       |
+| Contract guard `fallback` mode, its Loki alert, its `.env.example` entry                           | Temporary: deleted after one release with no `contract mismatch` line; the default becomes `off` |
+| Worktrees, scratch storages and snapshots of each diff run                                         | Removed by the tool at the end of every run                                                      |
+| Probe and spike scripts                                                                            | Never committed                                                                                  |

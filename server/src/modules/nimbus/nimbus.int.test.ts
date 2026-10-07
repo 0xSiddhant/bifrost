@@ -3,11 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { gzipSync } from 'node:zlib';
-import pino from 'pino';
 import type { InjectOptions } from 'fastify';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
 import type { NimbusResult } from '../../core/bus/events.js';
+import { createTestApp } from '../../testing/app.js';
 
 const MAX_TEST_MB = 8;
 
@@ -17,16 +16,12 @@ describe('nimbus module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-nimbus-'));
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       // A small ceiling keeps the byte-count assertions fast; the arithmetic is
       // identical at 100 MB.
       NIMBUS_MAX_TEST_MB: String(MAX_TEST_MB),
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 
   afterAll(async () => {

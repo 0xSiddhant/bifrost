@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const BOUNDARY = 'BifrostTestBoundary';
 
@@ -34,15 +33,11 @@ describe('file-transfer over HTTP', () => {
     // Pre-seed downloads/ — the boot scan must reconcile it into the listing.
     fs.mkdirSync(path.join(storageRoot, 'downloads'), { recursive: true });
     fs.writeFileSync(path.join(storageRoot, 'downloads', 'seeded.txt'), 'from the host');
-    const config = loadConfig({
-      DEPLOY_PROFILE: 'local',
-      PORT: '4646',
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       MAX_UPLOAD_SIZE_MB: '1',
       MAX_FILES_PER_UPLOAD: '3',
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
   });
 
   afterAll(async () => {
@@ -229,16 +224,10 @@ describe('file-transfer over HTTP', () => {
   it('rate-limits the upload route per IP with a clean 429', async () => {
     // Separate app: a tiny limit that the other tests' uploads don't consume.
     const limitedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-rl-'));
-    const limited = await createApp(
-      loadConfig({
-        DEPLOY_PROFILE: 'local',
-        PORT: '4646',
-        HEIMDALL_PIN: '4321',
-        STORAGE_ROOT: limitedRoot,
-        UPLOAD_RATE_LIMIT_PER_MIN: '2',
-      }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    const limited = await createTestApp({
+      STORAGE_ROOT: limitedRoot,
+      UPLOAD_RATE_LIMIT_PER_MIN: '2',
+    });
     try {
       const post = () =>
         limited.fastify.inject({

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
+import { testConfig } from '../../testing/app.js';
 import { openDb, checkpointAndClose, type DbHandle } from '../../core/db/index.js';
 import { EventBus } from '../../core/bus/index.js';
 import { SseHub } from '../../core/sse/index.js';
@@ -27,7 +27,7 @@ describe('downloads watcher → bus → sse', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-watch-'));
-    const config = loadConfig({ DEPLOY_PROFILE: 'local', PORT: '4646', HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = testConfig({ STORAGE_ROOT: storageRoot });
     for (const dir of Object.values(config.storage)) {
       if (!dir.endsWith('.db')) fs.mkdirSync(dir, { recursive: true });
     }

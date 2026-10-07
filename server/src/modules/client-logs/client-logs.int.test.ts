@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
 import { LEVEL_FORMATTER } from '../../core/logger/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 /** Everything the app writes, parsed — the point of this module is the output. */
 const written: Record<string, unknown>[] = [];
@@ -31,11 +31,8 @@ describe('client-logs', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-clientlogs-'));
-    app = await createApp(
-      loadConfig({
-        DEPLOY_PROFILE: 'local',
-        PORT: '4646',
-        HEIMDALL_PIN: '4321',
+    app = await createTestApp(
+      {
         STORAGE_ROOT: storageRoot,
         // Small enough that one oversized report trips it, roomy enough that a
         // schema-invalid entry still reaches the schema (the body limit fires
@@ -45,7 +42,7 @@ describe('client-logs', () => {
         // Comfortably above what the tests below spend, so only the flood test
         // at the end trips it — the limit is per IP and every case shares one.
         CLIENT_LOG_RATE_LIMIT_PER_MIN: '20',
-      }),
+      },
       { logger: captureLogger() },
     );
   });
