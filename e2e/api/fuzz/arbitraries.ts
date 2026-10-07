@@ -55,7 +55,7 @@ export type Channel = 'json' | 'url';
 
 /**
  * One code point per unit, so fast-check's lengths are the code-point lengths
- * ajv checks. Weighted towards the cases where fast-json-stringify's escaping
+ * ajv checks (but for two lone surrogates meeting: see stringArbitrary). Weighted towards the cases where fast-json-stringify's escaping
  * could part ways with JSON.stringify — PLAN-32's guard then catches it.
  */
 function units(channel: Channel): fc.Arbitrary<string> {
@@ -117,10 +117,12 @@ function stringArbitrary(schema: JsonSchema, channel: Channel): fc.Arbitrary<str
   if (max <= GENERATED_MAX_LENGTH * 4) {
     edges.push(fc.string({ unit: units(channel), minLength: max, maxLength: max }));
   }
-  return fc.oneof(
-    { weight: 4, arbitrary: any },
-    ...edges.map((arbitrary) => ({ weight: 1, arbitrary })),
-  );
+  // Each unit is one code point, except that a lone high surrogate followed by
+  // a lone low one fuses into a single astral character, one short of the
+  // length fast-check counted. Measure as ajv does, in code points.
+  return fc
+    .oneof({ weight: 4, arbitrary: any }, ...edges.map((arbitrary) => ({ weight: 1, arbitrary })))
+    .filter((value) => lengthOf(value) >= min && lengthOf(value) <= max);
 }
 
 function numberArbitrary(schema: JsonSchema, integer: boolean): fc.Arbitrary<number> {
