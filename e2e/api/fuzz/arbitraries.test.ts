@@ -81,6 +81,15 @@ describe('valid()', () => {
     );
   });
 
+  it('counts length in code points, even when two lone surrogates meet', () => {
+    // '\ud800' then '\udfff' fuse into one astral character: a two-unit string
+    // of one code point, under a minLength of 2 (CI seed 2075279933).
+    const lengths = fc
+      .sample(valid({ type: 'string', minLength: 2, maxLength: 2 }), { numRuns: 5_000, seed: 1 })
+      .map((value) => [...(value as string)].length);
+    expect(new Set(lengths)).toEqual(new Set([2]));
+  });
+
   it('does produce the awkward strings for a JSON body', () => {
     const seen = fc
       .sample(valid({ type: 'string', maxLength: 30 }), { numRuns: 2_000, seed: 7 })

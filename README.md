@@ -173,7 +173,7 @@ to.
 | `npm run test:all`                                             | **Every test, one command:** lint → typecheck → `npm test` → build → `test:e2e` (the same gate CI and the `verify` skill run). See [Testing](#testing)                               |
 | `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                                                                                                       |
 | `npm run test:e2e`                                             | End-to-end: every page in real browsers, the installed CLI, and the black-box API suite, against the build (needs `npm run build`)                                                   |
-| `npm run test:api-diff -- --base <ref>`                        | Old-vs-new API diff: replays every read route against `<ref>` and this build, byte for byte                                                                                          |
+| `npm run test:load [-- --profile <name>]`                      | On-demand load, stress, spike, soak and fan-out runs against the built server ([`docs/performance.md`](docs/performance.md))                                                         |
 
 Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 `scripts/start-launchd.sh`, `scripts/observability.sh`.
@@ -182,7 +182,7 @@ Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,
 
 **One command runs everything:** `npm run test:all` (lint, typecheck, unit + integration tests, build, end-to-end). The first time, install Playwright's browsers once: `cd e2e && npx playwright install chromium webkit`.
 
-Tests live in two kinds of place, on purpose. Unit and integration tests sit **beside the code they test**, in `server/`, `client/` and `cli/`. End-to-end tests live in **`e2e/`** and only ever drive the built app from outside. [`docs/testing.md`](docs/testing.md) is the map: every kind of test, where it lives, how to run and replay one, and what each one protects.
+Tests live in two kinds of place, on purpose. Unit and integration tests sit **beside the code they test**, in `server/`, `client/` and `cli/`. End-to-end tests live in **`e2e/`** and only ever drive the built app from outside. [`docs/testing.md`](docs/testing.md) is the map: every kind of test, where it lives, how to run and replay one, and what each one protects. Load, stress and soak runs are on demand, never in CI: `npm run test:load` ([`docs/performance.md`](docs/performance.md)).
 
 ## Project docs
 
@@ -199,6 +199,7 @@ Operating & deploying:
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 - [`docs/testing.md`](docs/testing.md) — every kind of test, where it lives and how to run it
+- [`docs/performance.md`](docs/performance.md) — the on-demand load harness: profiles, numbers, comparing two builds
 
 ## License
 

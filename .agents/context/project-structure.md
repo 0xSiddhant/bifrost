@@ -8,6 +8,7 @@ bifrost/
 ├── .github/workflows/         # ci.yml (lint/typecheck/test/build + e2e + docker build + backup smoke)
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
+├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
 ├── package.json               # npm workspaces: server, client, cli, e2e
 ├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
 ├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
@@ -167,7 +168,9 @@ bifrost/
 │   ├── browser/               #   journeys 1–18, cross-surface, routes.spec.ts, guard.spec.ts
 │   ├── cloud/                 #   DEPLOY_PROFILE=cloud gating
 │   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
-│   └── api-diff/              #   TEMPORARY old-vs-new diff (deleted in PLAN-34's final PR)
+│   ├── perf/                  #   the load harness, `npm run test:load` (PLAN-34): run.ts, options.ts,
+│   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics), report.ts,
+│   │                          #   profiles/{load,stress,spike,soak,fanout}.ts; never in CI
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
 │                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,

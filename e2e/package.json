@@ -2,7 +2,7 @@
   "name": "@bifrost/e2e",
   "version": "1.4.0",
   "private": true,
-  "description": "End-to-end safety net: the built app in real browsers, the installed CLI, the black-box API suite (PLAN-32a, PLAN-33), and the old-vs-new API diff",
+  "description": "End-to-end safety net: the built app in real browsers, the installed CLI, the black-box API suite (PLAN-32a, PLAN-33), and the on-demand load harness (PLAN-34)",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -11,13 +11,13 @@
     "test:e2e:cli": "vitest run --config vitest.e2e.config.ts",
     "test:e2e:api": "vitest run --config vitest.api.config.ts && tsx api/coverage-report.ts",
     "test:e2e": "npm run test:e2e:cli && npm run test:e2e:api && npm run test:e2e:ui",
-    "test:api-diff": "tsx api-diff/run.ts"
+    "test:load": "tsx perf/run.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/autocannon": "^7.12.7",
     "ajv": "^8.20.0",
-    "better-sqlite3": "^12.11.1",
+    "autocannon": "^8.0.0",
     "fast-check": "^4.10.2",
     "fastify": "^5.12.3",
     "vitest": "^4.1.10"
