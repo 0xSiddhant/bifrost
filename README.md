@@ -172,7 +172,7 @@ to.
 | `npm run test:resilience`                                      | Restart-resilience suite (50 restarts + SIGKILL, integrity-checked; on-demand)                                                                                                       |
 | `npm run test:all`                                             | **Every test, one command:** lint → typecheck → `npm test` → build → `test:e2e` (the same gate CI and the `verify` skill run). See [Testing](#testing)                               |
 | `npm test` / `npm run lint` / `npm run typecheck`              | Quality gates (also run in CI)                                                                                                                                                       |
-| `npm run test:e2e`                                             | End-to-end: every page in real browsers + the installed CLI, against the build (needs `npm run build`)                                                                               |
+| `npm run test:e2e`                                             | End-to-end: every page in real browsers, the installed CLI, and the black-box API suite, against the build (needs `npm run build`)                                                   |
 | `npm run test:api-diff -- --base <ref>`                        | Old-vs-new API diff: replays every read route against `<ref>` and this build, byte for byte                                                                                          |
 
 Convenience shell scripts (macOS service run): `scripts/start-pm2.sh`,

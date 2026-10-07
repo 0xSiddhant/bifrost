@@ -12,7 +12,8 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 | API description is current | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no                 | yes, in `npm test`     |
 | End-to-end: browser        | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes                | yes, after Build       |
 | End-to-end: installed CLI  | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes                | yes, after Build       |
-| Both of the above          |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
+| Black-box API (PLAN-33)    | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes                | yes, after Build       |
+| All three of the above     |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
 | Old-vs-new API diff        | `e2e/api-diff/`                                                       | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
 | Restart resilience         | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no                 | no (on demand)         |
 | Live verification          | `.claude/skills/live-verify`                                          | the skill                               | yes                | no (manual)            |
@@ -46,7 +47,7 @@ An eslint rule bans any import of `server/src`, `client/src` or `cli/src` from `
 ```bash
 npm run build                                  # the e2e suites run against dist/
 cd e2e && npx playwright install chromium webkit && cd ..   # once per Playwright version
-npm run test:e2e                               # CLI suite, then the browser suite
+npm run test:e2e                               # CLI suite, API suite, then the browser suite
 ```
 
 Narrower runs, from `e2e/`:
@@ -120,6 +121,57 @@ When the fix lands, the pin or workaround comes out in the same PR. The test the
 
 All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
 
+## The black-box API suite (PLAN-33)
+
+`e2e/api/` treats the built server as a stranger would: the production entry on a real port, over HTTP, knowing nothing but the committed `server/openapi.json` (read as a file). It runs with `API_CONTRACT_CHECK=strict`, so a response a schema would rewrite is a 500 here. `npm run test:e2e:api -w e2e` runs it, then the **coverage report**: every operation in the spec must have produced a success somewhere in the run, or the step fails.
+
+| File               | What it proves                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `boot.e2e.ts`      | The production entry starts with OpenTelemetry loaded by `--import`, exits 0 on SIGTERM within 10 s, and restarts clean on the same storage                                                                                                                                                                                                               |
+| `transport.e2e.ts` | What `inject` cannot see: the event stream over a socket (two streams, presence on close), a 300 MB streamed upload with flat server memory, `Range` 206/416, a folder zip verified entry by entry, a Brotli round trip, SIGTERM mid-upload with `tmp/` swept on the next boot, JSON 404 vs the SPA, asset types, `HEAD` on every `GET`, keep-alive reuse |
+| `contract.e2e.ts`  | A happy-path journey per tag; every response is validated against `openapi.json`, and every one of its operations succeeds                                                                                                                                                                                                                                |
+| `fuzz.e2e.ts`      | Two seeded properties per operation, generated from its request schemas (see below)                                                                                                                                                                                                                                                                       |
+| `security.e2e.ts`  | Admin guarding, path traversal against a canary, size-limit honesty, rate limits and login lockout, CORS, served-type safety                                                                                                                                                                                                                              |
+
+Every file ends with the same check: every response it received met the spec, and **no body leaked a filesystem path, a stack frame, or the traversal canary**.
+
+### The fuzzer
+
+`fuzz/arbitraries.ts` turns each operation's request schemas into fast-check generators. It covers exactly the keywords the server uses and **throws on any other**, so a schema using `format` or `oneOf` breaks the fuzzer loudly. Strings lean on the escaping edge cases: NUL, U+2028, RTL marks, astral characters, and lone surrogates in JSON bodies. For each operation:
+
+- **valid requests** must never get a 5xx, must get a declared status, and must return a spec-valid body;
+- **invalid requests** each carry one mutation: a dropped required field, a wrong type, one past a bound, a value outside an enum, an unknown property, or a string failing its pattern. When Fastify's own validator refuses one, the answer must be a declared 4xx. "Refuses" is decided by `fuzz/fastify-ajv.ts`, an oracle using Fastify's ajv defaults, which coerce `"7"` to 7 and strip unknown properties. `fastify-ajv.test.ts` checks that oracle against a bare Fastify instance.
+
+`fuzz/hints.ts` keeps it safe:
+
+- Accio URLs only point at a local title sink;
+- Nimbus payloads are small;
+- uploads, Brotli and Nimbus get raw bodies;
+- `login`, `revokeSessions`, `logout` and the event stream are excluded, each with its reason (the contract and security suites cover them).
+
+Depth and replay:
+
+```bash
+FUZZ_RUNS=1000 npm run test:e2e:api -w e2e -- fuzz          # a deep local run (CI uses 40)
+FUZZ_SEED=… FUZZ_OP='…' FUZZ_PATH='…' npm run test:e2e:api -w e2e -- fuzz -t '…'   # printed on any failure
+```
+
+It found two bugs on its first runs, both fixed in PLAN-33:
+
+- path parameters over 100 characters were refused by the router with a 414;
+- a short invalid Brotli input got a 200 that was then cut off mid-body.
+
+The contract suite found a third: the spec described raw JSON documents as a JSON string.
+
+### The security sweep
+
+- **Admin:** it reads the operations from the spec's `security` markers, so a new admin route joins it automatically.
+  - Each one must answer `401 UNAUTHORIZED` with no cookie, with a tampered cookie, and with a cookie from before `/revoke`. The requests are generated from the operation's own schemas, so validation never answers first.
+  - With a live session, each one must answer anything but 401. `revokeSessions` runs last, because it ends that session too.
+- **Traversal:** every file, folder and download parameter refuses encoded, double-encoded, backslash, NUL, overlong-UTF-8, look-alike-dot and absolute payloads with a 4xx. `STORAGE_ROOT` sits in a scratch "jail" beside a canary file of random contents, which must never appear in a response.
+- **Size limits:** for the documents, clipboard, client logs, Brotli and Nimbus, the cap itself must pass and one byte (or one entry) more must be refused with the domain's code.
+- **Rate limits and login lockout:** each runs on a server of its own, because the state they change is process-wide.
+
 ## The old-vs-new API diff
 
 ```bash
@@ -172,6 +224,7 @@ Every worktree, scratch storage and snapshot is removed before the tool exits, p
 | `e2e/` browser, cloud and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                         |
 | `npm run test:api-diff` and `e2e/api-diff/`                                                        | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it    |
 | Contract guard `strict` mode, `openapi.json` and its staleness and coverage tests, `createTestApp` | **Permanent**                                                                                    |
+| `e2e/api/` (the black-box API suite, PLAN-33)                                                      | **Permanent**                                                                                    |
 | `server/src/api-coverage.pending.ts` (the ratchet list)                                            | **Deleted** in PLAN-32c, once every route was described                                          |
 | Contract guard `fallback` mode, its Loki alert, its `.env.example` entry                           | Temporary: deleted after one release with no `contract mismatch` line; the default becomes `off` |
 | Worktrees, scratch storages and snapshots of each diff run                                         | Removed by the tool at the end of every run                                                      |

@@ -150,15 +150,22 @@ function declaredLength(request: FastifyRequest): number | null {
 }
 
 /**
- * Sends a codec stream, holding the status open until the first byte exists.
+ * Sends a codec stream, holding the status open until the first
+ * `HELD_HEAD_BYTES` exist (or the stream ends first).
  *
  * A stream handed straight to `reply.send()` commits its status the moment
  * piping starts, which is too early to be honest here: whether a blown cap or
  * a failed decode can still become a clean 413/422 depends entirely on whether
- * anything has gone out yet. So the first chunk is awaited first — a failure
- * before it arrives still has a status code available, and a failure after it
- * does not, which is exactly the split this module documents rather than
- * promising one uniform outcome.
+ * anything has gone out yet. So the head is awaited first — a failure inside
+ * it still has a status code available, and a failure after it does not,
+ * which is exactly the split this module documents rather than promising one
+ * uniform outcome.
+ *
+ * The head used to be one byte. PLAN-33's fuzzer found four input bytes that
+ * decode one byte and then fail: a 200 cut off mid-body, for an input that is
+ * plainly invalid. Holding 1 MiB (bounded memory per request) gives every
+ * output up to that size an honest 422; only a larger output that fails late
+ * still ends the connection.
  */
 async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): Promise<unknown> {
   // A client that vanishes mid-request leaves nobody to read this; destroying
@@ -171,7 +178,7 @@ async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): 
 
   let body: Readable;
   try {
-    body = await firstByteHeld(produced);
+    body = await headHeld(produced);
   } catch (error) {
     throw asHttpError(error);
   }
@@ -193,15 +200,29 @@ async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): 
   );
 }
 
-/** Pulls one chunk, then hands back a stream that replays it and the rest. */
-async function firstByteHeld(produced: Readable): Promise<Readable> {
+/** How much output is held before the status is committed (see `sendBytes`). */
+const HELD_HEAD_BYTES = 1024 * 1024;
+
+/** Pulls up to the head, then hands back a stream that replays it and the rest. */
+async function headHeld(produced: Readable): Promise<Readable> {
   const iterator = produced[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
-  const first = await iterator.next();
+  const head: Buffer[] = [];
+  let held = 0;
+  let done = false;
+  while (held < HELD_HEAD_BYTES) {
+    const next = await iterator.next();
+    if (next.done === true) {
+      done = true;
+      break;
+    }
+    head.push(next.value);
+    held += next.value.length;
+  }
   const rest: AsyncIterable<Buffer> = { [Symbol.asyncIterator]: () => iterator };
 
   async function* replay(): AsyncGenerator<Buffer> {
-    if (first.done !== true) yield first.value;
-    yield* rest;
+    yield* head;
+    if (!done) yield* rest;
   }
   return NodeReadable.from(replay(), { objectMode: false });
 }

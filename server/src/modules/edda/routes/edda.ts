@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { bodyTooLargeAs, documentBodyLimit } from '../../../core/http/body-limit.js';
 import {
   corsHeader,
   errorResponses,
@@ -174,6 +175,10 @@ function downloadFilename(name: string): string {
 }
 
 export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): void {
+  // PLAN-33: a document up to the cap must fit in the body (see body-limit.ts),
+  // and one over Fastify's limit is refused with the usecase's own code.
+  const bodyLimit = documentBodyLimit(deps.maxDocKb);
+  const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   // The client reads the doc-size cap + the live-preview threshold, never hardcodes them.
   app.get(
     '/api/edda/config',
@@ -214,6 +219,8 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   app.post<{ Body: { name?: string; content: string } }>(
     '/api/edda',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Save a new Markdown document',
@@ -307,6 +314,8 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
     '/api/edda/:id',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Rename a Markdown document or replace its content',

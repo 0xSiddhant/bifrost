@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { bodyTooLargeAs, documentBodyLimit } from '../../../core/http/body-limit.js';
 import {
   corsHeader,
   errorResponses,
@@ -170,6 +171,10 @@ function downloadFilename(name: string): string {
 }
 
 export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps): void {
+  // PLAN-33: a document up to the cap must fit in the body (see body-limit.ts),
+  // and one over Fastify's limit is refused with the usecase's own code.
+  const bodyLimit = documentBodyLimit(deps.maxDocKb);
+  const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   // The client reads the doc-size cap, never hardcodes it.
   app.get(
     '/api/groot/config',
@@ -207,6 +212,8 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   app.post<{ Body: { name?: string; content: string } }>(
     '/api/groot',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Save a new YAML document',
@@ -302,6 +309,8 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
     '/api/groot/:id',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Rename a YAML document or replace its content',

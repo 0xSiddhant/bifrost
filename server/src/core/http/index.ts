@@ -30,6 +30,9 @@ export class AppError extends Error {
   }
 }
 
+/** 255 characters × 12 encoded bytes each, rounded up. */
+export const MAX_PARAM_LENGTH = 4096;
+
 export interface HttpOptions {
   logger: Logger;
   /** Absolute path to the built client. Skipped when absent (dev mode: Vite serves it). */
@@ -55,6 +58,12 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
   const app = Fastify({
     loggerInstance: options.logger,
     forceCloseConnections: true,
+    // The router's own cap on one path parameter, checked on the raw,
+    // percent-encoded segment before any route runs (default 100 → a 414).
+    // Stored names may be 255 characters, and one non-ASCII character is up
+    // to 12 once encoded (4 UTF-8 bytes × `%XX`), so the cap must clear
+    // 255 × 12; the route's own schema still decides what is valid (PLAN-33).
+    routerOptions: { maxParamLength: MAX_PARAM_LENGTH },
   }) as unknown as FastifyInstance;
 
   // Both before auth and every module: swagger's route collector and the

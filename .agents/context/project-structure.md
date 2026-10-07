@@ -156,7 +156,10 @@ bifrost/
 │   │                          #   outside — lint-banned from importing server/client/cli src
 │   ├── playwright.config.ts   #   UI only: chromium-desktop, chromium-mobile, webkit-mobile, cloud
 │   ├── vitest.config.ts       #   unit tests of the support code (`npm test`)
-│   ├── vitest.e2e.config.ts   #   out-of-process suites without a browser (`*.e2e.ts`)
+│   ├── vitest.e2e.config.ts   #   the installed-CLI suite (`cli/**/*.e2e.ts`)
+│   ├── vitest.api.config.ts   #   the black-box API suite (`api/**/*.e2e.ts`, PLAN-33)
+│   ├── api/                   #   boot, transport, contract, fuzz/, security; support/ (spec reader,
+│   │                          #   recording fetch client, seeding, SSE, zip); coverage-report.ts
 │   ├── support/               #   server.ts (production entry, scratch storage, blanked .env),
 │   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
 │   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,

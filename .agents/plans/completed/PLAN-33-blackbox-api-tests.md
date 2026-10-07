@@ -160,29 +160,29 @@ No new routes. One behaviour fix: `POST`/`PUT` on `/api/{runestone,edda,groot,at
 ## Task checklist
 
 **Harness (extends PLAN-32a's `e2e/`)**
-- [ ] `e2e/package.json`: `fast-check`, `ajv` (2020 build), and `fastify` pinned to the server's version (for the oracle test); `tech-stack.md` row for `fast-check`
-- [ ] `e2e/package.json`: the `test:e2e:api` script, and `test:e2e` runs it
-- [ ] `e2e/support/server.ts`: a canary file in the parent of the scratch `STORAGE_ROOT` (opt-in); otherwise reused unchanged
-- [ ] `e2e/api/support/spec.ts`: load `server/openapi.json`, list operations, compile response validators (ajv 2020), coverage recorder
-- [ ] `e2e/api/support/http.ts`: thin `fetch` wrapper that records every response for the hygiene scan and the coverage report; cookie jar for admin sessions
+- [x] `e2e/package.json`: `fast-check`, `ajv` (2020 build), and `fastify` pinned to the server's version (for the oracle test); `tech-stack.md` row for `fast-check`
+- [x] `e2e/package.json`: the `test:e2e:api` script, and `test:e2e` runs it
+- [x] `e2e/support/server.ts`: a canary file in the parent of the scratch `STORAGE_ROOT` (opt-in); otherwise reused unchanged
+- [x] `e2e/api/support/spec.ts`: load `server/openapi.json`, list operations, compile response validators (ajv 2020), coverage recorder
+- [x] `e2e/api/support/http.ts`: thin `fetch` wrapper that records every response for the hygiene scan and the coverage report; cookie jar for admin sessions
 
 **Suites**
-- [ ] `e2e/api/boot.e2e.ts`, `transport.e2e.ts`: per "Boot and transport"
-- [ ] `contract.e2e.ts`: per-tag journeys + spec validation + the coverage report (empty = pass)
-- [ ] `fuzz/arbitraries.ts` (throws on unknown keywords), `fuzz/fastify-ajv.ts` (the pinned default ajv options, used as the valid/invalid oracle), `fuzz/hints.ts`, `fuzz.e2e.ts` (valid + invalid properties, seed/replay)
-- [ ] `security.e2e.ts`: admin, traversal + canary, limits honesty, rate limits, login lockout (own process), hygiene, CORS, served-type safety
+- [x] `e2e/api/boot.e2e.ts`, `transport.e2e.ts`: per "Boot and transport"
+- [x] `contract.e2e.ts`: per-tag journeys + spec validation + the coverage report (empty = pass)
+- [x] `fuzz/arbitraries.ts` (throws on unknown keywords), `fuzz/fastify-ajv.ts` (the pinned default ajv options, used as the valid/invalid oracle), `fuzz/hints.ts`, `fuzz.e2e.ts` (valid + invalid properties, seed/replay)
+- [x] `security.e2e.ts`: admin, traversal + canary, limits honesty, rate limits, login lockout (own process), hygiene, CORS, served-type safety
 
 **Fixes**
-- [ ] `fix(runestone|edda|groot|atlas)`: route `bodyLimit` from the cap; over-limit → `413 PAYLOAD_TOO_LARGE`; an in-process integration test at the real default cap (not `maxDocKb: 1`); a browser journey saving a 1.5 MB document in each editor; the change listed in `e2e/api-diff/expected-differences.ts` with this plan and reason; `npm run api:spec` re-run
-- [ ] Each further finding: small → `fix(<scope>)` commit with its red test first; not small → `.fails` test + decisions.md row + PLAN-99 row
+- [x] `fix(runestone|edda|groot|atlas)`: route `bodyLimit` from the cap; over-limit → `413 PAYLOAD_TOO_LARGE`; an in-process integration test at the real default cap (not `maxDocKb: 1`); a browser journey saving a 1.5 MB document in each editor; the change listed in `e2e/api-diff/expected-differences.ts` with this plan and reason; `npm run api:spec` re-run
+- [x] Each further finding: small → `fix(<scope>)` commit with its red test first; not small → `.fails` test + decisions.md row + PLAN-99 row
 
 **Gate & cleanup**
-- [ ] Merge-condition run (see Gate): `npm test`, full `test:e2e`, `test:api-diff --base develop` on seeded data, with only the listed expected differences
-- [ ] Cleanup: no `.fails` test left without a decisions.md + PLAN-99 row; no worktree, scratch storage, canary or snapshot left after the runs; no probe script committed; the PR lists what it deleted
+- [x] Merge-condition run (see Gate): `npm test`, full `test:e2e`, `test:api-diff --base develop` on seeded data, with only the listed expected differences — _WebKit runs in CI only (it cannot launch in the implementing container)_
+- [x] Cleanup: no `.fails` test left without a decisions.md + PLAN-99 row; no worktree, scratch storage, canary or snapshot left after the runs; no probe script committed; the PR lists what it deleted
 
 **Docs**
-- [ ] `docs/testing.md`: black-box, fuzz replay (`FUZZ_SEED`/`FUZZ_PATH`), security sweep
-- [ ] `architecture.md` (testing section), `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] `docs/testing.md`: black-box, fuzz replay (`FUZZ_SEED`/`FUZZ_PATH`), security sweep
+- [x] `architecture.md` (testing section), `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
 
 ## Acceptance criteria
 
@@ -204,24 +204,24 @@ No new routes. One behaviour fix: `POST`/`PUT` on `/api/{runestone,edda,groot,at
 ## Test checklist
 
 **Black-box (the deliverable)**
-- [ ] `boot.e2e.ts`: criterion 1
-- [ ] `transport.e2e.ts`: criterion 3
-- [ ] `contract.e2e.ts`: criterion 4
-- [ ] `fuzz.e2e.ts`: criterion 5
-- [ ] `security.e2e.ts`: criteria 7–11
+- [x] `boot.e2e.ts`: criterion 1
+- [x] `transport.e2e.ts`: criterion 3
+- [x] `contract.e2e.ts`: criterion 4
+- [x] `fuzz.e2e.ts`: criterion 5
+- [x] `security.e2e.ts`: criteria 7–11
 
 **Safety net (PLAN-32a, kept green)**
-- [ ] Full `test:e2e` and the API diff (criterion 13)
+- [x] Full `test:e2e` and the API diff (criterion 13) — _WebKit runs in CI only (it cannot launch in the implementing container)_
 
 **Unit**
-- [ ] `fuzz/arbitraries.test.ts`, in `npm test` (the e2e workspace's vitest `test` script) because it is pure: every keyword in the verified set produces values that ajv accepts against the same schema; every invalid mutation produces values ajv rejects; an unknown keyword throws (criterion 6)
-- [ ] `fuzz/fastify-ajv.test.ts`, in `npm test`: the pinned oracle and a bare Fastify instance agree on every spiked case (stripped extra property, `123`/`true`/`null`/`["a"]` → string, `"7"` → integer, `"x"` → 400)
+- [x] `fuzz/arbitraries.test.ts`, in `npm test` (the e2e workspace's vitest `test` script) because it is pure: every keyword in the verified set produces values that ajv accepts against the same schema; every invalid mutation produces values ajv rejects; an unknown keyword throws (criterion 6)
+- [x] `fuzz/fastify-ajv.test.ts`, in `npm test`: the pinned oracle and a bare Fastify instance agree on every spiked case (stripped extra property, `123`/`true`/`null`/`["a"]` → string, `"7"` → integer, `"x"` → 400)
 
 **Integration (in-process)**
-- [ ] Each document kind at the real default cap: just under saves, just over → `PAYLOAD_TOO_LARGE` (criterion 9, also guarded by PLAN-32's contract check)
+- [x] Each document kind at the real default cap: just under saves, just over → `PAYLOAD_TOO_LARGE` (criterion 9, also guarded by PLAN-32's contract check)
 
 **Lint**
-- [ ] A deliberate `server/src` import in a scratch `e2e/api` suite fails `npm run lint`, then is removed (criterion 2)
+- [x] A deliberate `server/src` import in a scratch `e2e/api` suite fails `npm run lint`, then is removed (criterion 2)
 
 **CI**
-- [ ] The PR's CI run shows the e2e step green and the API suite's duration (criterion 12)
+- [x] The PR's CI run shows the e2e step green and the API suite's duration (criterion 12) — _CI run 37591644092 on `4aadb19`: e2e step green; the API suite plus its coverage report took 24 s, inside the three-minute budget_

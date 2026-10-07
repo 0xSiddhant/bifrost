@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { bodyTooLargeAs, documentBodyLimit } from '../../../core/http/body-limit.js';
 import {
   corsHeader,
   errorResponses,
@@ -174,6 +175,10 @@ function downloadFilename(name: string): string {
 }
 
 export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps): void {
+  // PLAN-33: a document up to the cap must fit in the body (see body-limit.ts),
+  // and one over Fastify's limit is refused with the usecase's own code.
+  const bodyLimit = documentBodyLimit(deps.maxDocKb);
+  const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   // The client reads the doc-size cap, never hardcodes it.
   app.get(
     '/api/atlas/config',
@@ -211,6 +216,8 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   app.post<{ Body: { name?: string; content: string } }>(
     '/api/atlas',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Save a new XML document',
@@ -307,6 +314,8 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
     '/api/atlas/:id',
     {
+      bodyLimit,
+      errorHandler: tooLarge,
       schema: {
         tags: TAGS,
         summary: 'Rename a XML document or replace its content',

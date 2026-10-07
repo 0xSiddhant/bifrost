@@ -81,6 +81,26 @@ const KINDS: Kind[] = [
   },
 ];
 
+/** A valid document of each kind, padded to `bytes` bytes of ASCII. */
+/**
+ * A valid document of exactly `bytes` ASCII bytes. The filler is prose, with
+ * line breaks where the format allows them: one unbroken 1.5 MB word is
+ * nothing a person writes, and WebKit spends minutes laying it out.
+ */
+function bigDocument(kind: Kind['kind'], bytes: number): string {
+  const wrap: Record<Kind['kind'], [string, string, string]> = {
+    runestone: ['{"pad":"', '"}', ' '],
+    edda: ['# Big\n\n', '\n', '\n'],
+    groot: ['pad: ', '\n', ' '],
+    atlas: ['<?xml version="1.0" encoding="UTF-8"?>\n<pad>', '</pad>\n', '\n'],
+  };
+  const [head, tail, lineEnd] = wrap[kind];
+  const line = `${'the bridge holds every word of a long saga '.repeat(2).trimEnd()}${lineEnd}`;
+  const length = bytes - head.length - tail.length;
+  const filler = line.repeat(Math.ceil(length / line.length)).slice(0, length);
+  return `${head}${filler.replace(/\s$/, 'x')}${tail}`;
+}
+
 function slugFrom(page: Page, kind: string): string {
   return new URL(page.url()).pathname.replace(`/${kind}/`, '');
 }
@@ -176,6 +196,48 @@ for (const kind of KINDS) {
         await expect(row).toBeHidden();
         const gone = await page.request.get(`${server.baseUrl}${href}`, { maxRedirects: 0 });
         expect(gone.status()).toBe(404);
+      },
+    );
+
+    test(
+      'a 1.5 MB document, imported from a file, saves whole',
+      kind.editorRoutes,
+      async ({ page, server }) => {
+        // Over Fastify's default 1 MiB body limit and under the 2048 KB cap:
+        // refused with a 413 until PLAN-33 sized the route's limit from the cap.
+        // The server answers in milliseconds; the time goes on the page laying
+        // out 1.5 MB, which CI's software-rendered WebKit does far slower.
+        test.slow();
+        await page.goto(`/${kind.kind}`);
+        await page
+          .getByLabel('Document title')
+          .fill(`E2E big ${kind.kind} ${Date.now().toString(36)}`);
+        const big = bigDocument(kind.kind, 1_500_000);
+        await page.locator(`input[type="file"][accept*="${kind.ext}"]`).setInputFiles({
+          name: `big${kind.ext}`,
+          mimeType: kind.mime,
+          buffer: Buffer.from(big),
+        });
+        // Lasting state only, never the toast: while the page lays out 1.5 MB
+        // the toast can come and go before a poll sees it. The save's own
+        // answer comes first, so a refusal fails here by its status.
+        const saved = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === `/api/${kind.kind}`,
+          { timeout: 60_000 },
+        );
+        await page.getByRole('button', { name: 'Save to Pensieve' }).click();
+        expect((await saved).status()).toBe(201);
+        await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeDisabled({
+          timeout: 60_000,
+        });
+        await expect(page).toHaveURL(new RegExp(`/${kind.kind}/[a-z0-9-]+$`));
+        const raw = await page.request.get(
+          `${server.baseUrl}/${kind.kind}/api/${slugFrom(page, kind.kind)}`,
+        );
+        expect(raw.status()).toBe(200);
+        expect((await raw.body()).length).toBe(Buffer.byteLength(big));
       },
     );
 

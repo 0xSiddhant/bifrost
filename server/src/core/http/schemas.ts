@@ -63,11 +63,18 @@ export function redirect(description: string) {
 /**
  * A body sent as a string or stream (raw document text, an archive): no
  * serializer runs, so the schema only names the media type for the spec.
+ *
+ * A JSON media type is the exception: its body is the stored JSON document
+ * itself, so to a consumer it is *any* JSON value, not a JSON string (found by
+ * PLAN-33's consumer-side contract check).
  */
 export function rawBody(mediaType: string, description: string, headers?: Record<string, object>) {
+  const schema = /json/.test(mediaType)
+    ? { description: 'Any JSON value: the stored document as written' }
+    : { type: 'string' };
   return {
     description,
-    content: { [mediaType]: { schema: { type: 'string' } } },
+    content: { [mediaType]: { schema } },
     ...(headers ? { headers } : {}),
   };
 }

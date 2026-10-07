@@ -5474,7 +5474,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string"
+                  "description": "Any JSON value: the stored document as written"
                 }
               }
             }
