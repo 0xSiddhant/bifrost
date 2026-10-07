@@ -135,30 +135,30 @@ None. The harness is an outside client of existing routes and adds no server cod
 ## Task checklist
 
 **Harness**
-- [ ] `e2e/package.json`: `autocannon` (devDependency); `tech-stack.md` row
-- [ ] `e2e/perf/run.ts`: CLI (`--profile`, `--minutes`, `--connections`, `--baseline`, `--strict`, `--log-level`, `--contract`, `--server-dist`, `--keep`), `dist` presence check, disk-space check, spawn via `e2e/support/server.ts` with rate limits lifted
-- [ ] `e2e/perf/seed.ts`: the seeding set, over HTTP, timed
-- [ ] `e2e/perf/metrics.ts`: `/metrics` scraper + parser for the `bifrost_` default metrics and the request histogram; 15 s sampler
-- [ ] `e2e/perf/scenarios.ts`: read/write/mixed scenario definitions with unique-body setup
-- [ ] `e2e/perf/profiles/{load,stress,spike,soak,fanout}.ts`
-- [ ] `e2e/perf/report.ts`: terminal table, JSON result file, baseline diff, leak slope (least squares after warm-up)
-- [ ] `.gitignore`: `load-results/`; root `npm run test:load`
-- [ ] `e2e/tsconfig.json` includes `perf/` (the lint rule already covers `e2e/**`)
+- [x] `e2e/package.json`: `autocannon` (devDependency); `tech-stack.md` row
+- [x] `e2e/perf/run.ts`: CLI (`--profile`, `--minutes`, `--connections`, `--baseline`, `--strict`, `--log-level`, `--contract`, `--server-dist`, `--keep`), `dist` presence check, disk-space check, spawn via `e2e/support/server.ts` with rate limits lifted
+- [x] `e2e/perf/seed.ts`: the seeding set, over HTTP, timed
+- [x] `e2e/perf/metrics.ts`: `/metrics` scraper + parser for the `bifrost_` default metrics and the request histogram; 15 s sampler
+- [x] `e2e/perf/scenarios.ts`: read/write/mixed scenario definitions with unique-body setup
+- [x] `e2e/perf/profiles/{load,stress,spike,soak,fanout}.ts`
+- [x] `e2e/perf/report.ts`: terminal table, JSON result file, baseline diff, leak slope (least squares after warm-up)
+- [x] `.gitignore`: `load-results/`; root `npm run test:load`
+- [x] `e2e/tsconfig.json` includes `perf/` (the lint rule already covers `e2e/**`)
 
 **Runs**
-- [ ] One `load` + `stress` + `spike` run, and one 60-minute `soak`, on the owner's Mac, with results summarised in `progress.md` (numbers, machine, commit)
-- [ ] The PLAN-32 before/after `load` comparison, summarised in `progress.md`
-- [ ] Each finding: one-liner fixes are their own `perf(<scope>)` commit with before/after numbers, and pass the merge condition above (zero API-diff differences); anything bigger becomes a decisions.md row and a PLAN-99 row
+- [ ] One `load` + `stress` + `spike` run, and one 60-minute `soak`, on the owner's Mac, with results summarised in `progress.md` (numbers, machine, commit) *(Run on the Linux dev container, a 4-core Xeon, and summarised in `progress.md`; the run on the owner's Mac is left to the owner.)*
+- [x] The PLAN-32 before/after `load` comparison, summarised in `progress.md`
+- [x] Each finding: one-liner fixes are their own `perf(<scope>)` commit with before/after numbers, and pass the merge condition above (zero API-diff differences); anything bigger becomes a decisions.md row and a PLAN-99 row
 
 **Cleanup (the end of the temporary scaffolding PLAN-32 introduced)**
-- [ ] After the merge-condition run passes, **delete `e2e/api-diff/` and the root `test:api-diff` script**: PLAN-34 is the last change it guards (PLAN-32's "What stays and what is deleted"). Remove its mentions from `docs/testing.md` and the `verify` skill
-- [ ] Remove the PLAN-32 before/after `git worktree`, every `--keep` storage and every scratch result outside `load-results/`; `git worktree list` shows only the main checkout
-- [ ] No probe or one-off script committed; the PR description lists everything deleted
+- [x] After the merge-condition run passes, **delete `e2e/api-diff/` and the root `test:api-diff` script**: PLAN-34 is the last change it guards (PLAN-32's "What stays and what is deleted"). Remove its mentions from `docs/testing.md` and the `verify` skill
+- [x] Remove the PLAN-32 before/after `git worktree`, every `--keep` storage and every scratch result outside `load-results/`; `git worktree list` shows only the main checkout
+- [x] No probe or one-off script committed; the PR description lists everything deleted
 
 **Docs**
-- [ ] `docs/performance.md`: how to run each profile, what each number means, how to compare two builds (the worktree recipe), why it is not in CI. Linked from `docs/testing.md` and `README.md`
-- [ ] `verify` skill: a one-line note that `test:load` is on demand, like `test:resilience`
-- [ ] `architecture.md`, `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] `docs/performance.md`: how to run each profile, what each number means, how to compare two builds (the worktree recipe), why it is not in CI. Linked from `docs/testing.md` and `README.md`
+- [x] `verify` skill: a one-line note that `test:load` is on demand, like `test:resilience`
+- [x] `architecture.md`, `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
 
 ## Acceptance criteria
 
@@ -177,14 +177,14 @@ None. The harness is an outside client of existing routes and adds no server cod
 ## Test checklist
 
 **Unit**
-- [ ] `perf/metrics.test.ts`: parses a recorded `/metrics` exposition, including histogram buckets
-- [ ] `perf/report.test.ts`: baseline diff percentages and flagging; leak slope on synthetic series (flat, linear growth, noisy-flat, warm-up spike)
-- [ ] `perf/run.test.ts`: argument parsing; refusal of `STORAGE_ROOT`/port overrides; the disk-space guard (criterion 2)
+- [x] `perf/metrics.test.ts`: parses a recorded `/metrics` exposition, including histogram buckets
+- [x] `perf/report.test.ts`: baseline diff percentages and flagging; leak slope on synthetic series (flat, linear growth, noisy-flat, warm-up spike)
+- [x] `perf/run.test.ts`: argument parsing; refusal of `STORAGE_ROOT`/port overrides; the disk-space guard (criterion 2)
 
 **Manual (the deliverable is the harness and its first readings)**
-- [ ] `load`, `stress`, `spike` on the owner's machine (criteria 1, 3, 4)
-- [ ] 60-minute `soak` (criterion 5)
-- [ ] `fanout` (criterion 6)
-- [ ] A forced 5xx (a scratch build with a throwing route) exits non-zero (criterion 7)
-- [ ] PLAN-32 before/after via `--server-dist` (criterion 8)
-- [ ] With an outbound-connection monitor (`lsof -i` on the server pid during `load`), no external host is contacted (criterion 9)
+- [ ] `load`, `stress`, `spike` on the owner's machine (criteria 1, 3, 4) *(Run on the Linux dev container, a 4-core Xeon, and summarised in `progress.md`; the run on the owner's Mac is left to the owner.)*
+- [x] 60-minute `soak` (criterion 5)
+- [x] `fanout` (criterion 6)
+- [x] A forced 5xx (a scratch build with a throwing route) exits non-zero (criterion 7)
+- [x] PLAN-32 before/after via `--server-dist` (criterion 8)
+- [x] With an outbound-connection monitor (`lsof -i` on the server pid during `load`), no external host is contacted (criterion 9)
