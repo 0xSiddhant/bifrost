@@ -6,18 +6,17 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 
 **Why tests live in more than one place.** Unit and integration tests sit beside the code they test, in `server/`, `client/` and `cli/`. They import that code directly, run without a build, and come first in CI because they are fast. End-to-end tests live in `e2e/` and are _forbidden_ from importing product code: that rule is what proves they test what actually ships. Merging the two would lose that guarantee.
 
-| Kind                         | Where                                                                 | Command                                 | Needs a build?     | In CI                  |
-| ---------------------------- | --------------------------------------------------------------------- | --------------------------------------- | ------------------ | ---------------------- |
-| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no                 | yes, before Build      |
-| API description is current   | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no                 | yes, in `npm test`     |
-| End-to-end: browser          | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes                | yes, after Build       |
-| End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes                | yes, after Build       |
-| Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes                | yes, after Build       |
-| All three of the above       |                                                                       | `npm run test:e2e`                      | yes                | yes                    |
-| Old-vs-new API diff          | `e2e/api-diff/`                                                       | `npm run test:api-diff -- --base <ref>` | this checkout, yes | no (a plan's gate run) |
-| Restart resilience           | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no                 | no (on demand)         |
-| Load, stress, soak (PLAN-34) | `e2e/perf/` ([`docs/performance.md`](performance.md))                 | `npm run test:load -- --profile <name>` | yes                | no (on demand)         |
-| Live verification            | `.claude/skills/live-verify`                                          | the skill                               | yes                | no (manual)            |
+| Kind                         | Where                                                                 | Command                                 | Needs a build? | In CI              |
+| ---------------------------- | --------------------------------------------------------------------- | --------------------------------------- | -------------- | ------------------ |
+| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, before Build  |
+| API description is current   | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no             | yes, in `npm test` |
+| End-to-end: browser          | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes            | yes, after Build   |
+| End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, after Build   |
+| Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, after Build   |
+| All three of the above       |                                                                       | `npm run test:e2e`                      | yes            | yes                |
+| Restart resilience           | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no             | no (on demand)     |
+| Load, stress, soak (PLAN-34) | `e2e/perf/` ([`docs/performance.md`](performance.md))                 | `npm run test:load -- --profile <name>` | yes            | no (on demand)     |
+| Live verification            | `.claude/skills/live-verify`                                          | the skill                               | yes            | no (manual)        |
 
 ## Unit and integration tests
 
@@ -173,61 +172,15 @@ The contract suite found a third: the spec described raw JSON documents as a JSO
 - **Size limits:** for the documents, clipboard, client logs, Brotli and Nimbus, the cap itself must pass and one byte (or one entry) more must be refused with the domain's code.
 - **Rate limits and login lockout:** each runs on a server of its own, because the state they change is process-wide.
 
-## The old-vs-new API diff
-
-```bash
-npm run build                                               # the candidate is this checkout's build
-npm run test:api-diff -- --base develop                     # seeded data, reads + one write sequence
-npm run test:api-diff -- --base develop --candidate develop # the tool against itself: must be zero
-npm run test:api-diff -- --base develop --data path/to/app.db   # reads only, on a snapshot
-```
-
-It builds `<ref>`'s server in a temporary `git worktree` (with a clean `npm ci` of that ref's lockfile). It then seeds one scratch storage **through the base build's API**, with deliberate edge cases: unicode, 80-character names, documents with no author device, links with no title, staged and published files, folders, a custom theme and changed settings. That storage is copied twice with every file and directory timestamp kept.
-
-Base and candidate then run **one at a time, on the same port, with the same session secret and admin cookie**, so nothing but the code differs between them.
-
-**Reads.** The corpus is every read route with every query shape:
-
-- all sorts × orders × filters;
-- legacy and `paged=true`, with cursors walked to the end;
-- every record by slug and by stale slug;
-- raw endpoints, `?download`, and file content both as an attachment and `?inline=1` (a browser preview's headers);
-- admin reads with and without a session.
-
-For each request it compares the status, `content-type`, `location`, `content-disposition`, `access-control-allow-origin` and **the body bytes**. A zip is compared by its sorted entries (name, CRC-32, size), because a folder archive lists its files in the watcher's boot-scan order, which can differ between two boots of the same build.
-
-**Writes.** One scripted sequence covers every write route's success and refusal paths (400/404/409/413/422). It is compared after rewriting only a short, explicit list of generated values: ids, slugs, stored names, device ids, timestamps, and the relic name an unnamed document is given.
-
-**Excluded by nature**, each with its reason in `corpus.ts`:
-
-| Endpoint              | Why                                          |
-| --------------------- | -------------------------------------------- |
-| `/metrics`            | runtime gauges of this process               |
-| `/api/events`         | an endless SSE stream                        |
-| `/api/heimdall/stats` | uptime and live counters                     |
-| `/api/heimdall/about` | each build's own commit and build date       |
-| `/api/presence`       | connection times                             |
-| `/api/health`         | process uptime                               |
-| `/api/nimbus/down`    | a random payload pool generated at each boot |
-
-**The corpus check.** On a seeded run, every `GET` in the candidate's `server/openapi.json` must be reached by at least one read or be excluded above; otherwise the run fails (exit 1) and names the routes. A route the corpus never reads is a route the diff never compared. `--data` runs skip the check, because someone's data may simply hold no folder or no go-link.
-
-**Intended differences** go in `e2e/api-diff/expected-differences.ts`, each with its plan and reason. Any other difference fails the run (exit 1). Exit 2 means the tool itself could not run.
-
-**`--data`** snapshots a database with `VACUUM INTO` on a read-only connection, the same mechanism `npm run backup` uses, and runs **reads only**. The source is never written. ⚠️ Per the owner's instruction, the real-data run happens **once**, at PLAN-32c's gate, and the snapshot is deleted the moment it validates. See PLAN-32.
-
-Every worktree, scratch storage and snapshot is removed before the tool exits, pass or fail. `git worktree list` should show only the main checkout afterwards.
-
 ## What stays and what is temporary
 
 | Item                                                                                               | Fate                                                                                               |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `e2e/` browser, cloud and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                           |
-| `npm run test:api-diff` and `e2e/api-diff/`                                                        | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it      |
+| `npm run test:api-diff` and `e2e/api-diff/` (the old-vs-new API diff)                              | **Deleted** in PLAN-34, the last change it guarded                                                 |
 | Contract guard `strict` mode, `openapi.json` and its staleness and coverage tests, `createTestApp` | **Permanent**                                                                                      |
 | `e2e/api/` (the black-box API suite, PLAN-33)                                                      | **Permanent**                                                                                      |
 | `e2e/perf/` and `npm run test:load` (the load harness, PLAN-34)                                    | **Permanent**, on demand: never in `test:e2e` or CI. Its `load-results/` files are never committed |
 | `server/src/api-coverage.pending.ts` (the ratchet list)                                            | **Deleted** in PLAN-32c, once every route was described                                            |
 | Contract guard `fallback` mode, its Loki alert, its `.env.example` entry                           | Temporary: deleted after one release with no `contract mismatch` line; the default becomes `off`   |
-| Worktrees, scratch storages and snapshots of each diff run                                         | Removed by the tool at the end of every run                                                        |
 | Probe and spike scripts                                                                            | Never committed                                                                                    |

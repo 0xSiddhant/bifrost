@@ -17,6 +17,4 @@ Run these in order; stop at the first failure and report it with the failing out
 
 7. **CLI touched?** If the change is in `cli/`, the browser half of `live-verify` proves nothing — verify the **globally installed** `bifrost` against the built server instead (`npm run build` installs it), and check both a TTY and a piped run: colour, symbols and progress bars must vanish when stdout/stderr is not a terminal, and `--json` must stay parseable through `jq`.
 
-8. **A plan whose gate names the API diff** (PLAN-32b onward): `npm run test:api-diff -- --base develop` must report zero unexpected differences. It is not part of every verify — it builds a worktree and takes a minute or two — but it is part of every PR the plan says it guards.
-
 Report format: one line per step (✅/❌), then details only for failures. If a plan file defines extra acceptance criteria for the work in progress, list which ones are covered by tests vs. still manual.

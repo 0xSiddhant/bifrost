@@ -171,7 +171,6 @@ bifrost/
 │   ├── perf/                  #   the load harness, `npm run test:load` (PLAN-34): run.ts, options.ts,
 │   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics), report.ts,
 │   │                          #   profiles/{load,stress,spike,soak,fanout}.ts; never in CI
-│   └── api-diff/              #   TEMPORARY old-vs-new diff (deleted in PLAN-34's final PR)
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
 │                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,

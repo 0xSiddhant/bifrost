@@ -202,7 +202,7 @@ Dockerfile sets `CI=true` for its build), and PM2 never runs it at all, since
 
 A global guard fails any test on a page error, a `console.error`, a 5xx, a failed request, or any non-loopback request. `routes.spec.ts` reads `App.tsx` as text, so a page without a journey fails CI.
 
-A bug the net finds outside a PR's scope is pinned with `test.fail` (or, if racy, worked around with a comment) rather than skipped, and the pin comes out with its fix. PLAN-32a's seven findings were fixed in a follow-up PR and none are pinned today. A temporary `test:api-diff` tool proves a change is wire-neutral by replaying every read route and one write sequence against a worktree build of a base ref and this checkout, byte for byte. Detail: [`docs/testing.md`](../../docs/testing.md).
+A bug the net finds outside a PR's scope is pinned with `test.fail` (or, if racy, worked around with a comment) rather than skipped, and the pin comes out with its fix. PLAN-32a's seven findings were fixed in a follow-up PR and none are pinned today. PLAN-32's temporary `test:api-diff` tool proved PLAN-32b–34 wire-neutral, byte for byte against a worktree build of `develop`, and was deleted in PLAN-34. Detail: [`docs/testing.md`](../../docs/testing.md).
 
 ## The black-box API suite (PLAN-33)
 
@@ -226,7 +226,7 @@ A response schema is compiled into Fastify's serializer, so a wrong one silently
 
 | Mode | Where | On a difference |
 |---|---|---|
-| `strict` | every server test (`createTestApp`), every e2e server, the API diff's candidate | `500 CONTRACT_VIOLATION`, also for a schema-invalid payload or an undeclared status (5xx and HEAD exempt) |
+| `strict` | every server test (`createTestApp`), every e2e server | `500 CONTRACT_VIOLATION`, also for a schema-invalid payload or an undeclared status (5xx and HEAD exempt) |
 | `fallback` | production default, until one release runs clean | sends the **original** bytes and logs `contract mismatch` with the route and JSON pointer (never the values); a Loki alert fires on it |
 | `off` | the default once fallback is retired (a follow-up PR) | no hooks |
 
