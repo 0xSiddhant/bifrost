@@ -197,6 +197,9 @@ for (const kind of KINDS) {
       async ({ page, server }) => {
         // Over Fastify's default 1 MiB body limit and under the 2048 KB cap:
         // refused with a 413 until PLAN-33 sized the route's limit from the cap.
+        // The server answers in milliseconds; the time goes on the page laying
+        // out 1.5 MB, which CI's software-rendered WebKit does far slower.
+        test.slow();
         await page.goto(`/${kind.kind}`);
         await page
           .getByLabel('Document title')
@@ -207,8 +210,20 @@ for (const kind of KINDS) {
           mimeType: kind.mime,
           buffer: Buffer.from(big),
         });
+        // Lasting state only, never the toast: while the page lays out 1.5 MB
+        // the toast can come and go before a poll sees it. The save's own
+        // answer comes first, so a refusal fails here by its status.
+        const saved = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === `/api/${kind.kind}`,
+          { timeout: 60_000 },
+        );
         await page.getByRole('button', { name: 'Save to Pensieve' }).click();
-        await expect(page.getByRole('status').filter({ hasText: kind.created })).toBeVisible();
+        expect((await saved).status()).toBe(201);
+        await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeDisabled({
+          timeout: 60_000,
+        });
         await expect(page).toHaveURL(new RegExp(`/${kind.kind}/[a-z0-9-]+$`));
         const raw = await page.request.get(
           `${server.baseUrl}/${kind.kind}/api/${slugFrom(page, kind.kind)}`,
