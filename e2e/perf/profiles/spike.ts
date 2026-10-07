@@ -30,15 +30,19 @@ export function percentile(values: number[], quantile: number): number {
 /**
  * The first moment at or after `fromMs` from which a full window of probe
  * samples has its p99 within bound, or null if the probe never got there.
+ * A window with a gap in it (a request still stuck in the burst's queue) is
+ * not recovered yet; only running out of samples ends the search.
  */
 export function recoveryAt(samples: ProbeSample[], fromMs: number, boundMs: number): number | null {
   const after = samples.filter((sample) => sample.atMs >= fromMs);
+  const lastSentMs = after.at(-1)?.atMs ?? fromMs;
   for (const [index, start] of after.entries()) {
+    if (start.atMs + RECOVERY_WINDOW_MS * 0.75 > lastSentMs) return null;
     const window = after
       .slice(index)
       .filter((sample) => sample.atMs < start.atMs + RECOVERY_WINDOW_MS);
     const last = window.at(-1) ?? start;
-    if (last.atMs < start.atMs + RECOVERY_WINDOW_MS * 0.75) return null;
+    if (last.atMs < start.atMs + RECOVERY_WINDOW_MS * 0.75) continue;
     if (
       percentile(
         window.map((sample) => sample.latencyMs),
@@ -48,6 +52,22 @@ export function recoveryAt(samples: ProbeSample[], fromMs: number, boundMs: numb
       return start.atMs;
   }
   return null;
+}
+
+/** The probe's p99 and request count for each second of the run. */
+export function bySecond(
+  samples: ProbeSample[],
+): { second: number; p99Ms: number; requests: number }[] {
+  const buckets = new Map<number, number[]>();
+  for (const sample of samples) {
+    const second = Math.floor(sample.atMs / 1000);
+    buckets.set(second, [...(buckets.get(second) ?? []), sample.latencyMs]);
+  }
+  return [...buckets.entries()].map(([second, latencies]) => ({
+    second,
+    p99Ms: Number(percentile(latencies, 0.99).toFixed(1)),
+    requests: latencies.length,
+  }));
 }
 
 /** One connection, one request at a time, for as long as `running()` says. */
@@ -146,6 +166,10 @@ export const spike: ProfileDefinition = {
         ),
         recoveryBoundMs: bound,
         recoveryMs: recovered === null ? null : recovered - spikeEndMs,
+        spikeStartSecond: Math.floor(spikeStartMs / 1000),
+        spikeEndSecond: Math.floor(spikeEndMs / 1000),
+        // The probe second by second, so a result shows how recovery went.
+        probeBySecond: bySecond(samples),
       },
       failures,
     };
