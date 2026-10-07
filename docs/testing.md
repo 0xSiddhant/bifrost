@@ -29,7 +29,7 @@ A route's response schema is compiled into its serializer, so a wrong one change
 
 - **The contract guard in strict mode** runs in every server test and every e2e server. A response whose serialized bytes differ from `JSON.stringify` of what the handler returned, a payload that fails the schema, or a status the route does not declare becomes `500 CONTRACT_VIOLATION` and names the route and the JSON pointer. `core/http/contract.test.ts` proves it catches each way a schema rewrites bytes: a dropped field, `null` → `""`/`0`, an emptied object, coercion, key order and an undeclared status.
 - **`server/src/openapi.test.ts`** fails when the committed `server/openapi.json` is stale (`info.version` is ignored) and validates it as OpenAPI 3.1. Fix it with `npm run api:spec`.
-- **`server/src/api-coverage.test.ts`** fails for any route without `tags`, a `summary`, a unique `operationId`, a success entry, a `400` entry where a request schema exists, or with `security` that does not match `requireAdmin`. Until PLAN-32c, `api-coverage.pending.ts` lists the routes not yet described; it can only shrink.
+- **`server/src/api-coverage.test.ts`** fails for any route without `tags`, a `summary`, a unique `operationId`, a success entry, a `400` entry where a request schema exists, or with `security` that does not match `requireAdmin`. Every route is described, so a new one fails here until it is (PLAN-32c deleted the temporary pending list).
 
 ## The end-to-end safety net (PLAN-32a)
 
@@ -157,6 +157,8 @@ For each request it compares the status, `content-type`, `location`, `content-di
 | `/api/health`         | process uptime                               |
 | `/api/nimbus/down`    | a random payload pool generated at each boot |
 
+**The corpus check.** On a seeded run, every `GET` in the candidate's `server/openapi.json` must be reached by at least one read or be excluded above; otherwise the run fails (exit 1) and names the routes. A route the corpus never reads is a route the diff never compared. `--data` runs skip the check, because someone's data may simply hold no folder or no go-link.
+
 **Intended differences** go in `e2e/api-diff/expected-differences.ts`, each with its plan and reason. Any other difference fails the run (exit 1). Exit 2 means the tool itself could not run.
 
 **`--data`** snapshots a database with `VACUUM INTO` on a read-only connection, the same mechanism `npm run backup` uses, and runs **reads only**. The source is never written. ⚠️ Per the owner's instruction, the real-data run happens **once**, at PLAN-32c's gate, and the snapshot is deleted the moment it validates. See PLAN-32.
@@ -170,7 +172,7 @@ Every worktree, scratch storage and snapshot is removed before the tool exits, p
 | `e2e/` browser, cloud and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                         |
 | `npm run test:api-diff` and `e2e/api-diff/`                                                        | Temporary: deleted in PLAN-34's final PR, once PLAN-33's and PLAN-34's changes have passed it    |
 | Contract guard `strict` mode, `openapi.json` and its staleness and coverage tests, `createTestApp` | **Permanent**                                                                                    |
-| `server/src/api-coverage.pending.ts` (the ratchet list)                                            | Temporary: emptied and deleted in PLAN-32c                                                       |
+| `server/src/api-coverage.pending.ts` (the ratchet list)                                            | **Deleted** in PLAN-32c, once every route was described                                          |
 | Contract guard `fallback` mode, its Loki alert, its `.env.example` entry                           | Temporary: deleted after one release with no `contract mismatch` line; the default becomes `off` |
 | Worktrees, scratch storages and snapshots of each diff run                                         | Removed by the tool at the end of every run                                                      |
 | Probe and spike scripts                                                                            | Never committed                                                                                  |

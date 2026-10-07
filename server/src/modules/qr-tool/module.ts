@@ -27,6 +27,25 @@ export function terminalQr(text: string): Promise<string> {
 export const qrToolModule: FeatureModule = {
   name: 'qr-tool',
   register(app, deps) {
-    app.get('/api/qr/server-url', () => ({ urls: serverUrls(deps.config) }));
+    app.get(
+      '/api/qr/server-url',
+      {
+        schema: {
+          tags: ['qr-tool'],
+          summary: 'Every URL that reaches this server, LAN IPs first',
+          description:
+            'Android cannot resolve `.local`, so the IP URLs lead; the mDNS name is last (local profile only).',
+          operationId: 'getServerUrls',
+          response: {
+            200: {
+              type: 'object',
+              required: ['urls'],
+              properties: { urls: { type: 'array', items: { type: 'string' } } },
+            },
+          },
+        },
+      },
+      () => ({ urls: serverUrls(deps.config) }),
+    );
   },
 };

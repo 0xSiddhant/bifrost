@@ -3,21 +3,14 @@ import fs from 'node:fs';
 import type { RunningApp } from './app.js';
 import type { RouteCatalogEntry } from './core/http/openapi.js';
 import { createTestApp } from './testing/app.js';
-import { PENDING_ROUTES } from './api-coverage.pending.js';
 
 /**
  * Every route is described (PLAN-32, criterion 6): `tags`, a `summary`, a
  * unique `operationId`, a success entry, a `400` entry wherever a request
  * schema can refuse input, and `security` exactly when `requireAdmin` guards
  * it. Auto-`HEAD` routes and hidden ones (`@fastify/static`) are skipped.
- *
- * `api-coverage.pending.ts` lists the routes PLAN-32b has not converted yet.
- * It can only shrink: an entry must name a real route that still fails, so
- * converting a route forces its removal. PLAN-32c empties and deletes it.
+ * A new route fails here until it is described.
  */
-
-/** The pending list's current size: lower it as entries come off, never raise it. */
-const PENDING_CEILING = 64;
 
 type Schema = Record<string, unknown>;
 
@@ -60,23 +53,11 @@ describe('API coverage', () => {
     fs.rmSync(app.config.storage.root, { recursive: true, force: true });
   });
 
-  it('describes every route not on the pending list', () => {
+  it('describes every route', () => {
     const failing = routes
-      .filter((route) => !PENDING_ROUTES.includes(keyOf(route)))
       .map((route) => ({ route: keyOf(route), problems: problemsOf(route) }))
       .filter((entry) => entry.problems.length > 0);
     expect(failing).toEqual([]);
-  });
-
-  it('only shrinks the pending list: every entry is a real route that still needs converting', () => {
-    const byKey = new Map(routes.map((route) => [keyOf(route), route]));
-    const stale = PENDING_ROUTES.filter((key) => {
-      const route = byKey.get(key);
-      return !route || problemsOf(route).length === 0;
-    });
-    expect(stale, 'remove these from api-coverage.pending.ts').toEqual([]);
-    expect(new Set(PENDING_ROUTES).size).toBe(PENDING_ROUTES.length);
-    expect(PENDING_ROUTES.length).toBeLessThanOrEqual(PENDING_CEILING);
   });
 
   it('gives every operation a unique operationId', () => {

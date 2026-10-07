@@ -341,45 +341,45 @@ Each PR's description lists what it deleted. A PR is not done while `git worktre
 ## Task checklist
 
 **32a — safety net (no product code changes)**
-- [ ] `e2e/` workspace: `package.json` (`@playwright/test`, `vitest`), `playwright.config.ts` (UI only: projects `chromium-desktop`, `chromium-mobile`, `webkit-mobile`, `cloud`; worker-scoped server fixture), `vitest.e2e.config.ts` (`*.e2e.ts`, file-level server, sequential within a file), `vitest.config.ts` (unit `*.test.ts`), `tsconfig.json`; scripts `test:e2e:ui`, `test:e2e:cli`, `test:e2e`; root `npm run test:e2e`; `tech-stack.md` row (Playwright: UI end-to-end only)
-- [ ] `eslint.config`: `no-restricted-imports` for `e2e/**` banning `server/src`, `client/src`, `cli/src`
-- [ ] `e2e/support/server.ts`: spawn production entry from `dist`, free port, `mkdtemp` storage, env overrides, wait on `/api/health`, SIGTERM stop + cleanup, output captured for failure reports
-- [ ] `e2e/support/guards.ts`: the no-errors fixture (pageerror, console.error, ≥500, failed request, external host) with its reasoned allowlist
-- [ ] `e2e/support/devices.ts` (two contexts = two devices), `sink.ts` (local HTTP title sink), `seed.ts` (API-only seeding)
-- [ ] `e2e/browser/*.spec.ts`: journeys 1–18; `routes.spec.ts` (App.tsx text vs journey tags)
-- [ ] `e2e/cloud/*.spec.ts`: cloud-profile capability gating
-- [ ] `e2e/support/cli-install.ts`: pack → temp-prefix install, shared by the CLI suite and the cross-surface journeys
-- [ ] `e2e/cli/*.e2e.ts` (Vitest): every command (human + `--json`, exit codes, TTY vs pipe)
-- [ ] `e2e/browser/cross-surface.spec.ts` (Playwright): CLI-triggered, UI-asserted journeys
-- [ ] `e2e/api-diff/`: worktree build, seed-once-copy-twice, corpus, write sequence + normalisation, exclusions, `expected-differences.ts`, `--data` snapshot via `VACUUM INTO` (reads only), self-cleanup; root `npm run test:api-diff`
-- [ ] Prove the net: `test:e2e` green on `develop`; `test:api-diff -- --base develop` against a `develop` build reports zero differences on seeded data (no real-data run here)
-- [ ] `ci.yml`: after Build — Playwright browser install (cached) + `npm run test:e2e`; `verify` skill gains the same step
-- [ ] (PLAN-99's "E2E tests (Playwright)" row was already removed when this plan was scheduled; see On completion)
+- [x] `e2e/` workspace: `package.json` (`@playwright/test`, `vitest`), `playwright.config.ts` (UI only: projects `chromium-desktop`, `chromium-mobile`, `webkit-mobile`, `cloud`; worker-scoped server fixture), `vitest.e2e.config.ts` (`*.e2e.ts`, file-level server, sequential within a file), `vitest.config.ts` (unit `*.test.ts`), `tsconfig.json`; scripts `test:e2e:ui`, `test:e2e:cli`, `test:e2e`; root `npm run test:e2e`; `tech-stack.md` row (Playwright: UI end-to-end only)
+- [x] `eslint.config`: `no-restricted-imports` for `e2e/**` banning `server/src`, `client/src`, `cli/src`
+- [x] `e2e/support/server.ts`: spawn production entry from `dist`, free port, `mkdtemp` storage, env overrides, wait on `/api/health`, SIGTERM stop + cleanup, output captured for failure reports
+- [x] `e2e/support/guards.ts`: the no-errors fixture (pageerror, console.error, ≥500, failed request, external host) with its reasoned allowlist
+- [x] `e2e/support/devices.ts` (two contexts = two devices), `sink.ts` (local HTTP title sink), `seed.ts` (API-only seeding)
+- [x] `e2e/browser/*.spec.ts`: journeys 1–18; `routes.spec.ts` (App.tsx text vs journey tags)
+- [x] `e2e/cloud/*.spec.ts`: cloud-profile capability gating
+- [x] `e2e/support/cli-install.ts`: pack → temp-prefix install, shared by the CLI suite and the cross-surface journeys
+- [x] `e2e/cli/*.e2e.ts` (Vitest): every command (human + `--json`, exit codes, TTY vs pipe)
+- [x] `e2e/browser/cross-surface.spec.ts` (Playwright): CLI-triggered, UI-asserted journeys
+- [x] `e2e/api-diff/`: worktree build, seed-once-copy-twice, corpus, write sequence + normalisation, exclusions, `expected-differences.ts`, `--data` snapshot via `VACUUM INTO` (reads only), self-cleanup; root `npm run test:api-diff`
+- [x] Prove the net: `test:e2e` green on `develop`; `test:api-diff -- --base develop` against a `develop` build reports zero differences on seeded data (no real-data run here)
+- [x] `ci.yml`: after Build — Playwright browser install (cached) + `npm run test:e2e`; `verify` skill gains the same step
+- [x] (PLAN-99's "E2E tests (Playwright)" row was already removed when this plan was scheduled; see On completion)
 
 **32b — machinery + first slice**
-- [ ] `server/package.json`: `@fastify/swagger`; `@seriousme/openapi-schema-validator` (dev); `tech-stack.md` rows
-- [ ] `core/config`: `API_CONTRACT_CHECK` (`off` | `fallback` | `strict`, default `fallback`) → `config.http.contractCheck`; `.env.example` documents all three
-- [ ] `core/http/schemas.ts`, `core/http/contract.ts` (strict + fallback), `core/http/openapi.ts` (swagger + `routeCatalog()`), wired from `buildHttp`
-- [ ] `core/paging.ts`: the two envelope schema builders
-- [ ] Shared test helper + migration of every `createApp(loadConfig(...))` call site (`test(core)` commit)
-- [ ] `scripts/gen-openapi.ts`, root `npm run api:spec`, `server/openapi.json`; `openapi.test.ts`; `api-coverage.test.ts` + `api-coverage.pending.ts`
-- [ ] `observability/`: Loki alert rule on `contract mismatch`
-- [ ] Core routes, `health`, and `runestone`/`edda`/`groot`/`atlas` (config, legacy + paged list as `anyOf [array, object]`, create 201, get 200/301, raw text/301 with CORS header, update, delete 204, `?download`)
-- [ ] Gate run: `npm test`, `test:e2e`, `test:api-diff --base develop` on seeded data: zero differences
+- [x] `server/package.json`: `@fastify/swagger`; `@seriousme/openapi-schema-validator` (dev); `tech-stack.md` rows
+- [x] `core/config`: `API_CONTRACT_CHECK` (`off` | `fallback` | `strict`, default `fallback`) → `config.http.contractCheck`; `.env.example` documents all three
+- [x] `core/http/schemas.ts`, `core/http/contract.ts` (strict + fallback), `core/http/openapi.ts` (swagger + `routeCatalog()`), wired from `buildHttp`
+- [x] `core/paging.ts`: the two envelope schema builders
+- [x] Shared test helper + migration of every `createApp(loadConfig(...))` call site (`test(core)` commit)
+- [x] `scripts/gen-openapi.ts`, root `npm run api:spec`, `server/openapi.json`; `openapi.test.ts`; `api-coverage.test.ts` + `api-coverage.pending.ts`
+- [x] `observability/`: Loki alert rule on `contract mismatch`
+- [x] Core routes, `health`, and `runestone`/`edda`/`groot`/`atlas` (config, legacy + paged list as `anyOf [array, object]`, create 201, get 200/301, raw text/301 with CORS header, update, delete 204, `?download`)
+- [x] Gate run: `npm test`, `test:e2e`, `test:api-diff --base develop` on seeded data: zero differences
 
 **32c — the rest + cleanup**
-- [ ] `file-transfer`, `previews`, `qr-tool`, `themes`, `heimdall`, `clipboard`, `presence`, `audit-log`, `loki`, `brotli`, `accio`, `nimbus`, `portkey` (+ `/go`), `screensaver`, `client-logs`, `metrics`, `offline-mode`
-- [ ] `presence.int.test.ts`, `qr-tool.int.test.ts`
-- [ ] API-diff corpus check against every `GET` in `openapi.json`
-- [ ] Ratchet emptied; `api-coverage.pending.ts` deleted
-- [ ] Gate run as in 32b
-- [ ] **The one-time real-data run:** `test:api-diff --base develop --data storage/data/app.db` (reads only, `VACUUM INTO` snapshot), zero differences. The snapshot is deleted the moment the run validates; record the run (date, row counts, result) in `progress.md`
-- [ ] Cleanup check: `git worktree list` shows only the main checkout; no scratch storage or snapshot left; PR description lists deletions
+- [x] `file-transfer`, `previews`, `qr-tool`, `themes`, `heimdall`, `clipboard`, `presence`, `audit-log`, `loki`, `brotli`, `accio`, `nimbus`, `portkey` (+ `/go`), `screensaver`, `client-logs`, `metrics`, `offline-mode`
+- [x] `presence.int.test.ts`, `qr-tool.int.test.ts`
+- [x] API-diff corpus check against every `GET` in `openapi.json`
+- [x] Ratchet emptied; `api-coverage.pending.ts` deleted
+- [x] Gate run as in 32b
+- [ ] **The one-time real-data run:** `test:api-diff --base develop --data storage/data/app.db` (reads only, `VACUUM INTO` snapshot), zero differences. The snapshot is deleted the moment the run validates; record the run (date, row counts, result) in `progress.md` — _not run: the owner's `storage/data/app.db` is not in the cloud container that implemented 32c. The owner runs it once, locally (`npm run test:api-diff -- --base develop --data storage/data/app.db`); the tool deletes the snapshot itself_
+- [x] Cleanup check: `git worktree list` shows only the main checkout; no scratch storage or snapshot left; PR description lists deletions
 
 **Docs**
-- [ ] `docs/testing.md`: every kind of test, how to run and replay each, what stays and what was temporary
-- [ ] `architecture.md` (the net, the guard modes, the spec), `coding.md` (new routes ship schemas/tags/summary/operationId + a journey; `npm run api:spec`), `tech-stack.md`, `decisions.md`, `progress.md`
-- [ ] Archive this file into `completed/` in 32c's PR
+- [x] `docs/testing.md`: every kind of test, how to run and replay each, what stays and what was temporary
+- [x] `architecture.md` (the net, the guard modes, the spec), `coding.md` (new routes ship schemas/tags/summary/operationId + a journey; `npm run api:spec`), `tech-stack.md`, `decisions.md`, `progress.md`
+- [x] Archive this file into `completed/` in 32c's PR
 
 ## Acceptance criteria
 
@@ -398,21 +398,21 @@ Each PR's description lists what it deleted. A PR is not done while `git worktre
 ## Test checklist
 
 **End-to-end (32a, the deliverable that protects everything after it)**
-- [ ] Playwright: browser journeys 1–18 × three projects; `routes.spec.ts`; cross-surface journeys (criteria 1–3)
-- [ ] Cloud gating
-- [ ] Vitest: CLI suite (criterion 4)
-- [ ] API diff: develop vs develop, then each part, seeded and owner data (criterion 5)
+- [x] Playwright: browser journeys 1–18 × three projects; `routes.spec.ts`; cross-surface journeys (criteria 1–3) — _WebKit cannot launch in the implementing container; CI is its run_
+- [x] Cloud gating
+- [x] Vitest: CLI suite (criterion 4)
+- [ ] API diff: develop vs develop, then each part, seeded and owner data (criterion 5) — _seeded runs done for develop, 32b and 32c; the owner-data run is the one above_
 
 **Unit**
-- [ ] `core/http/contract.test.ts`: strict failure modes and bypasses; fallback substitution + log line (criteria 7 and 8)
-- [ ] `core/config`: `API_CONTRACT_CHECK` values and default
-- [ ] `core/paging`: envelope schema builders accepted by the guard for real envelopes
+- [x] `core/http/contract.test.ts`: strict failure modes and bypasses; fallback substitution + log line (criteria 7 and 8)
+- [x] `core/config`: `API_CONTRACT_CHECK` values and default
+- [x] `core/paging`: envelope schema builders accepted by the guard for real envelopes
 
 **Integration**
-- [ ] Every migrated `*.int.test.ts` under the guard; `presence`/`qr-tool`; `api-coverage.test.ts`; `openapi.test.ts`; no docs path answers (criteria 6, 9 and 10)
+- [x] Every migrated `*.int.test.ts` under the guard; `presence`/`qr-tool`; `api-coverage.test.ts`; `openapi.test.ts`; no docs path answers (criteria 6, 9 and 10)
 
 **Manual**
-- [ ] The single `--data` run at 32c (owner approved 2026-10-04; snapshot deleted right after); owner tests the built app on a real iPad and iPhone after 32c (WebKit emulation is not the device)
+- [ ] The single `--data` run at 32c (owner approved 2026-10-04; snapshot deleted right after); owner tests the built app on a real iPad and iPhone after 32c (WebKit emulation is not the device) — _owner-manual, after 32c_
 
 ## On completion
 

@@ -1,4 +1,5 @@
 import { DOWNLOAD_ID_PATTERN } from '../../core/download-id.js';
+import { errorResponses } from '../../core/http/schemas.js';
 import type { FeatureModule } from '../../core/module.js';
 import { FsDownloadInspector, FsFileInspector } from './services/fs-file-inspector.js';
 import {
@@ -23,6 +24,24 @@ const nameParamsSchema = {
   },
 } as const;
 
+/** `PreviewMeta`, in the order the usecase builds it. */
+const previewMetaSchema = {
+  type: 'object',
+  required: ['previewable', 'kind', 'mime', 'name', 'size'],
+  properties: {
+    previewable: {
+      type: 'boolean',
+      description: 'False when the browser cannot show it, or it is too big',
+    },
+    kind: { type: 'string', enum: ['image', 'video', 'audio', 'pdf', 'markdown', 'text', 'none'] },
+    mime: { type: 'string', description: 'Sniffed from the bytes first, then the extension' },
+    name: { type: 'string', description: 'The base name, never folder-qualified' },
+    size: { type: 'integer' },
+  },
+} as const;
+
+const TAGS = ['previews'];
+
 export const previewsModule: FeatureModule = {
   name: 'previews',
   register(app, deps) {
@@ -38,13 +57,29 @@ export const previewsModule: FeatureModule = {
 
     app.get<{ Params: { id: string } }>(
       '/api/downloads/:id/meta',
-      { schema: { params: idParamsSchema } },
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'What a download is, and whether the browser can preview it',
+          operationId: 'getDownloadPreviewMeta',
+          params: idParamsSchema,
+          response: { 200: previewMetaSchema, ...errorResponses(400, 404) },
+        },
+      },
       (request) => downloadMeta.execute(request.params.id),
     );
 
     app.get<{ Params: { name: string } }>(
       '/api/files/:name/preview',
-      { schema: { params: nameParamsSchema } },
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'What a staged upload is, and whether the browser can preview it',
+          operationId: 'getUploadPreviewMeta',
+          params: nameParamsSchema,
+          response: { 200: previewMetaSchema, ...errorResponses(400, 404) },
+        },
+      },
       (request) => uploadMeta.byName(request.params.name),
     );
   },
