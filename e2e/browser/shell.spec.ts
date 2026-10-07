@@ -66,16 +66,18 @@ test.describe('shell', () => {
     await expect(page.getByRole('button', { name: /Theme: Tokyo/ })).toBeVisible();
   });
 
-  test('every page with a format has a guide, and the others have none', async ({ page }) => {
-    const guides: [string, string][] = [
-      ['/runestone', 'JSON'],
-      ['/edda', 'Markdown'],
-      ['/atlas', 'XML'],
-      ['/groot', 'YAML'],
-      ['/loki', 'JavaScript'],
-      ['/brotli', 'Brotli'],
-    ];
-    for (const [path, title] of guides) {
+  // One test per page: six editors in one test sat at the 60 s limit on CI's
+  // WebKit, and a failure now names its page.
+  const guides: [string, string][] = [
+    ['/runestone', 'JSON'],
+    ['/edda', 'Markdown'],
+    ['/atlas', 'XML'],
+    ['/groot', 'YAML'],
+    ['/loki', 'JavaScript'],
+    ['/brotli', 'Brotli'],
+  ];
+  for (const [path, title] of guides) {
+    test(`${path} has a ${title} guide that opens and closes`, async ({ page }) => {
       await page.goto(path);
       await page.getByRole('button', { name: `${title} guide` }).click();
       const panel = page.getByRole('complementary', { name: `${title} guide` });
@@ -84,7 +86,10 @@ test.describe('shell', () => {
       // swallowed by the sheet's drag header (fixed after PLAN-32a).
       await page.getByRole('button', { name: 'Close guide' }).click();
       await expect(panel).toBeHidden();
-    }
+    });
+  }
+
+  test('a page with no format has no guide', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('button', { name: /guide$/ })).toHaveCount(0);
   });
