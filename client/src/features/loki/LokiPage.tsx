@@ -31,8 +31,8 @@ import { formatBytes } from '../../core/format';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { usePanelFont } from '../../core/panelFont';
-import { fetchLokiConfig, type LokiConfig } from '../../core/loki';
-import { bifrostEvents } from '../../core/sse';
+import type { LokiConfig } from '../../core/loki';
+import { lokiSettings } from '../../core/settings';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { Toast } from '../../core/ui/Toast';
@@ -147,20 +147,19 @@ export function LokiPage() {
   // Heimdall policy, or this browser's own on the standalone site (PLAN-35).
   const canExecute = lokiConfig?.executionEnabled === true;
 
-  // Read the runner policy, and re-read it live when Heimdall changes it.
+  // Read the runner policy, and follow it live when Heimdall changes it: the
+  // hub's policy, or this browser's own on the standalone site (PLAN-35).
   useEffect(() => {
     let cancelled = false;
-    const load = () => {
-      void fetchLokiConfig()
-        .then((cfg) => {
-          if (!cancelled) setLokiConfig(cfg);
-        })
-        .catch(() => {
-          // no config → execution just stays hidden; transforms still work
-        });
-    };
-    load();
-    const off = bifrostEvents.on('loki.settingsUpdated', load);
+    lokiSettings
+      .load()
+      .then((cfg) => {
+        if (!cancelled) setLokiConfig(cfg);
+      })
+      .catch(() => {
+        // no config → execution just stays hidden; transforms still work
+      });
+    const off = lokiSettings.subscribe(setLokiConfig);
     return () => {
       cancelled = true;
       off();

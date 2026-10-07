@@ -731,6 +731,12 @@
   margin: 0;
 }
 
+/* Standalone (PLAN-35): what these settings apply to is visible. */
+.heimdall-local-note {
+  margin-top: var(--space-1);
+  color: var(--accent);
+}
+
 .heimdall-content__actions {
   display: flex;
   align-items: center;

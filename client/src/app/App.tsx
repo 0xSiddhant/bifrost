@@ -4,7 +4,8 @@ import { hasCategory, needsHubForPath, type FeatureCategory } from '../core/feat
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { log } from '../core/log';
-import { fetchScreensaverConfig, type ScreensaverConfig } from '../core/screensaver';
+import type { ScreensaverConfig } from '../core/screensaver';
+import { screensaverSettings } from '../core/settings';
 import {
   fetchOfflineModeConfig,
   enabledTargets,
@@ -66,15 +67,6 @@ interface NavCategory {
   category: FeatureCategory;
 }
 
-/** Nótt on the standalone site: the build's baked defaults and the server's bounds. */
-const STANDALONE_SCREENSAVER: ScreensaverConfig = {
-  ...__BIFROST_DEFAULTS__.screensaver,
-  idleMin: 5,
-  idleMax: 3600,
-  rotateMin: 4,
-  rotateMax: 120,
-};
-
 const NAV: NavCategory[] = [
   {
     to: '/',
@@ -125,25 +117,18 @@ export function App() {
 
   useEffect(() => {
     if (!isDesktop) return;
-    if (!__HUB__) {
-      // No hub policy to read on the standalone site: the build's own defaults.
-      setScreensaverConfig(STANDALONE_SCREENSAVER);
-      return;
-    }
     let cancelled = false;
-    fetchScreensaverConfig()
+    screensaverSettings
+      .load()
       .then((cfg) => {
         if (!cancelled) setScreensaverConfig(cfg);
       })
       .catch(() => {
         // Module absent (older/cloud server) — the saver simply stays disabled.
       });
-    // Heimdall edits broadcast the new policy; rebind live without a reload.
-    const off = bifrostEvents.on('screensaver.settingsUpdated', (payload) => {
-      setScreensaverConfig((prev) =>
-        prev ? { ...prev, ...(payload as Partial<ScreensaverConfig>) } : prev,
-      );
-    });
+    // A Heimdall edit (another device on the hub, another tab standalone)
+    // rebinds live, without a reload.
+    const off = screensaverSettings.subscribe(setScreensaverConfig);
     return () => {
       cancelled = true;
       off();

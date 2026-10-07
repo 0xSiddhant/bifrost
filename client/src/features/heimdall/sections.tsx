@@ -19,18 +19,14 @@ import {
   UploadIcon,
   WifiOffIcon,
 } from '../../core/ui/icons';
+import type { LokiConfig, LokiSettingsPatch } from '../../core/loki';
+import type { ScreensaverConfig, ScreensaverSettingsPatch } from '../../core/screensaver';
 import {
-  fetchLokiConfig,
-  patchLokiSettings,
-  type LokiConfig,
-  type LokiSettingsPatch,
-} from '../../core/loki';
-import {
-  fetchScreensaverConfig,
-  patchScreensaverSettings,
-  type ScreensaverConfig,
-  type ScreensaverSettingsPatch,
-} from '../../core/screensaver';
+  accessSettings,
+  lokiSettings,
+  screensaverSettings,
+  type AccessConfig,
+} from '../../core/settings';
 import {
   fetchOfflineModeConfig,
   setOfflineModeTargetEnabled,
@@ -336,7 +332,102 @@ function ShortcutField({ value, onChange }: { value: string; onChange: (next: st
   );
 }
 
-function SettingsSection({ onLock }: SectionProps) {
+/** Shortcut and tap count: how Heimdall opens. The same controls in both builds. */
+function AccessFields({
+  shortcut,
+  tapCount,
+  onChange,
+}: {
+  shortcut: string;
+  tapCount: number;
+  onChange: (patch: Partial<AccessConfig>) => void;
+}) {
+  return (
+    <>
+      <ShortcutField value={shortcut} onChange={(next) => onChange({ shortcut: next })} />
+      <div id={ctlId('tap-count')}>
+        <Select
+          label="Hidden tap count"
+          value={String(tapCount)}
+          onChange={(event) => onChange({ tapCount: Number(event.target.value) })}
+        >
+          {[5, 7, 9, 11].map((count) => (
+            <option key={count} value={count}>
+              {count} taps
+            </option>
+          ))}
+        </Select>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Standalone Settings (PLAN-35): this browser's theme, and how Heimdall opens
+ * here. There is no household, so no "default theme" (it would be the same as
+ * picking one) and no sessions to revoke.
+ */
+function BrowserSettingsSection() {
+  const [access, setAccess] = useState<AccessConfig | null>(null);
+  const [themeState, setThemeState] = useState(() => themeEngine.getState());
+  const [saved, setSaved] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void accessSettings.load().then((value) => {
+      if (!cancelled) setAccess(value);
+    });
+    const offAccess = accessSettings.subscribe(setAccess);
+    const offTheme = themeEngine.subscribe(setThemeState);
+    return () => {
+      cancelled = true;
+      offAccess();
+      offTheme();
+    };
+  }, []);
+
+  const save = async () => {
+    if (!access) return;
+    setAccess(await accessSettings.save(access));
+    setSaved('Saved in this browser.');
+  };
+
+  if (!access) return <p className="caption">Loading settings…</p>;
+  return (
+    <Card>
+      <div className="stack">
+        <div id={ctlId('browser-theme')}>
+          <Select
+            label="Theme for this browser"
+            value={themeState.activeId ?? ''}
+            onChange={(event) => themeEngine.setTheme(event.target.value)}
+          >
+            {themeState.themes.map((theme) => (
+              <option key={theme.id} value={theme.id}>
+                {theme.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <AccessFields
+          shortcut={access.shortcut}
+          tapCount={access.tapCount}
+          onChange={(patch) => setAccess({ ...access, ...patch })}
+        />
+        {saved && (
+          <p className="caption" role="status" style={{ color: 'var(--ok)' }}>
+            {saved}
+          </p>
+        )}
+        <div className="row">
+          <Button onClick={() => void save()}>Save</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function HubSettingsSection({ onLock }: SectionProps) {
   const [settings, setSettings] = useState<HeimdallSettings | null>(null);
   // The bundled themes (PLAN-35): the household default picks among what ships.
   const themes = themeEngine.getState().themes;
@@ -385,23 +476,11 @@ function SettingsSection({ onLock }: SectionProps) {
   return (
     <Card>
       <div className="stack">
-        <ShortcutField
-          value={settings.shortcut}
-          onChange={(shortcut) => setSettings({ ...settings, shortcut })}
+        <AccessFields
+          shortcut={settings.shortcut}
+          tapCount={settings.tapCount}
+          onChange={(patch) => setSettings({ ...settings, ...patch })}
         />
-        <div id={ctlId('tap-count')}>
-          <Select
-            label="Hidden tap count"
-            value={String(settings.tapCount)}
-            onChange={(event) => setSettings({ ...settings, tapCount: Number(event.target.value) })}
-          >
-            {[5, 7, 9, 11].map((count) => (
-              <option key={count} value={count}>
-                {count} taps
-              </option>
-            ))}
-          </Select>
-        </div>
         <div id={ctlId('default-theme')}>
           <Select
             label="Default theme"
@@ -486,7 +565,8 @@ function LokiSection() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchLokiConfig()
+    lokiSettings
+      .load()
       .then((res) => {
         if (!cancelled) setCfg(res);
       })
@@ -500,9 +580,11 @@ function LokiSection() {
     setSaved(null);
     setError(null);
     try {
-      const updated = await patchLokiSettings(patch);
+      const updated = await lokiSettings.save(patch);
       setCfg(updated);
-      setSaved('Saved. Open Loki pages update instantly.');
+      setSaved(
+        __HUB__ ? 'Saved. Open Loki pages update instantly.' : 'Saved in this browser.',
+      );
     } catch {
       setError('Could not save Loki settings.');
     }
@@ -514,7 +596,7 @@ function LokiSection() {
       <div className="stack">
         <p className="caption">
           The Loki workbench's sandboxed execution (“Calcifer”). Runs happen in a killable Web
-          Worker with no DOM access. Execution is never offered in the cloud profile.
+          Worker with no DOM access, in the browser of whoever runs them.
         </p>
         <label className="check-row" id={ctlId('loki-execution')}>
           <input
@@ -601,7 +683,8 @@ function NottSection() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchScreensaverConfig()
+    screensaverSettings
+      .load()
       .then((res) => {
         if (!cancelled) setCfg(res);
       })
@@ -615,9 +698,9 @@ function NottSection() {
     setSaved(null);
     setError(null);
     try {
-      const updated = await patchScreensaverSettings(patch);
+      const updated = await screensaverSettings.save(patch);
       setCfg(updated);
-      setSaved('Saved. Open screens update instantly.');
+      setSaved(__HUB__ ? 'Saved. Open screens update instantly.' : 'Saved in this browser.');
     } catch {
       setError('Could not save screensaver settings.');
     }
@@ -905,7 +988,43 @@ function NetworkSection() {
 
 // ── About ───────────────────────────────────────────────────────
 
-function AboutSection() {
+/** Standalone About (PLAN-35): there is no server, so this is the client's own build. */
+function ClientAboutSection() {
+  const rows: [string, string][] = [
+    ['Version', __BIFROST_CLIENT__.version],
+    ['Commit', __BIFROST_CLIENT__.commit],
+    ['Built', new Date(__BIFROST_CLIENT__.builtAt).toLocaleString()],
+    ['Build', __BIFROST_BUILD__],
+  ];
+  return (
+    <Card>
+      <div className="stack" id={ctlId('about-info')}>
+        <p className="caption">
+          Heimdall is Bifrost's gatekeeper. On this standalone site it keeps this browser's own
+          settings; the household dials live on a Bifrost hub.
+        </p>
+        <dl className="about-grid">
+          {rows.map(([key, value]) => (
+            <div className="about-row" key={key}>
+              <dt className="caption">{key}</dt>
+              <dd className="mono">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <div className="about-links">
+          <a href="https://github.com/0xSiddhant/bifrost" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+          <a href="https://0xSiddhant.com" target="_blank" rel="noreferrer">
+            0xSiddhant.com
+          </a>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function HubAboutSection() {
   const [about, setAbout] = useState<AboutInfo | null>(null);
   const [changelog, setChangelog] = useState<string | null>(null);
 
@@ -1049,9 +1168,14 @@ function OfflineModeSection() {
 
 // ── Registry ────────────────────────────────────────────────────
 
-export const SECTIONS: HeimdallSection[] = [
+/**
+ * Every section, with the builds it exists in (PLAN-35). Standalone keeps only
+ * what lives in this browser: Settings, Sky Relics, Loki, Screensaver, About.
+ */
+const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
   {
     id: 'overview',
+    hubOnly: true,
     label: 'Overview',
     group: 'Watchtower',
     icon: <ShieldIcon size={16} />,
@@ -1061,6 +1185,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'activity',
+    hubOnly: true,
     label: 'Activity',
     group: 'Watchtower',
     icon: <ShieldIcon size={16} />,
@@ -1070,6 +1195,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'wardens',
+    hubOnly: true,
     label: 'Wardens',
     group: 'Watchtower',
     icon: <MonitorIcon size={16} />,
@@ -1084,14 +1210,22 @@ export const SECTIONS: HeimdallSection[] = [
     label: 'Settings',
     group: 'Realm',
     icon: <ShieldIcon size={16} />,
-    blurb: 'Entry gesture, default theme, and session control.',
-    Component: SettingsSection,
-    manifest: [
-      { controlId: 'shortcut', label: 'Admin shortcut', keywords: ['keyboard', 'hotkey', 'key'] },
-      { controlId: 'tap-count', label: 'Hidden tap count', keywords: ['tap', 'taps', 'gesture', 'count'] },
-      { controlId: 'default-theme', label: 'Default theme', keywords: ['theme'] },
-      { controlId: 'revoke', label: 'Revoke all sessions', keywords: ['logout', 'sessions', 'lock'] },
-    ],
+    blurb: __HUB__
+      ? 'Entry gesture, default theme, and session control.'
+      : "This browser's theme, and how Heimdall opens here.",
+    Component: __HUB__ ? HubSettingsSection : BrowserSettingsSection,
+    manifest: __HUB__
+      ? [
+          { controlId: 'shortcut', label: 'Admin shortcut', keywords: ['keyboard', 'hotkey', 'key'] },
+          { controlId: 'tap-count', label: 'Hidden tap count', keywords: ['tap', 'taps', 'gesture', 'count'] },
+          { controlId: 'default-theme', label: 'Default theme', keywords: ['theme'] },
+          { controlId: 'revoke', label: 'Revoke all sessions', keywords: ['logout', 'sessions', 'lock'] },
+        ]
+      : [
+          { controlId: 'browser-theme', label: 'Theme for this browser', keywords: ['theme', 'colour', 'color'] },
+          { controlId: 'shortcut', label: 'Admin shortcut', keywords: ['keyboard', 'hotkey', 'key'] },
+          { controlId: 'tap-count', label: 'Hidden tap count', keywords: ['tap', 'taps', 'gesture', 'count'] },
+        ],
   },
   {
     id: 'relics',
@@ -1136,6 +1270,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'offline-mode',
+    hubOnly: true,
     label: 'Offline mode',
     group: 'Realm',
     icon: <WifiOffIcon size={16} />,
@@ -1151,6 +1286,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'storage',
+    hubOnly: true,
     label: 'Storage',
     group: 'Vault',
     icon: <FolderIcon size={16} />,
@@ -1160,6 +1296,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'uploads',
+    hubOnly: true,
     label: 'Uploads',
     group: 'Vault',
     icon: <UploadIcon size={16} />,
@@ -1171,6 +1308,7 @@ export const SECTIONS: HeimdallSection[] = [
   },
   {
     id: 'network',
+    hubOnly: true,
     label: 'Network',
     group: 'Bridge',
     icon: <ClipboardIcon size={16} />,
@@ -1183,11 +1321,15 @@ export const SECTIONS: HeimdallSection[] = [
     label: 'About',
     group: 'Bridge',
     icon: <ShieldIcon size={16} />,
-    blurb: 'Version, build, runtime facts, and the changelog.',
-    Component: AboutSection,
-    manifest: [
-      { controlId: 'about-info', label: 'Version & build', keywords: ['version', 'commit', 'uptime', 'node'] },
-      { controlId: 'changelog', label: 'Changelog', keywords: ['history', 'releases', 'changes'] },
-    ],
+    blurb: __HUB__ ? 'Version, build, runtime facts, and the changelog.' : "This client's version and build.",
+    Component: __HUB__ ? HubAboutSection : ClientAboutSection,
+    manifest: __HUB__
+      ? [
+          { controlId: 'about-info', label: 'Version & build', keywords: ['version', 'commit', 'uptime', 'node'] },
+          { controlId: 'changelog', label: 'Changelog', keywords: ['history', 'releases', 'changes'] },
+        ]
+      : [{ controlId: 'about-info', label: 'Version & build', keywords: ['version', 'commit'] }],
   },
 ];
+
+export const SECTIONS: HeimdallSection[] = ALL_SECTIONS.filter((section) => __HUB__ || !section.hubOnly);

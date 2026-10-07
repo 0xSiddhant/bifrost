@@ -10,6 +10,7 @@
     "build": "vite build",
     "prebuild:standalone": "tsx ../scripts/copy-pdf-wasm.ts",
     "build:standalone": "vite build --mode standalone",
+    "postbuild:standalone": "tsx ../scripts/check-standalone.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

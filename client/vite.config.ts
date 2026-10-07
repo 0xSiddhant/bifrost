@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import dotenv from 'dotenv';
 import {
   buildManifest,
@@ -33,6 +35,28 @@ function buildManifestPlugin(build: Build, defaults: BuildDefaults): Plugin {
       });
     },
   };
+}
+
+/**
+ * What the client knows about itself: Heimdall's About on the standalone site,
+ * which has no server to ask (PLAN-35). The commit is best-effort: an image
+ * build has no .git, and "unknown" is the honest answer there.
+ */
+function clientInfo(mode: string): { version: string; commit: string; builtAt: string } {
+  if (mode === 'test') {
+    return { version: 'test', commit: 'test', builtAt: '1970-01-01T00:00:00.000Z' };
+  }
+  const pkg = readFileSync(new URL('./package.json', import.meta.url), 'utf8');
+  const { version } = JSON.parse(pkg) as { version: string };
+  let commit = process.env.BIFROST_COMMIT ?? 'unknown';
+  if (commit === 'unknown') {
+    try {
+      commit = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+    } catch {
+      // No git (an image build): the version still identifies the release.
+    }
+  }
+  return { version, commit, builtAt: new Date().toISOString() };
 }
 
 export default defineConfig(({ mode }) => {
@@ -68,6 +92,7 @@ export default defineConfig(({ mode }) => {
             __BIFROST_BUILD__: 'globalThis.__BIFROST_BUILD__',
             __HUB__: "(globalThis.__BIFROST_BUILD__ !== 'standalone')",
             __BIFROST_DEFAULTS__: JSON.stringify(defaults),
+            __BIFROST_CLIENT__: JSON.stringify(clientInfo(mode)),
           }
         : {
             // Literals, so Rollup drops the other build's branches: the
@@ -75,6 +100,7 @@ export default defineConfig(({ mode }) => {
             __BIFROST_BUILD__: JSON.stringify(build),
             __HUB__: JSON.stringify(!standalone),
             __BIFROST_DEFAULTS__: JSON.stringify(defaults),
+            __BIFROST_CLIENT__: JSON.stringify(clientInfo(mode)),
           },
     build: {
       outDir: standalone ? 'dist-standalone' : 'dist',
