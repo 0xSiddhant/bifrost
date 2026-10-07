@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { ExpandingGrid } from '../../core/ui/ExpandingGrid';
 import { LazyToolBody, TOOLS, availableTools } from '../../features/toolbox';
 
@@ -17,30 +17,23 @@ import { LazyToolBody, TOOLS, availableTools } from '../../features/toolbox';
  * TOOLS and the colours reorder with them — nothing hardcodes a per-card hue.
  */
 export function DiagonAlleyPage() {
-  const { capabilities } = useCapabilities();
   const { toolId } = useParams();
   const navigate = useNavigate();
 
-  const tools = useMemo(
-    () =>
-      availableTools(TOOLS, (module) => !capabilities || capabilities.modules.includes(module)),
-    [capabilities],
-  );
+  // The build's feature list is fixed, so this never changes after the first render.
+  const tools = useMemo(() => availableTools(TOOLS, hasFeature), []);
 
   const openTool = tools.find((tool) => tool.id === toolId && !tool.to) ?? null;
 
   /**
    * An unknown, unavailable or unsupported :toolId renders the hub with nothing
    * open and rewrites the URL — never a 404, never a dead panel. Replaced, not
-   * pushed, so Back doesn't bounce straight back into the bad URL. Waits for
-   * capabilities: until they land every tool looks available, and redirecting
-   * on a half-loaded page would close a panel the user legitimately deep-linked.
+   * pushed, so Back doesn't bounce straight back into the bad URL.
    */
   useEffect(() => {
-    if (!toolId || !capabilities) return;
-    if (openTool) return;
+    if (!toolId || openTool) return;
     navigate('/diagon-alley', { replace: true });
-  }, [toolId, capabilities, openTool, navigate]);
+  }, [toolId, openTool, navigate]);
 
   return (
     <>

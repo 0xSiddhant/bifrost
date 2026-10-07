@@ -79,11 +79,8 @@ function servePage(kind: 'runestone' | 'edda') {
   };
 }
 
-vi.mock('../../core/useCapabilities', () => ({
-  useCapabilities: () => ({
-    capabilities: { profile: 'local', modules: mocks.modules },
-    error: null,
-  }),
+vi.mock('../../core/features', () => ({
+  hasFeature: (id: string) => mocks.modules.includes(id),
 }));
 
 vi.mock('../../core/devices', () => ({

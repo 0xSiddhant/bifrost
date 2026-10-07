@@ -30,7 +30,6 @@ import { formatBytes } from '../../core/format';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
 import { usePanelFont } from '../../core/panelFont';
-import { useCapabilities } from '../../core/useCapabilities';
 import { fetchLokiConfig, type LokiConfig } from '../../core/loki';
 import { bifrostEvents } from '../../core/sse';
 import { Button } from '../../core/ui/Button';
@@ -108,7 +107,6 @@ export function LokiPage() {
   const [rxSubject, setRxSubject] = useState(initialDraft?.rxSubject ?? '');
 
   // Execution ("Calcifer", Part B) ------------------------------------------
-  const { capabilities } = useCapabilities();
   const [lokiConfig, setLokiConfig] = useState<LokiConfig | null>(null);
   const [output, setOutput] = useState<OutputState>(emptyOutput);
   const runnerRef = useRef<LokiRunner | null>(null);
@@ -144,10 +142,9 @@ export function LokiPage() {
     window.addEventListener('pointerup', onUp);
   };
 
-  // Execution is offered only in the local profile AND when Heimdall's master
-  // switch is on — a module in both profiles can't advertise a sub-capability,
-  // so the profile check is the mechanism.
-  const canExecute = capabilities?.profile === 'local' && lokiConfig?.executionEnabled === true;
+  // Execution is offered when the run policy's master switch is on: the hub's
+  // Heimdall policy, or this browser's own on the standalone site (PLAN-35).
+  const canExecute = lokiConfig?.executionEnabled === true;
 
   // Read the runner policy, and re-read it live when Heimdall changes it.
   useEffect(() => {
@@ -722,7 +719,7 @@ export function LokiPage() {
           </Toast>
         )}
 
-        {capabilities?.profile === 'local' && lokiConfig && !lokiConfig.executionEnabled && (
+        {lokiConfig && !lokiConfig.executionEnabled && (
           <p className="loki-soon caption">
             <strong>Calcifer</strong> (sandboxed execution) is turned off in Heimdall.
           </p>

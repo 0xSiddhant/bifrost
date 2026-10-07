@@ -1,6 +1,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { useCapabilities } from '../core/useCapabilities';
+import { hasCategory, type FeatureCategory } from '../core/features';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { log } from '../core/log';
@@ -37,8 +37,8 @@ import { NotFoundPage } from './pages/NotFoundPage';
  * routes: Midgard (Send/Receive/Hermes/Join Bifrost), Ollivanders (Runestone/
  * Variant/Edda), Diagon Alley (Nimbus and Portkey, plus the tools that expand
  * in place at /diagon-alley/:toolId rather than owning a route). A tab
- * appears only when at least one of its modules is loaded in the active deploy
- * profile. Heimdall is deliberately absent — it opens via gesture/shortcut only.
+ * appears only when this build ships one of its features (core/features.ts,
+ * PLAN-35). Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
 interface NavCategory {
   to: string;
@@ -46,8 +46,8 @@ interface NavCategory {
   icon: ReactNode;
   /** Sub-page path prefixes that also light this tab as active. */
   match?: string[];
-  /** Tab shows when any of these modules is available (null = always). */
-  modules: (string | null)[];
+  /** The features that put this tab in the nav. */
+  category: FeatureCategory;
 }
 
 const NAV: NavCategory[] = [
@@ -58,26 +58,25 @@ const NAV: NavCategory[] = [
     // Midgard needed no `match` until PLAN-28: it was the only hub whose tools
     // all lived at their own top-level routes that already start with '/'.
     match: ['/saga'],
-    modules: [null],
+    category: 'midgard',
   },
   {
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
     match: ['/runestone', '/variant', '/edda', '/groot', '/atlas', '/loki', '/brotli', '/pensieve'],
-    modules: ['runestone', 'variant', 'edda', 'groot', 'atlas', 'loki', 'brotli'],
+    category: 'ollivanders',
   },
   {
     to: '/diagon-alley',
     label: 'Diagon Alley',
     icon: <SparklesIcon size={18} />,
     match: ['/nimbus', '/portkey'],
-    modules: ['qr-tool', 'nimbus', 'portkey'],
+    category: 'diagon-alley',
   },
 ];
 
 export function App() {
-  const { capabilities } = useCapabilities();
   const [heimdallOpen, setHeimdallOpen] = useState(false);
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   usePublishedBanner();
@@ -185,11 +184,7 @@ export function App() {
       setScreensaverActive(true);
     },
   });
-  const nav = NAV.filter((category) =>
-    category.modules.some(
-      (module) => module === null || !capabilities || capabilities.modules.includes(module),
-    ),
-  );
+  const nav = NAV.filter((entry) => hasCategory(entry.category));
   // Page-scoped, not a global control (PLAN-22): only the two hubs whose pages
   // compute locally offer it — Ollivanders, and Diagon Alley with or without an
   // open tool.
@@ -383,8 +378,14 @@ export function App() {
           bifrost.local
         </span>
         <span className="caption">
-          profile: {capabilities?.profile ?? '—'} · v0.1.0 ·{' '}
-          <span className={`sse-dot sse-${sseStatus}`} /> {sseStatus}
+          build: {__BIFROST_BUILD__} · v0.1.0
+          {/* The standalone site holds no live connection to report on. */}
+          {__HUB__ && (
+            <>
+              {' · '}
+              <span className={`sse-dot sse-${sseStatus}`} /> {sseStatus}
+            </>
+          )}
         </span>
       </footer>
     </div>

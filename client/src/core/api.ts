@@ -135,15 +135,6 @@ export function pagedParams(params: URLSearchParams, request: OffsetRequest): st
   return params.toString();
 }
 
-export interface Capabilities {
-  profile: 'local' | 'cloud';
-  modules: string[];
-}
-
-export function fetchCapabilities(): Promise<Capabilities> {
-  return apiGet<Capabilities>('/api/capabilities');
-}
-
 /**
  * Downloads are a shared resource: file-transfer lists them, previews views
  * them — features can't import each other, so the contract lives here.

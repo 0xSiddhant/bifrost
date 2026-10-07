@@ -8,6 +8,8 @@
     "dev": "vite",
     "prebuild": "tsx ../scripts/copy-pdf-wasm.ts",
     "build": "vite build",
+    "prebuild:standalone": "tsx ../scripts/copy-pdf-wasm.ts",
+    "build:standalone": "vite build --mode standalone",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

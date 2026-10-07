@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { Portal } from '../../core/ui/Portal';
 import {
   ArchiveFileIcon,
@@ -114,9 +114,7 @@ const TOOLS: Tool[] = [
 ];
 
 export function OllivandersPage() {
-  const { capabilities } = useCapabilities();
-  const has = (module: string) => !capabilities || capabilities.modules.includes(module);
-  const tools = TOOLS.filter((tool) => tool.modules.some(has));
+  const tools = TOOLS.filter((tool) => tool.modules.some(hasFeature));
 
   return (
     <>
