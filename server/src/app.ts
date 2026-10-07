@@ -14,6 +14,7 @@ import {
 import { loadDotenv } from './core/config/dotenv.js';
 import { clientLogger, createLogger, moduleLogger, type Logger } from './core/logger/index.js';
 import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
+import { checkClientBuild } from './core/client-build.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
 import { buildHttp } from './core/http/index.js';
@@ -166,9 +167,11 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
+  const clientDistDir = fromRepoRoot('client', 'dist');
+  checkClientBuild(clientDistDir, config, logger);
   const fastify = await buildHttp({
     logger,
-    clientDistDir: fromRepoRoot('client', 'dist'),
+    clientDistDir,
     bus,
     contractCheck: config.http.contractCheck,
     apiVersion: getBuildInfo().version,

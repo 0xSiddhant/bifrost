@@ -3899,36 +3899,6 @@
         }
       }
     },
-    "/api/runestone/config": {
-      "get": {
-        "operationId": "getRunestoneConfig",
-        "summary": "The limits the editor must respect",
-        "tags": [
-          "runestone"
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "maxDocKb"
-                  ],
-                  "properties": {
-                    "maxDocKb": {
-                      "type": "integer",
-                      "description": "The largest document the server accepts, in KiB"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/runestone": {
       "get": {
         "operationId": "listRunestones",
@@ -4957,41 +4927,6 @@
         }
       }
     },
-    "/api/edda/config": {
-      "get": {
-        "operationId": "getEddaConfig",
-        "summary": "The limits the editor must respect",
-        "tags": [
-          "edda"
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "maxDocKb",
-                    "livePreviewMaxKb"
-                  ],
-                  "properties": {
-                    "maxDocKb": {
-                      "type": "integer",
-                      "description": "The largest document the server accepts, in KiB"
-                    },
-                    "livePreviewMaxKb": {
-                      "type": "integer",
-                      "description": "Above this size the editor stops rendering the preview on every keystroke"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/edda": {
       "get": {
         "operationId": "listEddas",
@@ -5976,36 +5911,6 @@
         }
       }
     },
-    "/api/groot/config": {
-      "get": {
-        "operationId": "getGrootConfig",
-        "summary": "The limits the editor must respect",
-        "tags": [
-          "groot"
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "maxDocKb"
-                  ],
-                  "properties": {
-                    "maxDocKb": {
-                      "type": "integer",
-                      "description": "The largest document the server accepts, in KiB"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/groot": {
       "get": {
         "operationId": "listGrootDocs",
@@ -6981,36 +6886,6 @@
                     "details": {
                       "type": "object",
                       "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/atlas/config": {
-      "get": {
-        "operationId": "getAtlasConfig",
-        "summary": "The limits the editor must respect",
-        "tags": [
-          "atlas"
-        ],
-        "responses": {
-          "200": {
-            "description": "Default Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "required": [
-                    "maxDocKb"
-                  ],
-                  "properties": {
-                    "maxDocKb": {
-                      "type": "integer",
-                      "description": "The largest document the server accepts, in KiB"
                     }
                   }
                 }

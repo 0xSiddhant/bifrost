@@ -55,9 +55,9 @@ describe('Spec', () => {
     expect(spec.isSuccess(spec.byId('getX'), 302)).toBe(false);
   });
 
-  it('loads the committed openapi.json: 89 operations, each with a unique id', () => {
+  it('loads the committed openapi.json: 85 operations, each with a unique id', () => {
     const real = loadSpec();
-    expect(real.operations).toHaveLength(89);
-    expect(new Set(real.operations.map((op) => op.operationId)).size).toBe(89);
+    expect(real.operations).toHaveLength(85);
+    expect(new Set(real.operations.map((op) => op.operationId)).size).toBe(85);
   });
 });

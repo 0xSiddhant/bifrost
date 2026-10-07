@@ -20,6 +20,15 @@ COPY cli/package.json ./cli/
 RUN npm ci
 # Build, then drop dev deps so only production node_modules ship.
 COPY . .
+# The editor caps are baked into the client at build time from the same keys
+# the server enforces (PLAN-35). An image builds without the runtime .env, so
+# pass the server's values as build args, or the defaults below are baked in;
+# the server's boot log names any key that drifted.
+ARG RUNESTONE_MAX_DOC_KB=2048
+ARG EDDA_MAX_DOC_KB=2048
+ARG EDDA_LIVE_PREVIEW_MAX_KB=300
+ARG GROOT_MAX_DOC_KB=2048
+ARG ATLAS_MAX_DOC_KB=2048
 # CI=true so the build's cli-sync step builds cli/ without also trying to
 # `npm install -g` the CLI into a throwaway image layer (PLAN-27).
 RUN CI=true npm run build \
