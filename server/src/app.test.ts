@@ -38,7 +38,6 @@ describe('boot → health → capabilities', () => {
         'file-transfer',
         'previews',
         'qr-tool',
-        'themes',
         'heimdall',
         'clipboard',
         'presence',

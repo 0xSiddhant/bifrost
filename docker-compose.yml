@@ -20,6 +20,5 @@ services:
     volumes:
       # State that must survive container replacement.
       - ./storage:/app/storage
-      - ./themes:/app/themes
     restart: unless-stopped
     init: true

@@ -1,7 +1,7 @@
 /**
  * `npm run backup [-- --include-env] [-- --meta]` — VACUUM INTO a consistent
- * SQLite copy and zip storage/ (minus tmp/ and BACKUP_EXCLUDE) plus themes/
- * into BACKUP_DIR, timestamped and rotated to the newest BACKUP_KEEP.
+ * SQLite copy and zip storage/ (minus tmp/ and BACKUP_EXCLUDE) into
+ * BACKUP_DIR, timestamped and rotated to the newest BACKUP_KEEP.
  * Online-safe: runs against a live server.
  *
  * `--meta` also writes `<archive>.meta.json` beside the zip — checksum, app
@@ -78,7 +78,6 @@ try {
       base: ROOT,
       storageRoot: config.storage.root,
       dbFile: config.storage.dbFile,
-      themesDir: config.themes.dir,
       envFile: path.join(ROOT, '.env'),
       backupDir: config.backupDir,
     },

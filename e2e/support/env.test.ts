@@ -12,7 +12,7 @@ describe('envKeysFrom', () => {
 describe('knownEnvKeys', () => {
   it('includes every required key from .env.example', () => {
     const keys = knownEnvKeys();
-    for (const key of ['DEPLOY_PROFILE', 'PORT', 'STORAGE_ROOT', 'HEIMDALL_PIN', 'THEMES_DIR']) {
+    for (const key of ['DEPLOY_PROFILE', 'PORT', 'STORAGE_ROOT', 'HEIMDALL_PIN']) {
       expect(keys).toContain(key);
     }
   });

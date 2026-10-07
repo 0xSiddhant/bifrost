@@ -11,6 +11,7 @@ export default tseslint.config(
     // reason node_modules is.
     ignores: [
       '**/dist/**',
+      '**/dist-standalone/**',
       '**/node_modules/**',
       'server/drizzle/**',
       'storage/**',

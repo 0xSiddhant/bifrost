@@ -1,5 +1,33 @@
-import { contrastWarnings, parseColor } from './contrast.js';
-import type { ResolvedTheme, ThemeFile } from './ports.js';
+import { parseColor } from './color';
+
+/**
+ * Ported from the server's `modules/themes/resolve.ts` when themes became
+ * client code (PLAN-35): the same derived defaults, so a theme looks exactly
+ * as it did when the server resolved it. `themes.test.ts` runs the server
+ * test's resolve cases against this copy.
+ */
+
+export type ThemeMode = 'dark' | 'light';
+
+/** A theme file exactly as authored (`client/src/assets/themes/*.json`). */
+export interface ThemeFile {
+  id: string;
+  name: string;
+  mode: ThemeMode;
+  tokens: Record<string, string>;
+}
+
+export interface ThemeSummary {
+  id: string;
+  name: string;
+  mode: ThemeMode;
+  preview: { bg: string; accent: string };
+}
+
+/** Authored tokens + derived defaults for everything omitted. */
+export interface ResolvedTheme extends ThemeSummary {
+  tokens: Record<string, string>;
+}
 
 /** `#2dd4bf` + 0.12 → `rgba(45, 212, 191, 0.12)`; passthrough when unparseable. */
 function alpha(color: string, value: number): string {
@@ -14,7 +42,7 @@ function alpha(color: string, value: number): string {
  * whole app — sky, glows, syntax colors, QR palette included. Authored
  * values always win; this only fills holes.
  */
-export function resolveTheme(theme: ThemeFile, builtIn: boolean): ResolvedTheme {
+export function resolveTheme(theme: ThemeFile): ResolvedTheme {
   const t = theme.tokens;
   const dark = theme.mode === 'dark';
   const accent = t['--accent'] ?? '#2dd4bf';
@@ -77,8 +105,6 @@ export function resolveTheme(theme: ThemeFile, builtIn: boolean): ResolvedTheme 
     name: theme.name,
     mode: theme.mode,
     preview: { bg: tokens['--bg'] ?? '#000000', accent },
-    builtIn,
-    warnings: contrastWarnings(tokens),
     tokens,
   };
 }

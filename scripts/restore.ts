@@ -1,6 +1,7 @@
 /**
  * `npm run restore -- <path> [--force]` — extract a backup over the repo
- * (storage/ and themes/, and .env only if the archive carries it). Refuses to
+ * (storage/, and .env only if the archive carries it; an older archive's
+ * themes/ is skipped, PLAN-35). Refuses to
  * run while a server is listening on PORT, since overwriting files under a live
  * process tears state; `--force` overrides.
  *
@@ -93,15 +94,20 @@ try {
     console.log('  no meta file beside it — restoring without a checksum check');
   }
 
-  restoreBackup({
+  const { skippedThemeFiles } = restoreBackup({
     archive,
     base: ROOT,
     storageRoot: config.storage.root,
-    themesDir: config.themes.dir,
     force,
     live,
   });
   console.log(`✔ restored ${archive}`);
+  if (skippedThemeFiles > 0) {
+    // An archive from before PLAN-35: themes ship with the client now.
+    console.log(
+      `  skipped themes/ (${skippedThemeFiles} file(s)): themes are part of the app since PLAN-35, not the backup.`,
+    );
+  }
   console.log('  Note: .env is restored only if the archive included it — recreate it otherwise.');
 } catch (error) {
   console.error(`✖ restore failed: ${(error as Error).message}`);

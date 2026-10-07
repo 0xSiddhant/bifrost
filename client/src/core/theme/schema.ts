@@ -1,6 +1,7 @@
 /**
  * The theme contract (JSON Schema draft 2020-12), mirrored prose-style in
- * docs/THEME-SPEC.md. A theme JSON is a flat map onto the tokens.css custom
+ * docs/THEME-SPEC.md. Moved from the server with the themes (PLAN-35); only
+ * `themes.test.ts` imports it, so ajv and this schema stay out of the bundle. A theme JSON is a flat map onto the tokens.css custom
  * properties: required color roles, optional atmosphere / syntax / diff / qr /
  * typography / shape groups. Omitted optional tokens get derived defaults
  * (resolve.ts) so a minimal theme is ~17 lines.

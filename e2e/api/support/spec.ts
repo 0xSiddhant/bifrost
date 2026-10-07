@@ -81,7 +81,7 @@ export class Spec {
         });
       }
     }
-    // A literal segment beats a parameter: `/api/themes/manage` is not `{id}`.
+    // A literal segment beats a parameter: `/api/things/manage` is not `{id}`.
     this.matchers = this.operations
       .map((op) => ({
         op,

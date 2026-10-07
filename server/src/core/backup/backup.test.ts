@@ -20,7 +20,10 @@ function tmpDir(label: string): string {
   return dir;
 }
 
-/** A minimal repo tree: storage/ (db + upload + tmp junk), themes/, .env. */
+/**
+ * A minimal repo tree: storage/ (db + upload + tmp junk), .env, and a stray
+ * themes/ that a backup must leave out since PLAN-35.
+ */
 function makeRepo(): { targets: BackupTargets } {
   const base = tmpDir('bkp-repo');
   const storageRoot = path.join(base, 'storage');
@@ -46,7 +49,7 @@ function makeRepo(): { targets: BackupTargets } {
   db.close();
 
   return {
-    targets: { base, storageRoot, dbFile, themesDir, envFile, backupDir: path.join(base, 'backups') },
+    targets: { base, storageRoot, dbFile, envFile, backupDir: path.join(base, 'backups') },
   };
 }
 
@@ -58,7 +61,7 @@ function extract(archive: string): string {
 
 /** Restore target + its configured folders, as scripts/restore.ts passes them. */
 function restoreRoots(base: string) {
-  return { base, storageRoot: path.join(base, 'storage'), themesDir: path.join(base, 'themes') };
+  return { base, storageRoot: path.join(base, 'storage') };
 }
 
 afterEach(() => {
@@ -66,7 +69,7 @@ afterEach(() => {
 });
 
 describe('createBackup', () => {
-  it('archives storage/ and themes/, excludes tmp/ and .env by default', () => {
+  it('archives storage/, and leaves out tmp/, .env and themes/ by default', () => {
     const { targets } = makeRepo();
     const { file, bytes } = createBackup(targets, { now: new Date('2026-07-21T10:00:00Z') });
     expect(fs.existsSync(file)).toBe(true);
@@ -75,8 +78,9 @@ describe('createBackup', () => {
     const dest = extract(file);
     expect(fs.existsSync(path.join(dest, 'storage/data/app.db'))).toBe(true);
     expect(fs.existsSync(path.join(dest, 'storage/uploads/photo.bin'))).toBe(true);
-    expect(fs.existsSync(path.join(dest, 'themes/midnight.json'))).toBe(true);
-    // tmp/ is boot-swept junk; .env holds secrets — both stay out.
+    // tmp/ is boot-swept junk; .env holds secrets — both stay out. Themes are
+    // client code in git since PLAN-35, so they are not backup state either.
+    expect(fs.existsSync(path.join(dest, 'themes'))).toBe(false);
     expect(fs.existsSync(path.join(dest, 'storage/tmp/aborted.part'))).toBe(false);
     expect(fs.existsSync(path.join(dest, '.env'))).toBe(false);
   });
@@ -119,7 +123,6 @@ describe('createBackup', () => {
     expect(fs.existsSync(path.join(dest, 'storage/uploads/photo.bin'))).toBe(false);
     expect(fs.existsSync(path.join(dest, 'storage/logs/app.log'))).toBe(true);
     expect(fs.existsSync(path.join(dest, 'storage/data/app.db'))).toBe(true);
-    expect(fs.existsSync(path.join(dest, 'themes/midnight.json'))).toBe(true);
   });
 
   it('rejects excluding data/ or a path-like entry', () => {
@@ -216,9 +219,21 @@ describe('restoreBackup refuses hostile archives before extracting anything', ()
     expect(fs.readdirSync(dest)).toEqual([]);
   }
 
-  it('refuses an entry outside storage/, themes/ and .env', () => {
+  it('refuses an entry outside storage/, a legacy themes/ and .env', () => {
     const archive = hostileZip({ 'storage/ok.txt': 'ok', 'scripts/backup-agent.sh': 'evil' });
     expectRefused(archive, /"scripts\/backup-agent\.sh" is outside storage\/, themes\/ and \.env/);
+  });
+
+  it('restores an archive from before PLAN-35 and skips its themes/', () => {
+    const archive = hostileZip({
+      'storage/uploads/kept.txt': 'KEPT',
+      'themes/old-one.json': '{}',
+      'themes/old-two.json': '{}',
+    });
+    const dest = tmpDir('bkp-legacy-dest');
+    expect(restoreBackup({ archive, ...restoreRoots(dest) })).toEqual({ skippedThemeFiles: 2 });
+    expect(fs.readFileSync(path.join(dest, 'storage/uploads/kept.txt'), 'utf8')).toBe('KEPT');
+    expect(fs.existsSync(path.join(dest, 'themes'))).toBe(false);
   });
 
   it('refuses a symlink entry', () => {

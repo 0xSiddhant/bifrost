@@ -76,7 +76,7 @@ jobs:
           BACKUP_DIR: ${{ runner.temp }}/backups
         run: |
           npm run setup           # storage folders + migrations => a real app.db
-          npm run backup          # VACUUM INTO + zip storage/ + themes/
+          npm run backup          # VACUUM INTO + zip storage/
           ls "$BACKUP_DIR"/bifrost-backup-*.zip
 
   docker:

@@ -44,7 +44,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server/package.json ./server/package.json
 COPY --from=builder /app/client/package.json ./client/package.json
 # Runtime state (bind-mounted in compose), owned by the unprivileged node user.
-RUN mkdir -p storage themes && chown -R node:node /app
+RUN mkdir -p storage && chown -R node:node /app
 USER node
 EXPOSE 4646
 # Node 20 ships global fetch — no curl/wget needed in the image.

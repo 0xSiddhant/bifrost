@@ -1,8 +1,6 @@
-import fs from 'node:fs';
 import { test, expect } from '../support/fixtures.js';
 import { Api } from '../support/api.js';
 import { routes } from '../support/journey.js';
-import { fromRepoRoot } from '../support/paths.js';
 import { isMobile, waitForLive } from '../support/ui.js';
 import type { Locator, Page } from '@playwright/test';
 
@@ -108,25 +106,21 @@ test(
       .toBe(1);
     await toggle(firstTarget, true);
 
-    // Themes: disabling hides it from every switcher; an uploaded theme appears live.
-    await section(page, 'Themes').click();
-    await toggle(dialog.getByRole('group', { name: 'Themes' }).getByLabel('Tokyo'), false);
-    await expect.poll(async () => (await admin.get('/api/themes')).text()).not.toContain('"tokyo"');
-    await toggle(dialog.getByRole('group', { name: 'Themes' }).getByLabel('Tokyo'), true);
-
-    const aurora = JSON.parse(
-      fs.readFileSync(fromRepoRoot('themes', 'aurora.json'), 'utf8'),
-    ) as Record<string, unknown>;
-    await admin.post('/api/themes', { ...aurora, id: 'e2e-frost', name: 'E2E Frost' });
+    // Themes ship with the client since PLAN-35: there is no Themes section to
+    // manage any more, and the household default set in Settings reaches a
+    // device that has made no choice of its own (criterion 13).
+    await expect(section(page, 'Themes')).toHaveCount(0);
+    await section(page, 'Settings').click();
+    await dialog.getByLabel('Default theme').selectOption('tokyo');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(dialog.getByRole('status')).toBeVisible();
     await dialog.getByRole('button', { name: 'Lock' }).click();
     await expect(dialog).toBeHidden();
-    await page.getByRole('button', { name: /open theme picker/ }).click();
-    await expect(page.getByRole('menuitemradio', { name: /E2E Frost/ })).toBeVisible();
-    await page.keyboard.press('Escape');
-    await admin.delete('/api/themes/e2e-frost');
-    await page.getByRole('button', { name: /open theme picker/ }).click();
-    await expect(page.getByRole('menuitemradio', { name: /E2E Frost/ })).toHaveCount(0);
-    await page.keyboard.press('Escape');
+    const fresh = await newDevice();
+    await fresh.goto(`${server.baseUrl}/`);
+    await expect(fresh.locator('html')).toHaveAttribute('data-theme', 'tokyo');
+    await fresh.close();
+    await admin.patch('/api/heimdall/settings', { defaultThemeId: null });
 
     // Settings: a new tap count, then the taps themselves open the gate.
     await page.keyboard.press('Shift+Meta+Comma');

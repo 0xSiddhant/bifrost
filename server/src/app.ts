@@ -26,7 +26,6 @@ import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
 import { previewsModule } from './modules/previews/module.js';
 import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
-import { themesModule } from './modules/themes/module.js';
 import { heimdallModule } from './modules/heimdall/module.js';
 import { clipboardModule } from './modules/clipboard/module.js';
 import { presenceModule } from './modules/presence/module.js';
@@ -59,7 +58,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     fileTransferModule,
     previewsModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     clipboardModule,
     presenceModule,
@@ -103,7 +101,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
   cloud: [
     healthModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     runestoneModule,
     variantModule,

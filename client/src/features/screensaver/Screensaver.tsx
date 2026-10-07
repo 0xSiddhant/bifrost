@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ScreensaverConfig } from '../../core/screensaver';
-import { bifrostEvents } from '../../core/sse';
+import { themeEngine } from '../../core/theme';
 import { MoonIcon } from '../../core/ui/icons';
 import { pickRandomQuote, WORLD_LABELS, type Quote } from '../../assets/quotes';
 import {
@@ -141,12 +141,13 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
   }, []);
 
   // Re-read theme colors if the theme changes while the saver is up.
-  useEffect(() => {
-    const off = bifrostEvents.on('theme.updated', () => {
-      colorsRef.current = readColors();
-    });
-    return off;
-  }, []);
+  useEffect(
+    () =>
+      themeEngine.subscribe(() => {
+        colorsRef.current = readColors();
+      }),
+    [],
+  );
 
   // Canvas setup, input, and the render loop.
   useEffect(() => {

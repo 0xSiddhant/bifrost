@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ApiError, apiGet } from '../../core/api';
+import { ApiError } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceLabel, deviceName } from '../../core/devices';
 import { log } from '../../core/log';
+import { themeEngine } from '../../core/theme';
 import { bifrostEvents } from '../../core/sse';
 import { eventToShortcut, prettyShortcut } from '../../core/shortcut';
 import { Button } from '../../core/ui/Button';
@@ -14,7 +15,6 @@ import {
   CodeIcon,
   FolderIcon,
   MonitorIcon,
-  QrIcon,
   ShieldIcon,
   UploadIcon,
   WifiOffIcon,
@@ -42,20 +42,17 @@ import {
   fetchAbout,
   fetchAudit,
   fetchChangelog,
-  fetchManagedThemes,
   fetchPresence,
   fetchSettings,
   fetchStats,
   fetchUploads,
   prunePresence,
   revokeSessions,
-  setThemeEnabled,
   updateSettings,
   type AboutInfo,
   type AuditPage,
   type FolderUsage,
   type HeimdallSettings,
-  type ManagedTheme,
   type PresenceDevice,
   type Stats,
   type UploadFileEntry,
@@ -339,14 +336,10 @@ function ShortcutField({ value, onChange }: { value: string; onChange: (next: st
   );
 }
 
-interface ThemeOption {
-  id: string;
-  name: string;
-}
-
 function SettingsSection({ onLock }: SectionProps) {
   const [settings, setSettings] = useState<HeimdallSettings | null>(null);
-  const [themes, setThemes] = useState<ThemeOption[]>([]);
+  // The bundled themes (PLAN-35): the household default picks among what ships.
+  const themes = themeEngine.getState().themes;
   const [saved, setSaved] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -355,11 +348,6 @@ function SettingsSection({ onLock }: SectionProps) {
     fetchSettings()
       .then((res) => {
         if (!cancelled) setSettings(res);
-      })
-      .catch(() => {});
-    apiGet<{ themes: ThemeOption[] }>('/api/themes')
-      .then((res) => {
-        if (!cancelled) setThemes(res.themes.map(({ id, name }) => ({ id, name })));
       })
       .catch(() => {});
     return () => {
@@ -446,67 +434,6 @@ function SettingsSection({ onLock }: SectionProps) {
             Revoke all sessions
           </Button>
         </div>
-      </div>
-    </Card>
-  );
-}
-
-// ── Themes ──────────────────────────────────────────────────────
-
-function ThemesSection() {
-  const [themes, setThemes] = useState<ManagedTheme[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchManagedThemes()
-      .then((res) => {
-        if (!cancelled) setThemes(res.themes);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const toggle = async (theme: ManagedTheme) => {
-    setError(null);
-    try {
-      const updated = await setThemeEnabled(theme.id, !theme.enabled);
-      setThemes((list) =>
-        list.map((entry) => (entry.id === theme.id ? { ...entry, enabled: updated.enabled } : entry)),
-      );
-    } catch (err) {
-      setError(
-        err instanceof ApiError && err.status === 409
-          ? 'At least one theme must stay enabled.'
-          : 'Could not update that theme.',
-      );
-    }
-  };
-
-  return (
-    <Card>
-      <div className="stack">
-        <p className="caption">
-          Enabled themes appear in the top-right theme switcher. Disabling one hides it everywhere
-          without deleting it.
-        </p>
-        <div className="stack" role="group" aria-label="Themes" id={ctlId('themes-list')}>
-          {themes.map((theme) => (
-            <label key={theme.id} className="check-row">
-              <input type="checkbox" checked={theme.enabled} onChange={() => void toggle(theme)} />
-              <span>{theme.name}</span>
-              <span className="badge">{theme.mode}</span>
-              {theme.builtIn && <span className="badge">built-in</span>}
-            </label>
-          ))}
-        </div>
-        {error && (
-          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
-            {error}
-          </p>
-        )}
       </div>
     </Card>
   );
@@ -1165,15 +1092,6 @@ export const SECTIONS: HeimdallSection[] = [
       { controlId: 'default-theme', label: 'Default theme', keywords: ['theme'] },
       { controlId: 'revoke', label: 'Revoke all sessions', keywords: ['logout', 'sessions', 'lock'] },
     ],
-  },
-  {
-    id: 'themes',
-    label: 'Themes',
-    group: 'Realm',
-    icon: <QrIcon size={16} />,
-    blurb: 'Enable or disable themes in the switcher.',
-    Component: ThemesSection,
-    manifest: [{ controlId: 'themes-list', label: 'Enable / disable themes', keywords: ['theme', 'switcher'] }],
   },
   {
     id: 'relics',

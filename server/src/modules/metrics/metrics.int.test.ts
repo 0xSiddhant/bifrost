@@ -196,9 +196,9 @@ describe('prometheus exposition', () => {
   // fastify-plugin. This is what proves that actually worked.
   it('observes requests to OTHER modules’ routes too', async () => {
     await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
-    await app.fastify.inject({ method: 'GET', url: '/api/themes' });
+    await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     const body = (await app.fastify.inject({ method: 'GET', url: '/metrics' })).body;
-    expect(body).toContain('route="/api/themes"');
+    expect(body).toContain('route="/api/heimdall/access"');
   });
 
   it('buckets unmatched requests under one label instead of minting series', async () => {

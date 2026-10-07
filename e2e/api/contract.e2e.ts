@@ -1,6 +1,4 @@
-import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { fromRepoRoot } from '../support/paths.js';
 import { startTitleSink, type TitleSink } from '../support/sink.js';
 import type { Client } from './support/http.js';
 import { DOCUMENT_CONTENT, DOCUMENT_KINDS, readPath, seedAll, type Seeds } from './support/seed.js';
@@ -153,18 +151,7 @@ describe('contract journeys', () => {
     );
   });
 
-  it('admin: themes, settings and the module policies', async () => {
-    const theme = JSON.parse(
-      fs.readFileSync(fromRepoRoot('themes/daybreak.json'), 'utf8'),
-    ) as Record<string, unknown>;
-    await status(
-      admin.post('/api/themes', { ...theme, id: 'e2e-contract', name: 'Contract' }),
-      201,
-    );
-    await status(admin.patch('/api/themes/e2e-contract', { enabled: false }), 200);
-    await status(admin.patch('/api/themes/e2e-contract', { enabled: true }), 200);
-    await status(admin.delete('/api/themes/e2e-contract'), 204);
-
+  it('admin: settings and the module policies', async () => {
     const settings = (await admin.get('/api/heimdall/settings')).json<{ tapCount: number }>();
     await status(admin.patch('/api/heimdall/settings', { tapCount: settings.tapCount }), 200);
     await status(admin.patch('/api/loki/settings', { runTimeoutMs: 5000 }), 200);

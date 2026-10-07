@@ -57,10 +57,7 @@ describe('boot', () => {
       expect(Date.now() - started).toBeLessThan(SHUTDOWN_BUDGET_MS);
       expect(first.exitStatus()).toEqual({ code: 0, signal: null });
 
-      const second = await startServer({
-        storageRoot: first.storageRoot,
-        themesDir: first.themesDir,
-      });
+      const second = await startServer({ storageRoot: first.storageRoot });
       try {
         const again = new Client(second.baseUrl, suite.recorder, 'e2e-api-boot-restart');
         expect((await again.get('/api/health')).status).toBe(200);
@@ -74,7 +71,6 @@ describe('boot', () => {
       }
     } finally {
       fs.rmSync(first.storageRoot, { recursive: true, force: true });
-      fs.rmSync(first.themesDir, { recursive: true, force: true });
     }
   });
 });

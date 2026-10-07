@@ -120,17 +120,6 @@ export interface OfflineModeConfig {
   disabled: string[];
 }
 
-/** One validated theme as the listing/SSE payload shows it. */
-export interface ThemeSummary {
-  id: string;
-  name: string;
-  mode: 'dark' | 'light';
-  preview: { bg: string; accent: string };
-  builtIn: boolean;
-  /** Contrast lint findings — warn, never block (PLAN-04). */
-  warnings: string[];
-}
-
 /** A shared-clipboard entry — the list/SSE payload shape (PLAN-06). */
 export interface ClipboardEntry {
   id: string;
@@ -284,7 +273,6 @@ export interface BifrostEventMap {
   'download.added': DownloadEntry;
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;
-  'theme.updated': { themes: ThemeSummary[] };
   'settings.updated': SettingsUpdatedEvent;
   'clipboard.updated': ClipboardChange;
   'presence.changed': { devices: PresenceDevice[] };

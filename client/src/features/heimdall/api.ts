@@ -69,21 +69,6 @@ export const fetchStats = (): Promise<Stats> => apiGet<Stats>('/api/heimdall/sta
 export const fetchUploads = (): Promise<UploadFilesPage> =>
   apiGet<UploadFilesPage>('/api/heimdall/uploads');
 
-export interface ManagedTheme {
-  id: string;
-  name: string;
-  mode: 'dark' | 'light';
-  builtIn: boolean;
-  enabled: boolean;
-}
-
-/** Every theme (incl. disabled ones) with its enable state — for the manager. */
-export const fetchManagedThemes = (): Promise<{ themes: ManagedTheme[] }> =>
-  apiGet<{ themes: ManagedTheme[] }>('/api/themes/manage');
-
-export const setThemeEnabled = (id: string, enabled: boolean): Promise<ManagedTheme> =>
-  apiSend<ManagedTheme>('PATCH', `/api/themes/${id}`, { enabled });
-
 export interface AuditRecord {
   id: number;
   ts: number;

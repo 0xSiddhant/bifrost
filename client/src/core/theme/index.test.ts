@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveThemeChoice } from './theme';
+import { resolveThemeChoice } from '.';
 
 const themes = [
   { id: 'aurora', mode: 'dark' as const },

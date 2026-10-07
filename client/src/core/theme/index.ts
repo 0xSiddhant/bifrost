@@ -1,25 +1,8 @@
-import { apiGet } from './api';
-import { bifrostEvents } from './sse';
+import { fetchHeimdallAccess } from '../heimdallAccess';
+import { BUNDLED_THEMES } from './bundled';
+import type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 
-export type ThemeMode = 'dark' | 'light';
-
-export interface ThemeSummary {
-  id: string;
-  name: string;
-  mode: ThemeMode;
-  preview: { bg: string; accent: string };
-  builtIn: boolean;
-  warnings: string[];
-}
-
-export interface ResolvedTheme extends ThemeSummary {
-  tokens: Record<string, string>;
-}
-
-interface ThemeListing {
-  defaultId: string | null;
-  themes: ThemeSummary[];
-}
+export type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 
 /** Visitor's explicit pick — same key PLAN-01 used, values stay compatible. */
 const CHOICE_KEY = 'bifrost.theme';
@@ -33,8 +16,8 @@ export interface ThemeEngineState {
 
 /**
  * PLAN-04 resolution order, pure for testability:
- * visitor choice → explicit server default → prefers-color-scheme match →
- * first available.
+ * visitor choice → the household default (hub only) → prefers-color-scheme
+ * match → first available. An unknown id at any step simply falls through.
  */
 export function resolveThemeChoice(input: {
   stored: string | null;
@@ -52,8 +35,19 @@ export function resolveThemeChoice(input: {
 
 type Listener = (state: ThemeEngineState) => void;
 
+/**
+ * Applies a theme as CSS custom properties on `:root`. Themes are bundled
+ * (PLAN-35), so nothing here touches the network except, in the hub build,
+ * one read of the household default. The token cache and the `index.html`
+ * replay are unchanged, so first paint is exactly as before.
+ */
 class ThemeEngine {
-  private themes: ThemeSummary[] = [];
+  private themes: ThemeSummary[] = BUNDLED_THEMES.map(({ id, name, mode, preview }) => ({
+    id,
+    name,
+    mode,
+    preview,
+  }));
   private activeId: string | null = null;
   private appliedKeys: string[] = [];
   private readonly listeners = new Set<Listener>();
@@ -67,64 +61,49 @@ class ThemeEngine {
     return () => this.listeners.delete(listener);
   }
 
-  /** Replay the cached theme synchronously, then reconcile against the server. */
+  /** Replay the cached theme synchronously, then settle on the right one. */
   init(): void {
     const cached = this.readCache();
     if (cached) {
       this.apply(cached, { cache: false });
     }
-    void this.refresh();
-    bifrostEvents.on('theme.updated', (payload) => {
-      const { themes } = payload as { themes: ThemeSummary[] };
-      this.themes = themes;
-      void this.reconcile();
-    });
+    if (!__HUB__) {
+      // No household on the standalone site: the device's own choice decides.
+      this.reconcile(null);
+      return;
+    }
+    fetchHeimdallAccess()
+      .then((access) => this.reconcile(access.defaultThemeId))
+      .catch(() => {
+        // Deliberately silent (PLAN-16a audit): without the household default
+        // the device's own choice and colour scheme still pick a correct
+        // theme, so this is a designed fallback. It also fires on every load
+        // while the hub is down, which would bury the archive for no signal.
+        this.reconcile(null);
+      });
   }
 
   /** Explicit visitor pick from the switcher. */
-  async setTheme(id: string): Promise<void> {
-    localStorage.setItem(CHOICE_KEY, id);
-    await this.load(id);
+  setTheme(id: string): void {
+    writeStorage(CHOICE_KEY, id);
+    this.load(id);
   }
 
-  private async refresh(): Promise<void> {
-    try {
-      const listing = await apiGet<ThemeListing>('/api/themes');
-      this.themes = listing.themes;
-      await this.reconcile(listing.defaultId);
-    } catch {
-      // Deliberately silent (PLAN-16a audit): the cached tokens and the
-      // stylesheet defaults already render a correct page, so this is a
-      // designed fallback, not a failure. It also fires on every offline load,
-      // which would make it the noisiest line in the archive for no signal.
-      this.notify();
-    }
-  }
-
-  private async reconcile(defaultId?: string | null): Promise<void> {
+  private reconcile(defaultId: string | null): void {
     const choice = resolveThemeChoice({
-      stored: localStorage.getItem(CHOICE_KEY),
-      defaultId: defaultId ?? null,
+      stored: readStorage(CHOICE_KEY),
+      defaultId,
       themes: this.themes,
       prefersLight: window.matchMedia('(prefers-color-scheme: light)').matches,
     });
-    if (choice) {
-      // Re-fetch even when the id matches — a watcher edit may have changed tokens.
-      await this.load(choice);
-    } else {
-      this.notify();
-    }
+    if (choice) this.load(choice);
+    else this.notify();
   }
 
-  private async load(id: string): Promise<void> {
-    try {
-      this.apply(await apiGet<ResolvedTheme>(`/api/themes/${id}`), { cache: true });
-    } catch {
-      // Deliberately silent, same reason as refresh(): a theme that can't be
-      // fetched leaves the previous one on screen, which is the intended
-      // degradation rather than something to page anyone about.
-      this.notify();
-    }
+  private load(id: string): void {
+    const theme = BUNDLED_THEMES.find((candidate) => candidate.id === id);
+    if (theme) this.apply(theme, { cache: true });
+    else this.notify();
   }
 
   private apply(theme: ResolvedTheme, options: { cache: boolean }): void {
@@ -139,7 +118,7 @@ class ThemeEngine {
     root.setAttribute('data-theme', theme.id);
     this.activeId = theme.id;
     if (options.cache) {
-      localStorage.setItem(
+      writeStorage(
         CACHE_KEY,
         JSON.stringify({ id: theme.id, mode: theme.mode, tokens: theme.tokens }),
       );
@@ -149,7 +128,7 @@ class ThemeEngine {
 
   private readCache(): ResolvedTheme | null {
     try {
-      const raw = localStorage.getItem(CACHE_KEY);
+      const raw = readStorage(CACHE_KEY);
       if (!raw) return null;
       const cached = JSON.parse(raw) as { id: string; mode: ThemeMode; tokens: unknown };
       if (!cached.id || typeof cached.tokens !== 'object' || cached.tokens === null) return null;
@@ -158,8 +137,6 @@ class ThemeEngine {
         name: cached.id,
         mode: cached.mode === 'light' ? 'light' : 'dark',
         preview: { bg: '', accent: '' },
-        builtIn: true,
-        warnings: [],
         tokens: cached.tokens as Record<string, string>,
       };
     } catch {
@@ -170,6 +147,28 @@ class ThemeEngine {
   private notify(): void {
     const state = this.getState();
     for (const listener of this.listeners) listener(state);
+  }
+}
+
+/**
+ * localStorage that cannot crash the page: Safari's private mode and a
+ * cleared or blocked store throw on access. Deliberately silent, the designed
+ * fallback the coding rules name for `core/theme`: the theme simply is not
+ * remembered for next time.
+ */
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // See readStorage.
   }
 }
 

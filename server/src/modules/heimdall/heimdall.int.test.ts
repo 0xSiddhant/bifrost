@@ -73,7 +73,7 @@ describe('heimdall auth guard + session', () => {
   it('exposes the entry gesture config publicly (no session)', async () => {
     const res = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ shortcut: 'shift+meta+comma', tapCount: 7 });
+    expect(res.json()).toEqual({ shortcut: 'shift+meta+comma', tapCount: 7, defaultThemeId: null });
   });
 
   it('rejects a wrong PIN and accepts the right one', async () => {
@@ -171,6 +171,38 @@ describe('heimdall auth guard + session', () => {
 
     const access = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     expect(access.json()).toMatchObject({ tapCount: 5, shortcut: 'ctrl+alt+h' });
+  });
+
+  // PLAN-35: themes are client code, so every device learns the household
+  // default from the public access route, and the server checks only the
+  // id's shape (it has no list of themes to check against any more).
+  it('publishes the household default theme to every device, checking only its pattern', async () => {
+    const set = await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: 'no-such-theme' },
+    });
+    expect(set.statusCode).toBe(200);
+    const access = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
+    expect(access.json()).toMatchObject({ defaultThemeId: 'no-such-theme' });
+
+    const bad = await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: 'Not A Theme!' },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: null },
+    });
+    const cleared = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
+    expect(cleared.json()).toMatchObject({ defaultThemeId: null });
   });
 
   it('rejects an invalid settings patch', async () => {

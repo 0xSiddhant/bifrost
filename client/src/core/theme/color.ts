@@ -1,9 +1,11 @@
 /**
- * WCAG contrast lint. Warn, never block (PLAN-04): a theme with unreadable
- * text still loads — Heimdall surfaces the warnings to the owner.
+ * Colour parsing for the derived defaults, and the WCAG contrast lint. Ported
+ * from the server (PLAN-35). The lint used to be a warning Heimdall showed;
+ * now that themes are code, `themes.test.ts` fails CI instead. Only
+ * `parseColor` is used at runtime, so the lint never reaches the bundle.
  */
 
-interface Rgb {
+export interface Rgb {
   r: number;
   g: number;
   b: number;

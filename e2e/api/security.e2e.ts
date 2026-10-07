@@ -146,7 +146,7 @@ describe('security', () => {
     ];
     const targets = () =>
       suite.recorder.spec.operations.filter((op) =>
-        /^\/api\/(files\/\{name\}|downloads\/\{id\}|themes\/\{id\})/.test(op.template),
+        /^\/api\/(files\/\{name\}|downloads\/\{id\})/.test(op.template),
       );
 
     it('every file, folder and download parameter refuses every payload with a 4xx', async () => {
