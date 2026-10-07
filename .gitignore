@@ -34,3 +34,6 @@ client/public/pdfjs-wasm/
 
 # Claude Code — skills are committed, local settings are not
 .claude/settings.local.json
+
+# PLAN-34: load-test results describe one machine on one day; never committed
+load-results/
