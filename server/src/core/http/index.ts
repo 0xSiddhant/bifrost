@@ -1,6 +1,4 @@
-import fs from 'node:fs';
 import Fastify, { type FastifyInstance } from 'fastify';
-import fastifyStatic from '@fastify/static';
 import type { EventBus } from '../bus/index.js';
 import type { ContractCheckMode } from '../config/index.js';
 import type { Logger } from '../logger/index.js';
@@ -35,8 +33,6 @@ export const MAX_PARAM_LENGTH = 4096;
 
 export interface HttpOptions {
   logger: Logger;
-  /** Absolute path to the built client. Skipped when absent (dev mode: Vite serves it). */
-  clientDistDir: string;
   /**
    * Publishes `http.requestCompleted` for every finished request, so a module
    * can measure the whole app without reaching into anyone else's routes
@@ -64,6 +60,12 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     // to 12 once encoded (4 UTF-8 bytes × `%XX`), so the cap must clear
     // 255 × 12; the route's own schema still decides what is valid (PLAN-33).
     routerOptions: { maxParamLength: MAX_PARAM_LENGTH },
+    // PLAN-36: the web host forwards every request with X-Forwarded-For, and
+    // the login throttle, presence, upload attribution, client-log relays and
+    // Nimbus all key on request.ip. Believe the header only from loopback,
+    // where the web host is: a LAN device cannot reach the loopback-bound API
+    // to forge one, and a forged one sent to the web host is overwritten there.
+    trustProxy: 'loopback',
   }) as unknown as FastifyInstance;
 
   // Both before auth and every module: swagger's route collector and the
@@ -128,24 +130,11 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     return reply.code(500).send({ error: 'INTERNAL', message: 'internal server error' });
   });
 
-  if (fs.existsSync(options.clientDistDir)) {
-    await app.register(fastifyStatic, { root: options.clientDistDir });
-    // SPA fallback: unknown non-API GETs get index.html so client routes deep-link.
-    app.setNotFoundHandler((request, reply) => {
-      if (request.method === 'GET' && !request.url.startsWith('/api/')) {
-        return reply.sendFile('index.html');
-      }
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'route not found' });
-    });
-  } else {
-    options.logger.info(
-      { clientDistDir: options.clientDistDir },
-      'client build not found — API only (dev mode serves the client via Vite)',
-    );
-    app.setNotFoundHandler((_request, reply) =>
-      reply.code(404).send({ error: 'NOT_FOUND', message: 'route not found' }),
-    );
-  }
+  // The client is the web host's to serve (PLAN-36); anything unmatched here
+  // is an unknown API path.
+  app.setNotFoundHandler((_request, reply) =>
+    reply.code(404).send({ error: 'NOT_FOUND', message: 'route not found' }),
+  );
 
   return app;
 }

@@ -323,6 +323,61 @@ describe('security', () => {
       expect(Number(locked?.headers.get('retry-after'))).toBeGreaterThan(0);
       expect((await api.post('/api/heimdall/login', { pin: server.pin })).status).toBe(429);
     }, 120_000);
+
+    /** Bad PINs until the throttle answers 429; returns how many it took. */
+    async function lockOut(api: Client, headers: Record<string, string>): Promise<number> {
+      for (let attempt = 1; attempt <= 12; attempt += 1) {
+        const response = await api.post(
+          '/api/heimdall/login',
+          { pin: `wrong-${attempt}` },
+          { headers },
+        );
+        if (response.status === 429) return attempt;
+        expect(response.status).toBe(401);
+      }
+      throw new Error('never locked out');
+    }
+
+    it('PLAN-36: behind the web host, the throttle counts each device by its own forwarded address', async () => {
+      const server = await startServer();
+      extra.push(server);
+      // Straight to the API from loopback, which is the web host's position:
+      // the only peer whose X-Forwarded-For the API trusts.
+      const api = new Client(server.apiUrl, suite.recorder, 'e2e-sec-xff');
+      await lockOut(api, { 'x-forwarded-for': '192.168.1.10' });
+      const other = await api.post(
+        '/api/heimdall/login',
+        { pin: 'wrong-other' },
+        { headers: { 'x-forwarded-for': '192.168.1.11' } },
+      );
+      expect(other.status, 'a second device is not locked out by the first').toBe(401);
+      const back = await api.post(
+        '/api/heimdall/login',
+        { pin: server.pin },
+        { headers: { 'x-forwarded-for': '192.168.1.10' } },
+      );
+      expect(back.status, 'the first device is still locked').toBe(429);
+    }, 120_000);
+
+    it('PLAN-36: a forged X-Forwarded-For through the web host changes nothing', async () => {
+      const server = await startServer();
+      extra.push(server);
+      expect(server.hasWebHost).toBe(true);
+      const api = new Client(server.baseUrl, suite.recorder, 'e2e-sec-forged');
+      // A new forged address on every attempt: if the API believed any of
+      // them, each would be a fresh device and the lockout would never come.
+      let attempt = 0;
+      for (; attempt < 12; attempt += 1) {
+        const response = await api.post(
+          '/api/heimdall/login',
+          { pin: `wrong-${attempt}` },
+          { headers: { 'x-forwarded-for': `10.9.8.${attempt}` } },
+        );
+        if (response.status === 429) break;
+        expect(response.status).toBe(401);
+      }
+      expect(attempt, 'never locked out: a forged address was believed').toBeLessThan(12);
+    }, 120_000);
   });
 
   describe('what a browser may do with a response', () => {

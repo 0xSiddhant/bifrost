@@ -23,7 +23,7 @@ export interface RouteCatalogEntry {
   schema: FastifySchema | undefined;
   /** The route is guarded by `app.requireAdmin`. */
   admin: boolean;
-  /** Hidden from the spec (`@fastify/static`'s wildcard). */
+  /** Hidden from the spec (`schema.hide`; the static wildcard that needed it moved to the web host in PLAN-36). */
   hide: boolean;
 }
 

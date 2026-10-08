@@ -1,8 +1,13 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
 /**
  * What the server says about itself while it is under load (PLAN-34): its own
  * `/metrics`, the Prometheus text prom-client serves with the `bifrost_`
- * prefix. The harness never measures the process from outside (no `ps`, no
- * `/proc`), so the numbers are the ones Grafana would show the owner.
+ * prefix. The harness never measures the API from outside (no `ps`, no
+ * `/proc`), so the numbers are the ones Grafana would show the owner. The one
+ * exception is the web host in front of it (PLAN-36), which has no `/metrics`:
+ * see `ProcessRssSampler`.
  */
 
 /** One sample line: a metric name, its labels, its value. */
@@ -183,6 +188,67 @@ export class MetricsSampler {
   }
 
   async stop(): Promise<MetricsSnapshot[]> {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    await this.inFlight;
+    return this.samples;
+  }
+}
+
+/** One reading of a process's resident set, from outside it. */
+export interface RssSample {
+  atMs: number;
+  rssBytes: number;
+}
+
+/** `ps -o rss=` prints kilobytes, padded; null when the process is gone. */
+export function parsePsRss(text: string): number | null {
+  const kilobytes = Number(text.trim());
+  return text.trim() !== '' && Number.isFinite(kilobytes) ? kilobytes * 1024 : null;
+}
+
+const run = promisify(execFile);
+
+/**
+ * The web host's RSS (PLAN-36), the one figure taken from outside a process:
+ * the web host has no `/metrics` of its own, and the plan's flat-memory
+ * promise covers the proxy as well as the API. `ps -o rss=` reads the same
+ * on macOS and Linux. Failures are counted like a failed scrape.
+ */
+export class ProcessRssSampler {
+  readonly samples: RssSample[] = [];
+  failures = 0;
+  private timer: NodeJS.Timeout | null = null;
+  private inFlight: Promise<void> | null = null;
+
+  constructor(
+    private readonly pid: number,
+    private readonly startedAt: number,
+    private readonly intervalMs: number,
+  ) {}
+
+  start(): this {
+    const tick = () => {
+      if (this.inFlight) return;
+      this.inFlight = run('ps', ['-o', 'rss=', '-p', String(this.pid)])
+        .then(({ stdout }) => {
+          const rssBytes = parsePsRss(stdout);
+          if (rssBytes === null) this.failures += 1;
+          else this.samples.push({ atMs: Date.now() - this.startedAt, rssBytes });
+        })
+        .catch(() => {
+          this.failures += 1;
+        })
+        .finally(() => {
+          this.inFlight = null;
+        });
+    };
+    tick();
+    this.timer = setInterval(tick, this.intervalMs);
+    return this;
+  }
+
+  async stop(): Promise<RssSample[]> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     await this.inFlight;

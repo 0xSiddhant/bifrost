@@ -6,8 +6,12 @@ set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-LABEL="local.bifrost"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+AGENTS="$HOME/Library/LaunchAgents"
+# PLAN-36: two services, the API and the web host. LEGACY is the single plist
+# every install before PLAN-36 has; re-running this script replaces it.
+LEGACY_LABEL="local.bifrost"
+API_LABEL="local.bifrost.api"
+WEB_LABEL="local.bifrost.web"
 echo "▶ Bifrost · launchd · $ROOT"
 
 # 1. prerequisites
@@ -38,21 +42,54 @@ npm run setup
 echo "▶ build..."
 npm run build
 
-# 5. write the plist (node path + repo path filled in for you)
-echo "▶ writing $PLIST..."
-mkdir -p "$HOME/Library/LaunchAgents"
-cat > "$PLIST" <<PLISTEOF
+# 5. which processes this run mode needs (BIFROST_RUN: full | api | web)
+env_get() { v="$(grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$v" ] && echo "$v" || echo "$2"; }
+MODE="$(env_get BIFROST_RUN full)"
+case "$MODE" in
+  full) WANT="api web" ;;
+  api)  WANT="api" ;;
+  web)  WANT="web" ;;
+  *) echo "✖ BIFROST_RUN must be full, api or web (got \"$MODE\")"; exit 1 ;;
+esac
+
+remove_plist() {
+  label="$1"; plist="$AGENTS/$label.plist"
+  if [ -f "$plist" ]; then
+    launchctl unload "$plist" 2>/dev/null || true
+    rm -f "$plist"
+    echo "✔ removed $label"
+  fi
+}
+
+# Upgrade first: the old single process must be gone BEFORE the web host
+# starts, or both would advertise bifrost.local and hold the API's port.
+if [ -f "$AGENTS/$LEGACY_LABEL.plist" ]; then
+  echo "▶ upgrading from the single-process service ($LEGACY_LABEL)..."
+  remove_plist "$LEGACY_LABEL"
+fi
+# Switching modes: drop the services this mode does not run.
+case " $WANT " in *" api "*) ;; *) remove_plist "$API_LABEL" ;; esac
+case " $WANT " in *" web "*) ;; *) remove_plist "$WEB_LABEL" ;; esac
+
+# 6. write one plist per process (node path + repo path filled in for you)
+write_plist() {
+  label="$1"; name="$2"; shift 2
+  plist="$AGENTS/$label.plist"
+  args=""
+  for arg in "$@"; do args="$args    <string>$arg</string>
+"; done
+  echo "▶ writing $plist..."
+  mkdir -p "$AGENTS"
+  cat > "$plist" <<PLISTEOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>$LABEL</string>
+  <string>$label</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$NODE_BIN</string>
-    <string>$ROOT/server/dist/bootstrap.js</string>
-  </array>
+$args  </array>
   <key>WorkingDirectory</key>
   <string>$ROOT</string>
   <key>EnvironmentVariables</key>
@@ -67,25 +104,40 @@ cat > "$PLIST" <<PLISTEOF
   <key>ExitTimeOut</key>
   <integer>15</integer>
   <key>StandardOutPath</key>
-  <string>$ROOT/storage/logs/launchd-out.log</string>
+  <string>$ROOT/storage/logs/launchd-$name-out.log</string>
   <key>StandardErrorPath</key>
-  <string>$ROOT/storage/logs/launchd-error.log</string>
+  <string>$ROOT/storage/logs/launchd-$name-error.log</string>
 </dict>
 </plist>
 PLISTEOF
+}
 
-# 6. (re)load the service
-echo "▶ (re)loading service..."
-launchctl unload "$PLIST" 2>/dev/null || true
-launchctl load "$PLIST"
+# 7. (re)load: the API first, so the web host's first request has an upstream.
+for name in $WANT; do
+  if [ "$name" = api ]; then
+    write_plist "$API_LABEL" api "$NODE_BIN" --import "$ROOT/server/dist/otel.js" "$ROOT/server/dist/bootstrap.js"
+    label="$API_LABEL"
+  else
+    write_plist "$WEB_LABEL" web "$NODE_BIN" "$ROOT/web/dist/bootstrap.js"
+    label="$WEB_LABEL"
+  fi
+  launchctl unload "$AGENTS/$label.plist" 2>/dev/null || true
+  launchctl load "$AGENTS/$label.plist"
+  echo "✔ loaded $label"
+done
 
-# 7. show the URL
-PORT="$(grep -E '^PORT=' .env | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$PORT" ] || PORT=4646
-NAME="$(grep -E '^MDNS_NAME=' .env | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$NAME" ] || NAME=bifrost
+# 8. show the URL
+PORT="$(env_get PORT 4646)"
+NAME="$(env_get MDNS_NAME bifrost)"
+API_PORT="$(env_get API_PORT $((PORT + 1)))"
 
 echo ""
-echo "✔ Bifrost loaded under launchd (starts now + on every login)."
-echo "  open:    http://$NAME.local:$PORT"
+echo "✔ Bifrost ($MODE) loaded under launchd (starts now + on every login)."
+case "$MODE" in
+  full) echo "  open:    http://$NAME.local:$PORT" ;;
+  web)  echo "  open:    http://$NAME.local:$PORT   (the standalone client; no API in this mode)" ;;
+  api)  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)" ;;
+esac
 echo "  status:  launchctl list | grep bifrost"
 echo "  logs:    npm run logs      # or storage/logs/launchd-*.log"
-echo "  stop:    launchctl unload $PLIST"
+echo "  stop:    launchctl unload $AGENTS/local.bifrost.*.plist"

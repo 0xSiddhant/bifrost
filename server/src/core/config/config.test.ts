@@ -172,3 +172,39 @@ describe('applySettingsOverlay', () => {
     );
   });
 });
+
+describe('the API port and run mode (PLAN-36)', () => {
+  it('puts the API on loopback at PORT + 1, in the full hub mode, by default', () => {
+    const config = loadConfig(VALID_ENV);
+    expect(config.port).toBe(4646);
+    expect(config.api).toEqual({ host: '127.0.0.1', port: 4647 });
+    expect(config.runMode).toBe('full');
+    expect(config.webHost).toBe('0.0.0.0');
+  });
+
+  it('takes an explicit API_PORT, API_HOST, BIFROST_RUN and WEB_HOST', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      API_PORT: '5000',
+      API_HOST: '::1',
+      BIFROST_RUN: 'api',
+      WEB_HOST: '127.0.0.1',
+    });
+    expect(config.api).toEqual({ host: '::1', port: 5000 });
+    expect(config.runMode).toBe('api');
+    expect(config.webHost).toBe('127.0.0.1');
+  });
+
+  it('refuses an API_PORT equal to PORT', () => {
+    expect(() => loadConfig({ ...VALID_ENV, API_PORT: '4646' })).toThrow(/API_PORT: must differ from PORT/);
+  });
+
+  it('refuses a default API port past 65535, naming the fix', () => {
+    expect(() => loadConfig({ ...VALID_ENV, PORT: '65535' })).toThrow(/API_PORT: PORT \+ 1 is not a port/);
+    expect(loadConfig({ ...VALID_ENV, PORT: '65535', API_PORT: '65534' }).api.port).toBe(65534);
+  });
+
+  it('refuses an unknown run mode', () => {
+    expect(() => loadConfig({ ...VALID_ENV, BIFROST_RUN: 'both' })).toThrow(/BIFROST_RUN/);
+  });
+});

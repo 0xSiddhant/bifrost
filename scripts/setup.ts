@@ -57,8 +57,16 @@ const unknown = [...envKeys(envContent, false)].filter((key) => !known.has(key))
 // that crash-loops on boot. HEIMDALL_PIN is the one exception: a fresh clone
 // legitimately runs setup before the PIN is set, so it stays a warning below.
 const envValues = dotenv.parse(envContent);
+let ports = '';
 try {
-  loadConfig({ ...envValues, ...process.env });
+  const config = loadConfig({ ...envValues, ...process.env });
+  ports = describePorts(
+    config.runMode,
+    config.port,
+    config.webHost,
+    config.api.host,
+    config.api.port,
+  );
 } catch (error) {
   if (!(error instanceof ConfigError)) throw error;
   const problems = error.message
@@ -80,6 +88,7 @@ if (migrate.status !== 0) {
 }
 
 console.log('\nBifrost setup complete.');
+if (ports) console.log(ports);
 if (!pinIsSet) {
   console.log('⚠ HEIMDALL_PIN is empty in .env — set it before starting the server.');
 }
@@ -96,3 +105,18 @@ if (unknown.length > 0) {
   );
 }
 console.log('Next: npm run dev');
+
+/** PLAN-36: which ports this install uses, by run mode. */
+function describePorts(
+  mode: string,
+  port: number,
+  webHost: string,
+  apiHost: string,
+  apiPort: number,
+): string {
+  const web = `web host on ${webHost}:${port}`;
+  const api = `API on ${apiHost}:${apiPort}`;
+  if (mode === 'api') return `✔ run mode api: ${api} (no web host)`;
+  if (mode === 'web') return `✔ run mode web: ${web}, serving the standalone client (no API)`;
+  return `✔ run mode full: ${web} → ${api}`;
+}

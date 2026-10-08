@@ -53,6 +53,23 @@ describe('core/api in the hub build', () => {
     expect(isHubClosed(error)).toBe(false);
     expect(sheets).toEqual([]);
   });
+
+  it("treats the web host's HUB_UNAVAILABLE 502 as the bridge closed, on reads and writes", async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: 'HUB_UNAVAILABLE', message: 'down' }), { status: 502 }),
+      ),
+    );
+    const read = await apiGet('/api/clipboard').catch((caught: unknown) => caught);
+    const write = await apiSend('POST', '/api/runestone', {}).catch((caught: unknown) => caught);
+    for (const error of [read, write]) {
+      expect(error).toBeInstanceOf(HubUnreachableError);
+      expect(isHubClosed(error)).toBe(true);
+    }
+    expect(sheets).toEqual([{ reason: 'unreachable' }, { reason: 'unreachable' }]);
+  });
 });
 
 describe('core/api in the standalone build', () => {

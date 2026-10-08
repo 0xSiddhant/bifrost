@@ -15,8 +15,10 @@
 # is actually due (newest backup older than BACKUP_INTERVAL_DAYS). launchd has
 # no "every 14 days", and a daily check survives sleep and reboots.
 #
-# A backup only happens while the server answers /api/health — a down server
-# is a skip (retried at the next daily check), not a failure.
+# A backup only happens while the API server answers /api/health on its own
+# port (API_PORT, PLAN-36), so a stopped web host never skips a backup — a down
+# API is a skip (retried at the next daily check), not a failure. In web-only
+# mode (BIFROST_RUN=web) there is no hub data in use, so every run skips.
 #
 # Settings (.env): BACKUP_CLOUD, BACKUP_CLOUD_ROOT, BACKUP_CLOUD_SUBDIR,
 # BACKUP_INTERVAL_DAYS, BACKUP_SCHEDULE_TIME, BACKUP_KEEP, BACKUP_EXCLUDE.
@@ -42,6 +44,9 @@ env_get() {
 }
 
 PORT="$(env_get PORT 4646)"
+# The same default the API's config applies: API_PORT, else PORT + 1.
+API_PORT="$(env_get API_PORT "$((PORT + 1))")"
+RUN_MODE="$(env_get BIFROST_RUN full)"
 STORAGE="$(env_get STORAGE_ROOT ./storage)"
 case "$STORAGE" in /*) ;; *) STORAGE="$ROOT/${STORAGE#./}" ;; esac
 LOG_DIR="$STORAGE/logs"
@@ -139,7 +144,7 @@ newest_backup() {
   ls -1 "$1" 2>/dev/null | grep -E '^bifrost-backup-' | sort | tail -n 1
 }
 
-server_up() { curl -fsS -m 5 "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; }
+server_up() { curl -fsS -m 5 "http://127.0.0.1:$API_PORT/api/health" >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------- run
 
@@ -164,8 +169,12 @@ cmd_run() {
     fi
   fi
 
+  if [ "$RUN_MODE" = web ]; then
+    log SKIP "web-only mode (BIFROST_RUN=web): nothing to back up"
+    return 0
+  fi
   if ! server_up; then
-    log SKIP "server not running on port $PORT — will retry at the next daily check"
+    log SKIP "API server not running on port $API_PORT — will retry at the next daily check"
     return 0
   fi
 
@@ -336,7 +345,7 @@ cmd_status() {
     code="$(launchctl print "$DOMAIN/$LABEL" 2>/dev/null | awk -F'= ' '/last exit code/ { print $2; exit }')"
     echo "  Last launchd exit:  ${code:-never ran since load}"
   fi
-  echo "  Server right now:   $(server_up && echo "running on port $PORT" || echo "NOT running on port $PORT (backups will skip)")"
+  echo "  API right now:      $(server_up && echo "running on port $API_PORT" || echo "NOT running on port $API_PORT (backups will skip)")"
   echo ""
 
   if croot="$(cloud_root 2>&1)"; then

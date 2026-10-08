@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { Bonjour } from 'bonjour-service';
-import type { Logger } from '../logger/index.js';
+import type { Logger } from './logger.js';
 
 export interface MdnsHandle {
   stop(): Promise<void>;
@@ -131,7 +131,16 @@ export interface AdvertiseOptions {
   pollMs?: number;
 }
 
-/** Advertise the hub over Bonjour so Apple devices resolve http://<name>.local. */
+/** How long probing may take before an unannounced service means the name is taken. */
+const CONFLICT_CHECK_MS = 3_000;
+
+/**
+ * Advertise the hub over Bonjour so Apple devices resolve http://<name>.local.
+ *
+ * Runs in the web host since PLAN-36, not the API server: this responder is
+ * the name server for `<name>.local`, so it must live and die with the process
+ * that answers PORT, or the name would vanish with every API restart.
+ */
 export function advertiseMdns(
   name: string,
   port: number,
@@ -148,9 +157,23 @@ export function advertiseMdns(
     // host is what makes the responder answer A/AAAA queries for <name>.local —
     // advertising the service alone only registers PTR/SRV/TXT, and the browser
     // resolves the hostname, not the service.
-    bonjour.publish({ name, type: 'http', port, host: `${name}.local` });
+    const service = bonjour.publish({ name, type: 'http', port, host: `${name}.local` });
     responder = bonjour;
     log.info({ name: `${name}.local`, port }, 'mdns advertisement up');
+    // bonjour-service drops a probed-and-taken name with a console.log and no
+    // event, so the only sign is a service that never got announced. The
+    // likely cause after PLAN-36 is an old single-process Bifrost still
+    // running and advertising the same name.
+    const check = setTimeout(() => {
+      if (responder === bonjour && !service.published && !service.activated) {
+        log.error(
+          { name: `${name}.local`, port },
+          `mdns name ${name}.local is already taken on the network — is an old Bifrost process ` +
+            'still running? Stop it (pm2 delete bifrost, or unload the old launchd plist) and restart',
+        );
+      }
+    }, CONFLICT_CHECK_MS);
+    check.unref();
   };
 
   const teardown = async (bonjour: InstanceType<typeof Bonjour>): Promise<void> => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  API_OUTAGE,
   isAllowed,
   isExternal,
   isNavigationCancelShaped,
@@ -57,6 +58,46 @@ describe('isAllowed', () => {
       isAllowed({ kind: 'external', page: '', url: 'https://example.com/', detail: 'blocked' }),
     ).toBe(false);
     expect(isAllowed({ kind: 'console.error', page: '', detail: 'boom' })).toBe(false);
+  });
+});
+
+describe('API_OUTAGE (PLAN-36)', () => {
+  it("allows the web host's 502/503 and the browser's lines for them, and nothing else", () => {
+    const allowed: Violation[] = [
+      {
+        kind: 'http5xx',
+        page: '',
+        url: 'http://127.0.0.1:1/api/runestone',
+        detail: '502 Bad Gateway',
+      },
+      {
+        kind: 'http5xx',
+        page: '',
+        url: 'http://127.0.0.1:1/go/x',
+        detail: '503 Service Unavailable',
+      },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: 'Failed to load resource: the server responded with a status of 502 (Bad Gateway)',
+      },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: "EventSource's response has a status 502 that is not 200. Aborting the connection.",
+      },
+    ];
+    for (const violation of allowed) expect(API_OUTAGE.matches(violation)).toBe(true);
+    const refused: Violation[] = [
+      { kind: 'http5xx', page: '', detail: '500 Internal Server Error' },
+      { kind: 'pageerror', page: '', detail: 'TypeError: x is undefined' },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: 'Failed to load resource: the server responded with a status of 500 ()',
+      },
+    ];
+    for (const violation of refused) expect(API_OUTAGE.matches(violation)).toBe(false);
   });
 });
 

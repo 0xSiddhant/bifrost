@@ -36,8 +36,8 @@ A route's response schema is compiled into its serializer, so a wrong one change
 
 `e2e/` is the fourth npm workspace. It only ever sees the **built** system, from outside:
 
-- the server through its production entry, `node --import server/dist/otel.js server/dist/bootstrap.js`;
-- the client as that server serves `client/dist`, in real browsers;
+- the hub through its two production entries, as `npm start` runs them (PLAN-36): the API, `node --import server/dist/otel.js server/dist/bootstrap.js`, on a loopback `API_PORT`, and the web host, `node web/dist/bootstrap.js`, on `PORT`. Every suite talks to the web host (`server.baseUrl`); `server.apiUrl` is the API itself, for the few tests about what sits behind it;
+- the client as the web host serves `client/dist`, in real browsers;
 - the CLI as a packed tarball, installed with `npm install -g --prefix <temp>`.
 
 An eslint rule bans any import of `server/src`, `client/src` or `cli/src` from `e2e/`. A test that imported product source would test the source, not what ships.
@@ -84,11 +84,13 @@ The old `cloud` project is gone: the client's nav comes from its build now, not 
 
 ### Isolation
 
-Each Playwright worker and each Vitest e2e file starts **its own server** on a free port, with:
+Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port), with:
 
 - a fresh `mkdtemp` storage root;
 - every key in `.env.example` and in your own `.env` blanked to its built-in default. The server's dotenv never overrides a set key, so without this a developer's real `.env` would leak into the suite;
-- `NODE_ENV=production`, `OTEL_ENABLED=false`, a fixed test PIN, and a unique `MDNS_NAME` per port, so a run on the host Mac never advertises a second `bifrost.local` on the LAN.
+- `NODE_ENV=production`, `OTEL_ENABLED=false`, a fixed test PIN, a unique `MDNS_NAME` per port, and `WEB_HOST=127.0.0.1`, which keeps the web host off the LAN and turns its mDNS off, so a run on the host Mac never advertises a second `bifrost.local`.
+
+A test can stop the whole hub (`halt()`), only the API (`haltApi()`, then `restartApi()`), or only the web host (`haltWeb()`). A load run can ask for the API alone (`direct`).
 
 A test that changes process-wide state (stopping the server, revoking every session, changing a policy, or needing exact counts) asks for `ownServer()`, a test-scoped server of its own.
 
@@ -111,7 +113,8 @@ The exceptions are an explicit allowlist, each with its reason:
 - the SSE stream cancelled by a navigation;
 - a request the page aborted itself;
 - the browser's own console line for a 4xx answer;
-- connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose.
+- connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose;
+- the web host's `502` (`503` for `/go`) and the browser's lines for them, but only after a test calls `guard.allowApiOutage()` because it stopped the API on purpose (PLAN-36). A 5xx from anything else still fails.
 - WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
 
 `browser/guard.spec.ts` proves the guard still fires for each kind.
@@ -141,7 +144,8 @@ All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings
 | `transport.e2e.ts` | What `inject` cannot see: the event stream over a socket (two streams, presence on close), a 300 MB streamed upload with flat server memory, `Range` 206/416, a folder zip verified entry by entry, a Brotli round trip, SIGTERM mid-upload with `tmp/` swept on the next boot, JSON 404 vs the SPA, asset types, `HEAD` on every `GET`, keep-alive reuse |
 | `contract.e2e.ts`  | A happy-path journey per tag; every response is validated against `openapi.json`, and every one of its operations succeeds                                                                                                                                                                                                                                |
 | `fuzz.e2e.ts`      | Two seeded properties per operation, generated from its request schemas (see below)                                                                                                                                                                                                                                                                       |
-| `security.e2e.ts`  | Admin guarding, path traversal against a canary, size-limit honesty, rate limits and login lockout, CORS, served-type safety                                                                                                                                                                                                                              |
+| `security.e2e.ts`  | Admin guarding, path traversal against a canary, size-limit honesty, rate limits and login lockout, CORS, served-type safety; behind the web host, the throttle counts each forwarded device, and a forged `X-Forwarded-For` changes nothing (PLAN-36)                                                                                                    |
+| `modes.e2e.ts`     | `npm start`'s entry in each run mode (PLAN-36): `full` (the hub client on `PORT` for the LAN, the API on loopback only), `api` (nothing on `PORT`), `web` (the standalone client, forwarding nothing) and `WEB_HOST=127.0.0.1` (this machine only, mDNS off with its reason)                                                                              |
 
 Every file ends with the same check: every response it received met the spec, and **no body leaked a filesystem path, a stack frame, or the traversal canary**.
 

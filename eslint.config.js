@@ -136,7 +136,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**'],
+              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**', '**/web/src/**'],
               message: 'e2e drives the built system from outside — never import product source.',
             },
           ],
@@ -145,8 +145,46 @@ export default tseslint.config(
     },
   },
   {
+    // The web host (PLAN-36) knows the API only as an upstream URL: it serves
+    // files and forwards requests, so importing server (or client) source would
+    // couple two processes that are meant to start, stop and fail separately.
+    files: ['web/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**', '**/e2e/**'],
+              message: 'the web host forwards to the API over HTTP — never import another workspace.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // PLAN-36: bifrost.local is answered by the web host, which owns the
+    // address people open. A responder in the API too would put two on the
+    // network (criterion 11), and would vanish whenever the API restarts.
+    files: ['server/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'bonjour-service', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+            { name: 'multicast-dns', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // CommonJS config files (PM2's ecosystem.config.cjs) — Node globals.
     files: ['**/*.cjs'],
+    // require() is how CommonJS imports; PM2's config reads .env with it.
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
     languageOptions: {
       sourceType: 'commonjs',
       globals: {

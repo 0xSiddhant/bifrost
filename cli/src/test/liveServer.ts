@@ -57,7 +57,11 @@ export async function startLiveServer(env: Record<string, string> = {}): Promise
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
-        PORT: String(port),
+        // The API alone (PLAN-36), on the port this helper polls: the CLI talks
+        // to it directly, as `bifrost --host 127.0.0.1:<API_PORT>` does.
+        PORT: String(port + 1),
+        API_PORT: String(port),
+        BIFROST_RUN: 'api',
         STORAGE_ROOT: storageRoot,
         HEIMDALL_PIN: 'cli-int-test-pin',
         DEPLOY_PROFILE: 'local',

@@ -41,19 +41,43 @@ if ! command -v pm2 >/dev/null 2>&1; then
   echo "▶ installing pm2 globally..."
   npm install -g pm2 || { echo "✖ 'npm install -g pm2' failed — try: sudo npm install -g pm2"; exit 1; }
 fi
-echo "▶ starting under pm2..."
+# PLAN-36: two apps, bifrost-api and bifrost-web; BIFROST_RUN picks which.
+env_get() { v="$(grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$v" ] && echo "$v" || echo "$2"; }
+MODE="$(env_get BIFROST_RUN full)"
+case "$MODE" in
+  full) WANT="bifrost-api bifrost-web" ;;
+  api)  WANT="bifrost-api" ;;
+  web)  WANT="bifrost-web" ;;
+  *) echo "✖ BIFROST_RUN must be full, api or web (got \"$MODE\")"; exit 1 ;;
+esac
+pm2_drop() { if pm2 describe "$1" >/dev/null 2>&1; then pm2 delete "$1" >/dev/null && echo "✔ removed pm2 app $1"; fi; }
+# Upgrade first: the single app every install before PLAN-36 runs must be gone
+# BEFORE the web host starts, or both would advertise bifrost.local and the
+# old one would hold the port the new API needs.
+pm2_drop bifrost
+# Switching modes: drop the apps this mode does not run.
+for app in bifrost-api bifrost-web; do
+  case " $WANT " in *" $app "*) ;; *) pm2_drop "$app" ;; esac
+done
+
+echo "▶ starting under pm2 ($MODE: $WANT)..."
 pm2 startOrRestart ecosystem.config.cjs
 pm2 save >/dev/null 2>&1 || true
 
 # 6. show the URL
-PORT="$(grep -E '^PORT=' .env | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$PORT" ] || PORT=4646
-NAME="$(grep -E '^MDNS_NAME=' .env | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$NAME" ] || NAME=bifrost
+PORT="$(env_get PORT 4646)"
+NAME="$(env_get MDNS_NAME bifrost)"
+API_PORT="$(env_get API_PORT $((PORT + 1)))"
 
 echo ""
-echo "✔ Bifrost is running under pm2."
-echo "  open:    http://$NAME.local:$PORT"
-echo "  logs:    pm2 logs bifrost"
+echo "✔ Bifrost ($MODE) is running under pm2."
+case "$MODE" in
+  full) echo "  open:    http://$NAME.local:$PORT" ;;
+  web)  echo "  open:    http://$NAME.local:$PORT   (the standalone client; no API in this mode)" ;;
+  api)  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)" ;;
+esac
+echo "  logs:    pm2 logs              # or: pm2 logs bifrost-api / bifrost-web"
 echo "  status:  pm2 status"
-echo "  stop:    pm2 stop bifrost"
+echo "  stop:    pm2 stop $WANT"
 echo ""
 echo "  Start on boot (run once):  pm2 startup   # then run the command it prints"

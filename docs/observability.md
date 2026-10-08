@@ -3,6 +3,10 @@
 Bifrost logs structured pino JSON to `storage/logs/` — rotated `app.N.log` files
 with a `current.log` symlink on the active one, kept to `LOG_RETENTION_FILES`
 rotations. That alone is the source of truth (`npm run logs` pretty-prints it).
+Since PLAN-36 the web host in front of the API writes its own series beside it,
+`app-web.N.log` (no symlink; `current.log` stays the API's), every line tagged
+`source: "web"`: its start and stop, the API going away and coming back, and
+streams a browser abandoned. Requests are logged once, by the API.
 This stack is a Grafana view on top; it is never load-bearing.
 
 Since PLAN-16a it is also **the** log UI: Heimdall's in-app viewer, its filters,
@@ -117,14 +121,20 @@ spans ────────────────push──────▶ 
     pino's numeric `level` instead, so Alloy fills `logLevel` in from it at
     ingest — one query therefore spans the whole archive, and the old files are
     never rewritten.
-  - `source` separates this process from the browsers. Server module lines carry
+  - `source` separates the processes from the browsers. Server module lines carry
     it explicitly; boot, shutdown, and request lines have no binding, so Alloy
-    defaults those to `server`.
+    defaults those to `server`. The web host's lines all carry `source: "web"`,
+    and `app*.log` already matches its `app-web.N.log` files.
+  - The two series never prune each other: pino-roll's retention counts only
+    files named exactly `<base>.<N>.log`, so `app.` and `app-web.` keep
+    `LOG_RETENTION_FILES` each.
 - **Loki** (`observability/loki/config.yml`) stores on a local filesystem
   volume; `reject_old_samples: false` is what lets it accept the backlog.
 - **Prometheus** (`observability/prometheus/prometheus.yml`) scrapes
   `host.docker.internal:4646` — **not** `localhost`, because Bifrost runs native
-  on macOS while this runs in a container. `node_exporter` is deliberately
+  on macOS while this runs in a container. Since PLAN-36 that is the web host,
+  which forwards `/metrics` to the API, so the target did not change; the API's
+  own port is loopback-only and a container could not reach it anyway. `node_exporter` is deliberately
   absent: in Docker on macOS it would measure the Linux VM rather than the Mac,
   producing numbers that look real and mean nothing. Every process metric comes
   from inside Node instead.

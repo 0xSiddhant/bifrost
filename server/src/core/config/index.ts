@@ -14,6 +14,14 @@ export const DEFAULT_LOG_RETENTION_FILES = 30;
 
 export type DeployProfile = 'local' | 'cloud';
 
+/**
+ * Which of the two processes this install runs (PLAN-36): `full` is the hub
+ * (web host on PORT + the API behind it), `api` the API alone on loopback,
+ * `web` the web host alone serving the standalone client.
+ */
+export const RUN_MODES = ['full', 'api', 'web'] as const;
+export type RunMode = (typeof RUN_MODES)[number];
+
 /** Zod error for a key that must be set: "missing" reads differently from "wrong". */
 function required(what: string, invalid: string) {
   return (issue: { input?: unknown }) =>
@@ -39,6 +47,13 @@ const envFields = z.object({
     .string({ error: required('the port the server listens on, e.g. 4646', 'must be a number') })
     .transform(Number)
     .pipe(z.number({ error: 'must be a number' }).int().min(1).max(65535)),
+  // PLAN-36: the API server's own port and bind address. PORT stays the
+  // address people open (now the web host's); the API sits behind it on
+  // loopback, so the web host is the only way in. API_PORT defaults to PORT + 1.
+  API_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  API_HOST: z.string().min(1).default('127.0.0.1'),
+  BIFROST_RUN: z.enum(RUN_MODES, { error: 'must be "full", "api" or "web"' }).default('full'),
+  WEB_HOST: z.string().min(1).default('0.0.0.0'),
   MDNS_NAME: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'must be a valid hostname label (lowercase letters, digits, dashes)')
@@ -164,11 +179,26 @@ const envFields = z.object({
   BACKUP_EXCLUDE: z.string().default(''),
 });
 
-// Cross-key rule: a default page larger than the cap could never be served.
-const envSchema = envFields.refine((env) => env.LIST_PAGE_SIZE <= env.LIST_PAGE_MAX, {
-  path: ['LIST_PAGE_SIZE'],
-  message: 'must not exceed LIST_PAGE_MAX',
-});
+// Cross-key rules: a default page larger than the cap could never be served,
+// and the API cannot share the web host's port.
+const envSchema = envFields
+  .refine((env) => env.LIST_PAGE_SIZE <= env.LIST_PAGE_MAX, {
+    path: ['LIST_PAGE_SIZE'],
+    message: 'must not exceed LIST_PAGE_MAX',
+  })
+  .refine((env) => apiPortOf(env) !== env.PORT, {
+    path: ['API_PORT'],
+    message: 'must differ from PORT (the web host listens on PORT, the API behind it)',
+  })
+  .refine((env) => apiPortOf(env) <= 65535, {
+    path: ['API_PORT'],
+    message: 'PORT + 1 is not a port; set API_PORT explicitly',
+  });
+
+/** API_PORT, or PORT + 1 when unset — the one place the default is decided. */
+function apiPortOf(env: { PORT: number; API_PORT?: number | undefined }): number {
+  return env.API_PORT ?? env.PORT + 1;
+}
 
 export interface StoragePaths {
   root: string;
@@ -184,7 +214,16 @@ export type ContractCheckMode = 'off' | 'fallback' | 'strict';
 
 export interface AppConfig {
   profile: DeployProfile;
+  /** The public port people open; the web host's since PLAN-36. */
   port: number;
+  /** Where this API server listens: loopback behind the web host by default. */
+  api: {
+    host: string;
+    port: number;
+  };
+  runMode: RunMode;
+  /** Where the web host listens (`127.0.0.1` keeps the hub on this machine). */
+  webHost: string;
   mdnsName: string;
   maxUploadSizeMb: number;
   maxFilesPerUpload: number;
@@ -386,6 +425,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
   const config: AppConfig = {
     profile: raw.DEPLOY_PROFILE,
     port: raw.PORT,
+    api: { host: raw.API_HOST, port: apiPortOf(raw) },
+    runMode: raw.BIFROST_RUN,
+    webHost: raw.WEB_HOST,
     mdnsName: raw.MDNS_NAME,
     maxUploadSizeMb: raw.MAX_UPLOAD_SIZE_MB,
     maxFilesPerUpload: raw.MAX_FILES_PER_UPLOAD,

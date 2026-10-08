@@ -229,23 +229,23 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 
 ## Task checklist
 
-- [ ] Spike first (scratch project, never committed): the six pass-through checks in "Streams, SSE and uploads pass through unbuffered"; record the result and the chosen proxy per path class in `decisions.md`
-- [ ] `web/` workspace (`@bifrost/web`): static `client/dist` + SPA fallback, proxy for the seven path roots, `X-Forwarded-For`, no body limit, `502 HUB_UNAVAILABLE` (an HTML 503 page for `/go/*`), `/healthz` (added to `RESERVED_ROOTS` and its test, per the routing rule), pino `source: 'web'`, graceful shutdown; lint rule banning `server/src`; `tech-stack.md` rows
-- [ ] Server: stop serving `client/dist`; listen on `API_HOST:API_PORT`; `trustProxy` loopback-only; config keys `API_PORT` / `API_HOST` (zod; `API_PORT ≠ PORT`); `serverUrls` and the boot QR still on `PORT`; the mDNS responder **removed** from the API server (`app.ts` no longer calls `advertiseMdns`), with `lanIPv4Addresses()` kept in `core/net.ts`
-- [ ] Move the mDNS responder to `web/src/mdns.ts` (+ tests, `bonjour-service` dependency); the web host advertises `MDNS_NAME` on `PORT` for the `local` profile after listening, and unpublishes on shutdown; `web/src/mdns-dev.ts` advertiser-only entry wired into `npm run dev`; `error` log on a name conflict
-- [ ] `.env.example` (both keys, documented), `npm run setup` (reports both ports, drift check)
-- [ ] `client/vite.config.ts`: Vite on `PORT`, proxy target `API_PORT`
-- [ ] Run modes: `BIFROST_RUN` and `WEB_HOST` (zod, shared `.env`); the web host's `web` mode (serves `client/dist-standalone`, forwards nothing, same rules as `nginx.conf`); mode-aware checks and logs (the `PORT` check only in `full`; the CLI hint in `api`; mDNS off on a loopback `WEB_HOST`; a refusal naming the fix when the needed build is missing); `npm run build` builds both clients
-- [ ] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (the plists for the mode, replacing the old single plist and any other mode's plists on re-run); compose profiles `api`/`web`; `Dockerfile` + `docker-compose.yml` (two services, health checks)
-- [ ] `scripts/backup-agent.sh` → `API_PORT`, mode-aware skip in `web` mode; `scripts/resilience.ts` → API on a random `API_PORT`
-- [ ] `e2e/support/server.ts`: spawn both on free ports, all suites through the web host; load harness `--direct`
-- [ ] `client/src/core/api.ts`: `ApiError` code `HUB_UNAVAILABLE` → `HubUnreachableError` (unit test); rewrite PLAN-32's journey 17 to stop the web host, plus an API-only-down step
+- [x] Spike first (scratch project, never committed): the six pass-through checks in "Streams, SSE and uploads pass through unbuffered"; record the result and the chosen proxy per path class in `decisions.md`
+- [x] `web/` workspace (`@bifrost/web`): static `client/dist` + SPA fallback, proxy for the seven path roots, `X-Forwarded-For`, no body limit, `502 HUB_UNAVAILABLE` (an HTML 503 page for `/go/*`), `/healthz` (added to `RESERVED_ROOTS` and its test, per the routing rule), pino `source: 'web'`, graceful shutdown; lint rule banning `server/src`; `tech-stack.md` rows
+- [x] Server: stop serving `client/dist`; listen on `API_HOST:API_PORT`; `trustProxy` loopback-only; config keys `API_PORT` / `API_HOST` (zod; `API_PORT ≠ PORT`); `serverUrls` and the boot QR still on `PORT`; the mDNS responder **removed** from the API server (`app.ts` no longer calls `advertiseMdns`), with `lanIPv4Addresses()` kept in `core/net.ts`
+- [x] Move the mDNS responder to `web/src/mdns.ts` (+ tests, `bonjour-service` dependency); the web host advertises `MDNS_NAME` on `PORT` for the `local` profile after listening, and unpublishes on shutdown; `web/src/mdns-dev.ts` advertiser-only entry wired into `npm run dev`; `error` log on a name conflict
+- [x] `.env.example` (both keys, documented), `npm run setup` (reports both ports, drift check)
+- [x] `client/vite.config.ts`: Vite on `PORT`, proxy target `API_PORT`
+- [x] Run modes: `BIFROST_RUN` and `WEB_HOST` (zod, shared `.env`); the web host's `web` mode (serves `client/dist-standalone`, forwards nothing, same rules as `nginx.conf`); mode-aware checks and logs (the `PORT` check only in `full`; the CLI hint in `api`; mDNS off on a loopback `WEB_HOST`; a refusal naming the fix when the needed build is missing); `npm run build` builds both clients
+- [x] `scripts/start.ts` + root `npm start`; `ecosystem.config.cjs` (two apps); `start-pm2.sh`; `start-launchd.sh` (the plists for the mode, replacing the old single plist and any other mode's plists on re-run); compose profiles `api`/`web`; `Dockerfile` + `docker-compose.yml` (two services, health checks)
+- [x] `scripts/backup-agent.sh` → `API_PORT`, mode-aware skip in `web` mode; `scripts/resilience.ts` → API on a random `API_PORT`
+- [x] `e2e/support/server.ts`: spawn both on free ports, all suites through the web host; load harness `--direct`
+- [x] `client/src/core/api.ts`: `ApiError` code `HUB_UNAVAILABLE` → `HubUnreachableError` (unit test); rewrite PLAN-32's journey 17 to stop the web host, plus an API-only-down step
 - [ ] Upgrade path: `start-launchd.sh` replaces the old single plist on re-run; `start-pm2.sh` removes the old `bifrost` app; API boot check for nothing on `PORT`; upgrade section in `CHANGELOG`/`README.md`; hand-tested upgrade under PM2 and launchd
-- [ ] `.claude/skills/verify/SKILL.md`, `.claude/skills/live-verify/SKILL.md`: both processes, the same URL
-- [ ] Docs: `docs/pm2.md`, `docs/launchd.md`, `docs/docker-linux.md`, `docs/observability.md`, `README.md`, `architecture.md` (one process → two, the proxy, `trustProxy`; supersedes the 2026-07-12 one-process decision with a new row), `project-structure.md` (fifth workspace)
+- [x] `.claude/skills/verify/SKILL.md`, `.claude/skills/live-verify/SKILL.md`: both processes, the same URL
+- [x] Docs: `docs/pm2.md`, `docs/launchd.md`, `docs/docker-linux.md`, `docs/observability.md`, `README.md`, `architecture.md` (one process → two, the proxy, `trustProxy`; supersedes the 2026-07-12 one-process decision with a new row), `project-structure.md` (fifth workspace)
 - [ ] Hand-run every row of the "Every way of running Bifrost" table on the owner's Mac (Docker on CI's image build plus a Linux `compose up` if available), with results in `progress.md`
-- [ ] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
-- [ ] Cleanup: the spike stays in the session scratchpad and is never committed; no stray processes, plists or PM2 apps left from testing; the PR lists deletions
+- [x] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] Cleanup: the spike stays in the session scratchpad and is never committed; no stray processes, plists or PM2 apps left from testing; the PR lists deletions
 
 ## Acceptance criteria
 
@@ -269,13 +269,13 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 
 ## Test checklist
 
-- [ ] `web/` unit/integration: proxied paths, SPA fallback, `502 HUB_UNAVAILABLE`, forwarded IP, no body limit (criteria 3–5)
-- [ ] Server: `trustProxy` loopback-only (a non-loopback `X-Forwarded-For` is ignored); config validation `API_PORT ≠ PORT` (criterion 4)
-- [ ] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6); the process set per mode (criterion 17)
-- [ ] Mode smoke test (CI, on the build): boot each of `full`, `api`, `web`, plus `WEB_HOST=127.0.0.1`; assert which ports listen, which client is served, that `web` makes no forwarded request, and the mDNS on/off decision (as a unit test of the decision, since CI cannot multicast) (criteria 13–16)
-- [ ] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
-- [ ] `test:load` before vs after (criterion 7)
-- [ ] `web/src/mdns.test.ts` (the moved suite): publish with `host`, error-handler and guard behaviour, the network-change rebuild (criterion 12)
+- [x] `web/` unit/integration: proxied paths, SPA fallback, `502 HUB_UNAVAILABLE`, forwarded IP, no body limit (criteria 3–5)
+- [x] Server: `trustProxy` loopback-only (a non-loopback `X-Forwarded-For` is ignored); config validation `API_PORT ≠ PORT` (criterion 4)
+- [x] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6); the process set per mode (criterion 17)
+- [x] Mode smoke test (CI, on the build): boot each of `full`, `api`, `web`, plus `WEB_HOST=127.0.0.1`; assert which ports listen, which client is served, that `web` makes no forwarded request, and the mDNS on/off decision (as a unit test of the decision, since CI cannot multicast) (criteria 13–16)
+- [x] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
+- [x] `test:load` before vs after (criterion 7)
+- [x] `web/src/mdns.test.ts` (the moved suite): publish with `host`, error-handler and guard behaviour, the network-change rebuild (criterion 12)
 - [ ] Integration: the web host advertises only for the `local` profile and unpublishes on shutdown; the API server no longer imports a responder (criteria 10 and 11)
 
 **Manual**

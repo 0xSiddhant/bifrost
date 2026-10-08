@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import type { AppConfig } from '../../core/config/index.js';
-import { lanIPv4Addresses } from '../../core/mdns/index.js';
+import { lanIPv4Addresses } from '../../core/net.js';
 import type { FeatureModule } from '../../core/module.js';
 
 /**

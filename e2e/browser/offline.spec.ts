@@ -4,8 +4,11 @@ import { mainNav, waitForLive } from '../support/ui.js';
 
 /**
  * Journey 17 — offline mode: with the switch on, a warmed page still opens
- * after the server is gone; an un-warmed one shows the route boundary panel,
- * never the app-wide crash card. Stops a server, so it has one of its own.
+ * after the hub is out of reach; an un-warmed one shows the route boundary
+ * panel, never the app-wide crash card. Out of reach means the web host is
+ * gone (PLAN-36): it serves the chunks, so with it stopped nothing the page
+ * has not cached can arrive, whether or not the API behind it still runs.
+ * Stops a server, so it has one of its own.
  */
 test(
   'a warmed page opens with the bridge down; an un-warmed one says so calmly',
@@ -20,7 +23,7 @@ test(
     });
 
     guard.allowConnectionLoss();
-    await server.halt();
+    await server.haltWeb();
     // The event stream notices first: the footer stops reading `open`.
     await expect(page.locator('.shell-footer')).not.toContainText(/\bopen\b/, { timeout: 20_000 });
 
