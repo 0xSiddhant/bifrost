@@ -17,6 +17,8 @@ COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
 COPY cli/package.json ./cli/
+# The root devDependency that replaces micromatch (tools/micromatch-shim/README.md).
+COPY tools/micromatch-shim ./tools/micromatch-shim/
 RUN npm ci
 # Build, then drop dev deps so only production node_modules ship.
 COPY . .
@@ -45,6 +47,7 @@ COPY server/package.json ./server/
 COPY client/package.json ./client/
 COPY cli/package.json ./cli/
 COPY e2e/package.json ./e2e/
+COPY tools/micromatch-shim ./tools/micromatch-shim/
 RUN npm ci --workspace client --include-workspace-root --ignore-scripts
 COPY client ./client
 COPY scripts ./scripts
