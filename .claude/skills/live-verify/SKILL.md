@@ -9,8 +9,8 @@ Tests passing is not "live-verified". This is the procedure behind the "live-ver
 
 ## Server
 
-1. `npm run build`, then start the **built** server with `npm start` (in the background) — never verify against `npm run dev`. Port comes from `.env` (`PORT` is required, no default; `.env.example` uses 4646). Poll `GET /api/health` until 200 before touching the browser.
-2. If the check needs clean state, run with `STORAGE_ROOT=<scratch dir>` instead of touching `storage/`.
+1. `npm run build`, then start the **built** hub with `npm start` (in the background) — never verify against `npm run dev`. Since PLAN-36 that is two processes: the web host on `PORT` (required, no default; `.env.example` uses 4646), which serves the page and forwards the API's paths, and the API on loopback `API_PORT` (default `PORT + 1`). Drive everything through `PORT`, the one URL people open; poll `GET http://localhost:<PORT>/api/health` until 200 before touching the browser (that answer proves both are up). Run the script with `node --import tsx scripts/start.ts` when you need its PID: `npx` puts a shell in between and a signal to it never reaches the supervisor.
+2. If the check needs clean state, run with `STORAGE_ROOT=<scratch dir>` instead of touching `storage/`. To see what a device sees while the API restarts, do not use `npm start`: its supervisor stops the web host the moment the API dies. Run the two yourself instead, the API with `BIFROST_RUN=api node --import ./server/dist/otel.js server/dist/bootstrap.js` and the web host with `node web/dist/bootstrap.js` (same `.env`), then stop and restart only the API: the page must still load, show "The Bifröst is closed", and close the sheet once the API is back.
 
 ## Browser
 
@@ -38,5 +38,5 @@ check three things a unit test cannot:
 
 ## Finish
 
-6. SIGINT the server (the kill test exists for a reason — a clean shutdown is part of the verification), close Chromium, and **Read every screenshot** to confirm it actually shows the expected state before claiming success.
+6. SIGINT `scripts/start.ts` (the kill test exists for a reason — a clean shutdown of both processes, the web host first, is part of the verification), close Chromium, and **Read every screenshot** to confirm it actually shows the expected state before claiming success.
 7. Report to the owner: what was verified live (with concrete observations, not "looks fine"), and what remains manual (real-device gestures, iOS quirks, etc.). Record the live-verified line in the `progress.md` session note.

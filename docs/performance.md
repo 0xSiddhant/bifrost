@@ -1,6 +1,6 @@
 # Performance: the load harness
 
-`npm run test:load` measures the **built** server under load (PLAN-34). It starts the production entry (`node --import server/dist/otel.js server/dist/bootstrap.js`) on scratch storage and an OS-assigned port, seeds it through the API, runs one profile, reads the server's own `/metrics` while it does, then prints a table and writes `load-results/<profile>-<timestamp>.json`.
+`npm run test:load` measures the **built** server under load (PLAN-34). It starts the production entries on scratch storage and OS-assigned ports, the API (`node --import server/dist/otel.js server/dist/bootstrap.js`) behind the web host (`node web/dist/bootstrap.js`) as production runs them since PLAN-36, seeds the hub through the web host, runs one profile, reads the API's own `/metrics` while it does, samples the web host's RSS with `ps` (it has no `/metrics`), then prints a table and writes `load-results/<profile>-<timestamp>.json`.
 
 It is **on demand, never a CI gate** (see [Why it is not in CI](#why-it-is-not-in-ci)). Run it before a release or after a change that could affect speed or memory, on the machine Bifrost actually runs on.
 
@@ -45,6 +45,7 @@ npm run test:load -- --profile fanout          # 200 SSE listeners, 4 × 1 GB st
 | `--contract <off\|fallback>`                              | `fallback`   | `API_CONTRACT_CHECK`. `strict` is refused: it validates every response with ajv                 |
 | `--server-dist <path>`                                    | this build   | Run another build: a checkout (or its `server/dist`) with `server/dist` and `client/dist` built |
 | `--keep`                                                  | off          | Keep the scratch storage for a post-mortem; its path is printed                                 |
+| `--direct`                                                | off          | The API alone, no web host in front: compare with a normal run to measure the hop (PLAN-36)     |
 | `--sse-listeners <n>`, `--uploads <n>`, `--upload-mb <n>` | 200, 4, 1024 | Fan-out sizes, for a smaller machine                                                            |
 
 **Measured as configured.** Every `.env` value stays at its production default, including `LOG_LEVEL=trace`, because that is what the household runs. The only overrides are the three per-IP rate limits (lifted to 1,000,000/min: they exist to stop abuse and would turn every write into a 429 measurement) and the contract mode. The result file lists every override.
@@ -83,6 +84,8 @@ npm run test:load -- --baseline load-results/load-<before timestamp>.json   # af
 
 git worktree remove --force /tmp/bifrost-before         # git worktree list shows only the main checkout
 ```
+
+A build from before PLAN-36 has no web host, so `--server-dist` runs it as the one process it was; compare it with this build both through the web host (what production pays now) and with `--direct` (the API's own change).
 
 Latencies are whole milliseconds, so a ⚠ on a single-digit p50 (1 → 2 ms reads +100%) is one rounding step, not a regression; judge the req/s and the larger latencies. Run the two back to back, on an otherwise idle machine, and compare like with like: the same `--contract` and `--log-level`. A build from before PLAN-32b ignores `API_CONTRACT_CHECK`, so compare it against both `off` (the serializer's own effect) and `fallback` (what production pays today).
 

@@ -9,12 +9,12 @@ bifrost/
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
 ├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
-├── package.json               # npm workspaces: server, client, cli, e2e
-├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
+├── package.json               # npm workspaces: server, client, cli, e2e, web
+├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web, picked by BIFROST_RUN (PLAN-36)
 ├── Dockerfile / .dockerignore # Linux-target hub image (CI-built; not the macOS run mode),
 │                              #   plus the `standalone` target (client only, nginx-unprivileged, PLAN-35)
 ├── docker/nginx-standalone.conf   # the standalone site's nginx: static files, no proxy_pass
-├── docker-compose.yml         # run on a Linux host (host networking)
+├── docker-compose.yml         # run on a Linux host (host networking): services bifrost-api + bifrost-web
 ├── docker-compose.standalone.yml  # the standalone site behind an existing reverse proxy
 ├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
 ├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
@@ -46,7 +46,9 @@ bifrost/
 │       ├── otel.ts            # OpenTelemetry SDK — loaded via `node --import`, BEFORE the app
 │       │                      #   (ESM hoists, so starting it from app code instruments nothing)
 │       ├── core/              # shared kernel — NEVER imports from modules/
-│       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
+│       │   ├── config/  db/  logger/  bus/  sse/  auth/  http/  backup/
+│       │   ├── net.ts         #   lanIPv4Addresses() (the responder itself moved to web/, PLAN-36)
+│       │   ├── web-host-check.ts  # full mode: error if nothing answers PORT/healthz after 10 s
 │       │   │                  #   http/: schemas.ts (shared response pieces), contract.ts (the
 │       │   │                  #   response contract guard), openapi.ts (swagger + routeCatalog)
 │       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
@@ -162,15 +164,28 @@ bifrost/
 │       ├── commands/          #   thin: parse args, call core/, print. No usecase tier —
 │       │                      #     there is no rule here the server does not already enforce
 │       └── test/              #   liveServer (spawns a REAL server per int suite) + runCli
+├── web/                       # FIFTH workspace (PLAN-36): the web host on PORT. Lint-banned from
+│   │                          #   importing server/client/cli/e2e source; reads the shared .env itself
+│   └── src/
+│       ├── bootstrap.ts       #   production entry (PM2/launchd/compose/npm start)
+│       ├── main.ts            #   mode → client dir, listen on WEB_HOST:PORT, mDNS decision, shutdown
+│       ├── host.ts            #   buildWebHost: static + SPA fallback + the proxy (hub), or the
+│       │                      #     nginx-rule static site (standalone); 502 HUB_UNAVAILABLE, /healthz
+│       ├── standalone-rules.ts  # the nginx-standalone.conf rules, parity-tested
+│       ├── config.ts  logger.ts  # its own zod view of .env; app-web.N.log, source: "web"
+│       ├── mdns.ts            #   the Bonjour responder (moved from server/src/core/mdns, PLAN-36)
+│       ├── mdns-dev.ts        #   advertiser-only process for `npm run dev`
+│       └── supervise.ts       #   runs a mode's processes as one for `npm start` (scripts/start.ts)
 ├── e2e/                       # FOURTH workspace (PLAN-32a): sees only the BUILT system, from
 │   │                          #   outside — lint-banned from importing server/client/cli src
 │   ├── playwright.config.ts   #   UI only: chromium-desktop, chromium-mobile, webkit-mobile, cloud
 │   ├── vitest.config.ts       #   unit tests of the support code (`npm test`)
 │   ├── vitest.e2e.config.ts   #   the installed-CLI suite (`cli/**/*.e2e.ts`)
 │   ├── vitest.api.config.ts   #   the black-box API suite (`api/**/*.e2e.ts`, PLAN-33)
-│   ├── api/                   #   boot, transport, contract, fuzz/, security; support/ (spec reader,
+│   ├── api/                   #   boot, transport, contract, fuzz/, security, modes (PLAN-36); support/ (spec reader,
 │   │                          #   recording fetch client, seeding, SSE, zip); coverage-report.ts
-│   ├── support/               #   server.ts (production entry, scratch storage, blanked .env),
+│   ├── support/               #   server.ts (both production entries, the web host in front; scratch
+│   │                          #   storage, blanked .env),
 │   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
 │   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,
 │   │                          #   pty.ts, sink.ts, pdf.ts, files.ts, guard-fixture.ts,
@@ -179,13 +194,13 @@ bifrost/
 │   ├── standalone/            #   the standalone site, from a static server with the nginx rules (PLAN-35)
 │   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
 │   ├── perf/                  #   the load harness, `npm run test:load` (PLAN-34): run.ts, options.ts,
-│   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics), report.ts,
+│   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics, web host RSS), report.ts,
 │   │                          #   profiles/{load,stress,spike,soak,fanout}.ts; never in CI
 ├── tools/micromatch-shim/     # stands in for micromatch (no `braces`): the 3 functions eslint-plugin-boundaries
 │                              #   uses, copied verbatim; wired by package.json devDependency + override
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
 │                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
-│                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,
+│                              #   skipped under CI) + start.ts (`npm start`), start-pm2.sh, start-launchd.sh,
 │                              #   observability.sh, check-standalone.ts (the standalone bundle reaches
 │                              #   no server), standalone-smoke.sh (the image, in CI)
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts

@@ -31,16 +31,37 @@ docker compose logs -f        # watch the boot banner / QR
 
 Open `http://<host>.local:4646` (Avahi advertises it) or `http://<host-ip>:4646`.
 
+### Two services (PLAN-36)
+
+`docker-compose.yml` runs one image as two services, the same two processes as
+on the Mac:
+
+| Service | What it is | Listens on |
+|---|---|---|
+| `bifrost-api` | the API server | `127.0.0.1:API_PORT` (default 4647), the host's loopback |
+| `bifrost-web` | the web host: the client, the API's paths forwarded, `bifrost.local` | `PORT` (4646) on the LAN |
+
+`docker compose up -d` starts both. For one alone, name it, with the matching
+`BIFROST_RUN` in `.env`: `docker compose up -d bifrost-api` (`api`) or
+`docker compose up -d bifrost-web` (`web`, the standalone client, no API).
+Restarting `bifrost-api` alone (`docker compose restart bifrost-api`) leaves the
+page up, showing "The Bifröst is closed" until it is back.
+
+**Upgrading from the single `bifrost` service:** `docker compose up -d
+--build --remove-orphans`. Without `--remove-orphans` the old container keeps
+running beside the new pair, holding the API's port and advertising the name.
+
 ### Notes
 
 - **Host networking** (`network_mode: host`) is required for mDNS; it means the
-  container binds the host's `PORT` directly (no `-p` mapping). Only one process
-  can own the port.
-- **State** lives in the bind mounts `./storage` and `./themes`. Back them up
-  with `npm run backup` on the host, or run the in-app backup (PLAN-10).
+  containers bind the host's `PORT` and `API_PORT` directly (no `-p` mapping),
+  and the API's loopback bind is the host's loopback, which is how the web host
+  reaches it. Only one process can own each port.
+- **State** lives in the bind mount `./storage`, shared by both services. Back
+  it up with `npm run backup` on the host, or run the in-app backup (PLAN-10).
 - **Permissions:** the container runs as the unprivileged `node` user (uid 1000).
   If the host `./storage` is owned by a different uid, either `chown -R 1000
-  storage themes` or adjust the compose `user:`.
+  storage` or adjust the compose `user:`.
 - **`.env`** is read at boot from the mount; it is deliberately excluded from the
   image (`.dockerignore`) so secrets never bake into layers.
 
@@ -49,13 +70,16 @@ Open `http://<host>.local:4646` (Avahi advertises it) or `http://<host-ip>:4646`
 Multi-stage: a builder installs all deps, runs `npm run build`, and
 `npm prune --omit=dev`; the runtime stage is `node:20-bookworm-slim` + `tini`
 (init) + `zip`/`unzip` (in-app backup), carrying only built output and
-production `node_modules`. A `HEALTHCHECK` polls `/api/health`.
+production `node_modules`. The image's `HEALTHCHECK` polls the API's
+`/api/health` on `API_PORT`; the compose file gives `bifrost-web` its own,
+polling `/healthz` on `PORT`.
 
 ## Verify (owner, on a Linux box/VM)
 
 Acceptance 5 — do this once on real hardware:
 
 1. `docker compose up -d --build` succeeds.
-2. From another device on the LAN, `http://<host>.local:4646` loads.
+2. From another device on the LAN, `http://<host>.local:4646` loads, and
+   `http://<host-ip>:4647` does not (the API is loopback-only).
 3. Drop a file into `storage/downloads/` on the host → it appears live in the
    Receive page (watcher works under host network).

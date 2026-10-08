@@ -87,7 +87,7 @@ cp .env.example .env
 # 3. create runtime folders (storage/{uploads,downloads,tmp,data,logs})
 npm run setup
 
-# 4. run in dev (server + client, hot reload)
+# 4. run in dev (API + client, hot reload)
 npm run dev
 ```
 
@@ -107,6 +107,24 @@ sh scripts/start-launchd.sh    # via launchd (zero extra deps, native)
 
 Pick one, not both. Details + how to choose: [`docs/pm2.md`](docs/pm2.md) ·
 [`docs/launchd.md`](docs/launchd.md).
+
+Bifrost runs as **two processes** (PLAN-36): the **web host** on `PORT` (4646),
+which serves the page, answers for `bifrost.local` and forwards API calls, and
+the **API server** behind it on `127.0.0.1:API_PORT` (default 4647, never on the
+LAN). The address is the same as ever. Restarting the API alone leaves the page
+up, showing "The Bifröst is closed" until it is back. `BIFROST_RUN` in `.env`
+picks what runs: `full` (both, the default), `api` (the API alone, for the CLI
+on this Mac: `bifrost --host 127.0.0.1:4647`) or `web` (the standalone tools
+site alone).
+
+### Upgrading from a version before PLAN-36
+
+Re-run the same script you installed with. `start-pm2.sh` deletes the old
+`bifrost` app and `start-launchd.sh` the old `local.bifrost` plist **before**
+starting the two new processes, so nothing old holds the API's port or
+advertises a second `bifrost.local`. On Linux, `docker compose up -d --build
+--remove-orphans`. If the web host is ever missing after an upgrade, the API
+logs an error saying so ten seconds after it starts.
 
 **Optional Grafana view of the logs** (Docker containers; works alongside the
 native run — Alloy tails `storage/logs/`). In a second terminal:
@@ -158,11 +176,11 @@ to.
 | Command                                                        | What it does                                                                                                                                                                         |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `npm run setup`                                                | Creates storage folders, verifies `.env`, runs DB migrations                                                                                                                         |
-| `npm run dev`                                                  | Dev mode with hot reload (server + client)                                                                                                                                           |
-| `npm run build`                                                | Production build (client + server), then re-installs the global `bifrost` CLI                                                                                                        |
+| `npm run dev`                                                  | Dev mode with hot reload: the API, Vite on `PORT` (forwarding to the API), and the mDNS name                                                                                         |
+| `npm run build`                                                | Production build (both clients, the API, the web host), then re-installs the global `bifrost` CLI                                                                                    |
 | `npm run build:standalone`                                     | The standalone site into `client/dist-standalone/`; fails if the bundle can reach a server (PLAN-35)                                                                                 |
 | `npm run dev:standalone` · `npm run preview:standalone`        | Run the standalone site locally: Vite dev with hot reload, or build then serve the real output ([`docs/standalone.md`](docs/standalone.md))                                          |
-| `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                                                                                                                 |
+| `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build: the processes `BIFROST_RUN` picks, as one (Ctrl-C stops the web host, then the API)                             |
 | `npm run logs`                                                 | Pretty-tail the JSON log file                                                                                                                                                        |
 | `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data                                                                                                  |
 | `npm run backup`                                               | Archive `storage/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`)                                                                                                    |
