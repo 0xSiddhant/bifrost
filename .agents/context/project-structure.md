@@ -11,15 +11,19 @@ bifrost/
 ├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
 ├── package.json               # npm workspaces: server, client, cli, e2e
 ├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
-├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
+├── Dockerfile / .dockerignore # Linux-target hub image (CI-built; not the macOS run mode),
+│                              #   plus the `standalone` target (client only, nginx-unprivileged, PLAN-35)
+├── docker/nginx-standalone.conf   # the standalone site's nginx: static files, no proxy_pass
 ├── docker-compose.yml         # run on a Linux host (host networking)
+├── docker-compose.standalone.yml  # the standalone site behind an existing reverse proxy
 ├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
 ├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
 │                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
 │   ├── ARCHITECTURE.md        # pointer → .agents/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
-│   ├── THEME-SPEC.md          # rules + JSON schema for user-made themes
+│   ├── THEME-SPEC.md          # rules + JSON schema for the bundled themes
+│   ├── standalone.md          # the standalone site: what it has, Docker, build args (PLAN-35)
 │   ├── pm2.md · launchd.md    # run as a service on macOS
 │   ├── docker-linux.md        # Docker on a Linux host
 │   ├── observability.md       # the optional Grafana stack
@@ -50,7 +54,7 @@ bifrost/
 │       │   │                  #   (+ their response schemas, PLAN-32)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
-│           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
+│           └── <feature>/     # health, file-transfer, previews, clipboard,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
 │               │              #   variant, edda, groot, atlas, loki, accio, nimbus, portkey,
 │               │              #   screensaver, client-logs, metrics, toolbox,
@@ -61,7 +65,7 @@ bifrost/
 │               └── schema.ts  # Drizzle tables owned by this module
 ├── client/
 │   └── src/
-│       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
+│       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       │                      #   + PensievePage (PLAN-21) — a shell ACROSS features, so it lives
 │       │                      #     here rather than in features/; its logic is in core/library/
@@ -69,7 +73,12 @@ bifrost/
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
-│       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
+│       │                      #   + themes/*.json (bundled at build time, PLAN-35)
+│       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
+│       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
+│       │                      #   bifrost.local.* localStorage, rules.ts + rules.cases.json),
+│       │                      #   api/sse clients (hub-only stubs in standalone), log.ts (batched
+│       │                      #   browser→server logger; a no-op sink standalone),
 │       │                      #   notify/ (global notification stack: store + host +
 │       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
 │       │                      #   theme engine, device registry, tokens,
@@ -164,9 +173,10 @@ bifrost/
 │   ├── support/               #   server.ts (production entry, scratch storage, blanked .env),
 │   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
 │   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,
-│   │                          #   pty.ts, sink.ts, pdf.ts, files.ts
-│   ├── browser/               #   journeys 1–18, cross-surface, routes.spec.ts, guard.spec.ts
-│   ├── cloud/                 #   DEPLOY_PROFILE=cloud gating
+│   │                          #   pty.ts, sink.ts, pdf.ts, files.ts, guard-fixture.ts,
+│   │                          #   static-server.ts + standalone-fixtures.ts (PLAN-35)
+│   ├── browser/               #   journeys 1–18, cross-surface, bridge-closed, routes.spec.ts, guard.spec.ts
+│   ├── standalone/            #   the standalone site, from a static server with the nginx rules (PLAN-35)
 │   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
 │   ├── perf/                  #   the load harness, `npm run test:load` (PLAN-34): run.ts, options.ts,
 │   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics), report.ts,
@@ -174,8 +184,8 @@ bifrost/
 ├── scripts/                   # setup, backup, restore, resilience (test:resilience),
 │                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,
-│                              #   observability.sh
-├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
+│                              #   observability.sh, check-standalone.ts (the standalone bundle reaches
+│                              #   no server), standalone-smoke.sh (the image, in CI)
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts
     ├── uploads/   downloads/   tmp/   data/ (app.db)   logs/
 ```

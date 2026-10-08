@@ -65,7 +65,7 @@ The app is organized into three category tabs, plus a few things that work every
 
 ### Everywhere
 
-- 🎨 Dynamic themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), addable via JSON
+- 🎨 Themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), bundled with the client: add one as a JSON file and rebuild
 - 🌌 **Nótt** — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 **Heimdall** — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 **Wardens** — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
@@ -116,7 +116,7 @@ sh scripts/observability.sh    # http://localhost:3000  (admin / bifrost)
 ```
 
 See [`docs/observability.md`](docs/observability.md). Back up all state
-(`storage/` + `themes/`) any time with `npm run backup`, or schedule it
+(`storage/`) any time with `npm run backup`, or schedule it
 (macOS): set `BACKUP_CLOUD` (dropbox / icloud / onedrive / gdrive / path) in
 `.env` and run `npm run backup:install` — a launchd agent checks daily and
 backs up every `BACKUP_INTERVAL_DAYS` into the cloud folder, only while the
@@ -163,7 +163,7 @@ to.
 | `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                                                                                                                 |
 | `npm run logs`                                                 | Pretty-tail the JSON log file                                                                                                                                                        |
 | `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data                                                                                                  |
-| `npm run backup`                                               | Archive `storage/` + `themes/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`)                                                                                       |
+| `npm run backup`                                               | Archive `storage/` to `BACKUP_DIR` (online-safe; `-- --include-env` to add `.env`)                                                                                                    |
 | `npm run backup:install` / `backup:uninstall`                  | Install/remove the scheduled-backup launchd agent (macOS; settings in `.env`)                                                                                                        |
 | `npm run backup:status`                                        | Schedule, agent state, last run/success/failure, stored backups, next due date                                                                                                       |
 | `npm run backup:stop` / `backup:start`                         | Pause scheduled backups (stays off across logins) / resume them                                                                                                                      |
@@ -193,6 +193,7 @@ Operating & deploying:
 - [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
 - [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy + Prometheus + Tempo stack
 - [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
+- [`docs/standalone.md`](docs/standalone.md) — the standalone site: the browser-only tools, as a static container behind your reverse proxy
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
 - [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops

@@ -34,6 +34,13 @@ export const LOCATION_RULES: readonly LocationRule[] = [
     defaultType: 'text/javascript',
   },
   { match: 'exact', path: '/index.html', fallback: null, cacheControl: 'no-cache' },
+  {
+    match: 'exact',
+    path: '/manifest.webmanifest',
+    fallback: null,
+    cacheControl: 'no-cache',
+    defaultType: 'application/manifest+json',
+  },
   { match: 'prefix', path: '/', fallback: '/index.html', cacheControl: 'no-cache' },
 ];
 
@@ -48,7 +55,6 @@ const TYPES: Record<string, string> = {
   '.js': 'text/javascript',
   '.css': 'text/css',
   '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.woff2': 'font/woff2',

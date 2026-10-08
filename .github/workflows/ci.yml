@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # PLAN-35: server/src/openapi-removals.test.ts diffs the spec against
+      # develop's, so develop must be here; the test fails rather than skips
+      # in CI when it is not.
+      - name: Fetch develop
+        run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -31,6 +37,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # PLAN-35: the standalone site, for the Playwright `standalone` project.
+      # Its postbuild step fails the job if the bundle can reach a server.
+      - name: Build standalone
+        run: npm run build:standalone
 
       # PLAN-32a: the end-to-end safety net runs against the build above —
       # the production server, the built client in real browsers (Chromium
@@ -96,3 +107,19 @@ jobs:
           tags: bifrost:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # PLAN-35: the standalone site's image, built and run the way
+      # docker-compose.standalone.yml runs it, then smoke-tested.
+      - name: Build standalone image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: standalone
+          push: false
+          load: true
+          tags: bifrost-standalone:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Standalone smoke test
+        run: scripts/standalone-smoke.sh bifrost-standalone:ci

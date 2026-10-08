@@ -1,8 +1,8 @@
 # Bifrost Theme Spec
 
-A theme is one JSON file in `themes/`. Drop a valid file there (or `POST /api/themes`) and it appears in every open client's theme switcher within ~2 seconds — no rebuild, no reload. An invalid file is skipped with a logged reason; the app never crashes over a theme.
+A theme is one JSON file in `client/src/assets/themes/`, bundled into the client at build time (PLAN-35): the switcher lists every file there, and choosing one makes no request. Add or change a file, run the client test, and rebuild; both builds (the hub and the standalone site) ship the same themes.
 
-The JSON Schema itself lives in `server/src/modules/themes/theme-schema.ts`; this document is its prose mirror.
+The JSON Schema lives in `client/src/core/theme/schema.ts` and is enforced by `client/src/core/theme/themes.test.ts`, which validates every bundled file against it and checks its contrast. A theme that fails is a red test, never a broken page. This document is the schema's prose mirror.
 
 ## File shape
 
@@ -17,7 +17,7 @@ The JSON Schema itself lives in `server/src/modules/themes/theme-schema.ts`; thi
 
 | Field | Rules |
 |---|---|
-| `id` | `a-z`, `0-9`, `-` only; 2–32 chars; unique; becomes the filename (`<id>.json`) and the `data-theme` attribute |
+| `id` | `a-z`, `0-9`, `-` only; 2–32 chars; unique; matches the filename (`<id>.json`) and becomes the `data-theme` attribute |
 | `name` | 1–48 chars, shown in the switcher |
 | `mode` | `dark` or `light` — drives `color-scheme`, the first-visit OS match, and the derived defaults |
 | `tokens` | Flat map of CSS custom properties (below). Unknown keys are rejected |
@@ -54,11 +54,11 @@ Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rg
 
 Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, `@`, `;`, `{}`, `<>`** — a theme must never trigger a network fetch or smuggle markup. Colors are pattern-checked strictly.
 
-## Contrast lint (warn, never block)
+## Contrast (a test, not a warning)
 
-On load, `--text` is checked against `--bg` and `--surface`. Ratios below **4.5:1** (WCAG AA body text) log a warning and are surfaced in the API (`warnings`), but the theme still loads — it's your hub.
+`--text` is checked against `--bg` and `--surface`. A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
 
-## Starter theme (copy, edit, drop into `themes/`)
+## Starter theme (copy, edit, save into `client/src/assets/themes/`)
 
 ```json
 {
@@ -87,18 +87,15 @@ On load, `--text` is checked against `--bg` and `--surface`. Ratios below **4.5:
 ## How themes are picked (resolution order)
 
 1. The visitor's own switcher choice (cached per device).
-2. The server default (`themes.default` in settings — Heimdall-set, PLAN-05).
+2. The household default (hub build only): Heimdall's "Default theme" (`themes.default` in settings, PLAN-05), which every device reads from `GET /api/heimdall/access` (`defaultThemeId`). The standalone site has no household, so it skips this step.
 3. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak out of the box).
+
+An unknown id at any step (a deleted theme someone still has chosen, say) simply falls through to the next.
 
 ## Adding / removing
 
-- **Filesystem:** save `<id>.json` into `themes/` — the watcher validates and broadcasts it live. Delete the file to remove it.
-- **API:** `POST /api/themes` (422 lists every schema violation with its exact path) and `DELETE /api/themes/:id`. Built-ins (`aurora`, `daybreak`, `ghibli-dusk`, `olympus`) refuse deletion/overwrite. Both endpoints require a Heimdall admin session (`requireAdmin`).
-
-## Enable / disable (Heimdall)
-
-An admin can hide a theme from the public switcher without deleting it. Disabled ids live in DB settings (`themes.disabled`) and are filtered from both `GET /api/themes` and the live `theme.updated` broadcast, so clients fall back automatically if their active theme is disabled. Heimdall uses `GET /api/themes/manage` (all themes + `enabled` flag) and `PATCH /api/themes/:id {enabled}`; disabling the last enabled theme is refused (409 `LAST_THEME`).
+Save `<id>.json` into `client/src/assets/themes/`, add its file name to the list the first test in `themes.test.ts` pins (so a file can never ship or vanish by accident), run `npm test -w client`, then rebuild (`npm run build`, and `npm run build:standalone` for the standalone site). Delete the file to remove a theme; a device that had chosen it falls back to the next step above. There is no theme API and no enable/disable switch any more (PLAN-35): what ships is what the files say.
 
 ## Troubleshooting
 
-Theme not showing up? Check the server log for `invalid theme file skipped` — it lists every schema issue with its JSON path. Duplicate `id`s are skipped with a `duplicate theme id` warning; the first-loaded file wins.
+Theme not showing up? Run `npx vitest run src/core/theme -w client` (from `client/`, `npx vitest run src/core/theme`): it names every schema issue with its JSON path, an `id` that does not match its file name (which also keeps ids unique), and any contrast below the floor. Then rebuild: a theme reaches a browser only through a build.

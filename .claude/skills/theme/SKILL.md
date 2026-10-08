@@ -1,28 +1,30 @@
 ---
 name: theme
-description: Create or edit a Bifrost theme (a JSON file in themes/) so it loads valid, reads calm, and gives every card its own colour. Use whenever the owner asks for a new theme, a palette change, or a fix to an existing theme's colours.
+description: Create or edit a Bifrost theme (a JSON file in client/src/assets/themes/) so it loads valid, reads calm, and gives every card its own colour. Use whenever the owner asks for a new theme, a palette change, or a fix to an existing theme's colours.
 ---
 
 # Theme — author a Bifrost theme
 
-A theme is one JSON file in `themes/<id>.json`. The running server watches the
-folder: a valid file appears in every open client's switcher within ~2s, an
-invalid one is skipped with a logged reason. **Read `docs/THEME-SPEC.md` first** —
-it is the prose mirror of the JSON schema (`server/src/modules/themes/theme-schema.ts`),
-the single source of truth for token names and value formats.
+A theme is one JSON file in `client/src/assets/themes/<id>.json`, bundled into
+the client at build time (PLAN-35): both builds ship every file there, and a
+theme reaches a browser only through a rebuild. **Read `docs/THEME-SPEC.md`
+first** — it is the prose mirror of the JSON schema
+(`client/src/core/theme/schema.ts`), the single source of truth for token names
+and value formats.
 
 ## Shape
 
 `{ "id", "name", "mode": "dark"|"light", "tokens": { … } }`. `id` is
-`a-z0-9-`, 2–32 chars, and becomes the filename + `data-theme` attribute.
+`a-z0-9-`, 2–32 chars, must equal the file name, and becomes the `data-theme`
+attribute.
 
 ## The 14 required color roles (a theme is these + metadata)
 
 `--bg` · `--surface` · `--surface-2` · `--text` · `--text-muted` · `--border` ·
 `--accent` · `--accent-2` · `--ok` · `--danger` · `--warn` · `--accent-soft` ·
 `--danger-soft` · `--scrim`. Everything else is optional and derived from these
-when omitted (`server/src/modules/themes/resolve.ts`). Copy a built-in
-(`themes/aurora.json`, `olympus.json`) as the starting shape — they define the
+when omitted (`client/src/core/theme/resolve.ts`). Copy a built-in
+(`client/src/assets/themes/aurora.json`, `olympus.json`) as the starting shape — they define the
 full optional set (atmosphere, syntax, diff, qr, **card palette**, **screensaver**).
 
 ## Dark themes must read CALM, not glaring (owner's bar)
@@ -72,7 +74,7 @@ derives on-brand from your accents/veil, or set them for a house-specific idle s
   `--text`, so usually leave unset).
 
 Mirror the theme's `--stars`/accents so the sky feels like the same world. Same
-restart rule as below (schema/`tokens.css` change → restart + rebuild).
+rebuild rule as below.
 
 ## QR + fonts (easy to get wrong)
 
@@ -83,22 +85,20 @@ restart rule as below (schema/`tokens.css` change → restart + rebuild).
 
 ## Validate
 
-1. `node -e "JSON.parse(require('fs').readFileSync('themes/<id>.json','utf8'))"` — parses.
-2. Every token key must be in the schema (`ALL_TOKEN_KEYS`); unknown keys are
-   rejected (`additionalProperties: false`). Run the themes tests if you touched
-   the schema: `npx vitest run src/modules/themes` (from `server/`).
-3. Contrast is a warn, not a block — but check `--text` vs `--bg`/`--surface`
-   clears ~4.5:1.
+The client test is the validator (there is no server-side check any more):
+`npx vitest run src/core/theme` from `client/`. For every bundled file it
+checks the schema (unknown token keys are rejected, `additionalProperties:
+false`), that the `id` equals the file name, and that `--text` clears **4.5:1**
+against `--bg` and `--surface` — a red test, not a warning. A **new** theme also
+goes into the file list the first test pins, so nothing ships or vanishes by
+accident.
 
 ## Ship
 
-- **Editing the theme schema or `tokens.css`/card CSS needs a server restart +
-  client rebuild** to take effect; editing only a theme JSON's *values*
-  hot-reloads live (the watcher). If a JSON edit adds a token the running server's
-  schema doesn't know yet, it will be **rejected** until restart.
-- Built-in theme files (`aurora`, `daybreak`, `ghibli-dusk`, `olympus`) can be
-  edited directly on disk (the API's overwrite-refusal only blocks POST/DELETE);
-  note in the PR that you changed a shipped built-in's appearance.
+- Any theme change, values included, needs a client rebuild (`npm run build`,
+  and `npm run build:standalone` for the standalone site). Nothing hot-reloads.
+- Built-in theme files can be edited directly; note in the PR that you changed
+  a shipped built-in's appearance.
 - Prove it with the `live-verify` skill (screenshot the hub in the theme) before
   handing off.
 - Per project rule, **leave the work uncommitted until the owner tests it** and

@@ -279,48 +279,48 @@ Everything else is unchanged. The server goes from 95 routes to 85; `npm run api
 ## Task checklist
 
 **Client: build split**
-- [ ] `vite.config.ts`: `standalone` mode → `outDir: dist-standalone`; `define` `__BIFROST_BUILD__` and the five cap keys plus the Loki/Nótt/Heimdall-access defaults from the root `.env`; no `.htaccess` (Docker serves it)
-- [ ] `client/package.json` + root: `build:standalone`; `client/src/vite-env.d.ts` declares the constants
-- [ ] `client/src/core/features.ts`: the manifest (`needsHub`), `HUB_FEATURES`, `STANDALONE_FEATURES`; `App.tsx` and the three hub pages read it; `useCapabilities.ts` and `fetchCapabilities` deleted
-- [ ] `core/api.ts`: `HubUnreachableError` (network failure) and `HubUnavailableError` (standalone stub); standalone stubs; `core/sse.ts` standalone no-op; `core/log.ts` `LogSink` (`HttpSink`/`NoopSink`)
-- [ ] `core/ui/BridgeClosed.tsx` + global handler (no stacking, auto-close on SSE `'open'`); standalone route fallback for hub-only paths; "Download instead" wiring in the four editors and Saga
+- [x] `vite.config.ts`: `standalone` mode → `outDir: dist-standalone`; `define` `__BIFROST_BUILD__` and the five cap keys plus the Loki/Nótt/Heimdall-access defaults from the root `.env`; no `.htaccess` (Docker serves it)
+- [x] `client/package.json` + root: `build:standalone`; `client/src/vite-env.d.ts` declares the constants
+- [x] `client/src/core/features.ts`: the manifest (`needsHub`), `HUB_FEATURES`, `STANDALONE_FEATURES`; `App.tsx` and the three hub pages read it; `useCapabilities.ts` and `fetchCapabilities` deleted
+- [x] `core/api.ts`: `HubUnreachableError` (network failure) and `HubUnavailableError` (standalone stub); standalone stubs; `core/sse.ts` standalone no-op; `core/log.ts` `LogSink` (`HttpSink`/`NoopSink`)
+- [x] `core/ui/BridgeClosed.tsx` + global handler (no stacking, auto-close on SSE `'open'`); standalone route fallback for hub-only paths; "Download instead" wiring in the four editors and Saga
 
 **Client: themes, caps, Loki, Heimdall**
-- [ ] `client/package.json`: `ajv` as a devDependency (test-only; never in the bundle)
-- [ ] `git mv themes/*.json client/src/assets/themes/`; `core/theme/resolve.ts` (ported); `ThemeEngine` without network or SSE; `core/theme/themes.test.ts` (schema + contrast for every file; resolve parity cases ported from the server test)
-- [ ] `core/{runestone,edda,groot,atlas}.ts`: caps from constants; config fetches deleted
-- [ ] `LokiPage.tsx`: build-based gate; standalone device-local policy
-- [ ] Heimdall: standalone opens without a PIN with the sections in the table; hub loses the Themes section; Settings' default-theme options come from the bundled themes; device-local stores for Loki/Nótt (`bifrost.local.*`)
+- [x] `client/package.json`: `ajv` as a devDependency (test-only; never in the bundle)
+- [x] `git mv themes/*.json client/src/assets/themes/`; `core/theme/resolve.ts` (ported); `ThemeEngine` without network or SSE; `core/theme/themes.test.ts` (schema + contrast for every file; resolve parity cases ported from the server test)
+- [x] `core/{runestone,edda,groot,atlas}.ts`: caps from constants; config fetches deleted
+- [x] `LokiPage.tsx`: build-based gate; standalone device-local policy
+- [x] Heimdall: standalone opens without a PIN with the sections in the table; hub loses the Themes section; Settings' default-theme options come from the bundled themes; device-local stores for Loki/Nótt (`bifrost.local.*`)
 
 **Server**
-- [ ] Delete `modules/themes/` and its `MANIFEST` entries; `THEMES_DIR` from config and `.env.example`; `theme.updated` from `core/bus/events.ts`
-- [ ] Delete the four editor `/config` routes; keep `/api/capabilities`
-- [ ] Heimdall `defaultThemeId`: pattern-only validation
-- [ ] Migration deleting the `themes.disabled` settings row (`db-migration` skill: upgraded and fresh DB)
-- [ ] `core/backup`, `scripts/backup.ts`, `scripts/restore.ts`: no `themes/`; restore skips and logs an old archive's `themes/`
-- [ ] Tests: `app.test.ts` module list, `themes.int.test.ts` deleted, backup/restore tests, Heimdall settings test
+- [x] Delete `modules/themes/` and its `MANIFEST` entries; `THEMES_DIR` from config and `.env.example`; `theme.updated` from `core/bus/events.ts`
+- [x] Delete the four editor `/config` routes; keep `/api/capabilities`
+- [x] Heimdall `defaultThemeId`: pattern-only validation
+- [x] Migration deleting the `themes.disabled` settings row (`db-migration` skill: upgraded and fresh DB)
+- [x] `core/backup`, `scripts/backup.ts`, `scripts/restore.ts`: no `themes/`; restore skips and logs an old archive's `themes/`
+- [x] Tests: `app.test.ts` module list, `themes.int.test.ts` deleted, backup/restore tests, Heimdall settings test
 
 **Tests (e2e, extends PLAN-32/33)**
-- [ ] `e2e/playwright.config.ts`: `standalone` project serving `dist-standalone/` from a small static server with the same fallback rules as the committed `nginx.conf` (a unit test checks the two rule sets agree); the no-request guard (only same-origin static assets)
-- [ ] Standalone journeys: every standalone feature works; every hub-only action and deep link shows the sheet; "Download instead" saves a file; Heimdall opens without a PIN and persists per device; themes switch with no request
-- [ ] Hub journeys: adjusted only for the removed Themes section; added: stop the server mid-session → sheet with "Try again" → restart → sheet closes, action succeeds
-- [ ] Build check: no `/api/`, `EventSource` or `/go/` in `dist-standalone/` outside the stub messages
-- [ ] `npm run api:spec`; `server/src/openapi-removals.test.ts` reads `develop`'s `server/openapi.json` (`git show`; `ci.yml` fetches `develop` so it never skips there) and asserts **every** difference is one of the ten removals or the `defaultThemeId` addition (an empty diff passes)
-- [ ] Rewrite the testing logic this plan touches: hub journeys for the Themes section and capabilities-driven nav; the deleted routes' server tests and schemas; any `e2e/` (journeys, API suites, `e2e/perf/` scenarios) naming a removed route (`grep` for each path)
-- [ ] PLAN-32's `cloud` Playwright project: it asserted that nav hides local-only pages because the **server** said so. After this plan the nav comes from the client build, so that assertion no longer holds and a hub build against a cloud-profile server is unsupported. The project is rewritten as a Vitest API check that a `cloud`-profile server still refuses (404) every local-only route, which is the security half that still matters
-- [ ] PLAN-32's `routes.spec.ts` reads route roots from `client/src/core/features.ts` (where they now live) instead of `App.tsx`, still as text
-- [ ] Standalone stub call counter: in the standalone build each stub records its calls. A Playwright check cold-loads every standalone page and asserts **zero** stub calls and no sheet until the user acts. The network guard alone cannot see this, because stubs never touch the network
-- [ ] `client/dist/bifrost-build.json` + server boot warning on cap drift; `Dockerfile` build `ARG`s for the five caps
-- [ ] `/api/heimdall/access` gains `defaultThemeId` (schema, `npm run api:spec`); `ThemeEngine` reads it
+- [x] `e2e/playwright.config.ts`: `standalone` project serving `dist-standalone/` from a small static server with the same fallback rules as the committed `nginx.conf` (a unit test checks the two rule sets agree); the no-request guard (only same-origin static assets)
+- [x] Standalone journeys: every standalone feature works; every hub-only action and deep link shows the sheet; "Download instead" saves a file; Heimdall opens without a PIN and persists per device; themes switch with no request
+- [x] Hub journeys: adjusted only for the removed Themes section; added: stop the server mid-session → sheet with "Try again" → restart → sheet closes, action succeeds
+- [x] Build check: no `/api/`, `EventSource` or `/go/` in `dist-standalone/` outside the stub messages
+- [x] `npm run api:spec`; `server/src/openapi-removals.test.ts` reads `develop`'s `server/openapi.json` (`git show`; `ci.yml` fetches `develop` so it never skips there) and asserts **every** difference is one of the ten removals or the `defaultThemeId` addition (an empty diff passes)
+- [x] Rewrite the testing logic this plan touches: hub journeys for the Themes section and capabilities-driven nav; the deleted routes' server tests and schemas; any `e2e/` (journeys, API suites, `e2e/perf/` scenarios) naming a removed route (`grep` for each path)
+- [x] PLAN-32's `cloud` Playwright project: it asserted that nav hides local-only pages because the **server** said so. After this plan the nav comes from the client build, so that assertion no longer holds and a hub build against a cloud-profile server is unsupported. The project is rewritten as a Vitest API check that a `cloud`-profile server still refuses (404) every local-only route, which is the security half that still matters
+- [x] PLAN-32's `routes.spec.ts` reads route roots from `client/src/core/features.ts` (where they now live) instead of `App.tsx`, still as text
+- [x] Standalone stub call counter: in the standalone build each stub records its calls. A Playwright check cold-loads every standalone page and asserts **zero** stub calls and no sheet until the user acts. The network guard alone cannot see this, because stubs never touch the network
+- [x] `client/dist/bifrost-build.json` + server boot warning on cap drift; `Dockerfile` build `ARG`s for the five caps
+- [x] `/api/heimdall/access` gains `defaultThemeId` (schema, `npm run api:spec`); `ThemeEngine` reads it
 
 **Docs & cleanup**
-- [ ] `Dockerfile` `standalone` target (client-only build stage, `nginx-unprivileged` final stage, build `ARG`s), committed `nginx.conf`, `docker-compose.standalone.yml` (external network, no published port, read-only, `cap_drop`), CI build + smoke test of the target
-- [ ] `client/src/core/settings/`: `SettingsStore`, `HubSettingsStore`, `LocalSettingsStore`, `rules.ts` + the shared server/client rule cases; Screensaver, Loki and Settings sections, Nótt, Loki's gate and the open gesture moved onto it
-- [ ] `docs/standalone.md` (the build args, the compose file, joining an existing reverse-proxy network, updating the container, verifying it); `docs/THEME-SPEC.md`; `README.md`; `.claude/skills/theme/SKILL.md` (new path; validation is the client test)
-- [ ] `architecture.md` (two builds, the feature manifest vs the server `MANIFEST`, the sheet), `project-structure.md`, `coding.md` (the `bifrost.local.*` localStorage class; new features declare `needsHub`), `tech-stack.md`
-- [ ] PLAN-99 row: standalone client logs → a log service (another container on the same Docker network)
-- [ ] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
-- [ ] Cleanup: the old repo-root `themes/` folder is gone; no probe scripts committed; no worktree or scratch data left; the PR lists deletions
+- [x] `Dockerfile` `standalone` target (client-only build stage, `nginx-unprivileged` final stage, build `ARG`s), committed `nginx.conf`, `docker-compose.standalone.yml` (external network, no published port, read-only, `cap_drop`), CI build + smoke test of the target
+- [x] `client/src/core/settings/`: `SettingsStore`, `HubSettingsStore`, `LocalSettingsStore`, `rules.ts` + the shared server/client rule cases; Screensaver, Loki and Settings sections, Nótt, Loki's gate and the open gesture moved onto it
+- [x] `docs/standalone.md` (the build args, the compose file, joining an existing reverse-proxy network, updating the container, verifying it); `docs/THEME-SPEC.md`; `README.md`; `.claude/skills/theme/SKILL.md` (new path; validation is the client test)
+- [x] `architecture.md` (two builds, the feature manifest vs the server `MANIFEST`, the sheet), `project-structure.md`, `coding.md` (the `bifrost.local.*` localStorage class; new features declare `needsHub`), `tech-stack.md`
+- [x] PLAN-99 row: standalone client logs → a log service (another container on the same Docker network)
+- [x] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] Cleanup: the old repo-root `themes/` folder is gone; no probe scripts committed; no worktree or scratch data left; the PR lists deletions
 
 ## Acceptance criteria
 
@@ -346,28 +346,28 @@ Everything else is unchanged. The server goes from 95 routes to 85; `npm run api
 ## Test checklist
 
 **Unit (client)**
-- [ ] `core/theme/themes.test.ts`: every bundled theme validates and passes contrast; resolve parity with the ported server cases
-- [ ] `core/features.test.ts`: standalone list = `needsHub: false`; every route root in `App.tsx` belongs to exactly one feature
-- [ ] `core/api.test.ts`: network failure → `HubUnreachableError`; HTTP error → `ApiError`; standalone stub throws without calling `fetch`
-- [ ] `core/log.test.ts`: `NoopSink` sends nothing; `HttpSink` unchanged
-- [ ] `BridgeClosed` component: no stacking, auto-close, button sets per context
-- [ ] `core/settings/LocalSettingsStore.test.ts`: round trip; corrupted JSON, out-of-range and old-format values fall back per field; a throwing `localStorage` uses defaults without crashing; the `storage` event syncs a second instance; `v1` → future-version migration hook (criterion 16)
-- [ ] `core/settings/rules.test.ts` + the server's matching test: both run the same table of cases (criterion 16)
-- [ ] Static-server fallback rules in the e2e harness match `nginx.conf` (criterion 18)
+- [x] `core/theme/themes.test.ts`: every bundled theme validates and passes contrast; resolve parity with the ported server cases
+- [x] `core/features.test.ts`: standalone list = `needsHub: false`; every route root in `App.tsx` belongs to exactly one feature
+- [x] `core/api.test.ts`: network failure → `HubUnreachableError`; HTTP error → `ApiError`; standalone stub throws without calling `fetch`
+- [x] `core/log.test.ts`: `NoopSink` sends nothing; `HttpSink` unchanged
+- [x] `BridgeClosed` component: no stacking, auto-close, button sets per context
+- [x] `core/settings/LocalSettingsStore.test.ts`: round trip; corrupted JSON, out-of-range and old-format values fall back per field; a throwing `localStorage` uses defaults without crashing; the `storage` event syncs a second instance; `v1` → future-version migration hook (criterion 16)
+- [x] `core/settings/rules.test.ts` + the server's matching test: both run the same table of cases (criterion 16)
+- [x] Static-server fallback rules in the e2e harness match `nginx.conf` (criterion 18)
 
 **Unit / integration (server)**
-- [ ] `app.test.ts` module list without `themes`; removed routes 404; `/api/capabilities` unchanged
-- [ ] Heimdall `defaultThemeId` pattern validation
-- [ ] Migration on an upgraded and a fresh DB; backup without `themes/`; restore skipping an old archive's `themes/`
+- [x] `app.test.ts` module list without `themes`; removed routes 404; `/api/capabilities` unchanged
+- [x] Heimdall `defaultThemeId` pattern validation
+- [x] Migration on an upgraded and a fresh DB; backup without `themes/`; restore skipping an old archive's `themes/`
 
 **Docker**
-- [ ] CI: build the `standalone` target, run it, smoke-test shell / deep link / asset headers / `/api/health` → app shell / healthcheck (criteria 1 and 18)
+- [x] CI: build the `standalone` target, run it, smoke-test shell / deep link / asset headers / `/api/health` → app shell / healthcheck (criteria 1 and 18)
 
 **End-to-end**
-- [ ] `standalone` project: criteria 1–3, 8 and 9
-- [ ] Hub projects: criteria 4, 5 and 7
-- [ ] CLI suite unchanged and green (criterion 10)
-- [ ] `openapi-removals.test.ts` + the Vitest API suites (criterion 12)
+- [x] `standalone` project: criteria 1–3, 8 and 9
+- [x] Hub projects: criteria 4, 5 and 7
+- [x] CLI suite unchanged and green (criterion 10)
+- [x] `openapi-removals.test.ts` + the Vitest API suites (criterion 12)
 
 **Manual**
 - [ ] The owner runs the compose file on the cloud machine behind the existing reverse proxy and opens a deep link and a refresh there; on a real iPhone and iPad, the standalone site and the hub

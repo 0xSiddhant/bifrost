@@ -37,11 +37,14 @@ test(
     await expect(page.getByRole('alertdialog')).toHaveCount(1);
 
     await ownServer({ port: server.port, storageRoot: server.storageRoot });
-    // The event stream may reconnect and close the sheet first; otherwise the
-    // person asks for it.
+    // Two ways the sheet closes, and either may win: the person asks (Try
+    // again), or the event stream reconnects and closes it on its own, even
+    // mid-click. Retry until it is gone by whichever path.
     const retry = sheet.getByRole('button', { name: 'Try again' });
-    if (await retry.isVisible()) await retry.click();
-    await expect(sheet).toBeHidden({ timeout: 20_000 });
+    await expect(async () => {
+      if (await retry.isVisible()) await retry.click({ timeout: 1_000 });
+      await expect(sheet).toBeHidden({ timeout: 1_000 });
+    }).toPass({ timeout: 20_000 });
 
     await save.click();
     await expect(page.getByRole('status').filter({ hasText: 'Runestone carved' })).toBeVisible();
