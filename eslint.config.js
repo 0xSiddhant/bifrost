@@ -164,6 +164,23 @@ export default tseslint.config(
     },
   },
   {
+    // PLAN-36: bifrost.local is answered by the web host, which owns the
+    // address people open. A responder in the API too would put two on the
+    // network (criterion 11), and would vanish whenever the API restarts.
+    files: ['server/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'bonjour-service', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+            { name: 'multicast-dns', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // CommonJS config files (PM2's ecosystem.config.cjs) — Node globals.
     files: ['**/*.cjs'],
     // require() is how CommonJS imports; PM2's config reads .env with it.
