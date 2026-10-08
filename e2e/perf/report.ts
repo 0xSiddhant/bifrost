@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { MetricsSnapshot } from './metrics.js';
+import type { MetricsSnapshot, RssSample } from './metrics.js';
 
 /**
  * A load run's result (PLAN-34): what was measured, on what, with what
@@ -57,6 +57,11 @@ export interface RunResult {
   seeding: { seconds: number; requests: number; requestsPerSecond: number } | null;
   scenarios: ScenarioResult[];
   metrics: MetricsSnapshot[];
+  /**
+   * PLAN-36: the web host's RSS over the run, sampled with `ps`. Absent in
+   * results from before PLAN-36 and in `--direct` runs, which have no web host.
+   */
+  webHostRss?: RssSample[];
   /** Profile-level verdicts and figures (the stress knee, spike recovery, soak slopes). */
   summary: Record<string, unknown>;
   /** Correctness failures: any of these makes the run exit non-zero. */
@@ -254,6 +259,15 @@ export function formatMetrics(samples: MetricsSnapshot[]): string {
     `  heap used ${mb(first.heapUsedBytes)} → ${mb(last.heapUsedBytes)} (peak ${mb(peak('heapUsedBytes'))})`,
     `  event-loop lag p99 peak ${fixed(lag * 1000)} ms; handles ${first.activeHandles} → ${last.activeHandles}`,
   ].join('\n');
+}
+
+export function formatWebHostRss(samples: RssSample[] | undefined): string {
+  const first = samples?.[0];
+  const last = samples?.at(-1);
+  if (!samples || !first || !last)
+    return 'web host: none in front (direct, or a build before PLAN-36)';
+  const peak = samples.reduce((max, sample) => Math.max(max, sample.rssBytes), 0);
+  return `web host rss (${samples.length} samples): ${mb(first.rssBytes)} → ${mb(last.rssBytes)} (peak ${mb(peak)})`;
 }
 
 /** `load-results/<profile>-<ISO timestamp>.json`, colons made filename-safe. */

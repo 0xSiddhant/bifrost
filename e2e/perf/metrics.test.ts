@@ -2,7 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { bucketQuantile, parseExposition, requestHistograms, snapshotOf } from './metrics.js';
+import {
+  bucketQuantile,
+  parseExposition,
+  parsePsRss,
+  requestHistograms,
+  snapshotOf,
+} from './metrics.js';
 
 // A real `/metrics` exposition, recorded from the built server after four requests.
 const fixture = fs.readFileSync(
@@ -85,5 +91,13 @@ describe('requestHistograms', () => {
     expect(bucketQuantile(histogram, 0.5)).toBe(0.01);
     expect(bucketQuantile(histogram, 0.99)).toBe(0.1);
     expect(bucketQuantile({ ...histogram, count: 0 }, 0.5)).toBeNull();
+  });
+});
+
+describe('parsePsRss', () => {
+  it('reads ps kilobytes as bytes, and a gone process as null', () => {
+    expect(parsePsRss('  51234\n')).toBe(51234 * 1024);
+    expect(parsePsRss('')).toBeNull();
+    expect(parsePsRss('\n')).toBeNull();
   });
 });

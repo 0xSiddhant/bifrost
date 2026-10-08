@@ -26,6 +26,8 @@ export interface RunOptions {
   /** A checkout (or its `server/dist`) to run instead of this one's build. */
   serverDist: string | null;
   keep: boolean;
+  /** PLAN-36: load the API alone, without the web host in front (the hop's cost). */
+  direct: boolean;
   /** Fan-out sizes, adjustable for a smaller machine. */
   sseListeners: number;
   uploadCount: number;
@@ -44,6 +46,7 @@ export const DEFAULTS: RunOptions = {
   contract: 'fallback',
   serverDist: null,
   keep: false,
+  direct: false,
   sseListeners: 200,
   uploadCount: 4,
   uploadMb: 1024,
@@ -77,6 +80,7 @@ export const USAGE = `npm run test:load -- [options]   (run \`npm run build\` fi
   --contract <off|fallback>   API_CONTRACT_CHECK (default fallback; strict is refused)
   --server-dist <path>    run another build: a checkout, or its server/dist
   --keep                  keep the scratch storage for a post-mortem
+  --direct                the API alone, no web host in front (to measure the hop)
   --sse-listeners <n>  --uploads <n>  --upload-mb <n>   fan-out sizes (200, 4, 1024)`;
 
 function positive(flag: string, raw: string | undefined): number {
@@ -157,6 +161,9 @@ export function parseArgs(argv: string[], cwd = process.env.INIT_CWD ?? process.
         break;
       case '--keep':
         options.keep = true;
+        break;
+      case '--direct':
+        options.direct = true;
         break;
       case '--sse-listeners':
         options.sseListeners = positive(flag, value());

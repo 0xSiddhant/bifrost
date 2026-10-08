@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { Api } from '../support/api.js';
 import { REPO_ROOT } from '../support/paths.js';
 import { startServer } from '../support/server.js';
-import { MetricsSampler } from './metrics.js';
+import { MetricsSampler, ProcessRssSampler } from './metrics.js';
 import {
   buildRootOf,
   parseArgs,
@@ -24,6 +24,7 @@ import {
   formatComparison,
   formatMetrics,
   formatScenarios,
+  formatWebHostRss,
   readResult,
   writeResult,
   type Machine,
@@ -92,10 +93,23 @@ export async function run(options: RunOptions): Promise<number> {
   );
 
   // startServer refuses a missing dist with "run `npm run build` first".
-  const server = await startServer({ buildRoot, env, keepStorage: options.keep });
+  const server = await startServer({
+    buildRoot,
+    env,
+    keepStorage: options.keep,
+    direct: options.direct,
+  });
+  log(
+    server.hasWebHost
+      ? `  through the web host on ${server.port}, the API on ${server.apiPort}`
+      : '  the API alone, no web host in front',
+  );
   const startedAt = Date.now();
   const definition = PROFILES[options.profile];
   const sampler = new MetricsSampler(server.baseUrl, startedAt, definition.sampleIntervalMs);
+  const webSampler = server.webPid
+    ? new ProcessRssSampler(server.webPid, startedAt, definition.sampleIntervalMs)
+    : null;
   const result: RunResult = {
     schema: 1,
     profile: options.profile,
@@ -110,6 +124,7 @@ export async function run(options: RunOptions): Promise<number> {
       logLevel: options.logLevel ?? 'trace (default)',
       serverBuild: buildRoot,
       serverCommit: git(buildRoot, 'rev-parse', '--short', 'HEAD'),
+      webHost: server.hasWebHost,
       sseListeners: options.profile === 'fanout' ? options.sseListeners : null,
       uploads:
         options.profile === 'fanout' ? `${options.uploadCount} × ${options.uploadMb} MB` : null,
@@ -137,6 +152,7 @@ export async function run(options: RunOptions): Promise<number> {
 
     log(`▸ ${options.profile}`);
     sampler.start();
+    webSampler?.start();
     const outcome = await definition.run({
       baseUrl: server.baseUrl,
       api,
@@ -148,8 +164,13 @@ export async function run(options: RunOptions): Promise<number> {
       log,
     });
     result.metrics = await sampler.stop();
+    if (webSampler) result.webHostRss = await webSampler.stop();
     result.scenarios = outcome.scenarios;
-    result.summary = { ...outcome.summary, metricsScrapeFailures: sampler.failures };
+    result.summary = {
+      ...outcome.summary,
+      metricsScrapeFailures: sampler.failures,
+      ...(webSampler ? webHostSummary(result.webHostRss ?? [], webSampler.failures) : {}),
+    };
     result.failures = outcome.failures;
     if (server.exitStatus())
       result.failures.push(
@@ -158,6 +179,7 @@ export async function run(options: RunOptions): Promise<number> {
   } catch (error) {
     result.failures.push(`the run itself failed: ${(error as Error).message}`);
     await sampler.stop();
+    await webSampler?.stop();
   } finally {
     await server.stop();
     if (options.keep) log(`  kept storage: ${server.storageRoot}`);
@@ -167,6 +189,7 @@ export async function run(options: RunOptions): Promise<number> {
   log(formatScenarios(result.scenarios));
   log('');
   log(formatMetrics(result.metrics));
+  log(formatWebHostRss(result.webHostRss));
   const shown = Object.fromEntries(
     Object.entries(result.summary).filter(([key]) => key !== 'overTime'),
   );
@@ -200,6 +223,19 @@ export async function run(options: RunOptions): Promise<number> {
       : '✓ correct',
   );
   return 0;
+}
+
+/** The web host's memory over the run, for the before/after record (PLAN-36). */
+function webHostSummary(samples: { rssBytes: number }[], failures: number): Record<string, number> {
+  const MB = 1024 * 1024;
+  const first = samples[0]?.rssBytes ?? 0;
+  const peak = samples.reduce((max, sample) => Math.max(max, sample.rssBytes), first);
+  return {
+    webHostRssStartMb: Number((first / MB).toFixed(1)),
+    webHostRssPeakMb: Number((peak / MB).toFixed(1)),
+    webHostRssGrowthMb: Number(((peak - first) / MB).toFixed(1)),
+    webHostRssSampleFailures: failures,
+  };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
