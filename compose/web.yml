@@ -1,0 +1,42 @@
+# The web host alone (PLAN-39): the hub client on PORT, the API's paths
+# forwarded to API_HOST:API_PORT, and bifrost.local. Linux host networking, so
+# it advertises on the LAN and sees each device's real address. On the Mac add
+# compose/web.bridge.yml (docs/docker-mac.md).
+#
+#   docker compose -f compose/web.yml --env-file .env up -d                              # Linux
+#   docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d    # Mac
+#
+# The client's caps are baked in at build time (PLAN-35), so they are read from
+# the same .env the API enforces at runtime: the two images cannot drift.
+#
+# Run from the repo root. A single file needs `--env-file .env`: Compose reads
+# ${VARS} from the .env beside the file it was given (compose/), not the repo
+# root's. The root docker-compose.yml needs no flag.
+name: bifrost
+
+x-client-build-args: &client-build-args
+  RUNESTONE_MAX_DOC_KB: ${RUNESTONE_MAX_DOC_KB:-2048}
+  EDDA_MAX_DOC_KB: ${EDDA_MAX_DOC_KB:-2048}
+  EDDA_LIVE_PREVIEW_MAX_KB: ${EDDA_LIVE_PREVIEW_MAX_KB:-300}
+  GROOT_MAX_DOC_KB: ${GROOT_MAX_DOC_KB:-2048}
+  ATLAS_MAX_DOC_KB: ${ATLAS_MAX_DOC_KB:-2048}
+
+services:
+  bifrost-web:
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+      args: *client-build-args
+    image: bifrost-web:latest
+    container_name: bifrost-web
+    network_mode: host
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+    volumes:
+      # Its own log series (app-web.N.log) beside the API's.
+      - ../storage:/app/storage
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 10s

@@ -97,29 +97,54 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Build the Linux image on every PR to keep the Dockerfile honest.
-      # Nothing runs it on the Mac (native PM2/launchd is the run mode).
-      - name: Build image
+      # PLAN-39: one image per process, each built on every PR so no
+      # Dockerfile can rot. Nothing runs the API image on the Mac (native
+      # PM2/launchd is its run mode there).
+      - name: Build API image
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: docker/api.Dockerfile
           push: false
-          tags: bifrost:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: bifrost-api:ci
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build web host image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          push: false
+          tags: bifrost-web:ci
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
 
       # PLAN-35: the standalone site's image, built and run the way
-      # docker-compose.standalone.yml runs it, then smoke-tested.
+      # compose/standalone.yml runs it, then smoke-tested.
       - name: Build standalone image
         uses: docker/build-push-action@v6
         with:
           context: .
-          target: standalone
+          file: docker/standalone.Dockerfile
           push: false
           load: true
           tags: bifrost-standalone:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=standalone
+          cache-to: type=gha,mode=max,scope=standalone
+
+      # Every way of combining the compose files (docs/docker-linux.md,
+      # docs/docker-mac.md) must still parse, with paths that resolve.
+      - name: Validate compose combinations
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          docker compose --profile observability config -q
+          docker compose -f compose/api.yml --env-file .env config -q
+          docker compose -f compose/web.yml --env-file .env config -q
+          docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env config -q
+          docker compose -f compose/observability.yml --env-file .env --profile observability config -q
+          BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml --env-file .env config -q
 
       - name: Standalone smoke test
         run: scripts/standalone-smoke.sh bifrost-standalone:ci

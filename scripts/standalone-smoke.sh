@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Smoke-test a built standalone image (PLAN-35 criterion 18): run it the way
-# docker-compose.standalone.yml does (read-only, no capabilities), then check
+# compose/standalone.yml does (read-only, no capabilities), then check
 # the shell, a deep link, a hashed asset's cache headers, the manifest's type, that /api/health is
 # the app shell rather than anything proxied, and that the healthcheck passes.
 #

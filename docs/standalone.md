@@ -46,7 +46,7 @@ It is built to sit behind the reverse proxy you already run, beside your other c
 ```bash
 # The network your reverse proxy (Caddy, Traefik, nginx-proxy, …) is on:
 docker network ls
-BIFROST_DOCKER_NETWORK=proxy docker compose -f docker-compose.standalone.yml up -d --build
+BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml up -d --build
 ```
 
 Then point the proxy at `bifrost-standalone:8080` for the public hostname, with TLS at the proxy. For example, with Caddy:
@@ -57,13 +57,13 @@ tools.example.com {
 }
 ```
 
-No proxy on the machine? Uncomment the `ports:` line in `docker-compose.standalone.yml` instead.
+No proxy on the machine? Uncomment the `ports:` line in `compose/standalone.yml` instead.
 
 ### Settings are build arguments
 
 Everything the site starts from is **baked in when the image is built**: the editor size caps, Loki's run policy, the screensaver's defaults, and Heimdall's shortcut and tap count. Vite writes them into the JavaScript, so a runtime `environment:` or `docker run -e` arrives too late and changes nothing.
 
-Set them under `build.args` in `docker-compose.standalone.yml` (the defaults are `.env.example`'s), then rebuild:
+Set them under `build.args` in `compose/standalone.yml` (the defaults are `.env.example`'s), then rebuild:
 
 ```yaml
 args:
@@ -79,7 +79,7 @@ A visitor can still change their own Loki, screensaver and Heimdall settings in 
 
 ```bash
 git pull
-BIFROST_DOCKER_NETWORK=proxy docker compose -f docker-compose.standalone.yml up -d --build
+BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml up -d --build
 ```
 
 Hashed assets are cached forever and the app shell never, so a browser picks up the new build on its next load.
@@ -87,7 +87,7 @@ Hashed assets are cached forever and the app shell never, so a browser picks up 
 ## Check it
 
 ```bash
-docker compose -f docker-compose.standalone.yml ps     # STATUS should read (healthy)
+docker compose -f compose/standalone.yml ps     # STATUS should read (healthy)
 scripts/standalone-smoke.sh bifrost-standalone:latest  # what CI runs on every PR
 ```
 

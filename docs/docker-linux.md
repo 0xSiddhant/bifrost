@@ -1,85 +1,97 @@
-# Bifrost in Docker (Linux target)
+# Bifrost in Docker (Linux)
 
-**The Mac does not run Bifrost in Docker.** Use [PM2](pm2.md) or
-[launchd](launchd.md) there. This image exists for two reasons:
+On a **Linux host** (a Raspberry Pi, a home server) Bifrost can run entirely in
+Docker. On the Mac the API runs natively; see [`docker-mac.md`](docker-mac.md) for
+the one piece that may run in Docker there, and [PM2](pm2.md) /
+[launchd](launchd.md) for the rest.
 
-1. The natural migration to a **Raspberry Pi / Linux home server**.
-2. **Executable documentation** of the runtime environment — CI builds it on
-   every PR so it can't silently rot.
+## The pieces
 
-## Why not Docker on macOS
+Each process has its own image and its own compose file (PLAN-39):
 
-Three core behaviours break inside Docker Desktop's Linux VM:
+| Piece | Image (`docker/`) | Compose file | What it is |
+|---|---|---|---|
+| API | `api.Dockerfile` | `compose/api.yml` | REST, SSE, uploads, the database; on the host's loopback `API_PORT` (4647) |
+| Web host | `web.Dockerfile` | `compose/web.yml` | the page on `PORT` (4646), the API's paths forwarded, `bifrost.local` |
+| Observability | (upstream images) | `compose/observability.yml` | Grafana, Loki, Alloy, Prometheus, Tempo, in the `observability` profile |
+| Standalone site | `standalone.Dockerfile` | `compose/standalone.yml` | the browser-only tools site, for a cloud machine ([`standalone.md`](standalone.md)) |
 
-- **mDNS** multicast can't cross the VM boundary, so `bifrost.local` never
-  resolves for other devices. (`network_mode: host` is a no-op on Docker
-  Desktop — it only truly shares the host network on native Linux.)
-- **chokidar/FSEvents** degrade to polling on bind mounts — the live-downloads
-  watch becomes slow and CPU-hungry.
-- The whole point is dropping files into **Finder-native folders**; a container
-  volume is not that.
-
-On a real Linux host with `--network host`, mDNS and the watcher work normally.
-
-## Run it on Linux
+The root `docker-compose.yml` includes the first three, so from the repo root:
 
 ```bash
-cp .env.example .env          # set HEIMDALL_PIN (required) and any limits
-docker compose up -d --build
-docker compose logs -f        # watch the boot banner / QR
+cp .env.example .env                                  # set HEIMDALL_PIN (required) and any limits
+docker compose up -d --build                          # the hub: API + web host
+docker compose --profile observability up -d --build  # the hub + the Grafana stack
+docker compose up -d bifrost-api                      # the API alone (set BIFROST_RUN=api)
+docker compose up -d bifrost-web                      # the web host alone (BIFROST_RUN=web: the standalone client)
+docker compose logs -f                                # the boot banner / QR
 ```
 
-Open `http://<host>.local:4646` (Avahi advertises it) or `http://<host-ip>:4646`.
+Open `http://<host>.local:4646` (the web host advertises it) or
+`http://<host-ip>:4646`.
 
-### Two services (PLAN-36)
+A single file works on its own too. It needs `--env-file .env`, because
+Compose reads `${VARS}` from the `.env` beside the file it is given:
 
-`docker-compose.yml` runs one image as two services, the same two processes as
-on the Mac:
+```bash
+docker compose -f compose/api.yml --env-file .env up -d
+docker compose -f compose/observability.yml --env-file .env --profile observability up -d
+```
 
-| Service | What it is | Listens on |
-|---|---|---|
-| `bifrost-api` | the API server | `127.0.0.1:API_PORT` (default 4647), the host's loopback |
-| `bifrost-web` | the web host: the client, the API's paths forwarded, `bifrost.local` | `PORT` (4646) on the LAN |
+(`sh scripts/observability.sh` runs that last one for you.)
 
-`docker compose up -d` starts both. For one alone, name it, with the matching
-`BIFROST_RUN` in `.env`: `docker compose up -d bifrost-api` (`api`) or
-`docker compose up -d bifrost-web` (`web`, the standalone client, no API).
-Restarting `bifrost-api` alone (`docker compose restart bifrost-api`) leaves the
-page up, showing "The Bifröst is closed" until it is back.
+Every file names its project `bifrost`, so mixing them is one project, and
+the observability volumes from before PLAN-39 are reused.
 
-**Upgrading from the single `bifrost` service:** `docker compose up -d
---build --remove-orphans`. Without `--remove-orphans` the old container keeps
-running beside the new pair, holding the API's port and advertising the name.
+## Upgrading
 
-### Notes
+- **From the one-image compose file** (PLAN-36): `docker compose up -d --build`.
+  The services keep their names (`bifrost-api`, `bifrost-web`), so they are
+  replaced in place with the new images.
+- **From the single `bifrost` service** (before PLAN-36): `docker compose up -d
+  --build --remove-orphans`. Without `--remove-orphans` the old container keeps
+  running beside the new pair, holding the API's port and advertising the name.
+- **The observability stack** moved from `docker-compose.observability.yml` to
+  `compose/observability.yml`. Its volumes keep their names, so Grafana and
+  Loki keep their history.
 
-- **Host networking** (`network_mode: host`) is required for mDNS; it means the
-  containers bind the host's `PORT` and `API_PORT` directly (no `-p` mapping),
-  and the API's loopback bind is the host's loopback, which is how the web host
-  reaches it. Only one process can own each port.
+## Notes
+
+- **Host networking** (`network_mode: host`) is how both hub services run on
+  Linux:
+  - the web host's mDNS reaches the LAN, and it sees each device's real address;
+  - the API's loopback bind is the host's loopback, which is how the web host
+    reaches it;
+  - there is no `-p` mapping, and only one process can own each port.
 - **State** lives in the bind mount `./storage`, shared by both services. Back
   it up with `npm run backup` on the host, or run the in-app backup (PLAN-10).
-- **Permissions:** the container runs as the unprivileged `node` user (uid 1000).
-  If the host `./storage` is owned by a different uid, either `chown -R 1000
-  storage` or adjust the compose `user:`.
-- **`.env`** is read at boot from the mount; it is deliberately excluded from the
-  image (`.dockerignore`) so secrets never bake into layers.
+- **Permissions:** the containers run as the unprivileged `node` user
+  (uid 1000). If the host's `storage/` belongs to another uid, run
+  `chown -R 1000 storage` (or adjust the compose `user:`). A web host that
+  cannot write its logs says so and names that command.
+- **`.env`** is read at boot from the mount. It is deliberately excluded from
+  every image (`.dockerignore`), so secrets never bake into layers.
+- **Caps** (the editors' size limits) are baked into the web image at build
+  time and enforced by the API at runtime. `compose/web.yml` reads both from
+  the same `.env`, so rebuild the web image (`--build`) after changing one.
 
-## Image shape
+## Image shapes
 
-Multi-stage: a builder installs all deps, runs `npm run build`, and
-`npm prune --omit=dev`; the runtime stage is `node:20-bookworm-slim` + `tini`
-(init) + `zip`/`unzip` (in-app backup), carrying only built output and
-production `node_modules`. The image's `HEALTHCHECK` polls the API's
-`/api/health` on `API_PORT`; the compose file gives `bifrost-web` its own,
-polling `/healthz` on `PORT`.
+| Image | Build | Runtime |
+|---|---|---|
+| API | the server workspace only, with `python3`/`make`/`g++` in case `better-sqlite3` has no prebuilt binary; pruned to production dependencies | `node:20-bookworm-slim` + `tini` + `zip`/`unzip` (in-app backup); `HEALTHCHECK` on the API's `/api/health` |
+| Web host | both clients (Vite) and the web host (`tsc`); no native toolchain | `node:20-bookworm-slim` with the web host's own production dependencies and the two built clients; no `apt` at all; `HEALTHCHECK` on `/healthz` |
+| Standalone | the standalone client only | `nginx-unprivileged`, read-only, no backend |
+
+CI builds all three on every PR and runs `docker compose config` for every
+combination above.
 
 ## Verify (owner, on a Linux box/VM)
 
-Acceptance 5 — do this once on real hardware:
-
-1. `docker compose up -d --build` succeeds.
+1. `docker compose up -d --build` succeeds, and both services turn healthy.
 2. From another device on the LAN, `http://<host>.local:4646` loads, and
    `http://<host-ip>:4647` does not (the API is loopback-only).
-3. Drop a file into `storage/downloads/` on the host → it appears live in the
-   Receive page (watcher works under host network).
+3. Drop a file into `storage/downloads/` on the host: it appears live in the
+   Receive page (the watcher works under host networking).
+4. `docker compose --profile observability up -d` adds the stack, and Grafana
+   at `:3000` shows the existing history.

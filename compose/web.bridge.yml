@@ -1,0 +1,27 @@
+# Override for compose/web.yml on the Mac (PLAN-39): Docker Desktop has no
+# host networking onto the LAN, so the web host runs in a bridge network,
+# publishes PORT, and reaches the native API through host.docker.internal.
+# bifrost.local comes from the native advertiser (MDNS_ADVERTISER=host in
+# .env), because multicast does not leave Docker Desktop's VM.
+#
+#   docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d
+#
+# Read docs/docker-mac.md first: through Docker Desktop's port forwarding the
+# web host may not see each device's own address.
+#
+# Run from the repo root. A single file needs `--env-file .env`: Compose reads
+# ${VARS} from the .env beside the file it was given (compose/), not the repo
+# root's. The root docker-compose.yml needs no flag.
+name: bifrost
+
+services:
+  bifrost-web:
+    network_mode: bridge
+    ports:
+      - '${PORT:-4646}:${PORT:-4646}'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    environment:
+      API_HOST: host.docker.internal
+      # Inside the container it must listen on every interface to be published.
+      WEB_HOST: 0.0.0.0

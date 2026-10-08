@@ -32,12 +32,19 @@ sh scripts/observability.sh down     # stop  (add -v to wipe stored logs)
 Or drive compose directly:
 
 ```bash
-docker compose -f docker-compose.observability.yml up -d
+docker compose -f compose/observability.yml --env-file .env --profile observability up -d
 open http://localhost:3000        # admin / bifrost  — change the password
 
-docker compose -f docker-compose.observability.yml down      # stop
-docker compose -f docker-compose.observability.yml down -v    # + wipe stored logs
+docker compose -f compose/observability.yml --env-file .env --profile observability down      # stop
+docker compose -f compose/observability.yml --env-file .env --profile observability down -v   # + wipe stored logs
 ```
+
+Every service is in the `observability` profile (PLAN-39), so the root
+`docker-compose.yml` includes the stack without starting it: when the hub runs
+in Docker on Linux, `docker compose --profile observability up -d` starts the
+hub and the stack as one project. The file moved from
+`docker-compose.observability.yml`; it keeps the project name `bifrost`, so
+the existing volumes (and Grafana's and Loki's history) are reused.
 
 The **Bifrost** dashboard is auto-provisioned (requests/min, errors + warnings,
 uploads, watcher events, errors-by-module, errors-by-source, request throughput,

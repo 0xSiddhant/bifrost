@@ -19,7 +19,9 @@ function read(cmd: string, fallback: string): string {
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as { version?: string };
 const info = {
   version: pkg.version ?? '0.0.0',
-  commit: read('git rev-parse --short HEAD', 'unknown'),
+  // An image build has no .git; BIFROST_COMMIT (a build arg) names it, as it
+  // does for the client's own stamp.
+  commit: process.env.BIFROST_COMMIT || read('git rev-parse --short HEAD', 'unknown'),
   buildDate: new Date().toISOString(),
 };
 

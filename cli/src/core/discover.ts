@@ -45,6 +45,39 @@ export function normalizeHost(raw: string): string {
   return `${url.protocol}//${url.host}`;
 }
 
+/**
+ * Where the default looks next when `bifrost.local` does not answer (PLAN-39):
+ * a hub on this same machine, the web host first, then an API run alone
+ * (`BIFROST_RUN=api`). Native or in a container, both publish these ports, so
+ * the CLI never needs to know which. Only ever tried for the default address,
+ * never for one the person chose.
+ */
+export const LOCAL_FALLBACKS = ['http://127.0.0.1:4646', 'http://127.0.0.1:4647'] as const;
+
+/**
+ * Failures where no server was reached at all, so trying another address
+ * cannot repeat anything the first one did. A timeout is deliberately not one:
+ * the request may have arrived.
+ */
+const CONNECT_FAILURES = new Set([
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EADDRNOTAVAIL',
+]);
+
+export function isConnectFailure(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === 'string' && CONNECT_FAILURES.has(code)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 export type HostSource = 'flag' | 'config' | 'default';
 
 export interface ResolvedHost {
@@ -68,14 +101,23 @@ export function resolveBaseUrl(flagHost?: string, configuredHost?: string): Reso
  * before a response exists, and `doctor` prints the identical text for its own
  * reachability check — one vocabulary, not two.
  */
-export function unreachableMessage(baseUrl: string, cause: string): string {
+export function unreachableMessage(
+  baseUrl: string,
+  cause: string,
+  alsoTried: readonly string[] = [],
+): string {
+  const tried = alsoTried.length > 0 ? `, nor at ${alsoTried.join(' or ')} on this machine` : '';
   return (
-    `couldn't reach the Bifrost server at ${baseUrl} (${cause}) — ` +
+    `couldn't reach the Bifrost server at ${baseUrl} (${cause})${tried} — ` +
     'check it is running, or point the CLI at it with ' +
     '--host <address> (or save one with `bifrost config set-host <address>`)'
   );
 }
 
-export function unreachable(baseUrl: string, cause: string): CliError {
-  return new CliError(unreachableMessage(baseUrl, cause), EXIT.unreachable);
+export function unreachable(
+  baseUrl: string,
+  cause: string,
+  alsoTried: readonly string[] = [],
+): CliError {
+  return new CliError(unreachableMessage(baseUrl, cause, alsoTried), EXIT.unreachable);
 }

@@ -13,7 +13,13 @@ set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-COMPOSE_FILE="docker-compose.observability.yml"
+# PLAN-39: the stack's own compose file, every service in the `observability`
+# profile so the root docker-compose.yml can include it without starting it.
+COMPOSE_FILE="compose/observability.yml"
+OBS="-f $COMPOSE_FILE --profile observability"
+# Compose reads ${VARS} from the .env beside the file it is given (compose/);
+# point it at the repo's own when there is one.
+[ -f .env ] && OBS="$OBS --env-file .env"
 
 # Docker present + daemon up
 command -v docker >/dev/null 2>&1 || { echo "✖ docker not found — install/start Docker Desktop"; exit 1; }
@@ -31,16 +37,16 @@ fi
 CMD="${1:-up}"
 case "$CMD" in
   logs)
-    exec $DC -f "$COMPOSE_FILE" logs -f
+    exec $DC $OBS logs -f
     ;;
   down)
     shift
-    $DC -f "$COMPOSE_FILE" down "$@"
+    $DC $OBS down "$@"
     echo "✔ observability stack stopped."
     ;;
   up)
     echo "▶ starting Grafana + Loki + Alloy..."
-    $DC -f "$COMPOSE_FILE" up -d
+    $DC $OBS up -d
     echo ""
     echo "✔ observability stack is up."
     echo "  Grafana:    http://localhost:3000   (admin / bifrost — change it)"

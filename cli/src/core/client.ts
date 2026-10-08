@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { deviceId, readConfig } from './config.js';
-import { resolveBaseUrl, unreachable } from './discover.js';
+import { isConnectFailure, LOCAL_FALLBACKS, resolveBaseUrl, unreachable } from './discover.js';
 import { CliError, EXIT } from './output.js';
 
 /**
@@ -42,10 +42,62 @@ export interface UploadInput {
 }
 
 export class ApiClient {
+  private current: string;
+  private fallbacks: readonly string[];
+  private triedFallbacks: readonly string[] = [];
+  private movedFrom: string | null = null;
+
+  /**
+   * `fallbacks` are tried, once, when `baseUrl` cannot be connected to at all
+   * (PLAN-39): the default `bifrost.local` that does not resolve on a machine
+   * running the hub itself. Empty for an address the person chose.
+   */
   constructor(
-    readonly baseUrl: string,
+    baseUrl: string,
     private readonly device: string | null,
-  ) {}
+    fallbacks: readonly string[] = [],
+  ) {
+    this.current = baseUrl;
+    this.fallbacks = fallbacks;
+  }
+
+  /** Where requests go: the address given, or the fallback that answered. */
+  get baseUrl(): string {
+    return this.current;
+  }
+
+  /** The address given, when requests moved to a fallback; otherwise null. */
+  get fellBackFrom(): string | null {
+    return this.movedFrom;
+  }
+
+  /**
+   * Try each fallback's `/api/health` once; move to the first that answers.
+   * Spent on the first call either way, so a command never probes twice.
+   */
+  private async relocate(): Promise<boolean> {
+    const candidates = this.fallbacks;
+    this.fallbacks = [];
+    for (const candidate of candidates) {
+      try {
+        const response = await fetch(`${candidate}/api/health`, { signal: AbortSignal.timeout(2_000) });
+        await response.arrayBuffer();
+        if (response.ok) {
+          this.movedFrom = this.current;
+          this.current = candidate;
+          return true;
+        }
+      } catch {
+        // Not there either; the next candidate, or the original error.
+      }
+    }
+    this.triedFallbacks = candidates;
+    return false;
+  }
+
+  private unreachable(error: unknown): CliError {
+    return unreachable(this.current, describeTransportFailure(error), this.triedFallbacks);
+  }
 
   url(path: string, query?: RequestOptions['query']): string {
     const url = new URL(path, `${this.baseUrl}/`);
@@ -133,7 +185,10 @@ export class ApiClient {
         ...init,
       });
     } catch (error) {
-      throw unreachable(this.baseUrl, describeTransportFailure(error));
+      if (isConnectFailure(error) && (await this.relocate())) {
+        return this.send(method, path, options, init);
+      }
+      throw this.unreachable(error);
     }
   }
 
@@ -157,6 +212,24 @@ export class ApiClient {
     path: string,
     files: readonly UploadInput[],
     options: { query?: RequestOptions['query']; onProgress?: (sent: number, total: number) => void } = {},
+  ): Promise<T> {
+    try {
+      return await this.postFilesTo<T>(what, path, files, options);
+    } catch (error) {
+      // Nothing reached a server, so the whole upload starts again from the
+      // first byte (the envelope reopens every file) at the fallback.
+      if (error instanceof ConnectFailure && (await this.relocate())) {
+        return this.postFilesTo<T>(what, path, files, options);
+      }
+      throw error instanceof ConnectFailure ? this.unreachable(error.cause) : error;
+    }
+  }
+
+  private async postFilesTo<T>(
+    what: string,
+    path: string,
+    files: readonly UploadInput[],
+    options: { query?: RequestOptions['query']; onProgress?: (sent: number, total: number) => void },
   ): Promise<T> {
     const boundary = `----BifrostCli${crypto.randomBytes(12).toString('hex')}`;
     const parts = files.map((file) => ({
@@ -233,7 +306,8 @@ export class ApiClient {
       if (readFailure !== null) {
         throw new CliError(`${what} failed: couldn't read a file to send — ${readFailure.message}`);
       }
-      throw unreachable(this.baseUrl, describeTransportFailure(error));
+      if (isConnectFailure(error)) throw new ConnectFailure(error);
+      throw this.unreachable(error);
     });
 
     if (answer.status < 200 || answer.status >= 300) {
@@ -311,8 +385,18 @@ export function multipartFilename(name: string): string {
   return name.replace(/["\\]|[\u0000-\u001f]/g, '_');
 }
 
-/** Builds the client every command uses: `--host`, then the saved default. */
+/** Marks an upload that never reached a server, so `postFiles` may retry it elsewhere. */
+class ConnectFailure extends Error {
+  constructor(cause: unknown) {
+    super('connect failure', { cause });
+  }
+}
+
+/**
+ * Builds the client every command uses: `--host`, then the saved default,
+ * then `bifrost.local` with this machine's own addresses behind it (PLAN-39).
+ */
 export function clientFromOptions(options: { host?: string }): ApiClient {
-  const { baseUrl } = resolveBaseUrl(options.host, readConfig().host);
-  return new ApiClient(baseUrl, deviceId());
+  const { baseUrl, source } = resolveBaseUrl(options.host, readConfig().host);
+  return new ApiClient(baseUrl, deviceId(), source === 'default' ? LOCAL_FALLBACKS : []);
 }

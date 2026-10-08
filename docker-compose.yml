@@ -1,61 +1,21 @@
-# Bifrost on a Linux host. See docs/docker-linux.md — this is NOT the macOS run
-# mode (host networking + FSEvents don't work in Docker Desktop's VM).
+# Bifrost in Docker (PLAN-39): every piece has its own image (docker/) and its
+# own compose file (compose/); this file puts the hub's pieces in one project.
 #
-#   cp .env.example .env      # set HEIMDALL_PIN etc.
-#   docker compose up -d --build
+#   docker compose up -d --build                         # the hub: API + web host (BIFROST_RUN=full)
+#   docker compose --profile observability up -d         # … plus Grafana/Loki/Alloy/Prometheus/Tempo
+#   docker compose up -d bifrost-api                     # one piece (BIFROST_RUN=api)
+#   docker compose up -d bifrost-web                     # one piece (BIFROST_RUN=web: the standalone client)
 #
-# PLAN-36: two services from one image. bifrost-api is the API on loopback
-# API_PORT; bifrost-web is the web host on PORT, which serves the client,
-# forwards the API paths and answers for bifrost.local. `up` starts both (the
-# hub, BIFROST_RUN=full). For one of them alone, name it, and set the matching
-# BIFROST_RUN in .env:
+# Linux hosts (host networking: bifrost.local, real client addresses, the API on
+# loopback). On a Mac the API runs natively and only the web host may run here,
+# with compose/web.bridge.yml — docs/docker-mac.md. The standalone site for a
+# cloud machine is compose/standalone.yml, not part of this project.
 #
-#   docker compose up -d bifrost-api    # BIFROST_RUN=api: the API alone
-#   docker compose up -d bifrost-web    # BIFROST_RUN=web: the standalone client alone
-#
-# Upgrading from the single `bifrost` service: `docker compose up -d
-# --remove-orphans` replaces it, so the old process cannot hold the API's port
-# or advertise the name beside the new web host.
+# Upgrading from the single `bifrost` service (before PLAN-36):
+# `docker compose up -d --build --remove-orphans`.
+name: bifrost
 
-x-bifrost: &bifrost
-  image: bifrost:latest
-  # Host networking: mDNS multicast advertises bifrost.local and LAN devices
-  # reach PORT; the API's loopback bind is this host's loopback. LINUX ONLY —
-  # a no-op on Docker Desktop (mac/win).
-  network_mode: host
-  env_file:
-    - .env
-  environment:
-    NODE_ENV: production
-    PORT: 4646
-  volumes:
-    # State that must survive container replacement (and the shared log archive).
-    - ./storage:/app/storage
-  restart: unless-stopped
-  init: true
-
-services:
-  bifrost-api:
-    <<: *bifrost
-    build: .
-    container_name: bifrost-api
-    command: ['node', '--import', './server/dist/otel.js', 'server/dist/bootstrap.js']
-    stop_grace_period: 15s
-
-  bifrost-web:
-    <<: *bifrost
-    container_name: bifrost-web
-    command: ['node', 'web/dist/bootstrap.js']
-    stop_grace_period: 10s
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'node',
-          '-e',
-          "fetch('http://127.0.0.1:'+(process.env.PORT||4646)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-        ]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
-      retries: 3
+include:
+  - compose/api.yml
+  - compose/web.yml
+  - compose/observability.yml

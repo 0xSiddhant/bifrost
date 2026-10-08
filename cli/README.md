@@ -72,7 +72,8 @@ takes — which is dependable on macOS and depends on `nss-mdns` (Linux) or Bonj
 and names the fix rather than printing a network error:
 
 ```
-error: couldn't reach the Bifrost server at http://bifrost.local:4646 (ENOTFOUND) —
+error: couldn't reach the Bifrost server at http://bifrost.local:4646 (ENOTFOUND),
+nor at http://127.0.0.1:4646 or http://127.0.0.1:4647 on this machine —
 check it is running, or point the CLI at it with --host <address>
 (or save one with `bifrost config set-host <address>`)
 ```
@@ -84,6 +85,16 @@ bifrost --host 192.168.1.20 status     # this invocation only
 bifrost config set-host 192.168.1.20   # saved default for later invocations
                                        # otherwise: bifrost.local:4646
 ```
+
+**On the machine that runs the hub** there is a shortcut (PLAN-39): when the
+default `bifrost.local` cannot be connected to, the CLI tries this machine
+itself, `127.0.0.1:4646` (the web host) and then `127.0.0.1:4647` (the API run
+alone, `BIFROST_RUN=api`), and uses the first that answers. It does not matter
+whether the hub runs natively or in Docker: both publish the same ports.
+`bifrost doctor` reports when it fell back and prints the `set-host` command
+that skips the detour. An address you gave (`--host`, or a saved one) is never
+second-guessed this way, and a timed-out request is never retried, since it may
+have arrived.
 
 A bare host gets `http://` and port 4646; `10.0.0.5:8080` and full
 `http://…` URLs are taken as written.

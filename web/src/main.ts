@@ -9,7 +9,7 @@ import {
   type WebConfig,
 } from './config.js';
 import { buildWebHost } from './host.js';
-import { createWebLogger, type Logger } from './logger.js';
+import { createWebLogger, logsDirProblem, type Logger } from './logger.js';
 import { advertiseMdns, type MdnsHandle } from './mdns.js';
 
 /**
@@ -20,14 +20,46 @@ import { advertiseMdns, type MdnsHandle } from './mdns.js';
 export type MdnsDecision = { advertise: true } | { advertise: false; reason: string };
 
 /** Whether this web host should answer for `<name>.local` (unit-tested; CI cannot multicast). */
-export function mdnsDecision(config: Pick<WebConfig, 'profile' | 'host'>): MdnsDecision {
+export function mdnsDecision(
+  config: Pick<WebConfig, 'profile' | 'host' | 'mdnsAdvertiser'>,
+): MdnsDecision {
   if (config.profile !== 'local') {
     return { advertise: false, reason: 'the cloud profile is never advertised on a LAN' };
+  }
+  if (config.mdnsAdvertiser === 'off') {
+    return { advertise: false, reason: 'MDNS_ADVERTISER=off' };
+  }
+  if (config.mdnsAdvertiser === 'host') {
+    return {
+      advertise: false,
+      reason: 'MDNS_ADVERTISER=host: the native advertiser (bifrost-mdns) answers for the name',
+    };
   }
   if (isLoopbackHost(config.host)) {
     return {
       advertise: false,
       reason: `WEB_HOST=${config.host} serves this machine only, so advertising a name other devices cannot reach would mislead them`,
+    };
+  }
+  return { advertise: true };
+}
+
+/**
+ * Whether the advertiser-only process (`bifrost-mdns`, PLAN-39) should answer
+ * for the name: only when it was asked to (`MDNS_ADVERTISER=host`), for the
+ * local profile. It advertises this machine's own addresses, which is the
+ * point: the web host it speaks for may be in a container with none of them.
+ */
+export function advertiserDecision(
+  config: Pick<WebConfig, 'profile' | 'mdnsAdvertiser'>,
+): MdnsDecision {
+  if (config.profile !== 'local') {
+    return { advertise: false, reason: 'the cloud profile is never advertised on a LAN' };
+  }
+  if (config.mdnsAdvertiser !== 'host') {
+    return {
+      advertise: false,
+      reason: `MDNS_ADVERTISER=${config.mdnsAdvertiser}: ${config.mdnsAdvertiser === 'web' ? 'the web host answers for the name' : 'nobody advertises'}`,
     };
   }
   return { advertise: true };
@@ -55,6 +87,11 @@ export async function main(): Promise<void> {
       process.exit(1);
     }
     throw error;
+  }
+  const problem = logsDirProblem(config.logsDir);
+  if (problem) {
+    process.stderr.write(`web host: ${problem}\n`);
+    process.exit(1);
   }
   const log: Logger = createWebLogger({
     level: config.logLevel,

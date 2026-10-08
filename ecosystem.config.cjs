@@ -6,13 +6,17 @@
  *
  * PLAN-36: two apps, `bifrost-api` (the API on loopback API_PORT) and
  * `bifrost-web` (the web host on PORT, which also answers for bifrost.local).
- * BIFROST_RUN in .env picks which exist: full (both), api, or web. Both apps
- * load .env themselves; this file reads it only to know the mode.
+ * BIFROST_RUN in .env picks which exist: full (both), api, or web; and
+ * MDNS_ADVERTISER=host adds `bifrost-mdns` (PLAN-39). The apps load .env
+ * themselves; this file reads it only to know which to define.
  */
 const path = require('node:path');
 require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 
 const mode = process.env.BIFROST_RUN || 'full';
+// PLAN-39: who answers for bifrost.local. `host` adds bifrost-mdns, a native
+// advertiser, for a web host running in Docker on the Mac.
+const advertiser = process.env.MDNS_ADVERTISER || 'web';
 
 const common = {
   cwd: __dirname,
@@ -55,7 +59,18 @@ const web = {
   error_file: 'storage/logs/pm2-web-error.log',
 };
 
+const mdns = {
+  ...common,
+  name: 'bifrost-mdns',
+  script: 'web/dist/advertise.js',
+  max_memory_restart: '128M',
+  out_file: 'storage/logs/pm2-mdns-out.log',
+  error_file: 'storage/logs/pm2-mdns-error.log',
+};
+
+// The API first, so the web host's first proxied request has an upstream.
+// Mirrors web/src/processes.ts, which `npm start` uses (and which is tested).
+const base = mode === 'api' ? [api] : mode === 'web' ? [web] : [api, web];
 module.exports = {
-  // The API first, so the web host's first proxied request has an upstream.
-  apps: mode === 'api' ? [api] : mode === 'web' ? [web] : [api, web],
+  apps: advertiser === 'host' ? [...base, mdns] : base,
 };

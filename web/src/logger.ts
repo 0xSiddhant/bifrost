@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import pino from 'pino';
 
@@ -8,6 +9,28 @@ export interface WebLoggerOptions {
   logsDir: string;
   retainFiles: number;
   pretty: boolean;
+}
+
+/**
+ * Why the logs directory cannot be written, or null when it can. Checked
+ * before the logger exists: pino-roll fails inside its worker thread, and the
+ * process then exits 1 without a word (PLAN-39 found it with a container's
+ * `node` user over a root-owned `storage/`), which leaves nothing to go on.
+ */
+export function logsDirProblem(logsDir: string): string | null {
+  try {
+    fs.mkdirSync(logsDir, { recursive: true });
+    fs.accessSync(logsDir, fs.constants.W_OK);
+    return null;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'error';
+    const uid = typeof process.getuid === 'function' ? process.getuid() : null;
+    return (
+      `cannot write its logs to ${logsDir} (${code})` +
+      (uid === null ? '' : `: it runs as uid ${uid}; make the storage folder writable by it`) +
+      ' (in Docker: chown -R 1000 storage on the host)'
+    );
+  }
 }
 
 /**

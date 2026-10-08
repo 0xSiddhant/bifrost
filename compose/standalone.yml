@@ -2,18 +2,23 @@
 # behind nginx, with no Bifrost server and nothing it can reach. See
 # docs/standalone.md.
 #
-#   BIFROST_DOCKER_NETWORK=proxy docker compose -f docker-compose.standalone.yml up -d --build
+#   BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml up -d --build
 #
 # It publishes no port: it joins the Docker network your reverse proxy is
 # already on, and the proxy routes the public hostname (and TLS) to
 # bifrost-standalone:8080. No fixed container name, no volume, no host port,
 # so it sits beside the other containers on the machine without colliding.
 
+# Not included by the root docker-compose.yml: it runs on another machine, on a
+# network the hub does not have. `name: bifrost` keeps the project name the old
+# root file got from the repo directory (PLAN-39).
+name: bifrost
+
 services:
   bifrost-standalone:
     build:
-      context: .
-      target: standalone
+      context: ..
+      dockerfile: docker/standalone.Dockerfile
       # Baked in at build time (Vite inlines them), so a change here needs
       # `up -d --build`; a runtime `environment:` would arrive too late.
       # Defaults are .env.example's.

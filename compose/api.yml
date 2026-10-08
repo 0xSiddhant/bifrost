@@ -1,0 +1,33 @@
+# The API server alone (PLAN-39). Linux host networking: it binds the host's
+# loopback API_PORT, which is where the web host (native or compose/web.yml)
+# forwards to. Never run on the Mac: the API is native there (docs/docker-mac.md).
+#
+#   docker compose -f compose/api.yml --env-file .env up -d   # with BIFROST_RUN=api in .env
+#
+# Paths are relative to this file. `name: bifrost` keeps the project (and its
+# volumes) the same however the file is reached: alone, or included by the root
+# docker-compose.yml.
+#
+# Run from the repo root. A single file needs `--env-file .env`: Compose reads
+# ${VARS} from the .env beside the file it was given (compose/), not the repo
+# root's. The root docker-compose.yml needs no flag.
+name: bifrost
+
+services:
+  bifrost-api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    image: bifrost-api:latest
+    container_name: bifrost-api
+    network_mode: host
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+    volumes:
+      # State that must survive container replacement (and the shared log archive).
+      - ../storage:/app/storage
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 15s
