@@ -86,6 +86,22 @@ export const CONNECTION_LOSS: AllowEntry = {
 };
 
 /**
+ * Allowed only after a test has deliberately stopped the API behind a running
+ * web host (`guard.allowApiOutage()`, PLAN-36): every API call is then answered
+ * `502 HUB_UNAVAILABLE` (a `/go` link 503), and the browser logs each one. A
+ * 5xx from anything else, and every other console line, still fails the test.
+ */
+export const API_OUTAGE: AllowEntry = {
+  reason:
+    'The test stopped the API on purpose and left the web host up: its 502 HUB_UNAVAILABLE (503 for /go) is the designed answer, and the browser logs each one.',
+  matches: (v) =>
+    (v.kind === 'http5xx' && /^50[23]\b/.test(v.detail)) ||
+    (v.kind === 'console.error' &&
+      (/^Failed to load resource: the server responded with a status of 50[23]\b/.test(v.detail) ||
+        /^EventSource's response has a status 50[23] that is not 200/.test(v.detail))),
+};
+
+/**
  * WebKit's report of a same-origin request cut off by the page navigating
  * away. Chromium drops such a request silently; WebKit rejects its `fetch`
  * (or dynamic `import()`) promise in the old document first, which surfaces as

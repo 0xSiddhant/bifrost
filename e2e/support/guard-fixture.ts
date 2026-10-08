@@ -1,5 +1,6 @@
 import type { BrowserContext, Page, TestInfo } from '@playwright/test';
 import {
+  API_OUTAGE,
   CONNECTION_LOSS,
   formatViolations,
   isAllowed,
@@ -28,12 +29,16 @@ export interface GuardState {
   /** From now on, a refused connection is expected (the test stopped the server). */
   allowConnectionLoss(): void;
   connectionLossAllowed(): boolean;
+  /** From now on, a 502 from the web host is expected (the test stopped the API alone). */
+  allowApiOutage(): void;
+  apiOutageAllowed(): boolean;
 }
 
 export function attachGuard(context: BrowserContext, state: GuardState): void {
   const record = (violation: Violation, page?: Page | null) => {
     if (!state.isRecording() || isAllowed(violation)) return;
     if (state.connectionLossAllowed() && CONNECTION_LOSS.matches(violation)) return;
+    if (state.apiOutageAllowed() && API_OUTAGE.matches(violation)) return;
     if (page && isNavigationCancelShaped(violation)) {
       state.cancels.offer(page, violation, Date.now());
       return;
@@ -119,6 +124,7 @@ export async function useGuard(
 ): Promise<void> {
   let recording = true;
   let connectionLoss = false;
+  let apiOutage = false;
   const state: GuardState = {
     violations: [],
     cancels: new NavigationCancels<Page>(),
@@ -133,6 +139,10 @@ export async function useGuard(
       connectionLoss = true;
     },
     connectionLossAllowed: () => connectionLoss,
+    allowApiOutage: () => {
+      apiOutage = true;
+    },
+    apiOutageAllowed: () => apiOutage,
   };
   await use(state);
   // Every page has closed by now, so anything still held was never explained
