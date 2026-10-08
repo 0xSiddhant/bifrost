@@ -172,7 +172,11 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
       // through unbuffered. The timeouts are off because a direct connection
       // had none: a slow 2 GB upload would otherwise outlast undici's 300 s
       // header timeout before the API could answer. The API's own limits rule.
-      undici: { bodyTimeout: 0, headersTimeout: 0 },
+      // `connections: null` lifts reply-from's default pool of 128: every open
+      // tab holds an event stream and every long transfer a connection, and
+      // past the cap the next request queued forever (the fanout run's 200
+      // listeners hung). A direct connection had no cap either.
+      undici: { bodyTimeout: 0, headersTimeout: 0, connections: null },
       replyOptions: {
         rewriteRequestHeaders: (request, headers) => ({
           ...headers,

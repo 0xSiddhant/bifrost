@@ -275,6 +275,28 @@ describe('hub mode', () => {
     await closing;
   });
 
+  it('opens more event streams at once than undici would by default (128)', async () => {
+    // Every open tab holds one stream, every long download one connection.
+    // Past reply-from's default pool of 128 the next request waited in the
+    // queue forever; a direct connection to the API had no such cap.
+    const web = await hub(await startUpstream());
+    await web.listen({ port: 0, host: '127.0.0.1' });
+    const address = web.server.address();
+    const webPort = typeof address === 'object' && address ? address.port : 0;
+    const controller = new AbortController();
+    const opened = await Promise.all(
+      Array.from({ length: 140 }, async () => {
+        const response = await fetch(`http://127.0.0.1:${webPort}/api/events`, {
+          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5_000)]),
+        });
+        const { value } = await response.body!.getReader().read();
+        return new TextDecoder().decode(value).includes('data: first');
+      }),
+    );
+    controller.abort();
+    expect(opened.filter(Boolean)).toHaveLength(140);
+  }, 15_000);
+
   it('serves the hub client, with the SPA fallback for client routes', async () => {
     const web = await hub(await startUpstream());
     expect((await web.inject({ url: '/' })).body).toContain('hub');
