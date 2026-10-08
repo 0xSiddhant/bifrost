@@ -1,0 +1,33 @@
+{
+  "$comment": "PLAN-35: one table of settings values, run by both client/src/core/settings/rules.test.ts and server/src/core/config/settings-rules.test.ts, so the browser's device-local settings accept exactly what the server's Heimdall overlay accepts. Keys are the server's settings keys.",
+  "cases": [
+    { "key": "screensaver.idleSeconds", "value": 60, "accepted": true },
+    { "key": "screensaver.idleSeconds", "value": 5, "accepted": true },
+    { "key": "screensaver.idleSeconds", "value": 3600, "accepted": true },
+    { "key": "screensaver.idleSeconds", "value": 4, "accepted": false },
+    { "key": "screensaver.idleSeconds", "value": 3601, "accepted": false },
+    { "key": "screensaver.idleSeconds", "value": 60.5, "accepted": false },
+    { "key": "screensaver.quoteRotateSeconds", "value": 4, "accepted": true },
+    { "key": "screensaver.quoteRotateSeconds", "value": 120, "accepted": true },
+    { "key": "screensaver.quoteRotateSeconds", "value": 3, "accepted": false },
+    { "key": "screensaver.quoteRotateSeconds", "value": 121, "accepted": false },
+    { "key": "screensaver.density", "value": "low", "accepted": true },
+    { "key": "screensaver.density", "value": "high", "accepted": true },
+    { "key": "screensaver.density", "value": "extreme", "accepted": false },
+    { "key": "screensaver.motion", "value": "calm", "accepted": true },
+    { "key": "screensaver.motion", "value": "lively", "accepted": true },
+    { "key": "screensaver.motion", "value": "frantic", "accepted": false },
+    { "key": "loki.runTimeoutMs", "value": 250, "accepted": true },
+    { "key": "loki.runTimeoutMs", "value": 30000, "accepted": true },
+    { "key": "loki.runTimeoutMs", "value": 249, "accepted": false },
+    { "key": "loki.runTimeoutMs", "value": 30001, "accepted": false },
+    { "key": "loki.consoleMaxEntries", "value": 10, "accepted": true },
+    { "key": "loki.consoleMaxEntries", "value": 5000, "accepted": true },
+    { "key": "loki.consoleMaxEntries", "value": 9, "accepted": false },
+    { "key": "loki.consoleMaxEntries", "value": 5001, "accepted": false },
+    { "key": "heimdall.tapCount", "value": 3, "accepted": true },
+    { "key": "heimdall.tapCount", "value": 20, "accepted": true },
+    { "key": "heimdall.tapCount", "value": 2, "accepted": false },
+    { "key": "heimdall.tapCount", "value": 21, "accepted": false }
+  ]
+}

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { ClientLogger } from './log';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ClientLogger, httpSink, noopSink } from './log';
 
 /** A transport with hand-driven time, so no test waits on a real timer. */
 function harness(options: { failSends?: boolean } = {}) {
@@ -143,5 +143,29 @@ describe('ClientLogger', () => {
     const h = harness({ failSends: true });
     expect(() => h.logger.error('boom')).not.toThrow();
     await expect(h.logger.flush()).resolves.toBeUndefined();
+  });
+});
+
+describe('log sinks (PLAN-35)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('noopSink sends nothing and asks nothing: the standalone site has nowhere to post', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    await noopSink.send([{ level: 'error', msg: 'boom', ts: 1 }]);
+    expect(await noopSink.config()).toEqual({});
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('httpSink still posts the batch to /api/client-logs and reads its config', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ level: 'info' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    await httpSink.send([{ level: 'error', msg: 'boom', ts: 1 }]);
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/client-logs',
+      expect.objectContaining({ method: 'POST', keepalive: true, body: JSON.stringify({ entries: [{ level: 'error', msg: 'boom', ts: 1 }] }) }),
+    );
+    expect(await httpSink.config()).toEqual({ level: 'info' });
+    expect(fetch).toHaveBeenLastCalledWith('/api/client-logs/config', expect.anything());
   });
 });

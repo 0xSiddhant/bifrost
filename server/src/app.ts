@@ -14,6 +14,7 @@ import {
 import { loadDotenv } from './core/config/dotenv.js';
 import { clientLogger, createLogger, moduleLogger, type Logger } from './core/logger/index.js';
 import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
+import { checkClientBuild } from './core/client-build.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
 import { buildHttp } from './core/http/index.js';
@@ -26,7 +27,6 @@ import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
 import { previewsModule } from './modules/previews/module.js';
 import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
-import { themesModule } from './modules/themes/module.js';
 import { heimdallModule } from './modules/heimdall/module.js';
 import { clipboardModule } from './modules/clipboard/module.js';
 import { presenceModule } from './modules/presence/module.js';
@@ -59,7 +59,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     fileTransferModule,
     previewsModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     clipboardModule,
     presenceModule,
@@ -103,7 +102,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
   cloud: [
     healthModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     runestoneModule,
     variantModule,
@@ -169,9 +167,11 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
+  const clientDistDir = fromRepoRoot('client', 'dist');
+  checkClientBuild(clientDistDir, config, logger);
   const fastify = await buildHttp({
     logger,
-    clientDistDir: fromRepoRoot('client', 'dist'),
+    clientDistDir,
     bus,
     contractCheck: config.http.contractCheck,
     apiVersion: getBuildInfo().version,

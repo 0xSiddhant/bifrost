@@ -125,30 +125,33 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   const guard = { preHandler: app.requireAdmin };
 
   // Public: the entry gesture needs the current shortcut + tap count to work.
-  // Not a security boundary (the PIN is) — just the door, not the key.
+  // Not a security boundary (the PIN is) — just the door, not the key. Since
+  // PLAN-35 it also carries the household default theme: themes are client
+  // code, and every device (not only an admin) must still learn the default.
   app.get(
     '/api/heimdall/access',
     {
       schema: {
         tags: TAGS,
-        summary: 'The entry gesture: the shortcut and tap count that open the PIN prompt',
+        summary: 'The entry gesture, plus the household default theme every device applies',
         description: 'Public on purpose: it is the door, not the key. The PIN is the boundary.',
         operationId: 'getHeimdallAccess',
         response: {
           200: {
             type: 'object',
-            required: ['shortcut', 'tapCount'],
+            required: ['shortcut', 'tapCount', 'defaultThemeId'],
             properties: {
               shortcut: settingsSchema.properties.shortcut,
               tapCount: settingsSchema.properties.tapCount,
+              defaultThemeId: settingsSchema.properties.defaultThemeId,
             },
           },
         },
       },
     },
     () => {
-      const { shortcut, tapCount } = deps.getSettings.execute();
-      return { shortcut, tapCount };
+      const { shortcut, tapCount, defaultThemeId } = deps.getSettings.execute();
+      return { shortcut, tapCount, defaultThemeId };
     },
   );
 

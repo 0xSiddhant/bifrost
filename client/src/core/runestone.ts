@@ -2,18 +2,26 @@ import {
   ApiError,
   apiGet,
   apiSend,
+  hubOnly,
   pagedParams,
   type DocumentListPage,
   type OffsetRequest,
 } from './api';
 
 export interface RunestoneConfig {
-  /** Document size cap in KB — from .env via the server, never hardcoded. */
+  /** Document size cap in KB — the server's own .env value, baked in at build time. */
   maxDocKb: number;
 }
 
-export const fetchRunestoneConfig = (): Promise<RunestoneConfig> =>
-  apiGet<RunestoneConfig>('/api/runestone/config');
+/**
+ * The size cap, baked in at build time from the same `.env` key the server
+ * enforces on save (PLAN-35): one number, so the client never allows what the
+ * server refuses. A changed cap needs a client rebuild; the server's boot log
+ * names any drift.
+ */
+export const RUNESTONE_CONFIG: RunestoneConfig = {
+  maxDocKb: __BIFROST_DEFAULTS__.caps.runestoneMaxDocKb,
+};
 
 /** A saved document as the library lists it (no content). */
 export interface RunestoneSummary {
@@ -49,13 +57,13 @@ function listParams(query: RunestoneListQuery): URLSearchParams {
   return params;
 }
 
-export function listRunestones(query: RunestoneListQuery = {}): Promise<RunestoneSummary[]> {
+function hubListRunestones(query: RunestoneListQuery = {}): Promise<RunestoneSummary[]> {
   const qs = listParams(query).toString();
   return apiGet<RunestoneSummary[]>(`/api/runestone${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
-export function listRunestonesPage(
+function hubListRunestonesPage(
   query: RunestoneListQuery,
   request: OffsetRequest,
 ): Promise<DocumentListPage<RunestoneSummary>> {
@@ -69,7 +77,7 @@ export function listRunestonesPage(
  * follows it transparently — compare `doc.slug` to fix the address bar.
  * Returns null on 404 (the creative not-carved page).
  */
-export async function fetchRunestone(slug: string): Promise<RunestoneDoc | null> {
+async function hubFetchRunestone(slug: string): Promise<RunestoneDoc | null> {
   try {
     return await apiGet<RunestoneDoc>(`/api/runestone/${encodeURIComponent(slug)}`);
   } catch (error) {
@@ -78,13 +86,36 @@ export async function fetchRunestone(slug: string): Promise<RunestoneDoc | null>
   }
 }
 
-export const saveRunestone = (input: { name?: string; content: string }): Promise<RunestoneDoc> =>
+const hubSaveRunestone = (input: { name?: string; content: string }): Promise<RunestoneDoc> =>
   apiSend<RunestoneDoc>('POST', '/api/runestone', input);
 
-export const updateRunestone = (
+const hubUpdateRunestone = (
   id: string,
   input: { name?: string; content?: string },
 ): Promise<RunestoneDoc> => apiSend<RunestoneDoc>('PUT', `/api/runestone/${id}`, input);
 
-export const deleteRunestone = (id: string): Promise<null> =>
+const hubDeleteRunestone = (id: string): Promise<null> =>
   apiSend<null>('DELETE', `/api/runestone/${id}`);
+
+/*
+ * The hub's document API. On the standalone site each is a stub that throws
+ * HubUnavailableError and opens the Bifröst sheet, with no request (PLAN-35).
+ */
+export const listRunestones: typeof hubListRunestones = __HUB__
+  ? hubListRunestones
+  : hubOnly('listRunestones');
+export const listRunestonesPage: typeof hubListRunestonesPage = __HUB__
+  ? hubListRunestonesPage
+  : hubOnly('listRunestonesPage');
+export const fetchRunestone: typeof hubFetchRunestone = __HUB__
+  ? hubFetchRunestone
+  : hubOnly('fetchRunestone');
+export const saveRunestone: typeof hubSaveRunestone = __HUB__
+  ? hubSaveRunestone
+  : hubOnly('saveRunestone');
+export const updateRunestone: typeof hubUpdateRunestone = __HUB__
+  ? hubUpdateRunestone
+  : hubOnly('updateRunestone');
+export const deleteRunestone: typeof hubDeleteRunestone = __HUB__
+  ? hubDeleteRunestone
+  : hubOnly('deleteRunestone');

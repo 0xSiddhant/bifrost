@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './api';
+import { apiGet, apiSend, hubOnly } from './api';
 
 /**
  * Nótt (idle screensaver) policy. The app reads the public config on load and
@@ -36,10 +36,14 @@ export type ScreensaverSettingsPatch = Partial<{
   quoteRotateSeconds: number;
 }>;
 
-export const fetchScreensaverConfig = (): Promise<ScreensaverConfig> =>
+const hubFetchScreensaverConfig = (): Promise<ScreensaverConfig> =>
   apiGet<ScreensaverConfig>('/api/screensaver/config');
 
-export const patchScreensaverSettings = (
+const hubPatchScreensaverSettings = (
   patch: ScreensaverSettingsPatch,
 ): Promise<ScreensaverConfig> =>
   apiSend<ScreensaverConfig>('PATCH', '/api/screensaver/settings', patch);
+
+// Hub-only: on the standalone site each is a stub that makes no request (PLAN-35).
+export const fetchScreensaverConfig: typeof hubFetchScreensaverConfig = __HUB__ ? hubFetchScreensaverConfig : hubOnly('fetchScreensaverConfig');
+export const patchScreensaverSettings: typeof hubPatchScreensaverSettings = __HUB__ ? hubPatchScreensaverSettings : hubOnly('patchScreensaverSettings');

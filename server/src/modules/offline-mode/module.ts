@@ -17,7 +17,8 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * broadcast so open tabs rebind without a reload. The registry itself is
  * code-owned (pages come and go through code changes, not admin typing); only
  * the disabled ids are stored, as one comma-separated `settings` row — the same
- * overlay `themes.disabled` uses, so there is no new table and no migration.
+ * shape the theme switcher's `themes.disabled` row had (removed in PLAN-35), so
+ * there is no new table and no migration.
  *
  * Registered in BOTH profiles: warming client chunks is harmless mechanism, not
  * a LAN-trust concern (matching `toolbox`/`variant`/`screensaver`).

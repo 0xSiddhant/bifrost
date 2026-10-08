@@ -97,7 +97,6 @@ const envFields = z.object({
   SCREENSAVER_MOUSE_REACTIVE: z.enum(['true', 'false']).default('true'),
   SCREENSAVER_SHOW_QUOTES: z.enum(['true', 'false']).default('true'),
   SCREENSAVER_QUOTE_ROTATE_SECONDS: z.coerce.number().int().min(4).max(120).default(14),
-  THEMES_DIR: z.string().min(1).default('./themes'),
   STORAGE_ROOT: z.string({
     error: required('where the database and files live, e.g. ./storage', 'must be a path'),
   }),
@@ -263,7 +262,6 @@ export interface AppConfig {
     quoteRotateSeconds: number;
   };
   themes: {
-    dir: string;
     /**
      * Explicit server default (DB settings overlay, Heimdall-set in PLAN-05).
      * null = not configured — clients then fall through to their
@@ -446,7 +444,6 @@ export function loadConfig(env: Env = process.env): AppConfig {
       quoteRotateSeconds: raw.SCREENSAVER_QUOTE_ROTATE_SECONDS,
     },
     themes: {
-      dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,
     },
     storage: resolveStoragePaths(raw.STORAGE_ROOT),

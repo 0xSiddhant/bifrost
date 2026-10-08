@@ -168,10 +168,7 @@ describe('transport', () => {
         // gets no such chance, so leave its leftover for the sweep to clear.
         fs.writeFileSync(path.join(tmp, 'left-by-a-crash'), 'partial');
 
-        const again = await startServer({
-          storageRoot: server.storageRoot,
-          themesDir: server.themesDir,
-        });
+        const again = await startServer({ storageRoot: server.storageRoot });
         try {
           expect(leftovers()).toEqual([]);
         } finally {
@@ -179,7 +176,6 @@ describe('transport', () => {
         }
       } finally {
         fs.rmSync(server.storageRoot, { recursive: true, force: true });
-        fs.rmSync(server.themesDir, { recursive: true, force: true });
       }
     });
   });

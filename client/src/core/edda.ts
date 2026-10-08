@@ -2,19 +2,29 @@ import {
   ApiError,
   apiGet,
   apiSend,
+  hubOnly,
   pagedParams,
   type DocumentListPage,
   type OffsetRequest,
 } from './api';
 
 export interface EddaConfig {
-  /** Document size cap in KB — from .env via the server, never hardcoded. */
+  /** Document size cap in KB — the server's own .env value, baked in at build time. */
   maxDocKb: number;
   /** Above this size the live preview auto-degrades to manual refresh. */
   livePreviewMaxKb: number;
 }
 
-export const fetchEddaConfig = (): Promise<EddaConfig> => apiGet<EddaConfig>('/api/edda/config');
+/**
+ * The size cap, baked in at build time from the same `.env` key the server
+ * enforces on save (PLAN-35): one number, so the client never allows what the
+ * server refuses. A changed cap needs a client rebuild; the server's boot log
+ * names any drift.
+ */
+export const EDDA_CONFIG: EddaConfig = {
+  maxDocKb: __BIFROST_DEFAULTS__.caps.eddaMaxDocKb,
+  livePreviewMaxKb: __BIFROST_DEFAULTS__.caps.eddaLivePreviewMaxKb,
+};
 
 /** A saved document as the library lists it (no content). */
 export interface EddaSummary {
@@ -50,13 +60,13 @@ function listParams(query: EddaListQuery): URLSearchParams {
   return params;
 }
 
-export function listEddas(query: EddaListQuery = {}): Promise<EddaSummary[]> {
+function hubListEddas(query: EddaListQuery = {}): Promise<EddaSummary[]> {
   const qs = listParams(query).toString();
   return apiGet<EddaSummary[]>(`/api/edda${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
-export function listEddasPage(
+function hubListEddasPage(
   query: EddaListQuery,
   request: OffsetRequest,
 ): Promise<DocumentListPage<EddaSummary>> {
@@ -70,7 +80,7 @@ export function listEddasPage(
  * follows it transparently — compare `doc.slug` to fix the address bar.
  * Returns null on 404 (the creative not-written page).
  */
-export async function fetchEdda(slug: string): Promise<EddaDoc | null> {
+async function hubFetchEdda(slug: string): Promise<EddaDoc | null> {
   try {
     return await apiGet<EddaDoc>(`/api/edda/${encodeURIComponent(slug)}`);
   } catch (error) {
@@ -79,12 +89,23 @@ export async function fetchEdda(slug: string): Promise<EddaDoc | null> {
   }
 }
 
-export const saveEdda = (input: { name?: string; content: string }): Promise<EddaDoc> =>
+const hubSaveEdda = (input: { name?: string; content: string }): Promise<EddaDoc> =>
   apiSend<EddaDoc>('POST', '/api/edda', input);
 
-export const updateEdda = (
-  id: string,
-  input: { name?: string; content?: string },
-): Promise<EddaDoc> => apiSend<EddaDoc>('PUT', `/api/edda/${id}`, input);
+const hubUpdateEdda = (id: string, input: { name?: string; content?: string }): Promise<EddaDoc> =>
+  apiSend<EddaDoc>('PUT', `/api/edda/${id}`, input);
 
-export const deleteEdda = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/edda/${id}`);
+const hubDeleteEdda = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/edda/${id}`);
+
+/*
+ * The hub's document API. On the standalone site each is a stub that throws
+ * HubUnavailableError and opens the Bifröst sheet, with no request (PLAN-35).
+ */
+export const listEddas: typeof hubListEddas = __HUB__ ? hubListEddas : hubOnly('listEddas');
+export const listEddasPage: typeof hubListEddasPage = __HUB__
+  ? hubListEddasPage
+  : hubOnly('listEddasPage');
+export const fetchEdda: typeof hubFetchEdda = __HUB__ ? hubFetchEdda : hubOnly('fetchEdda');
+export const saveEdda: typeof hubSaveEdda = __HUB__ ? hubSaveEdda : hubOnly('saveEdda');
+export const updateEdda: typeof hubUpdateEdda = __HUB__ ? hubUpdateEdda : hubOnly('updateEdda');
+export const deleteEdda: typeof hubDeleteEdda = __HUB__ ? hubDeleteEdda : hubOnly('deleteEdda');

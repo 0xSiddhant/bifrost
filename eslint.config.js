@@ -8,13 +8,17 @@ export default tseslint.config(
     // `client/public/pdfjs-wasm/` is pdf.js's own vendored decoders, copied out
     // of node_modules by scripts/copy-pdf-wasm.ts — third-party build output
     // that happens to land outside node_modules, so it is ignored for the same
-    // reason node_modules is.
+    // reason node_modules is. `tools/micromatch-shim/` is micromatch's own
+    // CommonJS, copied verbatim to replace it (its README says why), so it is
+    // third-party code kept as written, not ours to restyle.
     ignores: [
       '**/dist/**',
+      '**/dist-standalone/**',
       '**/node_modules/**',
       'server/drizzle/**',
       'storage/**',
       'client/public/pdfjs-wasm/**',
+      'tools/micromatch-shim/**',
       'e2e/test-results/**',
       'e2e/playwright-report/**',
     ],

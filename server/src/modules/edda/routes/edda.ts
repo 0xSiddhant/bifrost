@@ -19,7 +19,6 @@ import type {
 
 export interface EddaRoutesDeps {
   maxDocKb: number;
-  livePreviewMaxKb: number;
   list: ListEddasUseCase;
   save: SaveEddaUseCase;
   get: GetEddaUseCase;
@@ -114,18 +113,6 @@ const recordSchema = {
   },
 } as const;
 
-const configResponseSchema = {
-  type: 'object',
-  required: ['maxDocKb', 'livePreviewMaxKb'],
-  properties: {
-    maxDocKb: { type: 'integer', description: 'The largest document the server accepts, in KiB' },
-    livePreviewMaxKb: {
-      type: 'integer',
-      description: 'Above this size the editor stops rendering the preview on every keystroke',
-    },
-  },
-} as const;
-
 const listResponseSchema = {
   description: 'Without `paged=true`, the bare array it always was; with it, one page',
   anyOf: [{ type: 'array', items: summarySchema }, documentListPageSchema(summarySchema)],
@@ -179,23 +166,6 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   // and one over Fastify's limit is refused with the usecase's own code.
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
-  // The client reads the doc-size cap + the live-preview threshold, never hardcodes them.
-  app.get(
-    '/api/edda/config',
-    {
-      schema: {
-        tags: TAGS,
-        summary: 'The limits the editor must respect',
-        operationId: 'getEddaConfig',
-        response: { 200: configResponseSchema },
-      },
-    },
-    () => ({
-      maxDocKb: deps.maxDocKb,
-      livePreviewMaxKb: deps.livePreviewMaxKb,
-    }),
-  );
-
   app.get<{ Querystring: ListQuery }>(
     '/api/edda',
     {

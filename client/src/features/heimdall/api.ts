@@ -1,9 +1,4 @@
-import { apiGet, apiSend } from '../../core/api';
-
-export interface AccessConfig {
-  shortcut: string;
-  tapCount: number;
-}
+import { apiGet, apiSend, hubOnly } from '../../core/api';
 
 export interface HeimdallSettings {
   shortcut: string;
@@ -44,45 +39,27 @@ export interface UploadFilesPage {
   items: UploadFileEntry[];
 }
 
-/** Public — the entry gesture needs the current shortcut + tap count. */
-export const fetchAccess = (): Promise<AccessConfig> => apiGet<AccessConfig>('/api/heimdall/access');
-
-export const login = (pin: string): Promise<{ ok: true }> =>
+const hubLogin = (pin: string): Promise<{ ok: true }> =>
   apiSend<{ ok: true }>('POST', '/api/heimdall/login', { pin });
 
-export const logout = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/logout');
+const hubLogout = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/logout');
 
-export const fetchSession = (): Promise<{ ok: true }> => apiGet<{ ok: true }>('/api/heimdall/session');
+const hubFetchSession = (): Promise<{ ok: true }> => apiGet<{ ok: true }>('/api/heimdall/session');
 
-export const revokeSessions = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/revoke');
+const hubRevokeSessions = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/revoke');
 
-export const fetchSettings = (): Promise<HeimdallSettings> =>
+const hubFetchSettings = (): Promise<HeimdallSettings> =>
   apiGet<HeimdallSettings>('/api/heimdall/settings');
 
-export const updateSettings = (
+const hubUpdateSettings = (
   patch: Partial<{ shortcut: string; tapCount: number; defaultThemeId: string | null }>,
 ): Promise<HeimdallSettings> =>
   apiSend<HeimdallSettings>('PATCH', '/api/heimdall/settings', patch);
 
-export const fetchStats = (): Promise<Stats> => apiGet<Stats>('/api/heimdall/stats');
+const hubFetchStats = (): Promise<Stats> => apiGet<Stats>('/api/heimdall/stats');
 
-export const fetchUploads = (): Promise<UploadFilesPage> =>
+const hubFetchUploads = (): Promise<UploadFilesPage> =>
   apiGet<UploadFilesPage>('/api/heimdall/uploads');
-
-export interface ManagedTheme {
-  id: string;
-  name: string;
-  mode: 'dark' | 'light';
-  builtIn: boolean;
-  enabled: boolean;
-}
-
-/** Every theme (incl. disabled ones) with its enable state — for the manager. */
-export const fetchManagedThemes = (): Promise<{ themes: ManagedTheme[] }> =>
-  apiGet<{ themes: ManagedTheme[] }>('/api/themes/manage');
-
-export const setThemeEnabled = (id: string, enabled: boolean): Promise<ManagedTheme> =>
-  apiSend<ManagedTheme>('PATCH', `/api/themes/${id}`, { enabled });
 
 export interface AuditRecord {
   id: number;
@@ -108,14 +85,14 @@ export interface PresenceDevice {
   lastSeen: number;
 }
 
-export const fetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
+const hubFetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
   apiGet<{ devices: PresenceDevice[] }>('/api/presence');
 
 /** Drop devices offline for > 7 days, then return the fresh roster. */
-export const prunePresence = (): Promise<{ removed: number; devices: PresenceDevice[] }> =>
+const hubPrunePresence = (): Promise<{ removed: number; devices: PresenceDevice[] }> =>
   apiSend<{ removed: number; devices: PresenceDevice[] }>('POST', '/api/presence/prune');
 
-export const fetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
+const hubFetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
   const query = new URLSearchParams();
   if (params.event) query.set('event', params.event);
   query.set('limit', String(params.limit ?? 100));
@@ -132,10 +109,28 @@ export interface AboutInfo {
   profile: 'local' | 'cloud';
 }
 
-export const fetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>('/api/heimdall/about');
+const hubFetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>('/api/heimdall/about');
 
-export const fetchChangelog = (): Promise<{ content: string }> =>
+const hubFetchChangelog = (): Promise<{ content: string }> =>
   apiGet<{ content: string }>('/api/heimdall/changelog');
+
+/*
+ * Heimdall's admin API: hub-only. On the standalone site each is a stub with
+ * no request, and the sections that call them are absent there (PLAN-35).
+ */
+export const login: typeof hubLogin = __HUB__ ? hubLogin : hubOnly('login');
+export const logout: typeof hubLogout = __HUB__ ? hubLogout : hubOnly('logout');
+export const fetchSession: typeof hubFetchSession = __HUB__ ? hubFetchSession : hubOnly('fetchSession');
+export const revokeSessions: typeof hubRevokeSessions = __HUB__ ? hubRevokeSessions : hubOnly('revokeSessions');
+export const fetchSettings: typeof hubFetchSettings = __HUB__ ? hubFetchSettings : hubOnly('fetchSettings');
+export const updateSettings: typeof hubUpdateSettings = __HUB__ ? hubUpdateSettings : hubOnly('updateSettings');
+export const fetchStats: typeof hubFetchStats = __HUB__ ? hubFetchStats : hubOnly('fetchStats');
+export const fetchUploads: typeof hubFetchUploads = __HUB__ ? hubFetchUploads : hubOnly('fetchUploads');
+export const fetchPresence: typeof hubFetchPresence = __HUB__ ? hubFetchPresence : hubOnly('fetchPresence');
+export const prunePresence: typeof hubPrunePresence = __HUB__ ? hubPrunePresence : hubOnly('prunePresence');
+export const fetchAudit: typeof hubFetchAudit = __HUB__ ? hubFetchAudit : hubOnly('fetchAudit');
+export const fetchAbout: typeof hubFetchAbout = __HUB__ ? hubFetchAbout : hubOnly('fetchAbout');
+export const fetchChangelog: typeof hubFetchChangelog = __HUB__ ? hubFetchChangelog : hubOnly('fetchChangelog');
 
 // The log viewer, its filters, and the runtime level switch were removed in
 // PLAN-16a: Grafana/Loki is the log UI now, and `LOG_LEVEL` in .env (+ restart)

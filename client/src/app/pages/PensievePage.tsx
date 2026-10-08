@@ -5,7 +5,7 @@ import { copyText } from '../../core/copy';
 import { deviceName, onDevicesChange } from '../../core/devices';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { log } from '../../core/log';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
@@ -68,7 +68,6 @@ function scrollListIntoView(node: HTMLElement | null): void {
 export function PensievePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { capabilities } = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<LibraryPageView | null>(null);
@@ -99,23 +98,12 @@ export function PensievePage() {
     }
   };
 
-  // Capabilities arrive a tick after mount; until then we know of no kinds, so
-  // the first load waits rather than firing a fan-out over an empty registry.
-  //
-  // Keyed on the module list's *contents*, not the capabilities object: `kinds`
-  // is what the load effect and the SSE subscriptions both depend on, so a
-  // fresh-but-equal object would re-fetch and re-subscribe on every render.
-  const moduleKey = capabilities ? capabilities.modules.join(' ') : null;
-  // The "Present" action is gated on Saga's own module, not on the row's kind:
+  // The "Present" action is gated on Saga's own feature, not on the row's kind:
   // an entry carries a `presentRoute` because its documents *can* be presented,
-  // and whether the viewer can is a separate question (PLAN-28). Rows do not
-  // render before capabilities land, so `false` here is never a false negative.
-  const canPresent = capabilities?.modules.includes('saga') ?? false;
-  const kinds = useMemo(() => {
-    if (moduleKey === null) return null;
-    const modules = new Set(moduleKey.split(' '));
-    return availableKinds(LIBRARY_REGISTRY, (module) => modules.has(module));
-  }, [moduleKey]);
+  // and whether the viewer can is a separate question (PLAN-28).
+  const canPresent = hasFeature('saga');
+  // The build's feature list is fixed (PLAN-35), so the kinds never change.
+  const kinds = useMemo(() => availableKinds(LIBRARY_REGISTRY, hasFeature), []);
 
   // The open filter lives in the URL, so a chip is linkable and Back restores
   // the previous one. An unknown or disabled kind reads as All.
@@ -415,7 +403,7 @@ export function PensievePage() {
           </div>
 
           {/* Type chips. One kind means no chips at all — a filter with a single
-              option is decoration. They are absent until capabilities land. */}
+              option is decoration. */}
           {kinds && kinds.length > 1 && (
             <div className="lib-chips" role="group" aria-label="Filter by type">
               <button

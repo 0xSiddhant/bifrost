@@ -57,7 +57,7 @@ export function ThemeSwitcher() {
                 theme.id === state.activeId ? 'theme-menu__item is-active' : 'theme-menu__item'
               }
               onClick={() => {
-                void themeEngine.setTheme(theme.id);
+                themeEngine.setTheme(theme.id);
                 setOpen(false);
               }}
             >

@@ -30,8 +30,6 @@ export interface StartServerOptions {
   profile?: 'local' | 'cloud';
   /** Reuse an existing storage root (a restart, or the API diff's prepared copy). */
   storageRoot?: string;
-  /** Reuse an existing themes folder (paired with `storageRoot` on a restart). */
-  themesDir?: string;
   /** Reuse a port (a restart must come back on the address the browser knows). */
   port?: number;
   /** Extra env on top of production defaults. */
@@ -61,7 +59,6 @@ export interface E2EServer {
   baseUrl: string;
   port: number;
   storageRoot: string;
-  themesDir: string;
   pin: string;
   profile: 'local' | 'cloud';
   /** The active pino file (`current.log` is pino-roll's symlink to it). */
@@ -134,20 +131,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
   } else {
     storageRoot = scratchDir('bifrost-e2e-storage-');
   }
-  // Themes are state too (Heimdall uploads and deletes them), and THEMES_DIR's
-  // default is the repo's own themes/ — a theme journey would edit the checkout.
-  let themesDir = options.themesDir;
-  if (!themesDir) {
-    themesDir = scratchDir('bifrost-e2e-themes-');
-    fs.cpSync(path.join(buildRoot, 'themes'), themesDir, { recursive: true });
-  }
-
   const env = serverEnv({
     NODE_ENV: 'production',
     DEPLOY_PROFILE: profile,
     PORT: String(port),
     STORAGE_ROOT: storageRoot,
-    THEMES_DIR: themesDir,
     HEIMDALL_PIN: E2E_PIN,
     OTEL_ENABLED: 'false',
     // A unique Bonjour name: on the owner's Mac a second `bifrost.local` would
@@ -202,7 +190,6 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     baseUrl,
     port,
     storageRoot,
-    themesDir,
     pin: E2E_PIN,
     profile,
     canary,
@@ -214,7 +201,6 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
       await halt();
       if (!options.keepStorage) {
         if (!options.storageRoot) fs.rmSync(jail ?? storageRoot, { recursive: true, force: true });
-        if (!options.themesDir) fs.rmSync(themesDir, { recursive: true, force: true });
       }
     },
   };

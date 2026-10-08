@@ -8,7 +8,7 @@ import type { ContentFormatEntry } from '../../core/contentFormat/types';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
 import { log } from '../../core/log';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { Toast } from '../../core/ui/Toast';
@@ -77,11 +77,7 @@ interface DecompressResult {
 
 export function BrotliPage() {
   const navigate = useNavigate();
-  const { capabilities } = useCapabilities();
-  const hasModule = useCallback(
-    (module: string) => !capabilities || capabilities.modules.includes(module),
-    [capabilities],
-  );
+  const hasModule = hasFeature;
 
   const [config, setConfig] = useState<BrotliConfig | null>(null);
   const [mode, setMode] = useState<Mode>('compress');

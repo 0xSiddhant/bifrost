@@ -2,18 +2,26 @@ import {
   ApiError,
   apiGet,
   apiSend,
+  hubOnly,
   pagedParams,
   type DocumentListPage,
   type OffsetRequest,
 } from './api';
 
 export interface AtlasConfig {
-  /** Document size cap in KB — from .env via the server, never hardcoded. */
+  /** Document size cap in KB — the server's own .env value, baked in at build time. */
   maxDocKb: number;
 }
 
-export const fetchAtlasConfig = (): Promise<AtlasConfig> =>
-  apiGet<AtlasConfig>('/api/atlas/config');
+/**
+ * The size cap, baked in at build time from the same `.env` key the server
+ * enforces on save (PLAN-35): one number, so the client never allows what the
+ * server refuses. A changed cap needs a client rebuild; the server's boot log
+ * names any drift.
+ */
+export const ATLAS_CONFIG: AtlasConfig = {
+  maxDocKb: __BIFROST_DEFAULTS__.caps.atlasMaxDocKb,
+};
 
 /** A saved document as the Pensieve lists it (no content). */
 export interface AtlasSummary {
@@ -49,13 +57,13 @@ function listParams(query: AtlasListQuery): URLSearchParams {
   return params;
 }
 
-export function listAtlases(query: AtlasListQuery = {}): Promise<AtlasSummary[]> {
+function hubListAtlases(query: AtlasListQuery = {}): Promise<AtlasSummary[]> {
   const qs = listParams(query).toString();
   return apiGet<AtlasSummary[]>(`/api/atlas${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
-export function listAtlasesPage(
+function hubListAtlasesPage(
   query: AtlasListQuery,
   request: OffsetRequest,
 ): Promise<DocumentListPage<AtlasSummary>> {
@@ -69,7 +77,7 @@ export function listAtlasesPage(
  * follows it transparently — compare `doc.slug` to fix the address bar.
  * Returns null on 404 (the creative not-grown page).
  */
-export async function fetchAtlas(slug: string): Promise<AtlasDoc | null> {
+async function hubFetchAtlas(slug: string): Promise<AtlasDoc | null> {
   try {
     return await apiGet<AtlasDoc>(`/api/atlas/${encodeURIComponent(slug)}`);
   } catch (error) {
@@ -78,13 +86,25 @@ export async function fetchAtlas(slug: string): Promise<AtlasDoc | null> {
   }
 }
 
-export const saveAtlas = (input: { name?: string; content: string }): Promise<AtlasDoc> =>
+const hubSaveAtlas = (input: { name?: string; content: string }): Promise<AtlasDoc> =>
   apiSend<AtlasDoc>('POST', '/api/atlas', input);
 
-export const updateAtlas = (
+const hubUpdateAtlas = (
   id: string,
   input: { name?: string; content?: string },
 ): Promise<AtlasDoc> => apiSend<AtlasDoc>('PUT', `/api/atlas/${id}`, input);
 
-export const deleteAtlas = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/atlas/${id}`);
+const hubDeleteAtlas = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/atlas/${id}`);
+
+/*
+ * The hub's document API. On the standalone site each is a stub that throws
+ * HubUnavailableError and opens the Bifröst sheet, with no request (PLAN-35).
+ */
+export const fetchAtlas: typeof hubFetchAtlas = __HUB__ ? hubFetchAtlas : hubOnly('fetchAtlas');
+export const saveAtlas: typeof hubSaveAtlas = __HUB__ ? hubSaveAtlas : hubOnly('saveAtlas');
+export const updateAtlas: typeof hubUpdateAtlas = __HUB__ ? hubUpdateAtlas : hubOnly('updateAtlas');
+export const deleteAtlas: typeof hubDeleteAtlas = __HUB__ ? hubDeleteAtlas : hubOnly('deleteAtlas');
+export const listAtlases: typeof hubListAtlases = __HUB__ ? hubListAtlases : hubOnly('listAtlases');
+export const listAtlasesPage: typeof hubListAtlasesPage = __HUB__
+  ? hubListAtlasesPage
+  : hubOnly('listAtlasesPage');

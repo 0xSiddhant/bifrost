@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type DragEvent,
 } from 'react';
+import { hubNavigate, showBridgeClosed } from '../../core/bridge';
 import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
@@ -25,7 +26,7 @@ import { relicTitle } from '../../core/relicNames';
 import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
-import { ApiError } from '../../core/api';
+import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
@@ -35,10 +36,9 @@ import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchRunestone,
-  fetchRunestoneConfig,
+  RUNESTONE_CONFIG,
   saveRunestone,
   updateRunestone,
-  type RunestoneConfig,
 } from '../../core/runestone';
 import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
@@ -100,31 +100,13 @@ export function RunestonePage() {
   const [view, setView] = useState<'code' | 'tree'>(() =>
     window.innerWidth < 768 ? 'tree' : 'code',
   );
-  const [config, setConfig] = useState<RunestoneConfig | null>(null);
-  const configRequest = useRef<Promise<RunestoneConfig | null> | null>(null);
+  // Baked in at build time (PLAN-35): known before the first render.
+  const config = RUNESTONE_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [restorable, setRestorable] = useState<RunestoneDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const request = fetchRunestoneConfig();
-    // An import picked before this answers must still be checked against the
-    // cap (found by PLAN-32a's e2e net): it awaits this rather than skipping.
-    configRequest.current = request.catch(() => null);
-    request
-      .then((cfg) => {
-        if (!cancelled) setConfig(cfg);
-      })
-      .catch(() => {
-        // cap check degrades gracefully; the server still enforces it on save
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Load (or fail to find) the document a slug URL names.
   useEffect(() => {
@@ -242,7 +224,7 @@ export function RunestonePage() {
     }
   }, [view, valid, debouncedText]);
 
-  const maxBytes = config ? config.maxDocKb * 1024 : null;
+  const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
   const debouncedCursor = useDebounced(cursor, 150);
@@ -279,6 +261,15 @@ export function RunestonePage() {
         ok('Saved');
       }
     } catch (error) {
+      if (isHubClosed(error)) {
+        // The sheet already explains; on the standalone site its "Download
+        // instead" is this editor's own export, the local answer to "save".
+        showBridgeClosed({
+          reason: error instanceof HubUnavailableError ? 'standalone' : 'unreachable',
+          download: exportDocument,
+        });
+        return;
+      }
       fail(
         error instanceof ApiError && error.status === 413
           ? 'The server refused it — over the size limit.'
@@ -337,7 +328,7 @@ export function RunestonePage() {
   // is derived from — a snapshot 300ms old is not what the user is looking at.
   const compressWithBrotli = () => {
     putBrotliSeed({ text, sourceLabel: 'Runestone' });
-    void navigate('/brotli');
+    hubNavigate(navigate, '/brotli');
   };
 
   const clearDocument = () => {
@@ -385,8 +376,7 @@ export function RunestonePage() {
   };
 
   const importText = async (name: string, content: string, sizeBytes: number) => {
-    const loaded = config ?? (await configRequest.current);
-    const maxBytes = loaded ? loaded.maxDocKb * 1024 : null;
+    const maxBytes = config.maxDocKb * 1024;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
@@ -491,7 +481,7 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -529,7 +519,7 @@ export function RunestonePage() {
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+          <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
             Pensieve
           </Button>
         </div>

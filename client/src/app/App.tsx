@@ -1,10 +1,11 @@
 import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
-import { useCapabilities } from '../core/useCapabilities';
+import { hasCategory, needsHubForPath, type FeatureCategory } from '../core/features';
 import { bifrostEvents, type SseStatus } from '../core/sse';
 import { startDeviceRegistry } from '../core/devices';
 import { log } from '../core/log';
-import { fetchScreensaverConfig, type ScreensaverConfig } from '../core/screensaver';
+import type { ScreensaverConfig } from '../core/screensaver';
+import { screensaverSettings } from '../core/settings';
 import {
   fetchOfflineModeConfig,
   enabledTargets,
@@ -20,6 +21,7 @@ import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { RouteBoundary } from '../core/ui/RouteBoundary';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
+import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
 import { GuideButton } from '../core/guide/GuideButton';
 import { usePublishedBanner } from './usePublishedBanner';
 import { runWarmLoad } from './offlineWarmLoad';
@@ -32,13 +34,28 @@ import { DiagonAlleyPage } from './pages/DiagonAlleyPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 /**
+ * Standalone's last route (PLAN-35): a server path the container's fallback
+ * handed to the app (`/go/…`, `/api/…`, `/<kind>/api/…`) or a hub-only page
+ * gets the Bifröst sheet; anything else is the ordinary 404.
+ */
+function StandaloneFallback() {
+  const { pathname } = useLocation();
+  return needsHubForPath(pathname) ? <BridgeClosedPage /> : <NotFoundPage />;
+}
+
+/** A route that shows a saved document needs the hub; the standalone site explains instead. */
+function hubRoute(element: ReactNode): ReactNode {
+  return __HUB__ ? element : <BridgeClosedPage />;
+}
+
+/**
  * Nav is three category tabs (was a flat seven that overflowed the mobile bar).
  * Each tab is a hub page whose tools live as cards there and keep their own
  * routes: Midgard (Send/Receive/Hermes/Join Bifrost), Ollivanders (Runestone/
  * Variant/Edda), Diagon Alley (Nimbus and Portkey, plus the tools that expand
  * in place at /diagon-alley/:toolId rather than owning a route). A tab
- * appears only when at least one of its modules is loaded in the active deploy
- * profile. Heimdall is deliberately absent — it opens via gesture/shortcut only.
+ * appears only when this build ships one of its features (core/features.ts,
+ * PLAN-35). Heimdall is deliberately absent — it opens via gesture/shortcut only.
  */
 interface NavCategory {
   to: string;
@@ -46,8 +63,8 @@ interface NavCategory {
   icon: ReactNode;
   /** Sub-page path prefixes that also light this tab as active. */
   match?: string[];
-  /** Tab shows when any of these modules is available (null = always). */
-  modules: (string | null)[];
+  /** The features that put this tab in the nav. */
+  category: FeatureCategory;
 }
 
 const NAV: NavCategory[] = [
@@ -58,26 +75,25 @@ const NAV: NavCategory[] = [
     // Midgard needed no `match` until PLAN-28: it was the only hub whose tools
     // all lived at their own top-level routes that already start with '/'.
     match: ['/saga'],
-    modules: [null],
+    category: 'midgard',
   },
   {
     to: '/ollivanders',
     label: 'Ollivanders',
     icon: <WandIcon size={18} />,
     match: ['/runestone', '/variant', '/edda', '/groot', '/atlas', '/loki', '/brotli', '/pensieve'],
-    modules: ['runestone', 'variant', 'edda', 'groot', 'atlas', 'loki', 'brotli'],
+    category: 'ollivanders',
   },
   {
     to: '/diagon-alley',
     label: 'Diagon Alley',
     icon: <SparklesIcon size={18} />,
     match: ['/nimbus', '/portkey'],
-    modules: ['qr-tool', 'nimbus', 'portkey'],
+    category: 'diagon-alley',
   },
 ];
 
 export function App() {
-  const { capabilities } = useCapabilities();
   const [heimdallOpen, setHeimdallOpen] = useState(false);
   const { registerTap } = useHeimdallGesture(() => setHeimdallOpen(true));
   usePublishedBanner();
@@ -102,19 +118,17 @@ export function App() {
   useEffect(() => {
     if (!isDesktop) return;
     let cancelled = false;
-    fetchScreensaverConfig()
+    screensaverSettings
+      .load()
       .then((cfg) => {
         if (!cancelled) setScreensaverConfig(cfg);
       })
       .catch(() => {
         // Module absent (older/cloud server) — the saver simply stays disabled.
       });
-    // Heimdall edits broadcast the new policy; rebind live without a reload.
-    const off = bifrostEvents.on('screensaver.settingsUpdated', (payload) => {
-      setScreensaverConfig((prev) =>
-        prev ? { ...prev, ...(payload as Partial<ScreensaverConfig>) } : prev,
-      );
-    });
+    // A Heimdall edit (another device on the hub, another tab standalone)
+    // rebinds live, without a reload.
+    const off = screensaverSettings.subscribe(setScreensaverConfig);
     return () => {
       cancelled = true;
       off();
@@ -128,6 +142,8 @@ export function App() {
   const [warmStatus, setWarmStatus] = useState<WarmLoadStatus>(OFF_STATUS);
 
   useEffect(() => {
+    // A static site has nothing to warm against: the toggle is hub-only.
+    if (!__HUB__) return;
     let cancelled = false;
     fetchOfflineModeConfig()
       .then((cfg) => {
@@ -185,11 +201,7 @@ export function App() {
       setScreensaverActive(true);
     },
   });
-  const nav = NAV.filter((category) =>
-    category.modules.some(
-      (module) => module === null || !capabilities || capabilities.modules.includes(module),
-    ),
-  );
+  const nav = NAV.filter((entry) => hasCategory(entry.category));
   // Page-scoped, not a global control (PLAN-22): only the two hubs whose pages
   // compute locally offer it — Ollivanders, and Diagon Alley with or without an
   // open tool.
@@ -317,7 +329,7 @@ export function App() {
               {/* pre-rename URLs (shipped as "library", then "mimir") */}
               <Route path="/runestone/library" element={<Navigate to="/pensieve?type=runestone" replace />} />
               <Route path="/runestone/mimir" element={<Navigate to="/pensieve?type=runestone" replace />} />
-              <Route path="/runestone/:slug" element={<pages.RunestonePage />} />
+              <Route path="/runestone/:slug" element={hubRoute(<pages.RunestonePage />)} />
               <Route path="/variant" element={<pages.VariantPage />} />
               {/* literal segments beat the :slug param — declared first */}
               <Route path="/edda" element={<pages.EddaPage />} />
@@ -325,16 +337,16 @@ export function App() {
               {/* pre-rename URL (development-only "library") */}
               <Route path="/edda/library" element={<Navigate to="/pensieve?type=edda" replace />} />
               <Route path="/edda/preview/:slug" element={<pages.EddaPreviewPage />} />
-              <Route path="/edda/:slug" element={<pages.EddaPage />} />
+              <Route path="/edda/:slug" element={hubRoute(<pages.EddaPage />)} />
               {/* literal segments beat the :slug param — declared first */}
               <Route path="/groot" element={<pages.GrootPage />} />
               <Route path="/groot/pensieve" element={<Navigate to="/pensieve?type=groot" replace />} />
               <Route path="/groot/library" element={<Navigate to="/pensieve?type=groot" replace />} />
-              <Route path="/groot/:slug" element={<pages.GrootPage />} />
+              <Route path="/groot/:slug" element={hubRoute(<pages.GrootPage />)} />
               <Route path="/atlas" element={<pages.AtlasPage />} />
               <Route path="/atlas/pensieve" element={<Navigate to="/pensieve?type=atlas" replace />} />
               <Route path="/atlas/library" element={<Navigate to="/pensieve?type=atlas" replace />} />
-              <Route path="/atlas/:slug" element={<pages.AtlasPage />} />
+              <Route path="/atlas/:slug" element={hubRoute(<pages.AtlasPage />)} />
               <Route path="/loki" element={<pages.LokiPage />} />
               <Route path="/brotli" element={<pages.BrotliPage />} />
               <Route path="/wardens" element={<pages.WardensPage />} />
@@ -346,10 +358,10 @@ export function App() {
                   or `?source=` for the terminal hand-off) or a saved edda.
                   One component serves both, as EddaPage already does. */}
               <Route path="/saga" element={<pages.SagaPage />} />
-              <Route path="/saga/:slug" element={<pages.SagaPage />} />
+              <Route path="/saga/:slug" element={hubRoute(<pages.SagaPage />)} />
               <Route path="/nimbus" element={<pages.NimbusPage />} />
               <Route path="/portkey" element={<pages.PortkeyPage />} />
-              <Route path="*" element={<NotFoundPage />} />
+              <Route path="*" element={__HUB__ ? <NotFoundPage /> : <StandaloneFallback />} />
             </Routes>
           </Suspense>
         </RouteBoundary>
@@ -358,6 +370,8 @@ export function App() {
       {/* Outside <Routes> on purpose: a notification raised on one page must
           survive navigating to another, so it cannot live inside the router. */}
       <NotificationHost />
+      {/* One sheet for every "needs the hub" moment, in either build (PLAN-35). */}
+      <BridgeClosedHost />
 
       {/* Heimdall is a modal overlay, not a route — no URL, nothing to probe.
           Opened by the gesture/shortcut only (≥768px). */}
@@ -383,8 +397,14 @@ export function App() {
           bifrost.local
         </span>
         <span className="caption">
-          profile: {capabilities?.profile ?? '—'} · v0.1.0 ·{' '}
-          <span className={`sse-dot sse-${sseStatus}`} /> {sseStatus}
+          build: {__BIFROST_BUILD__} · v0.1.0
+          {/* The standalone site holds no live connection to report on. */}
+          {__HUB__ && (
+            <>
+              {' · '}
+              <span className={`sse-dot sse-${sseStatus}`} /> {sseStatus}
+            </>
+          )}
         </span>
       </footer>
     </div>

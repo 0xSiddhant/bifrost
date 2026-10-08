@@ -10,8 +10,8 @@ declare global {
 
 const mocks = vi.hoisted(() => ({ modules: [] as string[] }));
 
-vi.mock('../../core/useCapabilities', () => ({
-  useCapabilities: () => ({ capabilities: { profile: 'local', modules: mocks.modules }, error: null }),
+vi.mock('../../core/features', () => ({
+  hasFeature: (id: string) => mocks.modules.includes(id),
 }));
 
 // The join card reads the server URL; it is not what this test is about.
@@ -39,7 +39,7 @@ function doors(): string[] {
 }
 
 describe('MidgardPage', () => {
-  it('shows every door the local profile serves', () => {
+  it('shows every door the hub build ships', () => {
     mocks.modules = ['file-transfer', 'clipboard', 'accio', 'saga'];
     act(() =>
       root.render(
@@ -51,9 +51,9 @@ describe('MidgardPage', () => {
     expect(doors()).toEqual(['/upload', '/downloads', '/hermes', '/accio', '/saga']);
   });
 
-  // Found by PLAN-32a's cloud project: these three carried no module gate, so a
-  // cloud server showed doors into pages whose APIs answer 404.
-  it('hides Send, Receive and Hermes when their modules are not loaded (the cloud profile)', () => {
+  // PLAN-32a's cloud project found these three carried no gate; since PLAN-35
+  // the gate is the build's own feature list, and standalone keeps only Saga.
+  it('keeps only Saga when the build ships none of the transfer doors (standalone)', () => {
     mocks.modules = ['saga', 'runestone'];
     act(() =>
       root.render(

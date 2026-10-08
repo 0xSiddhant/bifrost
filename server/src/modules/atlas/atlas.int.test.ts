@@ -22,10 +22,11 @@ describe('atlas module', () => {
 
   const inject = (opts: InjectOptions) => app.fastify.inject(opts);
 
-  it('exposes the doc-size cap', async () => {
+  // PLAN-35: the cap is baked into the client from the same .env key at build
+  // time, so the server no longer answers a config read. It still enforces it.
+  it('no longer serves /api/atlas/config', async () => {
     const response = await inject({ method: 'GET', url: '/api/atlas/config' });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ maxDocKb: 1 });
+    expect(response.statusCode).toBe(404);
   });
 
   it('full lifecycle: save → list → fetch by slug → rename (301 old slug) → delete', async () => {

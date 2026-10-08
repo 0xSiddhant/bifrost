@@ -31,7 +31,7 @@ Save as `~/Library/LaunchAgents/local.bifrost.plist`, replacing the two
     <string>__REPO__/server/dist/bootstrap.js</string>
   </array>
 
-  <!-- Run from the repo so .env, storage/, and themes/ resolve. -->
+  <!-- Run from the repo so .env and storage/ resolve. -->
   <key>WorkingDirectory</key>
   <string>__REPO__</string>
 

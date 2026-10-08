@@ -26,7 +26,6 @@ export interface Seeds {
   clipboard: string;
   accio: string;
   portkey: string;
-  theme: string;
 }
 
 interface DownloadEntry {
@@ -119,7 +118,6 @@ export async function seedAll(client: Client, sinkBaseUrl: string): Promise<Seed
     clipboard,
     accio,
     portkey,
-    theme: 'aurora',
   };
 }
 
@@ -135,7 +133,6 @@ export function readPath(op: Operation, seeds: Seeds): string {
       return op.template.endsWith('/archive') ? seeds.downloadFolder : seeds.downloadFile;
     }
     if (op.template.startsWith('/api/files/')) return seeds.upload;
-    if (op.template.startsWith('/api/themes/')) return seeds.theme;
     if (op.template.startsWith('/api/clipboard/')) return seeds.clipboard;
     if (op.template.startsWith('/api/accio/')) return seeds.accio;
     if (op.template.startsWith('/api/portkey/') || op.template.startsWith('/go/'))

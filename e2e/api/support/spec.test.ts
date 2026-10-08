@@ -4,8 +4,8 @@ import { Spec, loadSpec } from './spec.js';
 describe('Spec', () => {
   const spec = new Spec({
     paths: {
-      '/api/themes/{id}': { get: { operationId: 'getTheme', responses: { 200: {} } } },
-      '/api/themes/manage': {
+      '/api/things/{id}': { get: { operationId: 'getTheme', responses: { 200: {} } } },
+      '/api/things/manage': {
         get: {
           operationId: 'listManaged',
           security: [{ adminSession: [] }],
@@ -35,9 +35,9 @@ describe('Spec', () => {
   });
 
   it('prefers a literal segment over a parameter, and resolves HEAD to GET', () => {
-    expect(spec.find('GET', '/api/themes/manage')?.operationId).toBe('listManaged');
-    expect(spec.find('HEAD', '/api/themes/aurora')?.operationId).toBe('getTheme');
-    expect(spec.find('GET', '/api/themes/a/b')).toBeUndefined();
+    expect(spec.find('GET', '/api/things/manage')?.operationId).toBe('listManaged');
+    expect(spec.find('HEAD', '/api/things/aurora')?.operationId).toBe('getTheme');
+    expect(spec.find('GET', '/api/things/a/b')).toBeUndefined();
     expect(spec.byId('listManaged').admin).toBe(true);
   });
 
@@ -55,9 +55,9 @@ describe('Spec', () => {
     expect(spec.isSuccess(spec.byId('getX'), 302)).toBe(false);
   });
 
-  it('loads the committed openapi.json: 95 operations, each with a unique id', () => {
+  it('loads the committed openapi.json: 85 operations, each with a unique id', () => {
     const real = loadSpec();
-    expect(real.operations).toHaveLength(95);
-    expect(new Set(real.operations.map((op) => op.operationId)).size).toBe(95);
+    expect(real.operations).toHaveLength(85);
+    expect(new Set(real.operations.map((op) => op.operationId)).size).toBe(85);
   });
 });

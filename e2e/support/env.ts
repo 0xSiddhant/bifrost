@@ -8,7 +8,7 @@ import { fromRepoRoot } from './paths.js';
  * The server calls `dotenv.config()` on the repo-root `.env` at boot, and dotenv
  * never overrides a key that is already set. So an e2e server spawned on a
  * developer's machine would otherwise inherit that machine's real `.env`: its
- * rate limits, its session secret, its log level, its THEMES_DIR. Setting every
+ * rate limits, its session secret, its log level, its editor caps. Setting every
  * known key to the empty string pins it, and `loadConfig` reads an empty value
  * as unset, so the server falls back to the built-in production default — the
  * same values CI sees, wherever the suite runs.

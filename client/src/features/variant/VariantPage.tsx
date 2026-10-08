@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { copyText } from '../../core/copy';
 import { log } from '../../core/log';
 import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
@@ -94,7 +94,6 @@ const emptyPane = (label: string): PaneState => ({
 });
 
 export function VariantPage() {
-  const { capabilities } = useCapabilities();
   const font = usePanelFont();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -566,8 +565,7 @@ export function VariantPage() {
     setResults(null);
   };
 
-  const canPickFromLibrary =
-    !capabilities || capabilities.modules.includes('runestone');
+  const canPickFromLibrary = hasFeature('runestone');
 
   const empty = left.text.trim() === '' && right.text.trim() === '';
 

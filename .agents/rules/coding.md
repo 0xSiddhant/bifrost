@@ -6,6 +6,13 @@
 - Usecases import repository/service **interfaces**, never Drizzle, `fs`, chokidar, or fetch directly.
 - Client `features/` mirror the same rule: no cross-feature imports; shared code goes in `client/src/core`.
 
+## Two client builds (PLAN-35)
+
+- **A new client feature declares itself in `client/src/core/features.ts`**, with its route roots and `needsHub`. Gate UI on `hasFeature(id)`, never on the server's capabilities. `needsHub: false` means it works with no Bifrost server at all, and the standalone build ships it.
+- **Every client call to the server is hub-only.** Write it as `export const x: typeof hubX = __HUB__ ? hubX : hubOnly('x')` (or go through `apiGet`/`apiSend`, which already are), and a hub-only lazy page as an inline `__HUB__ ? page(() => import(…)) : BridgeClosedPage`. `npm run build:standalone` fails if a server path survives in the bundle.
+- A server action that fails offers the sheet (`showBridgeClosed`), with `download` when there is a local copy to offer. A hand-off to a hub-only page uses `hubNavigate`.
+- Settings a standalone visitor can change go through `core/settings/` (`SettingsStore`), with a rule per field in `rules.ts` and cases in `rules.cases.json` that the server's overlay test runs too.
+
 ## Routing (reserved roots)
 
 - There is one list of the app's own top-level URL path roots: `server/src/core/reserved-roots.ts` (server prefixes + every client route root + `api`/`go`). **Whenever you add a new top-level route** — a server route outside `/api/`, or a first-segment client route in `App.tsx` (`/foo`, a new hub, a feature page) — **add its root to `RESERVED_ROOTS` in the same change**, and to the assertion list in `reserved-roots.test.ts`. Portkey go-link slugs are validated against this list, so a missing entry lets a user create `/go/<name>` that shadows a real page; the guard test only checks the roots it already knows, it cannot discover new ones for you.
@@ -48,12 +55,12 @@
 - Vitest. Every usecase gets unit tests (repos mocked via interfaces). Routes tested with `fastify.inject`.
 - Every plan's acceptance criteria get at least one automated test where feasible; manual steps go in the PR description.
 - A "kill test" (SIGINT mid-operation, restart, assert no corruption) is required for any plan touching storage.
-- **A new client page ships with a journey** in `e2e/browser/` that declares its route with `routes('/the/path')` (written literally). `routes.spec.ts` reads `App.tsx` as text and fails CI for any route no journey names (PLAN-32a).
-- `npm run test:e2e` must stay green after `npm run build`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped; the pin comes out in the PR that fixes it. See `docs/testing.md`.
+- **A new client page ships with a journey** in `e2e/browser/` that declares its route with `routes('/the/path')` (written literally). `routes.spec.ts` reads `App.tsx` as text and fails CI for any route no journey names (PLAN-32a). A `needsHub: false` feature also needs a journey in `e2e/standalone/` naming its root, because `routes.spec.ts` checks `features.ts` per build (PLAN-35).
+- `npm run test:e2e` must stay green after `npm run build` and `npm run build:standalone`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped; the pin comes out in the PR that fixes it. See `docs/testing.md`.
 
 ## Frontend
 
 - Design tokens/themes only via CSS custom properties — never hardcode colors in components.
-- Hub/portal cards get their color from the **10-slot card palette** (`--card-1..10`, class `.card-tone-N`). Colour follows **position, per page**: build the grid from an ordered array and render with `cardToneClass(index + 1)` (`core/ui/cardTone.ts`, wraps after 10). Never hand-pick a card color, write a literal `card-tone-N` string, or pass a fixed number — derive from the render index so reordering recolours. Each theme defines its own 10 hues in `themes/*.json`.
+- Hub/portal cards get their color from the **10-slot card palette** (`--card-1..10`, class `.card-tone-N`). Colour follows **position, per page**: build the grid from an ordered array and render with `cardToneClass(index + 1)` (`core/ui/cardTone.ts`, wraps after 10). Never hand-pick a card color, write a literal `card-tone-N` string, or pass a fixed number — derive from the render index so reordering recolours. Each theme defines its own 10 hues in `client/src/assets/themes/*.json`.
 - Responsive-first: layouts verified at 375px, 768px, 1280px.
-- No `localStorage` for critical state; server is the source of truth. Allowed non-critical class (per decision log): theme-choice cache, `deviceId`, relic-collection prefs, draft buffers.
+- No `localStorage` for critical state; server is the source of truth. Allowed non-critical class (per decision log): theme-choice cache, `deviceId`, relic-collection prefs, draft buffers, and the standalone site's own settings under `bifrost.local.*` (PLAN-35: one browser's preferences with nothing to sync to, read only through `LocalSettingsStore`, which validates every field).

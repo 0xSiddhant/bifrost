@@ -6,8 +6,11 @@ import { Button } from './Button';
 import { EmptyState } from './EmptyState';
 import { WifiOffIcon } from './icons';
 
-/** Cheap, exists in both deploy profiles, and says nothing but "I am here". */
-const HEALTH_URL = '/api/health';
+/**
+ * Cheap, and says nothing but "I am here". The standalone site has no server
+ * to ask, so it asks for its own shell: the chunks come from the same place.
+ */
+const HEALTH_URL = __HUB__ ? '/api/health' : '/index.html';
 /** A vanished host never refuses, so the probe needs its own patience limit. */
 const PROBE_TIMEOUT_MS = 3_000;
 /** How often to ask again while the panel is up and the bridge is down. */

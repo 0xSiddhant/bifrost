@@ -80,9 +80,13 @@ function LoginView({ onUnlock }: { onUnlock: () => void }) {
  * starts on the PIN view; any close (scrim, Esc, Lock) ends the session, and a
  * page refresh naturally re-locks it — no ambient admin access survives a close
  * or a reload.
+ *
+ * Standalone (PLAN-35): no server to check a PIN against, and a PIN checked in
+ * the browser is theatre, so the modal opens straight to the device-local
+ * sections and says plainly that they live in this browser.
  */
 export function HeimdallModal({ onClose }: { onClose: () => void }) {
-  const [auth, setAuth] = useState<AuthState>('pin');
+  const [auth, setAuth] = useState<AuthState>(__HUB__ ? 'pin' : 'open');
   const [activeId, setActiveId] = useState<string>(FIRST_SECTION?.id ?? '');
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<string | null>(null);
@@ -99,7 +103,7 @@ export function HeimdallModal({ onClose }: { onClose: () => void }) {
   // Any close ends the admin session, so reopening (or a refresh) requires the
   // PIN again — no ambient admin access lingers.
   const close = useCallback(() => {
-    void logout().catch(() => {});
+    if (__HUB__) void logout().catch(() => {});
     onClose();
   }, [onClose]);
 
@@ -262,11 +266,14 @@ export function HeimdallModal({ onClose }: { onClose: () => void }) {
                 <div className="heimdall-content__titles">
                   <h2>{active?.label}</h2>
                   <p className="caption">{active?.blurb}</p>
+                  {!__HUB__ && (
+                    <p className="caption heimdall-local-note">These settings live in this browser.</p>
+                  )}
                 </div>
                 <div className="heimdall-content__actions">
                   {/* Every close ends the session; Lock is the explicit affordance. */}
                   <Button variant="ghost" size="sm" onClick={close}>
-                    Lock
+                    {__HUB__ ? 'Lock' : 'Close'}
                   </Button>
                 </div>
               </header>

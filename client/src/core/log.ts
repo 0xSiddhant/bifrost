@@ -48,7 +48,7 @@ export interface ClientLogFields {
   stack?: string;
 }
 
-interface QueuedEntry {
+export interface QueuedEntry {
   level: ClientLogLevel;
   msg: string;
   module?: string;
@@ -57,15 +57,19 @@ interface QueuedEntry {
   ts: number;
 }
 
-interface Transport {
+/**
+ * Where reported lines go (PLAN-35). The hub build posts them to the server;
+ * the standalone site has no server of its own to post to, so its lines go
+ * nowhere. A later log service for that site is one more sink here.
+ */
+export interface LogSink {
   send: (entries: QueuedEntry[]) => Promise<void>;
-  now: () => number;
-  route: () => string;
-  schedule: (fn: () => void, ms: number) => number;
-  cancel: (handle: number) => void;
+  /** The floor and batch size, when the sink has somewhere to ask. */
+  config: () => Promise<unknown>;
 }
 
-const defaultTransport: Transport = {
+/** The hub's `/api/client-logs`, as since PLAN-16a. */
+export const httpSink: LogSink = {
   send: async (entries) => {
     const response = await fetch(INGEST_URL, {
       method: 'POST',
@@ -76,6 +80,31 @@ const defaultTransport: Transport = {
     });
     if (!response.ok) throw new Error(`client-logs responded ${response.status}`);
   },
+  config: async () => {
+    const response = await fetch(CONFIG_URL, { headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`client-logs config responded ${response.status}`);
+    return response.json();
+  },
+};
+
+/** The standalone site's: accepted and dropped, with no request ever made. */
+export const noopSink: LogSink = {
+  send: async () => undefined,
+  config: async () => ({}),
+};
+
+const sink: LogSink = __HUB__ ? httpSink : noopSink;
+
+interface Transport {
+  send: (entries: QueuedEntry[]) => Promise<void>;
+  now: () => number;
+  route: () => string;
+  schedule: (fn: () => void, ms: number) => number;
+  cancel: (handle: number) => void;
+}
+
+const defaultTransport: Transport = {
+  send: (entries) => sink.send(entries),
   now: () => Date.now(),
   route: () => window.location.pathname,
   schedule: (fn, ms) => window.setTimeout(fn, ms),
@@ -97,7 +126,7 @@ export class ClientLogger {
    * the default floor stands and logging keeps working, because a broken
    * config request is exactly the kind of moment worth having logs for.
    */
-  async configure(fetchConfig: () => Promise<unknown> = defaultFetchConfig): Promise<void> {
+  async configure(fetchConfig: () => Promise<unknown> = sink.config): Promise<void> {
     try {
       const config = (await fetchConfig()) as { level?: unknown; maxBatch?: unknown };
       if (isLevel(config.level)) this.level = config.level;
@@ -172,12 +201,6 @@ export class ClientLogger {
 
 function isLevel(value: unknown): value is ClientLogLevel {
   return typeof value === 'string' && (LEVELS as string[]).includes(value);
-}
-
-async function defaultFetchConfig(): Promise<unknown> {
-  const response = await fetch(CONFIG_URL, { headers: { accept: 'application/json' } });
-  if (!response.ok) throw new Error(`client-logs config responded ${response.status}`);
-  return response.json();
 }
 
 /** The app-wide logger. Client code logs through this, never bare `console.*`. */

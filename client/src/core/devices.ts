@@ -35,7 +35,8 @@ function apply(devices: PresenceDevice[]): void {
 }
 
 export function startDeviceRegistry(): void {
-  if (started) return;
+  // Presence is the hub's view of who is connected; standalone has no hub.
+  if (!__HUB__ || started) return;
   started = true;
   apiGet<{ devices: PresenceDevice[] }>('/api/presence')
     .then((res) => apply(res.devices))

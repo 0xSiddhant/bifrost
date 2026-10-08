@@ -3,7 +3,7 @@ import type { WorkerOptions } from './support/fixtures.js';
 
 /**
  * Playwright is for the UI only (owner's call, PLAN-32a): browser journeys,
- * cloud-profile gating, and the cross-surface journeys whose assertion is what
+ * the standalone site (PLAN-35), and the cross-surface journeys whose assertion is what
  * a browser shows. Everything out-of-process without a browser (the installed
  * CLI, PLAN-33's API suites) runs under Vitest — see vitest.e2e.config.ts.
  *
@@ -21,7 +21,7 @@ const chromiumLaunch = chromiumExecutable
 
 export default defineConfig<object, WorkerOptions>({
   testDir: '.',
-  testMatch: ['browser/**/*.spec.ts', 'cloud/**/*.spec.ts'],
+  testMatch: ['browser/**/*.spec.ts', 'standalone/**/*.spec.ts'],
   // The packed, temp-prefix CLI for the cross-surface journeys.
   globalSetup: './browser/global-setup.ts',
   fullyParallel: true,
@@ -68,9 +68,18 @@ export default defineConfig<object, WorkerOptions>({
       use: { ...devices['iPhone 14'] },
     },
     {
-      name: 'cloud',
-      testMatch: 'cloud/**/*.spec.ts',
-      use: { ...devices['Desktop Chrome'], profile: 'cloud', ...chromiumLaunch },
+      // The standalone site (PLAN-35): dist-standalone/ from a static server
+      // with the container's nginx rules, and no Bifrost server at all. The
+      // profile's own cloud-gating check is an API test now
+      // (api/cloud-profile.e2e.ts): a client build no longer asks the server
+      // what to show.
+      name: 'standalone',
+      testMatch: 'standalone/**/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 900 },
+        ...chromiumLaunch,
+      },
     },
   ],
 });

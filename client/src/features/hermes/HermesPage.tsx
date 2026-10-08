@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
 import { ApiError } from '../../core/api';
 import { saveLink } from '../../core/accio';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceName } from '../../core/devices';
 import { Button } from '../../core/ui/Button';
@@ -70,9 +70,8 @@ function firstWebLink(text: string): string | null {
 
 export function HermesPage() {
   const { entries, ready } = useClipboard();
-  const { capabilities } = useCapabilities();
-  // Accio is local-profile only; without it the action simply isn't offered.
-  const hasAccio = capabilities?.modules.includes('accio') ?? false;
+  // Without Accio in the build, the action simply isn't offered.
+  const hasAccio = hasFeature('accio');
   const [accioed, setAccioed] = useState<Record<string, 'done' | 'failed'>>({});
   const [text, setText] = useState('');
   const [isCode, setIsCode] = useState(false);

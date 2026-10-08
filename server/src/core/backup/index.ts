@@ -12,8 +12,10 @@
  *
  *   storage/            (everything except tmp/ and any `exclude`d folders;
  *                        data/app.db is the vacuumed copy)
- *   themes/             (user-added theme JSON — state outside storage/)
  *   .env                (only with includeEnv — secrets stay out by default)
+ *
+ * Archives before PLAN-35 also carried `themes/`. Themes are client code in
+ * git now, so restore skips that folder (and reports how much it skipped).
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,8 +30,6 @@ export interface BackupTargets {
   storageRoot: string;
   /** Absolute path to the live SQLite file (storage/data/app.db). */
   dbFile: string;
-  /** Absolute path to themes/ (must live under base); skipped when absent. */
-  themesDir: string;
   /** Absolute path to .env (only archived when includeEnv is set). */
   envFile: string;
   /** Directory the archive is written to (BACKUP_DIR). */
@@ -65,14 +65,13 @@ export interface CreateBackupResult {
 export interface RestoreOptions {
   /** Archive to extract. */
   archive: string;
-  /** Repo root to extract into (storage/ and themes/ are overwritten). */
+  /** Repo root to extract into (storage/ is overwritten). */
   base: string;
   /**
-   * The configured storage/ and themes/ folders (absolute, under `base`). An
-   * archive may only write inside these, plus `.env` — see assertSafeArchive.
+   * The configured storage/ folder (absolute, under `base`). An archive may
+   * only write inside it, plus `.env` — see assertSafeArchive.
    */
   storageRoot: string;
-  themesDir: string;
   /** Extract even if the server looks live. Never skips the entry check. */
   force?: boolean;
   /** Whether a server is currently running (computed by the caller). */
@@ -141,11 +140,14 @@ function capture(cmd: string, args: string[], cwd: string): string {
  * be able to write to. `unzip` itself already drops absolute paths and `../`,
  * but happily writes any other repo path (scripts/, server/…) and recreates
  * symlinks, which a later entry can write through. So every entry must be:
- * not a symlink, relative with no `..`, and inside the configured storage or
- * themes folder, or be `.env` exactly.
+ * not a symlink, relative with no `..`, and inside the configured storage
+ * folder, or be `.env` exactly, or sit under a pre-PLAN-35 archive's
+ * `themes/` (accepted here, never extracted).
+ *
+ * Returns how many `themes/` entries the archive carries, for the skip.
  */
-function assertSafeArchive(options: RestoreOptions): void {
-  const allowed = [rel(options.base, options.storageRoot), rel(options.base, options.themesDir)];
+function assertSafeArchive(options: RestoreOptions): number {
+  const allowed = [rel(options.base, options.storageRoot), LEGACY_THEMES];
   const names = capture('unzip', ['-Z1', options.archive], options.base).split('\n').filter(Boolean);
   // Long listing, same order as -Z1; entry lines are the ones whose 2nd field
   // is the zip version ("3.0"). The first field is the unix mode ("l…" = link).
@@ -172,7 +174,11 @@ function assertSafeArchive(options: RestoreOptions): void {
     }
     if (problem) throw new Error(`refusing to restore: archive entry "${name}" ${problem}`);
   });
+  return names.filter((name) => name.startsWith(`${LEGACY_THEMES}/`) && !name.endsWith('/')).length;
 }
+
+/** Where pre-PLAN-35 archives kept theme JSON. Restore skips it. */
+const LEGACY_THEMES = 'themes';
 
 function run(cmd: string, args: string[], cwd: string): void {
   const result = spawnSync(cmd, args, { cwd, stdio: ['ignore', 'ignore', 'pipe'] });
@@ -216,7 +222,6 @@ export function createBackup(
   //    live db triplet (the WAL/SHM would make an inconsistent copy — replaced
   //    in step 2).
   const entries = [storageRel];
-  if (fs.existsSync(targets.themesDir)) entries.push(rel(targets.base, targets.themesDir));
   run(
     'zip',
     [
@@ -328,14 +333,24 @@ export function resolveBackupArchive(target: string): ResolvedBackup {
   return { archive: newest.archive, metaFile: metaFor(newest.archive), pickedLatest: true };
 }
 
-export function restoreBackup(options: RestoreOptions): void {
+export interface RestoreResult {
+  /**
+   * Theme files an archive from before PLAN-35 carried and restore left out:
+   * themes are client code now, so they come with the build, not the backup.
+   */
+  skippedThemeFiles: number;
+}
+
+export function restoreBackup(options: RestoreOptions): RestoreResult {
   if (!fs.existsSync(options.archive)) throw new Error(`archive not found: ${options.archive}`);
-  assertSafeArchive(options);
+  const skippedThemeFiles = assertSafeArchive(options);
   if (options.live && !options.force) {
     throw new Error(
       'a server appears to be running — refusing to restore over live state. Stop it first, or pass --force.',
     );
   }
   fs.mkdirSync(options.base, { recursive: true });
-  run('unzip', ['-o', '-q', options.archive, '-d', options.base], options.base);
+  const skip = skippedThemeFiles > 0 ? ['-x', `${LEGACY_THEMES}/*`] : [];
+  run('unzip', ['-o', '-q', options.archive, ...skip, '-d', options.base], options.base);
+  return { skippedThemeFiles };
 }

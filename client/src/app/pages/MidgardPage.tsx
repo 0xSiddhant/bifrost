@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { Portal } from '../../core/ui/Portal';
 import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
 import {
@@ -21,7 +21,7 @@ interface Portal {
   title: string;
   description: string;
   go: string;
-  /** Card shows only when this module is loaded (omitted = always). */
+  /** Card shows only when this build ships the feature (omitted = always). */
   module?: string;
 }
 
@@ -72,10 +72,7 @@ const PORTALS: Portal[] = [
 ];
 
 export function MidgardPage() {
-  const { capabilities } = useCapabilities();
-  const portals = PORTALS.filter(
-    (portal) => !portal.module || !capabilities || capabilities.modules.includes(portal.module),
-  );
+  const portals = PORTALS.filter((portal) => !portal.module || hasFeature(portal.module));
 
   return (
     <>
@@ -93,12 +90,16 @@ export function MidgardPage() {
         ))}
       </div>
 
-      <div className="rune-divider" aria-hidden="true">
-        ᛒᛁᚠᚱᛟᛋᛏ
-      </div>
-
-      {/* Not a portal — the wide onboarding band stays its own component. */}
-      <JoinBifrostCard />
+      {/* Not a portal — the wide onboarding band stays its own component. It
+          shows the hub's own URL, so the standalone site has none (PLAN-35). */}
+      {__HUB__ && (
+        <>
+          <div className="rune-divider" aria-hidden="true">
+            ᛒᛁᚠᚱᛟᛋᛏ
+          </div>
+          <JoinBifrostCard />
+        </>
+      )}
     </>
   );
 }

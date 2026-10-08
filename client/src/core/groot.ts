@@ -2,18 +2,26 @@ import {
   ApiError,
   apiGet,
   apiSend,
+  hubOnly,
   pagedParams,
   type DocumentListPage,
   type OffsetRequest,
 } from './api';
 
 export interface GrootConfig {
-  /** Document size cap in KB — from .env via the server, never hardcoded. */
+  /** Document size cap in KB — the server's own .env value, baked in at build time. */
   maxDocKb: number;
 }
 
-export const fetchGrootConfig = (): Promise<GrootConfig> =>
-  apiGet<GrootConfig>('/api/groot/config');
+/**
+ * The size cap, baked in at build time from the same `.env` key the server
+ * enforces on save (PLAN-35): one number, so the client never allows what the
+ * server refuses. A changed cap needs a client rebuild; the server's boot log
+ * names any drift.
+ */
+export const GROOT_CONFIG: GrootConfig = {
+  maxDocKb: __BIFROST_DEFAULTS__.caps.grootMaxDocKb,
+};
 
 /** A saved document as the Pensieve lists it (no content). */
 export interface GrootSummary {
@@ -49,13 +57,13 @@ function listParams(query: GrootListQuery): URLSearchParams {
   return params;
 }
 
-export function listGroots(query: GrootListQuery = {}): Promise<GrootSummary[]> {
+function hubListGroots(query: GrootListQuery = {}): Promise<GrootSummary[]> {
   const qs = listParams(query).toString();
   return apiGet<GrootSummary[]>(`/api/groot${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
-export function listGrootsPage(
+function hubListGrootsPage(
   query: GrootListQuery,
   request: OffsetRequest,
 ): Promise<DocumentListPage<GrootSummary>> {
@@ -69,7 +77,7 @@ export function listGrootsPage(
  * follows it transparently — compare `doc.slug` to fix the address bar.
  * Returns null on 404 (the creative not-grown page).
  */
-export async function fetchGroot(slug: string): Promise<GrootDoc | null> {
+async function hubFetchGroot(slug: string): Promise<GrootDoc | null> {
   try {
     return await apiGet<GrootDoc>(`/api/groot/${encodeURIComponent(slug)}`);
   } catch (error) {
@@ -78,13 +86,25 @@ export async function fetchGroot(slug: string): Promise<GrootDoc | null> {
   }
 }
 
-export const saveGroot = (input: { name?: string; content: string }): Promise<GrootDoc> =>
+const hubSaveGroot = (input: { name?: string; content: string }): Promise<GrootDoc> =>
   apiSend<GrootDoc>('POST', '/api/groot', input);
 
-export const updateGroot = (
+const hubUpdateGroot = (
   id: string,
   input: { name?: string; content?: string },
 ): Promise<GrootDoc> => apiSend<GrootDoc>('PUT', `/api/groot/${id}`, input);
 
-export const deleteGroot = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/groot/${id}`);
+const hubDeleteGroot = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/groot/${id}`);
+
+/*
+ * The hub's document API. On the standalone site each is a stub that throws
+ * HubUnavailableError and opens the Bifröst sheet, with no request (PLAN-35).
+ */
+export const listGroots: typeof hubListGroots = __HUB__ ? hubListGroots : hubOnly('listGroots');
+export const listGrootsPage: typeof hubListGrootsPage = __HUB__
+  ? hubListGrootsPage
+  : hubOnly('listGrootsPage');
+export const fetchGroot: typeof hubFetchGroot = __HUB__ ? hubFetchGroot : hubOnly('fetchGroot');
+export const saveGroot: typeof hubSaveGroot = __HUB__ ? hubSaveGroot : hubOnly('saveGroot');
+export const updateGroot: typeof hubUpdateGroot = __HUB__ ? hubUpdateGroot : hubOnly('updateGroot');
+export const deleteGroot: typeof hubDeleteGroot = __HUB__ ? hubDeleteGroot : hubOnly('deleteGroot');

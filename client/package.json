@@ -8,6 +8,12 @@
     "dev": "vite",
     "prebuild": "tsx ../scripts/copy-pdf-wasm.ts",
     "build": "vite build",
+    "prebuild:standalone": "tsx ../scripts/copy-pdf-wasm.ts",
+    "predev:standalone": "tsx ../scripts/copy-pdf-wasm.ts",
+    "dev:standalone": "vite --mode standalone",
+    "build:standalone": "vite build --mode standalone",
+    "preview:standalone": "vite preview --mode standalone",
+    "postbuild:standalone": "tsx ../scripts/check-standalone.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -47,6 +53,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
+    "ajv": "^8.20.0",
     "jsdom": "^29.1.1",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"

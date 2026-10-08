@@ -1,0 +1,15 @@
+{
+  "name": "micromatch",
+  "version": "4.0.8-bifrost.1",
+  "description": "Bifrost's stand-in for micromatch 4.0.8: the three functions eslint-plugin-boundaries calls, on the same picomatch, without the braces dependency (see README.md)",
+  "license": "MIT",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "picomatch": "^2.3.1"
+  }
+}

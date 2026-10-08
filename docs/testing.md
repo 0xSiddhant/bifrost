@@ -10,7 +10,7 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 | ---------------------------- | --------------------------------------------------------------------- | --------------------------------------- | -------------- | ------------------ |
 | Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, before Build  |
 | API description is current   | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no             | yes, in `npm test` |
-| End-to-end: browser          | `e2e/browser/`, `e2e/cloud/` (Playwright)                             | `npm run test:e2e:ui -w e2e`            | yes            | yes, after Build   |
+| End-to-end: browser          | `e2e/browser/`, `e2e/standalone/` (Playwright)                        | `npm run test:e2e:ui -w e2e`            | yes, both      | yes, after Build   |
 | End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, after Build   |
 | Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, after Build   |
 | All three of the above       |                                                                       | `npm run test:e2e`                      | yes            | yes                |
@@ -70,13 +70,23 @@ Where Playwright's own browser download is unavailable but a Chromium is install
 | `chromium-desktop` | 1280×900                                         | the Mac on the desk                                                                    |
 | `chromium-mobile`  | Pixel 7, 390×844, touch                          | phones, and the layouts below 640/768px                                                |
 | `webkit-mobile`    | iPhone 14                                        | the household's iPads and iPhones are WebKit, and Safari-only bugs have shipped before |
-| `cloud`            | Chromium against a `DEPLOY_PROFILE=cloud` server | the deployment manifest, seen from outside                                             |
+| `standalone`       | Chromium, 1280×900, against `dist-standalone/`   | the standalone site (PLAN-35): no server at all, served with the container's rules     |
+
+### The standalone project (PLAN-35)
+
+`e2e/standalone/` runs against `client/dist-standalone/` (build it first: `npm run build:standalone`), served by `e2e/support/static-server.ts` with the location rules of the committed `docker/nginx-standalone.conf`; `static-server.test.ts` parses that file and fails if the two disagree. No Bifrost server starts.
+
+On top of the usual guard, every context carries a **no-request guard**: the page may ask its own origin only for files of the build (and navigations). Anything else, an `/api/…` call above all, fails the test at teardown, even though the static server would have answered it with the app shell. The hub stubs never touch the network, so the cold-load journey also reads their call counter (`globalThis.__bifrostStubCalls`) and expects zero.
+
+The old `cloud` project is gone: the client's nav comes from its build now, not from asking the server, so the security half of that check is an API test (`e2e/api/cloud-profile.e2e.ts`): a `DEPLOY_PROFILE=cloud` server still refuses every local-only route.
+
+`routes.spec.ts` checks both builds' coverage: every `App.tsx` route has a journey, every feature root in `client/src/core/features.ts` is journeyed by the hub suite, and every `needsHub: false` root by the standalone suite too.
 
 ### Isolation
 
 Each Playwright worker and each Vitest e2e file starts **its own server** on a free port, with:
 
-- a fresh `mkdtemp` storage root and a scratch copy of `themes/` (`THEMES_DIR` defaults to the repo's own folder, which a theme journey would otherwise edit);
+- a fresh `mkdtemp` storage root;
 - every key in `.env.example` and in your own `.env` blanked to its built-in default. The server's dotenv never overrides a set key, so without this a developer's real `.env` would leak into the suite;
 - `NODE_ENV=production`, `OTEL_ENABLED=false`, a fixed test PIN, and a unique `MDNS_NAME` per port, so a run on the host Mac never advertises a second `bifrost.local` on the LAN.
 
@@ -176,7 +186,7 @@ The contract suite found a third: the spec described raw JSON documents as a JSO
 
 | Item                                                                                               | Fate                                                                                               |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `e2e/` browser, cloud and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                           |
+| `e2e/` browser, standalone and CLI suites, and the CI step                                              | **Permanent**: the regression net for every later change                                           |
 | `npm run test:api-diff` and `e2e/api-diff/` (the old-vs-new API diff)                              | **Deleted** in PLAN-34, the last change it guarded                                                 |
 | Contract guard `strict` mode, `openapi.json` and its staleness and coverage tests, `createTestApp` | **Permanent**                                                                                      |
 | `e2e/api/` (the black-box API suite, PLAN-33)                                                      | **Permanent**                                                                                      |

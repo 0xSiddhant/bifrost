@@ -114,14 +114,6 @@ const recordSchema = {
   },
 } as const;
 
-const configResponseSchema = {
-  type: 'object',
-  required: ['maxDocKb'],
-  properties: {
-    maxDocKb: { type: 'integer', description: 'The largest document the server accepts, in KiB' },
-  },
-} as const;
-
 const listResponseSchema = {
   description: 'Without `paged=true`, the bare array it always was; with it, one page',
   anyOf: [{ type: 'array', items: summarySchema }, documentListPageSchema(summarySchema)],
@@ -175,20 +167,6 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   // and one over Fastify's limit is refused with the usecase's own code.
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
-  // The client reads the doc-size cap, never hardcodes it.
-  app.get(
-    '/api/groot/config',
-    {
-      schema: {
-        tags: TAGS,
-        summary: 'The limits the editor must respect',
-        operationId: 'getGrootConfig',
-        response: { 200: configResponseSchema },
-      },
-    },
-    () => ({ maxDocKb: deps.maxDocKb }),
-  );
-
   app.get<{ Querystring: ListQuery }>(
     '/api/groot',
     {

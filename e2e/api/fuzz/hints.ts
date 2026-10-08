@@ -66,7 +66,6 @@ export function hintsFor(context: HintContext): Record<string, Hint> {
     getDownloadArchive: { params: { id: either(seeds.downloadFolder, word) } },
     getUploadContent: { params: { name: either(seeds.upload, word) } },
     getUploadPreviewMeta: { params: { name: either(seeds.upload, word) } },
-    getTheme: { params: { id: either(seeds.theme, word) } },
     followPortkey: { params: { slug: either(seeds.portkey, word) } },
     updatePortkey: { params: { slug: either(seeds.portkey, word) } },
     updateLink: { params: { id: either(seeds.accio, word) } },
