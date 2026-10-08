@@ -25,6 +25,14 @@ export function loadDotenv(): void {
 export const RUN_MODES = ['full', 'api', 'web'] as const;
 export type RunMode = (typeof RUN_MODES)[number];
 
+/**
+ * Who answers for `<MDNS_NAME>.local` (PLAN-39): the web host itself (the
+ * default), a separate native advertiser process (a web host in Docker on the
+ * Mac, whose multicast cannot leave Docker Desktop's VM), or nobody.
+ */
+export const MDNS_ADVERTISERS = ['web', 'host', 'off'] as const;
+export type MdnsAdvertiser = (typeof MDNS_ADVERTISERS)[number];
+
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const;
 
 const schema = z
@@ -38,6 +46,9 @@ const schema = z
     API_HOST: z.string().min(1).default('127.0.0.1'),
     BIFROST_RUN: z.enum(RUN_MODES, { error: 'must be "full", "api" or "web"' }).default('full'),
     WEB_HOST: z.string().min(1).default('0.0.0.0'),
+    MDNS_ADVERTISER: z
+      .enum(MDNS_ADVERTISERS, { error: 'must be "web", "host" or "off"' })
+      .default('web'),
     MDNS_NAME: z
       .string()
       .regex(/^[a-z0-9-]+$/, 'must be a valid hostname label (lowercase letters, digits, dashes)')
@@ -63,6 +74,7 @@ export interface WebConfig {
   /** Where the API it forwards to listens. */
   api: { host: string; port: number };
   runMode: RunMode;
+  mdnsAdvertiser: MdnsAdvertiser;
   mdnsName: string;
   logsDir: string;
   logLevel: (typeof LOG_LEVELS)[number];
@@ -90,6 +102,7 @@ export function loadWebConfig(env: NodeJS.ProcessEnv = process.env): WebConfig {
     host: raw.WEB_HOST,
     api: { host: raw.API_HOST, port: raw.API_PORT ?? raw.PORT + 1 },
     runMode: raw.BIFROST_RUN,
+    mdnsAdvertiser: raw.MDNS_ADVERTISER,
     mdnsName: raw.MDNS_NAME,
     logsDir: path.join(storageRoot, 'logs'),
     logLevel: raw.LOG_LEVEL,

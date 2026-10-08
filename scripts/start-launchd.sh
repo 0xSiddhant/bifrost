@@ -12,6 +12,8 @@ AGENTS="$HOME/Library/LaunchAgents"
 LEGACY_LABEL="local.bifrost"
 API_LABEL="local.bifrost.api"
 WEB_LABEL="local.bifrost.web"
+# PLAN-39: the native advertiser, for a web host in Docker on the Mac.
+MDNS_LABEL="local.bifrost.mdns"
 echo "▶ Bifrost · launchd · $ROOT"
 
 # 1. prerequisites
@@ -51,6 +53,12 @@ case "$MODE" in
   web)  WANT="web" ;;
   *) echo "✖ BIFROST_RUN must be full, api or web (got \"$MODE\")"; exit 1 ;;
 esac
+ADVERTISER="$(env_get MDNS_ADVERTISER web)"
+case "$ADVERTISER" in
+  host) WANT="$WANT mdns" ;;
+  web|off) ;;
+  *) echo "✖ MDNS_ADVERTISER must be web, host or off (got \"$ADVERTISER\")"; exit 1 ;;
+esac
 
 remove_plist() {
   label="$1"; plist="$AGENTS/$label.plist"
@@ -70,6 +78,7 @@ fi
 # Switching modes: drop the services this mode does not run.
 case " $WANT " in *" api "*) ;; *) remove_plist "$API_LABEL" ;; esac
 case " $WANT " in *" web "*) ;; *) remove_plist "$WEB_LABEL" ;; esac
+case " $WANT " in *" mdns "*) ;; *) remove_plist "$MDNS_LABEL" ;; esac
 
 # 6. write one plist per process (node path + repo path filled in for you)
 write_plist() {
@@ -117,9 +126,12 @@ for name in $WANT; do
   if [ "$name" = api ]; then
     write_plist "$API_LABEL" api "$NODE_BIN" --import "$ROOT/server/dist/otel.js" "$ROOT/server/dist/bootstrap.js"
     label="$API_LABEL"
-  else
+  elif [ "$name" = web ]; then
     write_plist "$WEB_LABEL" web "$NODE_BIN" "$ROOT/web/dist/bootstrap.js"
     label="$WEB_LABEL"
+  else
+    write_plist "$MDNS_LABEL" mdns "$NODE_BIN" "$ROOT/web/dist/advertise.js"
+    label="$MDNS_LABEL"
   fi
   launchctl unload "$AGENTS/$label.plist" 2>/dev/null || true
   launchctl load "$AGENTS/$label.plist"
@@ -138,6 +150,10 @@ case "$MODE" in
   web)  echo "  open:    http://$NAME.local:$PORT   (the standalone client; no API in this mode)" ;;
   api)  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)" ;;
 esac
+if [ "$ADVERTISER" = host ]; then
+  echo "  name:    bifrost-mdns answers for $NAME.local here (MDNS_ADVERTISER=host)"
+  echo "  web:     the web host runs in Docker: docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d"
+fi
 echo "  status:  launchctl list | grep bifrost"
 echo "  logs:    npm run logs      # or storage/logs/launchd-*.log"
 echo "  stop:    launchctl unload $AGENTS/local.bifrost.*.plist"

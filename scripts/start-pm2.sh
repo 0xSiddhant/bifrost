@@ -50,13 +50,21 @@ case "$MODE" in
   web)  WANT="bifrost-web" ;;
   *) echo "✖ BIFROST_RUN must be full, api or web (got \"$MODE\")"; exit 1 ;;
 esac
+# PLAN-39: MDNS_ADVERTISER=host adds the native advertiser, for a web host in
+# Docker on the Mac (docs/docker-mac.md).
+ADVERTISER="$(env_get MDNS_ADVERTISER web)"
+case "$ADVERTISER" in
+  host) WANT="$WANT bifrost-mdns" ;;
+  web|off) ;;
+  *) echo "✖ MDNS_ADVERTISER must be web, host or off (got \"$ADVERTISER\")"; exit 1 ;;
+esac
 pm2_drop() { if pm2 describe "$1" >/dev/null 2>&1; then pm2 delete "$1" >/dev/null && echo "✔ removed pm2 app $1"; fi; }
 # Upgrade first: the single app every install before PLAN-36 runs must be gone
 # BEFORE the web host starts, or both would advertise bifrost.local and the
 # old one would hold the port the new API needs.
 pm2_drop bifrost
 # Switching modes: drop the apps this mode does not run.
-for app in bifrost-api bifrost-web; do
+for app in bifrost-api bifrost-web bifrost-mdns; do
   case " $WANT " in *" $app "*) ;; *) pm2_drop "$app" ;; esac
 done
 
@@ -76,6 +84,10 @@ case "$MODE" in
   web)  echo "  open:    http://$NAME.local:$PORT   (the standalone client; no API in this mode)" ;;
   api)  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)" ;;
 esac
+if [ "$ADVERTISER" = host ]; then
+  echo "  name:    bifrost-mdns answers for $NAME.local here (MDNS_ADVERTISER=host)"
+  echo "  web:     the web host runs in Docker: docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d"
+fi
 echo "  logs:    pm2 logs              # or: pm2 logs bifrost-api / bifrost-web"
 echo "  status:  pm2 status"
 echo "  stop:    pm2 stop $WANT"
