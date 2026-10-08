@@ -244,8 +244,8 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 - [x] `.claude/skills/verify/SKILL.md`, `.claude/skills/live-verify/SKILL.md`: both processes, the same URL
 - [x] Docs: `docs/pm2.md`, `docs/launchd.md`, `docs/docker-linux.md`, `docs/observability.md`, `README.md`, `architecture.md` (one process → two, the proxy, `trustProxy`; supersedes the 2026-07-12 one-process decision with a new row), `project-structure.md` (fifth workspace)
 - [ ] Hand-run every row of the "Every way of running Bifrost" table on the owner's Mac (Docker on CI's image build plus a Linux `compose up` if available), with results in `progress.md`
-- [ ] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
-- [ ] Cleanup: the spike stays in the session scratchpad and is never committed; no stray processes, plists or PM2 apps left from testing; the PR lists deletions
+- [x] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] Cleanup: the spike stays in the session scratchpad and is never committed; no stray processes, plists or PM2 apps left from testing; the PR lists deletions
 
 ## Acceptance criteria
 
@@ -274,7 +274,7 @@ PLAN-32's journey 17 ("a warmed page still opens after the server is stopped") i
 - [x] `scripts/start.ts`: signal forwarding and either-child-dies exit (criterion 6); the process set per mode (criterion 17)
 - [x] Mode smoke test (CI, on the build): boot each of `full`, `api`, `web`, plus `WEB_HOST=127.0.0.1`; assert which ports listen, which client is served, that `web` makes no forwarded request, and the mDNS on/off decision (as a unit test of the decision, since CI cannot multicast) (criteria 13–16)
 - [x] e2e: the full net through the web host; login throttle from two forwarded IPs; API stopped → sheet → restart (criteria 2, 4 and 5)
-- [ ] `test:load` before vs after (criterion 7)
+- [x] `test:load` before vs after (criterion 7)
 - [x] `web/src/mdns.test.ts` (the moved suite): publish with `host`, error-handler and guard behaviour, the network-change rebuild (criterion 12)
 - [ ] Integration: the web host advertises only for the `local` profile and unpublishes on shutdown; the API server no longer imports a responder (criteria 10 and 11)
 
