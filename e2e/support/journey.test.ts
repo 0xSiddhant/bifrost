@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { routeTagsInSpec, routes, routesInAppSource } from './journey.js';
+import {
+  featuresInSource,
+  rootIsCovered,
+  routeTagsInSpec,
+  routes,
+  routesInAppSource,
+} from './journey.js';
 
 describe('routesInAppSource', () => {
   it('joins nested relative children onto their parent and keeps self-closing routes flat', () => {
@@ -33,5 +39,36 @@ describe('route tags', () => {
     const spec =
       "test('a', routes('/edda/:slug', \"*\"), fn);\nconst r = routes(\n  '/upload',\n);\nother('/nope');";
     expect(routeTagsInSpec(spec)).toEqual(['/edda/:slug', '*', '/upload']);
+  });
+});
+
+describe('featuresInSource (PLAN-35)', () => {
+  const source = `
+export const FEATURES: readonly Feature[] = [
+  // Midgard
+  { id: 'saga', label: 'Saga', roots: ['/saga'], category: 'midgard', needsHub: false },
+  {
+    id: 'clipboard',
+    label: 'Hermes',
+    roots: ['/hermes', '/muninn'],
+    category: 'midgard',
+    needsHub: true,
+  },
+  { id: 'guide', label: 'Guide', roots: [], category: null, needsHub: false },
+];
+`;
+
+  it('reads each feature, one-line or spread over lines, with its roots and hub need', () => {
+    expect(featuresInSource(source)).toEqual([
+      { id: 'saga', roots: ['/saga'], needsHub: false },
+      { id: 'clipboard', roots: ['/hermes', '/muninn'], needsHub: true },
+      { id: 'guide', roots: [], needsHub: false },
+    ]);
+  });
+
+  it('counts a root covered by itself or a route beneath it, not by a lookalike', () => {
+    expect(rootIsCovered('/edda', ['/edda/:slug'])).toBe(true);
+    expect(rootIsCovered('/edda', ['/edda'])).toBe(true);
+    expect(rootIsCovered('/edda', ['/eddas'])).toBe(false);
   });
 });

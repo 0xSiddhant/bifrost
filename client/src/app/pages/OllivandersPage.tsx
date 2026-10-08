@@ -21,8 +21,7 @@ import {
  * reorder with it — no per-card colour is hardcoded.
  */
 interface Tool {
-  /** Shows when **any** of these modules is loaded. Most tools name one; the
-   *  Pensieve is a shell over several, so it appears if any kind exists. */
+  /** Shows when this build ships **any** of these features (core/features.ts). */
   modules: string[];
   to: string;
   icon: ReactNode;
@@ -65,10 +64,10 @@ const TOOLS: Tool[] = [
     go: 'change the shape',
   },
   {
-    // The one library over every document kind (PLAN-21). It owns no module of
-    // its own — it is a shell over the tools above, so it appears whenever any
-    // of them does, and the registry decides which types it can list.
-    modules: ['runestone', 'edda', 'groot', 'atlas'],
+    // The one library over every document kind (PLAN-21): its own feature,
+    // because it lists what the hub stores, so the standalone site has none
+    // (PLAN-35). The registry decides which types it can list.
+    modules: ['pensieve'],
     to: '/pensieve',
     icon: <BookmarkIcon size={24} />,
     title: 'Pensieve',

@@ -62,3 +62,38 @@ export function routeTagsInSpec(source: string): string[] {
   }
   return found;
 }
+
+export interface DeclaredFeature {
+  id: string;
+  roots: string[];
+  needsHub: boolean;
+}
+
+/**
+ * Every feature `client/src/core/features.ts` declares (PLAN-35), read as
+ * text like `App.tsx`: its id, the URL roots it owns, and whether it needs
+ * the hub. Each `{ id: '…', … }` literal is one feature.
+ */
+export function featuresInSource(source: string): DeclaredFeature[] {
+  const list = /FEATURES:[^=]*=\s*\[([\s\S]*?)\n\];/.exec(source)?.[1] ?? '';
+  return [...list.matchAll(/\{([^{}]*)\}/g)].flatMap((match) => {
+    const body = match[1] ?? '';
+    const id = /\bid:\s*'([^']+)'/.exec(body)?.[1];
+    const roots = /\broots:\s*\[([^\]]*)\]/.exec(body)?.[1];
+    const needsHub = /\bneedsHub:\s*(true|false)/.exec(body)?.[1];
+    if (id === undefined || roots === undefined || needsHub === undefined) return [];
+    return [
+      {
+        id,
+        roots: [...roots.matchAll(/'([^']+)'/g)].map((root) => root[1] ?? ''),
+        needsHub: needsHub === 'true',
+      },
+    ];
+  });
+}
+
+/** A root counts as covered by a journey tagged with it or any route beneath it. */
+export function rootIsCovered(root: string, tags: Iterable<string>): boolean {
+  for (const tag of tags) if (tag === root || tag.startsWith(`${root}/`)) return true;
+  return false;
+}

@@ -11,7 +11,14 @@
  */
 
 export type ViolationKind =
-  'pageerror' | 'console.error' | 'http5xx' | 'requestfailed' | 'external';
+  | 'pageerror'
+  | 'console.error'
+  | 'http5xx'
+  | 'requestfailed'
+  | 'external'
+  // The standalone site asked its own origin for something that is not a
+  // file of the build: a request meant for a hub it does not have (PLAN-35).
+  | 'hubrequest';
 
 export interface Violation {
   kind: ViolationKind;
