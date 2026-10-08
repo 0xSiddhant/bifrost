@@ -45,12 +45,14 @@ Update after every work session: status, branch/PR, notes. Statuses: `not-starte
 | PLAN-36 | Separate ports: web host + API server | in-review | **PR #88** → develop (`feat/plan-36-separate-ports`) | Implemented 2026-10-08. New `web/` workspace (the web host on `PORT`, mDNS, the proxy) in front of the API on loopback `API_PORT`; `BIFROST_RUN`/`WEB_HOST` modes; every run path updated; e2e through the web host. Five proxy defects found by the e2e net and the load runs, each fixed red → green. Owner-manual: the Mac hand-runs. Plan archived to `completed/` |
 | PLAN-37 | API versioning (`/api/v1`) | not-started | — | Drafted 2026-10-04. Gated on PLAN-36. Two PRs: 37a server, 37b clients |
 | PLAN-38 | API docs (Swagger UI on the API server) | not-started | — | Drafted 2026-10-04. Gated on PLAN-37. Single PR |
+| PLAN-39 | Docker per process (images, compose files, Mac web host, CLI fallback) | in-progress | `feat/plan-39-docker-per-process`, stacked on #88 | Drafted 2026-10-08 at the owner's request on #88; built on top of it before PLAN-37 |
 | PLAN-99 | Future backlog                                     | reference-only | —                                             | Never "implemented" wholesale                                                                                                 |
 
 ## Recent activity (newest first)
 
 Recent activity holds the sessions since the latest release tag, one entry per session. Older sessions, and the full detail behind any entry here (test evidence, live-verify runs, deviations), live in [`history.md`](history.md) — the `context-sync` skill moves entries there at each release.
 
+- 2026-10-08 — **PLAN-39 drafted** (`.agents/plans/PLAN-39-docker-per-process.md`) after the owner asked on #88 for separate Dockerfiles and compose files per piece, observability in the same compose project, an unaffected CLI that finds a local hub, and `bifrost.local` with Docker. Owner's answers: build on top of #88 (do not merge it first), the web host only in Docker on the Mac, the CLI fallback yes. A Mac spike is mandated (loopback through `host.docker.internal`, client addresses through Docker Desktop). Implementation follows on `feat/plan-39-docker-per-process`.
 - 2026-10-08 — **PLAN-36 implemented** on `feat/plan-36-separate-ports` (#88), off develop `0daa888` (PLAN-35 merged as #87).
   - **Spike** (scratchpad, never committed): `@fastify/http-proxy` passed SSE (1–2 ms), a 1 GB upload (proxy RSS +11 MB), Range, a chunked zip and a client abort (16 ms); `X-Forwarded-For` is set by hand (reply-from sets none).
   - **Server**: no client serving, `API_HOST:API_PORT`, `trustProxy: 'loopback'`, mDNS moved out (lint-guarded), `core/net.ts`, the full-mode `PORT/healthz` check after 10 s; `healthz` reserved; kill tests in api mode.
