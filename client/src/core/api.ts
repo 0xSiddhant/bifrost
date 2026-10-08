@@ -102,6 +102,17 @@ async function hubFetch(path: string, init: RequestInit, timed: boolean): Promis
  * can show the specific reason — a Portkey 422 says *why* the slug/target was
  * refused, not just "failed". Falls back to a generic message on a non-JSON body.
  */
+/**
+ * PLAN-36: behind the web host, an API that is down arrives as an HTTP 502
+ * with `{ error: 'HUB_UNAVAILABLE' }`, not as a network failure. It means the
+ * same thing (the bridge is closed), so it gets the same sheet and error.
+ */
+function closedOr(path: string, error: ApiError): Error {
+  if (error.code !== 'HUB_UNAVAILABLE') return error;
+  showBridgeClosed({ reason: 'unreachable' });
+  return new HubUnreachableError(path, error);
+}
+
 async function toApiError(method: string, path: string, response: Response): Promise<ApiError> {
   const fallback = `${method} ${path} failed with ${response.status}`;
   try {
@@ -148,7 +159,7 @@ async function hubGet<T>(path: string, options: ApiGetOptions = {}): Promise<T> 
     timed,
   );
   if (!response.ok) {
-    throw await toApiError('GET', path, response);
+    throw closedOr(path, await toApiError('GET', path, response));
   }
   return (await response.json()) as T;
 }
@@ -171,7 +182,7 @@ async function hubSend<T>(method: string, path: string, body?: unknown): Promise
     false,
   );
   if (!response.ok) {
-    throw await toApiError(method, path, response);
+    throw closedOr(path, await toApiError(method, path, response));
   }
   const text = await response.text();
   return (text ? JSON.parse(text) : null) as T;
