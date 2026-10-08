@@ -160,6 +160,8 @@ to.
 | `npm run setup`                                                | Creates storage folders, verifies `.env`, runs DB migrations                                                                                                                         |
 | `npm run dev`                                                  | Dev mode with hot reload (server + client)                                                                                                                                           |
 | `npm run build`                                                | Production build (client + server), then re-installs the global `bifrost` CLI                                                                                                        |
+| `npm run build:standalone`                                     | The standalone site into `client/dist-standalone/`; fails if the bundle can reach a server (PLAN-35)                                                                                 |
+| `npm run dev:standalone` · `npm run preview:standalone`        | Run the standalone site locally: Vite dev with hot reload, or build then serve the real output ([`docs/standalone.md`](docs/standalone.md))                                          |
 | `npm start`                                                    | Re-installs the global `bifrost` CLI, then runs the production build                                                                                                                 |
 | `npm run logs`                                                 | Pretty-tail the JSON log file                                                                                                                                                        |
 | `npm run db:studio` (or `cd server && npx drizzle-kit studio`) | Opens [Drizzle Studio](https://local.drizzle.studio) to browse/edit the SQLite data                                                                                                  |
@@ -193,7 +195,7 @@ Operating & deploying:
 - [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
 - [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy + Prometheus + Tempo stack
 - [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
-- [`docs/standalone.md`](docs/standalone.md) — the standalone site: the browser-only tools, as a static container behind your reverse proxy
+- [`docs/standalone.md`](docs/standalone.md) — the standalone site: the browser-only tools, run locally (`npm run dev:standalone` / `preview:standalone`) or as a static container behind your reverse proxy
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
 - [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops

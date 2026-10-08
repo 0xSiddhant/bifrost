@@ -19,6 +19,19 @@ Anything that needs the hub explains itself instead of failing: a link or button
 
 Heimdall opens by the same shortcut and taps as on the hub, with **no PIN**: there is no server to check one against, and a PIN checked in the browser would protect nothing. Its sections (theme, the shortcut and taps, Sky Relics, Loki's run policy, the screensaver, About) are stored in this browser's `localStorage` under `bifrost.local.*`, and say so.
 
+## Run it locally
+
+No Docker needed to try it or work on it:
+
+```bash
+npm run dev:standalone       # Vite dev server in standalone mode, hot reload: http://localhost:5173
+npm run preview:standalone   # build dist-standalone/, then serve exactly that: http://localhost:4173
+```
+
+Neither starts a Bifrost server, and none is needed: the standalone build has no proxy and no request path to one, so anything hub-only shows "The Bifröst is closed", exactly as the deployed site does. Running `npm run dev` (the hub) at the same time is fine; Vite moves to the next free port.
+
+`preview:standalone` serves the real build output, so it is the one to check before deploying. It falls back to the app for any unknown path, a little more loosely than the container's nginx (which 404s a missing `/assets/` file); the e2e `standalone` project serves the build with the container's exact rules (`e2e/support/static-server.ts`). The baked defaults come from your root `.env`, as they do for every build.
+
 ## Run it in Docker
 
 The site is a container: static files behind `nginx-unprivileged`, running as a non-root user on port 8080, read-only, with every capability dropped. Its nginx has no `proxy_pass` anywhere, so not even the web server can reach a backend.
