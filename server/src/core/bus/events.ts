@@ -249,7 +249,7 @@ export interface Portkey {
 
 /** One finished HTTP request, as the core HTTP layer saw it (PLAN-16b). */
 export interface RequestCompletedEvent {
-  /** The Fastify route TEMPLATE (`/api/downloads/:id/content`), or 'unmatched'. */
+  /** The Fastify route TEMPLATE (`/api/v1/downloads/:id/content`), or 'unmatched'. */
   route: string;
   method: string;
   statusCode: number;
@@ -270,6 +270,12 @@ export interface BifrostEventMap {
    * whole app is doing", and it keeps prom-client out of core.
    */
   'http.requestCompleted': RequestCompletedEvent;
+  /**
+   * A request that arrived on a legacy, unversioned API path and was answered
+   * by its v1 route (PLAN-37). Counted per route template, so the owner can see
+   * when nothing still calls the old paths before removing them.
+   */
+  'http.legacyApiRequest': { route: string; method: string };
   'download.added': DownloadEntry;
   'download.changed': DownloadEntry;
   'download.removed': DownloadEntry;

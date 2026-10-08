@@ -23,7 +23,7 @@ export function registerAboutRoutes(app: FastifyInstance, deps: AboutRoutesDeps)
   const guard = { preHandler: app.requireAdmin };
 
   app.get(
-    '/api/heimdall/about',
+    '/api/v1/heimdall/about',
     {
       ...guard,
       schema: {
@@ -67,7 +67,7 @@ export function registerAboutRoutes(app: FastifyInstance, deps: AboutRoutesDeps)
   );
 
   app.get(
-    '/api/heimdall/changelog',
+    '/api/v1/heimdall/changelog',
     {
       ...guard,
       schema: {

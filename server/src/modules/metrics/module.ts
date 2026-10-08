@@ -125,12 +125,17 @@ export const metricsModule: FeatureModule = {
       );
     });
 
+    const unlegacy = bus.on('http.legacyApiRequest', (event) => {
+      registry.recordLegacyRequest(event.route);
+    });
+
     app.addHook('onClose', () => {
       clearInterval(snapshotTimer);
       clearInterval(diskTimer);
       loopLag.disable();
       unsubscribe();
       unobserve();
+      unlegacy();
     });
 
     log.info(

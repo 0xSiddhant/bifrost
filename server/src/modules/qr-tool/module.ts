@@ -28,7 +28,7 @@ export const qrToolModule: FeatureModule = {
   name: 'qr-tool',
   register(app, deps) {
     app.get(
-      '/api/qr/server-url',
+      '/api/v1/qr/server-url',
       {
         schema: {
           tags: ['qr-tool'],

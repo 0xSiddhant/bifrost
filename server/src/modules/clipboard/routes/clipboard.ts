@@ -49,7 +49,7 @@ const TAGS = ['clipboard'];
 
 export function registerClipboardRoutes(app: FastifyInstance, deps: ClipboardRoutesDeps): void {
   app.get(
-    '/api/clipboard',
+    '/api/v1/clipboard',
     {
       schema: {
         tags: TAGS,
@@ -62,7 +62,7 @@ export function registerClipboardRoutes(app: FastifyInstance, deps: ClipboardRou
   );
 
   app.post<{ Body: { text: string; kind?: string; lang?: string; ttlSeconds?: number } }>(
-    '/api/clipboard',
+    '/api/v1/clipboard',
     {
       schema: {
         tags: TAGS,
@@ -80,7 +80,7 @@ export function registerClipboardRoutes(app: FastifyInstance, deps: ClipboardRou
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/clipboard/:id',
+    '/api/v1/clipboard/:id',
     {
       schema: {
         tags: TAGS,

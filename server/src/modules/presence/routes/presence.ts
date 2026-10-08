@@ -45,7 +45,7 @@ const TAGS = ['presence'];
 
 export function registerPresenceRoutes(app: FastifyInstance, deps: PresenceRoutesDeps): void {
   app.get(
-    '/api/presence',
+    '/api/v1/presence',
     {
       schema: {
         tags: TAGS,
@@ -62,7 +62,7 @@ export function registerPresenceRoutes(app: FastifyInstance, deps: PresenceRoute
   // On-demand prune of devices offline for > 7 days — the Wardens surfaces call
   // this on open. Device activity elsewhere is preserved (no cascade).
   app.post(
-    '/api/presence/prune',
+    '/api/v1/presence/prune',
     {
       schema: {
         tags: TAGS,
@@ -82,7 +82,7 @@ export function registerPresenceRoutes(app: FastifyInstance, deps: PresenceRoute
   );
 
   app.patch<{ Body: { deviceId: string; name?: string | null } }>(
-    '/api/presence/name',
+    '/api/v1/presence/name',
     {
       schema: {
         tags: TAGS,

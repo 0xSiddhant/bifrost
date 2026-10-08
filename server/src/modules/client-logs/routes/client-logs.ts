@@ -68,9 +68,9 @@ export function registerClientLogRoutes(app: FastifyInstance, deps: ClientLogRou
 
   // Public, and read once on boot: the client is a static build that never sees
   // .env, so the floor has to be delivered over the wire. Same shape as
-  // /api/loki/config and /api/screensaver/config.
+  // /api/v1/loki/config and /api/v1/screensaver/config.
   app.get(
-    '/api/client-logs/config',
+    '/api/v1/client-logs/config',
     {
       schema: {
         tags: TAGS,
@@ -95,7 +95,7 @@ export function registerClientLogRoutes(app: FastifyInstance, deps: ClientLogRou
   );
 
   app.post<{ Body: { entries: ClientLogEntry[] } }>(
-    '/api/client-logs',
+    '/api/v1/client-logs',
     {
       // Both bounds matter and they bound different things: bodyLimit stops one
       // enormous request (413 before the body is read), the rate limit stops

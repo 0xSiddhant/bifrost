@@ -61,7 +61,7 @@ describe('groot module', () => {
 
     const stale = await inject({ method: 'GET', url: `/api/groot/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/api/groot/${renamed.slug}`);
+    expect(stale.headers.location).toBe(`/api/v1/groot/${renamed.slug}`);
 
     const remove = await inject({ method: 'DELETE', url: `/api/groot/${created.id}` });
     expect(remove.statusCode).toBe(204);
@@ -97,10 +97,10 @@ describe('groot module', () => {
     });
     const stale = await inject({ method: 'GET', url: `/groot/api/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/groot/api/${rename.json().slug}`);
+    expect(stale.headers.location).toBe(`/groot/api/v1/${rename.json().slug}`);
     // download flag survives the 301
     const staleDl = await inject({ method: 'GET', url: `/groot/api/${created.slug}?download=1` });
-    expect(staleDl.headers.location).toBe(`/groot/api/${rename.json().slug}?download=1`);
+    expect(staleDl.headers.location).toBe(`/groot/api/v1/${rename.json().slug}?download=1`);
 
     const missing = await inject({ method: 'GET', url: '/groot/api/never-was-zz9zz9' });
     expect(missing.statusCode).toBe(404);

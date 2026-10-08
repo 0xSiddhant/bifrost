@@ -111,7 +111,7 @@ export const spike: ProfileDefinition = {
   sampleIntervalMs: 1_000,
   async run(context) {
     let running = true;
-    const probePath = '/api/runestone?paged=true';
+    const probePath = '/api/v1/runestone?paged=true';
     const probing = probe(context.baseUrl, probePath, () => running);
     const probeStart = performance.now();
 

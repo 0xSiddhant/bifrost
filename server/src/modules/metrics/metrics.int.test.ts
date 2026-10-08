@@ -187,7 +187,7 @@ describe('prometheus exposition', () => {
   it('records the request histogram against the route template, not the url', async () => {
     await app.fastify.inject({ method: 'GET', url: '/api/health' });
     const body = (await app.fastify.inject({ method: 'GET', url: '/metrics' })).body;
-    expect(body).toMatch(/bifrost_http_request_duration_seconds_bucket\{[^}]*route="\/api\/health"/);
+    expect(body).toMatch(/bifrost_http_request_duration_seconds_bucket\{[^}]*route="\/api\/v1\/health"/);
     expect(body).toMatch(/bifrost_http_request_duration_seconds_count\{[^}]*method="GET"[^}]*\} [1-9]/);
   });
 
@@ -198,7 +198,7 @@ describe('prometheus exposition', () => {
     await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
     await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     const body = (await app.fastify.inject({ method: 'GET', url: '/metrics' })).body;
-    expect(body).toContain('route="/api/heimdall/access"');
+    expect(body).toContain('route="/api/v1/heimdall/access"');
   });
 
   it('buckets unmatched requests under one label instead of minting series', async () => {

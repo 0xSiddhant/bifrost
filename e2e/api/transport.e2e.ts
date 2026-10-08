@@ -37,14 +37,14 @@ describe('transport', () => {
 
         const saved = await suite
           .client()
-          .post('/api/runestone', { name: 'Streamed', content: '{}' });
+          .post('/api/v1/runestone', { name: 'Streamed', content: '{}' });
         expect(saved.status).toBe(201);
         const frame = /event: runestone\.saved\ndata: .*"name":"Streamed"/;
         await a.waitFor(frame);
         await b.waitFor(frame);
 
         const online = async () =>
-          (await suite.client().get('/api/presence'))
+          (await suite.client().get('/api/v1/presence'))
             .json<{ devices: { deviceId: string; online: boolean }[] }>()
             .devices.filter((device) => device.online)
             .map((device) => device.deviceId);
@@ -88,11 +88,11 @@ describe('transport', () => {
       // The promise in architecture.md: uploads stream to disk, so memory does
       // not grow with the body. 128 MiB of headroom against a 300 MiB body.
       expect(peak - baseline).toBeLessThan(128 * 1024 * 1024);
-      expect((await suite.client().delete('/api/files/big-stream.bin')).status).toBe(204);
+      expect((await suite.client().delete('/api/v1/files/big-stream.bin')).status).toBe(204);
     });
 
     it('a Range download answers 206 with Content-Range, and an unsatisfiable one 416', async () => {
-      const url = `/api/downloads/${seeds.downloadFile}/content`;
+      const url = `/api/v1/downloads/${seeds.downloadFile}/content`;
       const partial = await suite.client().get(url, { headers: { range: 'bytes=2-5' } });
       expect(partial.status).toBe(206);
       expect(partial.headers.get('content-range')).toBe('bytes 2-5/21');
@@ -104,7 +104,7 @@ describe('transport', () => {
     });
 
     it('a folder archive streams a whole zip with no content-length', async () => {
-      const archive = await suite.client().get(`/api/downloads/${seeds.downloadFolder}/archive`);
+      const archive = await suite.client().get(`/api/v1/downloads/${seeds.downloadFolder}/archive`);
       expect(archive.status).toBe(200);
       expect(archive.headers.get('content-type')).toBe('application/zip');
       expect(archive.headers.get('content-length')).toBeNull();
@@ -123,13 +123,13 @@ describe('transport', () => {
       const headers = { 'content-type': 'application/octet-stream' };
       const compressed = await suite
         .client()
-        .post('/api/brotli/compress?quality=balanced', undefined, {
+        .post('/api/v1/brotli/compress?quality=balanced', undefined, {
           body: input,
           headers,
         });
       expect(compressed.status).toBe(200);
       expect(compressed.bytes.length).toBeLessThan(input.length);
-      const restored = await suite.client().post('/api/brotli/decompress', undefined, {
+      const restored = await suite.client().post('/api/v1/brotli/decompress', undefined, {
         body: compressed.bytes,
         headers,
       });

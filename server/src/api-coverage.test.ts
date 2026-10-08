@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import type { RunningApp } from './app.js';
 import type { RouteCatalogEntry } from './core/http/openapi.js';
+import { isReservedRoot } from './core/reserved-roots.js';
 import { createTestApp } from './testing/app.js';
 
 /**
@@ -38,6 +39,26 @@ function problemsOf(route: RouteCatalogEntry): string[] {
   return problems;
 }
 
+/**
+ * Every route is versioned from its first commit (PLAN-37): `/api/v<n>/…`, or a
+ * raw document at `/<kind>/api/v<n>/:slug`. Only these are not, each for a
+ * reason; static files are hidden routes and skipped above.
+ */
+const UNVERSIONED_ALLOWED: Record<string, string> = {
+  'GET /go/:slug': 'a human URL printed on QR codes and typed by hand, not an API',
+  'GET /metrics': 'Prometheus scrapes /metrics at the root by convention, not an API',
+};
+
+const VERSIONED = /^(?:\/api|\/(?:runestone|edda|groot|atlas)\/api)\/v\d+\//;
+
+/** The routes outside a versioned prefix and outside the allowlist. */
+function unversioned(routes: readonly Pick<RouteCatalogEntry, 'method' | 'url'>[]): string[] {
+  return routes
+    .map(keyOf)
+    .filter((key) => !(key in UNVERSIONED_ALLOWED))
+    .filter((key) => !VERSIONED.test(key.slice(key.indexOf(' ') + 1)));
+}
+
 describe('API coverage', () => {
   let app: RunningApp;
   let routes: RouteCatalogEntry[];
@@ -58,6 +79,26 @@ describe('API coverage', () => {
       .map((route) => ({ route: keyOf(route), problems: problemsOf(route) }))
       .filter((entry) => entry.problems.length > 0);
     expect(failing).toEqual([]);
+  });
+
+  it('versions every route but the reasoned allowlist', () => {
+    expect(unversioned(routes)).toEqual([]);
+  });
+
+  it('would refuse a route registered outside a version', () => {
+    expect(
+      unversioned([
+        { method: 'GET', url: '/api/fresh' },
+        { method: 'GET', url: '/runestone/api/:slug' },
+        { method: 'GET', url: '/api/v2/fresh' },
+        { method: 'GET', url: '/go/:slug' },
+      ]),
+    ).toEqual(['GET /api/fresh', 'GET /runestone/api/:slug']);
+  });
+
+  it('reserves every first path segment a route uses (Portkey slugs cannot shadow one)', () => {
+    const roots = new Set(routes.map((route) => route.url.split('/')[1] ?? ''));
+    expect([...roots].filter((root) => !isReservedRoot(root))).toEqual([]);
   });
 
   it('gives every operation a unique operationId', () => {

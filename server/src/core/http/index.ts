@@ -4,6 +4,7 @@ import type { ContractCheckMode } from '../config/index.js';
 import type { Logger } from '../logger/index.js';
 import { registerContractCheck } from './contract.js';
 import { registerOpenApi } from './openapi.js';
+import { registerLegacyPathMarker, rewriteLegacyUrl } from './versioning.js';
 
 /**
  * Domain errors carry their HTTP status; everything else becomes an opaque
@@ -66,7 +67,12 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
     // where the web host is: a LAN device cannot reach the loopback-bound API
     // to forge one, and a forged one sent to the web host is overwritten there.
     trustProxy: 'loopback',
+    // PLAN-37: every API is versioned (`/api/v1/…`). The paths from before
+    // versions are rewritten to their v1 route here, before routing, so one
+    // route serves both: one rate-limit bucket, one guard, one contract check.
+    rewriteUrl: rewriteLegacyUrl,
   }) as unknown as FastifyInstance;
+  registerLegacyPathMarker(app, options.bus);
 
   // Both before auth and every module: swagger's route collector and the
   // contract guard's hooks only see routes registered after them (PLAN-32).
@@ -79,7 +85,7 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
   if (options.bus) {
     const bus = options.bus;
     app.addHook('onResponse', (request, reply, done) => {
-      // The route TEMPLATE, never the concrete url — `/api/downloads/:id` is
+      // The route TEMPLATE, never the concrete url — `/api/v1/downloads/:id` is
       // one series, while the raw path would mint one per file id and turn a
       // histogram into a cardinality problem. Unmatched requests (404s, static
       // assets) share a single bucket for the same reason.

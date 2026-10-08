@@ -195,7 +195,7 @@ export async function createApp(
   }
 
   fastify.get(
-    '/api/capabilities',
+    '/api/v1/capabilities',
     {
       schema: {
         tags: ['core'],

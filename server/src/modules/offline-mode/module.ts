@@ -11,9 +11,9 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * that compute locally — so this module owns only the *policy*: which of the
  * warmable pages an admin has left enabled.
  *
- * Same shape as the screensaver module: a public `GET /api/offline-mode/config`
+ * Same shape as the screensaver module: a public `GET /api/v1/offline-mode/config`
  * the client reads to decide what to warm, an admin
- * `PATCH /api/offline-mode/settings`, and an `offlineMode.settingsUpdated`
+ * `PATCH /api/v1/offline-mode/settings`, and an `offlineMode.settingsUpdated`
  * broadcast so open tabs rebind without a reload. The registry itself is
  * code-owned (pages come and go through code changes, not admin typing); only
  * the disabled ids are stored, as one comma-separated `settings` row — the same
@@ -97,7 +97,7 @@ export const offlineModeModule: FeatureModule = {
     // Public: the client reads this on load (and via SSE) to know which targets
     // its toggle should warm. Read-only, carries no secrets.
     app.get(
-      '/api/offline-mode/config',
+      '/api/v1/offline-mode/config',
       {
         schema: {
           tags: TAGS,
@@ -120,7 +120,7 @@ export const offlineModeModule: FeatureModule = {
     };
 
     app.patch<{ Body: { id: string; enabled: boolean } }>(
-      '/api/offline-mode/settings',
+      '/api/v1/offline-mode/settings',
       {
         preHandler: app.requireAdmin,
         schema: {

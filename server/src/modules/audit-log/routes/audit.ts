@@ -19,7 +19,7 @@ const querySchema = {
 } as const;
 
 export function registerAuditRoutes(app: FastifyInstance, deps: AuditRoutesDeps): void {
-  // Session-guarded (core/auth). Lives under /api/heimdall but the audit-log
+  // Session-guarded (core/auth). Lives under /api/v1/heimdall but the audit-log
   // module owns it — delete the module and only this endpoint disappears.
   app.get<{
     Querystring: {
@@ -30,7 +30,7 @@ export function registerAuditRoutes(app: FastifyInstance, deps: AuditRoutesDeps)
       offset?: number;
     };
   }>(
-    '/api/heimdall/audit',
+    '/api/v1/heimdall/audit',
     {
       preHandler: app.requireAdmin,
       schema: {

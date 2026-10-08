@@ -25,7 +25,7 @@ npm run test:load -- --profile fanout          # 200 SSE listeners, 4 × 1 GB st
 
 **Scenarios** (in `load`, `stress` and `spike`):
 
-- **Read:** `/api/health`, `/api/capabilities`, each document kind's legacy and paged list, a document by slug, a raw document, the Accio and Portkey paged lists, and `/go/:slug` redirects (not followed, and each one counts a hit).
+- **Read:** `/api/v1/health`, `/api/v1/capabilities`, each document kind's legacy and paged list, a document by slug, a raw document, the Accio and Portkey paged lists, and `/go/:slug` redirects (not followed, and each one counts a hit).
 - **Write:** create → update → delete triples for a runestone, an Accio link and a go-link. Every body and slug is unique, so writes never collide on a 409, and each triple leaves the database the size it found it.
 - **Mixed:** 80% reads and 20% writes (36 reads drawn across the read scenarios and three write triples per cycle).
 

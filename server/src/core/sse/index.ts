@@ -1,4 +1,4 @@
-import type { ServerResponse } from 'node:http';
+import type { OutgoingHttpHeaders, ServerResponse } from 'node:http';
 import type { FastifyInstance } from 'fastify';
 import { rawBody } from '../http/schemas.js';
 import type { Logger } from '../logger/index.js';
@@ -39,7 +39,7 @@ const eventsRouteSchema = {
 };
 
 /**
- * Single SSE endpoint for the whole app (`GET /api/events`). Modules never
+ * Single SSE endpoint for the whole app (`GET /api/v1/events`). Modules never
  * touch this directly — they emit on the event bus and wiring code decides
  * what gets broadcast. The hub also knows every open connection, which the
  * presence module (PLAN-06) reads to build the live-device list.
@@ -50,10 +50,13 @@ export class SseHub {
   private heartbeat: NodeJS.Timeout | null = null;
 
   register(app: FastifyInstance, log: Logger): void {
-    app.get('/api/events', { schema: eventsRouteSchema }, (request, reply) => {
+    app.get('/api/v1/events', { schema: eventsRouteSchema }, (request, reply) => {
       reply.hijack();
       const res = reply.raw;
       res.writeHead(200, {
+        // What the hooks set before the hijack, which would otherwise be lost:
+        // the legacy path's Deprecation and successor-version link (PLAN-37).
+        ...(reply.getHeaders() as OutgoingHttpHeaders),
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
         connection: 'keep-alive',

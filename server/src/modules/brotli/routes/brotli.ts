@@ -54,7 +54,7 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
 
   /** Limits live in .env, so the page reads them instead of hardcoding a menu. */
   app.get(
-    '/api/brotli/config',
+    '/api/v1/brotli/config',
     {
       schema: {
         tags: TAGS,
@@ -83,7 +83,7 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
   );
 
   app.post<{ Querystring: { quality?: BrotliQualityName } }>(
-    '/api/brotli/compress',
+    '/api/v1/brotli/compress',
     {
       schema: {
         tags: TAGS,
@@ -120,7 +120,7 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
   );
 
   app.post(
-    '/api/brotli/decompress',
+    '/api/v1/brotli/decompress',
     {
       schema: {
         tags: TAGS,

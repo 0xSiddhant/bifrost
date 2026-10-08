@@ -12,7 +12,7 @@ import type { ProfileDefinition } from './types.js';
 const MB = 2 ** 20;
 const EVENTS = 20;
 
-/** One `/api/events` stream held open, with the arrival time of every saved document's event. */
+/** One `/api/v1/events` stream held open, with the arrival time of every saved document's event. */
 interface Listener {
   arrivals: Map<string, number>;
   connected: Promise<void>;
@@ -24,9 +24,9 @@ function listen(baseUrl: string, deviceId: string): Listener {
   let buffer = '';
   let request: http.ClientRequest;
   const connected = new Promise<void>((resolve, reject) => {
-    request = http.get(`${baseUrl}/api/events?deviceId=${deviceId}`, (response) => {
+    request = http.get(`${baseUrl}/api/v1/events?deviceId=${deviceId}`, (response) => {
       if (response.statusCode !== 200) {
-        reject(new Error(`/api/events → ${response.statusCode}`));
+        reject(new Error(`/api/v1/events → ${response.statusCode}`));
         return;
       }
       response.setEncoding('utf8');
@@ -160,7 +160,7 @@ export const fanout: ProfileDefinition = {
       for (let index = 0; index < EVENTS; index += 1) {
         const name = `fanout-${Date.now().toString(36)}-${index}`;
         sent.set(name, performance.now());
-        await api.post('/api/runestone', { name, content: '{"fanout":true}' });
+        await api.post('/api/v1/runestone', { name, content: '{"fanout":true}' });
       }
       const deadline = Date.now() + 15_000;
       while (
@@ -248,10 +248,10 @@ export const fanout: ProfileDefinition = {
         );
       }
 
-      for (const name of names) await api.post(`/api/files/${encodeURIComponent(name)}/publish`);
+      for (const name of names) await api.post(`/api/v1/files/${encodeURIComponent(name)}/publish`);
       let ids: string[] = [];
       for (let tries = 0; tries < 120 && ids.length < names.length; tries += 1) {
-        const listing = (await api.get('/api/downloads')).json<{ id: string; name: string }[]>();
+        const listing = (await api.get('/api/v1/downloads')).json<{ id: string; name: string }[]>();
         ids = listing.filter((entry) => names.includes(entry.name)).map((entry) => entry.id);
         if (ids.length < names.length) await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -264,8 +264,10 @@ export const fanout: ProfileDefinition = {
           ids.map(async (id, index) => {
             const [parts, seconds] = await timed(() =>
               Promise.all([
-                drain(`${baseUrl}/api/downloads/${id}/content`, { range: `bytes=0-${half - 1}` }),
-                drain(`${baseUrl}/api/downloads/${id}/content`, { range: `bytes=${half}-` }),
+                drain(`${baseUrl}/api/v1/downloads/${id}/content`, {
+                  range: `bytes=0-${half - 1}`,
+                }),
+                drain(`${baseUrl}/api/v1/downloads/${id}/content`, { range: `bytes=${half}-` }),
               ]),
             );
             const bytes = parts.reduce((total, part) => total + part.bytes, 0);
@@ -290,7 +292,7 @@ export const fanout: ProfileDefinition = {
       const folder = context.seeds.downloadFolderIds[0];
       if (folder) {
         const [archive, seconds] = await timed(() =>
-          drain(`${baseUrl}/api/downloads/${folder}/archive`),
+          drain(`${baseUrl}/api/v1/downloads/${folder}/archive`),
         );
         const ok = archive.status === 200 && archive.bytes > 0;
         if (!ok) failures.push(`fanout: folder archive → ${archive.status}`);
@@ -312,7 +314,7 @@ export const fanout: ProfileDefinition = {
     }
 
     // ── Brotli ─────────────────────────────────────────────────────────────
-    const config = (await api.get('/api/brotli/config')).json<{ maxInputMb: number }>();
+    const config = (await api.get('/api/v1/brotli/config')).json<{ maxInputMb: number }>();
     const input = brotliInput(config.maxInputMb * MB);
     context.log(`  brotli: a ${config.maxInputMb} MB round trip`);
     const post = (path: string, body: Buffer) =>
@@ -322,10 +324,10 @@ export const fanout: ProfileDefinition = {
         expect: [200],
       });
     const [compressed, compressSeconds] = await timed(() =>
-      post('/api/brotli/compress?quality=balanced', input),
+      post('/api/v1/brotli/compress?quality=balanced', input),
     );
     const [restored, decompressSeconds] = await timed(() =>
-      post('/api/brotli/decompress', compressed.bytes),
+      post('/api/v1/brotli/decompress', compressed.bytes),
     );
     const same =
       crypto.createHash('sha256').update(restored.bytes).digest('hex') ===

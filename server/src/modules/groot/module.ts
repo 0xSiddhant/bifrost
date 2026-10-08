@@ -14,12 +14,12 @@ import {
  * workspace beside Runestone (JSON) and Edda (Markdown). Its own `groot_docs`
  * table and CRUD, plus `groot.saved`/`groot.deleted` on the bus so open
  * Pensieves live-update and audit-log records activity, and the raw
- * `/groot/api/:slug` data URL.
+ * `/groot/api/v1/:slug` data URL.
  *
  * **The server never parses YAML.** It stores text and enforces the byte cap,
  * which is Edda's contract rather than Runestone's: alias expansion is a
  * billion-laughs amplifier, so the size cap does not bound a parse, and
- * `/groot/api/:slug` promises "the bytes that were saved" — the same promise
+ * `/groot/api/v1/:slug` promises "the bytes that were saved" — the same promise
  * Edda's markdown endpoint makes — not "valid YAML". Every parse in this
  * feature happens in the browser, under `maxAliasCount`.
  */

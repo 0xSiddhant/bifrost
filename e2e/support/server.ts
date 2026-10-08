@@ -113,7 +113,7 @@ export async function waitForHealth(
   isAlive: () => boolean,
   output: () => string,
   timeoutMs = 60_000,
-  healthPath = '/api/health',
+  healthPath = '/api/v1/health',
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {

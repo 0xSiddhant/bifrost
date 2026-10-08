@@ -61,7 +61,7 @@ describe('runestone module', () => {
     // stale-name slug with a valid id → 301 to the canonical slug
     const stale = await inject({ method: 'GET', url: `/api/runestone/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/api/runestone/${renamed.slug}`);
+    expect(stale.headers.location).toBe(`/api/v1/runestone/${renamed.slug}`);
 
     const remove = await inject({ method: 'DELETE', url: `/api/runestone/${created.id}` });
     expect(remove.statusCode).toBe(204);
@@ -92,7 +92,7 @@ describe('runestone module', () => {
     });
     const stale = await inject({ method: 'GET', url: `/runestone/api/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/runestone/api/${rename.json().slug}`);
+    expect(stale.headers.location).toBe(`/runestone/api/v1/${rename.json().slug}`);
 
     const missing = await inject({ method: 'GET', url: '/runestone/api/never-was-zz9zz9' });
     expect(missing.statusCode).toBe(404);

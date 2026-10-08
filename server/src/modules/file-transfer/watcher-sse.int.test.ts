@@ -67,7 +67,7 @@ describe('downloads watcher → bus → sse', () => {
       { timeout: 10_000, interval: 200 },
     );
 
-    const listing = await app.inject({ method: 'GET', url: '/api/downloads' });
+    const listing = await app.inject({ method: 'GET', url: '/api/v1/downloads' });
     expect(listing.json()).toHaveLength(1);
   }, 15_000);
 
@@ -98,7 +98,7 @@ describe('downloads watcher → bus → sse', () => {
       { timeout: 10_000, interval: 200 },
     );
 
-    const listing = await app.inject({ method: 'GET', url: '/api/downloads' });
+    const listing = await app.inject({ method: 'GET', url: '/api/v1/downloads' });
     expect(listing.json()).toEqual([]);
   }, 15_000);
 
@@ -114,7 +114,7 @@ describe('downloads watcher → bus → sse', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/api/files/moved.txt/publish',
+      url: '/api/v1/files/moved.txt/publish',
       headers: { 'x-bifrost-device': 'device-a' },
     });
     expect(res.statusCode).toBe(200);
@@ -142,7 +142,7 @@ describe('downloads watcher → bus → sse', () => {
     fs.writeFileSync(path.join(storageRoot, 'uploads', 'anon.txt'), 'staged');
     broadcast.mockClear();
 
-    await app.inject({ method: 'POST', url: '/api/files/anon.txt/publish' });
+    await app.inject({ method: 'POST', url: '/api/v1/files/anon.txt/publish' });
 
     // Null, not omitted: the client filter must tell "unknown sender" from
     // "me", and show the banner in the first case.

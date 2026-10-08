@@ -172,7 +172,7 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   app.get<{ Querystring: ListQuery }>(
-    '/api/atlas',
+    '/api/v1/atlas',
     {
       schema: {
         tags: TAGS,
@@ -192,7 +192,7 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   );
 
   app.post<{ Body: { name?: string; content: string } }>(
-    '/api/atlas',
+    '/api/v1/atlas',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -216,12 +216,12 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   );
 
   // Public read-only raw endpoint, the runestone/edda/groot pattern: the stored
-  // bytes at /atlas/api/:slug, outside /api/ so a saved document doubles as a
+  // bytes at /atlas/api/v1/:slug, outside /api/ so a saved document doubles as a
   // stable data URL. Registered routes win over the SPA fallback, so only this
   // exact shape escapes the client app. CORS is wide open: it serves nothing but
   // the document the URL names. `?download=1` → attachment.
   app.get<{ Params: { slug: string }; Querystring: { download?: string } }>(
-    '/atlas/api/:slug',
+    '/atlas/api/v1/:slug',
     {
       schema: {
         tags: TAGS,
@@ -247,7 +247,7 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
       reply.header('access-control-allow-origin', '*');
       if (!canonical) {
         const suffix = request.query.download ? '?download=1' : '';
-        return reply.redirect(`/atlas/api/${encodeURIComponent(record.slug)}${suffix}`, 301);
+        return reply.redirect(`/atlas/api/v1/${encodeURIComponent(record.slug)}${suffix}`, 301);
       }
       if (request.query.download) {
         reply.header(
@@ -266,7 +266,7 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   // :slug resolves saved docs; a stale-name slug with a valid id 301s to the
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
-    '/api/atlas/:slug',
+    '/api/v1/atlas/:slug',
     {
       schema: {
         tags: TAGS,
@@ -283,14 +283,14 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       if (!canonical) {
-        return reply.redirect(`/api/atlas/${encodeURIComponent(record.slug)}`, 301);
+        return reply.redirect(`/api/v1/atlas/${encodeURIComponent(record.slug)}`, 301);
       }
       return record;
     },
   );
 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
-    '/api/atlas/:id',
+    '/api/v1/atlas/:id',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -313,7 +313,7 @@ export function registerAtlasRoutes(app: FastifyInstance, deps: AtlasRoutesDeps)
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/atlas/:id',
+    '/api/v1/atlas/:id',
     {
       schema: {
         tags: TAGS,

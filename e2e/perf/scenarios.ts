@@ -48,21 +48,21 @@ const getOne = (paths: () => string, expect = [200]): Step => ({
 
 export function readScenarios(seeds: Seeded): Scenario[] {
   const reads: Scenario[] = [
-    { name: 'read: health', steps: [get('/api/health')] },
-    { name: 'read: capabilities', steps: [get('/api/capabilities')] },
+    { name: 'read: health', steps: [get('/api/v1/health')] },
+    { name: 'read: capabilities', steps: [get('/api/v1/capabilities')] },
   ];
   for (const kind of DOCUMENT_KINDS) {
     const slugs = seeds.slugs[kind];
     reads.push(
-      { name: `read: ${kind} list (legacy)`, steps: [get(`/api/${kind}`)] },
-      { name: `read: ${kind} list (paged)`, steps: [get(`/api/${kind}?paged=true`)] },
-      { name: `read: ${kind} by slug`, steps: [getOne(() => `/api/${kind}/${pick(slugs)}`)] },
-      { name: `read: ${kind} raw`, steps: [getOne(() => `/${kind}/api/${pick(slugs)}`)] },
+      { name: `read: ${kind} list (legacy)`, steps: [get(`/api/v1/${kind}`)] },
+      { name: `read: ${kind} list (paged)`, steps: [get(`/api/v1/${kind}?paged=true`)] },
+      { name: `read: ${kind} by slug`, steps: [getOne(() => `/api/v1/${kind}/${pick(slugs)}`)] },
+      { name: `read: ${kind} raw`, steps: [getOne(() => `/${kind}/api/v1/${pick(slugs)}`)] },
     );
   }
   reads.push(
-    { name: 'read: accio list (paged)', steps: [get('/api/accio?paged=true')] },
-    { name: 'read: portkey list (paged)', steps: [get('/api/portkey?paged=true')] },
+    { name: 'read: accio list (paged)', steps: [get('/api/v1/accio?paged=true')] },
+    { name: 'read: portkey list (paged)', steps: [get('/api/v1/portkey?paged=true')] },
     // Not followed: the redirect is the response. Each one also counts a hit.
     {
       name: 'read: go-link redirect',
@@ -80,18 +80,22 @@ export function documentWrite(): Step[] {
   return [
     {
       method: 'POST',
-      path: () => '/api/runestone',
+      path: () => '/api/v1/runestone',
       body: () => ({ name: unique('load-write'), content: documentOf('runestone', 2048, counter) }),
       expect: [201],
       capture: captureId,
     },
     {
       method: 'PUT',
-      path: (context) => `/api/runestone/${String(context.id)}`,
+      path: (context) => `/api/v1/runestone/${String(context.id)}`,
       body: () => ({ content: documentOf('runestone', 2048, counter + 1) }),
       expect: [200],
     },
-    { method: 'DELETE', path: (context) => `/api/runestone/${String(context.id)}`, expect: [204] },
+    {
+      method: 'DELETE',
+      path: (context) => `/api/v1/runestone/${String(context.id)}`,
+      expect: [204],
+    },
   ];
 }
 
@@ -99,7 +103,7 @@ export function accioWrite(): Step[] {
   return [
     {
       method: 'POST',
-      path: () => '/api/accio',
+      path: () => '/api/v1/accio',
       // Titled and on a loopback discard port: nothing to fetch, nowhere to go.
       body: () => ({
         url: `http://127.0.0.1:9/${unique('load')}`,
@@ -111,11 +115,11 @@ export function accioWrite(): Step[] {
     },
     {
       method: 'PATCH',
-      path: (context) => `/api/accio/${String(context.id)}`,
+      path: (context) => `/api/v1/accio/${String(context.id)}`,
       body: () => ({ title: 'Load write, retitled' }),
       expect: [200],
     },
-    { method: 'DELETE', path: (context) => `/api/accio/${String(context.id)}`, expect: [204] },
+    { method: 'DELETE', path: (context) => `/api/v1/accio/${String(context.id)}`, expect: [204] },
   ];
 }
 
@@ -123,7 +127,7 @@ export function portkeyWrite(): Step[] {
   return [
     {
       method: 'POST',
-      path: () => '/api/portkey',
+      path: () => '/api/v1/portkey',
       body: (context) => {
         context.slug = unique('load-go');
         return { slug: context.slug, url: 'http://127.0.0.1:9/target' };
@@ -132,11 +136,15 @@ export function portkeyWrite(): Step[] {
     },
     {
       method: 'PATCH',
-      path: (context) => `/api/portkey/${String(context.slug)}`,
+      path: (context) => `/api/v1/portkey/${String(context.slug)}`,
       body: () => ({ note: 'load write' }),
       expect: [200],
     },
-    { method: 'DELETE', path: (context) => `/api/portkey/${String(context.slug)}`, expect: [204] },
+    {
+      method: 'DELETE',
+      path: (context) => `/api/v1/portkey/${String(context.slug)}`,
+      expect: [204],
+    },
   ];
 }
 

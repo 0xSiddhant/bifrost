@@ -81,7 +81,7 @@ export class Api {
 
   /** Open an admin session; later calls carry its cookie. */
   async login(pin: string): Promise<this> {
-    const response = await this.post('/api/heimdall/login', { pin });
+    const response = await this.post('/api/v1/heimdall/login', { pin });
     const setCookie = response.headers.getSetCookie();
     this.cookie = setCookie.map((line) => line.split(';')[0]).join('; ');
     return this;
@@ -98,7 +98,7 @@ export class Api {
       const content = typeof file.content === 'string' ? Buffer.from(file.content) : file.content;
       form.append('files', new Blob([new Uint8Array(content)]), file.name);
     }
-    return this.request('POST', `/api/files${query}`, { body: form, ...options });
+    return this.request('POST', `/api/v1/files${query}`, { body: form, ...options });
   }
 }
 
@@ -117,7 +117,7 @@ export async function saveDocument(
   name?: string,
 ): Promise<SavedDocument> {
   const response = await api.post(
-    `/api/${kind}`,
+    `/api/v1/${kind}`,
     name === undefined ? { content } : { name, content },
   );
   return response.json<SavedDocument>();

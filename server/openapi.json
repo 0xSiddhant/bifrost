@@ -3,7 +3,7 @@
   "info": {
     "title": "Bifrost",
     "version": "1.4.0",
-    "description": "The HTTP API of a Bifrost LAN hub — the same one its web app and its `bifrost` CLI use.\n\nTwo things to know when reading this description:\n\n- **Sibling path parameters.** Each document kind reads a record at `/api/<kind>/{slug}` and\n  writes it at `/api/<kind>/{id}`. OpenAPI treats those as one path with two parameter\n  names, which it forbids; renaming a route parameter is a code change made only for the\n  description's sake, so both appear as written and the merge is left to the API docs plan.\n- **Request validation follows Fastify's defaults.** Properties a request schema does not\n  declare are stripped rather than refused, and scalar values are coerced to the declared\n  type (`\"7\"` for an integer is accepted as `7`)."
+    "description": "The HTTP API of a Bifrost LAN hub — the same one its web app and its `bifrost` CLI use.\n\nFour things to know when reading this description:\n\n- **Every API is versioned in its path.** This describes v1: `/api/v1/…`, and each public\n  raw document at `/<kind>/api/v1/{slug}`. `/go/{slug}` and `/metrics` are not APIs and are\n  never versioned.\n- **The paths from before versions existed still mean v1.** `/api/<rest>` answers exactly as\n  `/api/v1/<rest>`, and `/<kind>/api/{slug}` as `/<kind>/api/v1/{slug}`: the same route, so the\n  same body, status, limits and guards. Their responses add `Deprecation: true` and a\n  `Link: <v1 path>; rel=\"successor-version\"` header. They are listed here only once, as v1.\n- **Versioning policy.** v1 only ever grows: no operation is removed and no response field\n  disappears. A breaking change gets a new version for the affected module alone\n  (`/api/v2/<module>/…`), and its v1 keeps answering.\n- **Sibling path parameters.** Each document kind reads a record at `/api/v1/<kind>/{slug}` and\n  writes it at `/api/v1/<kind>/{id}`. OpenAPI treats those as one path with two parameter\n  names, which it forbids; renaming a route parameter is a code change made only for the\n  description's sake, so both appear as written and the merge is left to the API docs plan.\n- **Request validation follows Fastify's defaults.** Properties a request schema does not\n  declare are stripped rather than refused, and scalar values are coerced to the declared\n  type (`\"7\"` for an integer is accepted as `7`)."
   },
   "components": {
     "securitySchemes": {
@@ -11,13 +11,13 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "bifrost_admin",
-        "description": "The Heimdall session cookie set by POST /api/heimdall/login"
+        "description": "The Heimdall session cookie set by POST /api/v1/heimdall/login"
       }
     },
     "schemas": {}
   },
   "paths": {
-    "/api/events": {
+    "/api/v1/events": {
       "get": {
         "operationId": "streamEvents",
         "summary": "The live event stream (Server-Sent Events)",
@@ -39,7 +39,7 @@
         }
       }
     },
-    "/api/health": {
+    "/api/v1/health": {
       "get": {
         "operationId": "getHealth",
         "summary": "Liveness: the process is up and serving",
@@ -84,7 +84,7 @@
         }
       }
     },
-    "/api/files": {
+    "/api/v1/files": {
       "post": {
         "operationId": "uploadFiles",
         "summary": "Upload files (multipart/form-data)",
@@ -382,7 +382,7 @@
         }
       }
     },
-    "/api/files/config": {
+    "/api/v1/files/config": {
       "get": {
         "operationId": "getUploadConfig",
         "summary": "The upload limits the client checks before sending",
@@ -422,7 +422,7 @@
         }
       }
     },
-    "/api/downloads": {
+    "/api/v1/downloads": {
       "get": {
         "operationId": "listDownloads",
         "summary": "Everything on offer in downloads/, newest first",
@@ -492,7 +492,7 @@
         }
       }
     },
-    "/api/downloads/{id}/content": {
+    "/api/v1/downloads/{id}/content": {
       "get": {
         "operationId": "getDownloadContent",
         "summary": "A download's bytes, with range support",
@@ -682,7 +682,7 @@
         }
       }
     },
-    "/api/downloads/{id}/archive": {
+    "/api/v1/downloads/{id}/archive": {
       "get": {
         "operationId": "getDownloadArchive",
         "summary": "A folder's files as a zip, streamed",
@@ -778,7 +778,7 @@
         }
       }
     },
-    "/api/files/{name}/publish": {
+    "/api/v1/files/{name}/publish": {
       "post": {
         "operationId": "publishUpload",
         "summary": "Move a staged upload into downloads/, offering it to the LAN",
@@ -909,7 +909,7 @@
         }
       }
     },
-    "/api/files/{name}": {
+    "/api/v1/files/{name}": {
       "patch": {
         "operationId": "renameUpload",
         "summary": "Rename a staged upload",
@@ -1255,7 +1255,7 @@
         }
       }
     },
-    "/api/files/{name}/content": {
+    "/api/v1/files/{name}/content": {
       "get": {
         "operationId": "getUploadContent",
         "summary": "A staged upload's bytes, with range support",
@@ -1447,7 +1447,7 @@
         }
       }
     },
-    "/api/downloads/{id}/meta": {
+    "/api/v1/downloads/{id}/meta": {
       "get": {
         "operationId": "getDownloadPreviewMeta",
         "summary": "What a download is, and whether the browser can preview it",
@@ -1571,7 +1571,7 @@
         }
       }
     },
-    "/api/files/{name}/preview": {
+    "/api/v1/files/{name}/preview": {
       "get": {
         "operationId": "getUploadPreviewMeta",
         "summary": "What a staged upload is, and whether the browser can preview it",
@@ -1697,7 +1697,7 @@
         }
       }
     },
-    "/api/qr/server-url": {
+    "/api/v1/qr/server-url": {
       "get": {
         "operationId": "getServerUrls",
         "summary": "Every URL that reaches this server, LAN IPs first",
@@ -1730,7 +1730,7 @@
         }
       }
     },
-    "/api/heimdall/access": {
+    "/api/v1/heimdall/access": {
       "get": {
         "operationId": "getHeimdallAccess",
         "summary": "The entry gesture, plus the household default theme every device applies",
@@ -1774,7 +1774,7 @@
         }
       }
     },
-    "/api/heimdall/login": {
+    "/api/v1/heimdall/login": {
       "post": {
         "operationId": "login",
         "summary": "Log in with the PIN; sets the admin session cookie",
@@ -1976,7 +1976,7 @@
         }
       }
     },
-    "/api/heimdall/logout": {
+    "/api/v1/heimdall/logout": {
       "post": {
         "operationId": "logout",
         "summary": "End this browser's admin session",
@@ -2074,7 +2074,7 @@
         }
       }
     },
-    "/api/heimdall/session": {
+    "/api/v1/heimdall/session": {
       "get": {
         "operationId": "getSession",
         "summary": "Probe: 200 with a live admin session, 401 without",
@@ -2139,7 +2139,7 @@
         }
       }
     },
-    "/api/heimdall/revoke": {
+    "/api/v1/heimdall/revoke": {
       "post": {
         "operationId": "revokeSessions",
         "summary": "Revoke every admin session, this one included",
@@ -2270,7 +2270,7 @@
         }
       }
     },
-    "/api/heimdall/settings": {
+    "/api/v1/heimdall/settings": {
       "get": {
         "operationId": "getSettings",
         "summary": "The runtime settings",
@@ -2531,7 +2531,7 @@
         }
       }
     },
-    "/api/heimdall/uploads": {
+    "/api/v1/heimdall/uploads": {
       "get": {
         "operationId": "listUploadFiles",
         "summary": "Files in uploads/, newest first",
@@ -2666,7 +2666,7 @@
         }
       }
     },
-    "/api/heimdall/stats": {
+    "/api/v1/heimdall/stats": {
       "get": {
         "operationId": "getStats",
         "summary": "Dashboard figures: uptime, clients, uploads, disk, 24 h of activity",
@@ -2784,7 +2784,7 @@
         }
       }
     },
-    "/api/heimdall/about": {
+    "/api/v1/heimdall/about": {
       "get": {
         "operationId": "getAbout",
         "summary": "The build stamp and runtime facts",
@@ -2875,7 +2875,7 @@
         }
       }
     },
-    "/api/heimdall/changelog": {
+    "/api/v1/heimdall/changelog": {
       "get": {
         "operationId": "getChangelog",
         "summary": "CHANGELOG.md, or an empty string before the first release",
@@ -2938,7 +2938,7 @@
         }
       }
     },
-    "/api/clipboard": {
+    "/api/v1/clipboard": {
       "get": {
         "operationId": "listClipboard",
         "summary": "The shared clipboard, newest first (expired entries excluded)",
@@ -3183,7 +3183,7 @@
         }
       }
     },
-    "/api/clipboard/{id}": {
+    "/api/v1/clipboard/{id}": {
       "delete": {
         "operationId": "deleteClipboardEntry",
         "summary": "Delete a clipboard entry",
@@ -3265,7 +3265,7 @@
         }
       }
     },
-    "/api/presence": {
+    "/api/v1/presence": {
       "get": {
         "operationId": "listPresence",
         "summary": "Every known device, online first, then most recently seen",
@@ -3336,7 +3336,7 @@
         }
       }
     },
-    "/api/presence/prune": {
+    "/api/v1/presence/prune": {
       "post": {
         "operationId": "prunePresence",
         "summary": "Forget devices offline for more than 7 days",
@@ -3495,7 +3495,7 @@
         }
       }
     },
-    "/api/presence/name": {
+    "/api/v1/presence/name": {
       "patch": {
         "operationId": "claimDeviceName",
         "summary": "Claim (or clear, with null) a friendly name for a device",
@@ -3706,7 +3706,7 @@
         }
       }
     },
-    "/api/heimdall/audit": {
+    "/api/v1/heimdall/audit": {
       "get": {
         "operationId": "listAudit",
         "summary": "The audit history, newest first, filterable by event and time",
@@ -3899,7 +3899,7 @@
         }
       }
     },
-    "/api/runestone": {
+    "/api/v1/runestone": {
       "get": {
         "operationId": "listRunestones",
         "summary": "List saved JSON documents",
@@ -4345,7 +4345,7 @@
         }
       }
     },
-    "/runestone/api/{slug}": {
+    "/runestone/api/v1/{slug}": {
       "get": {
         "operationId": "getRunestoneRaw",
         "summary": "The raw document text, as a public data URL",
@@ -4460,7 +4460,7 @@
         }
       }
     },
-    "/api/runestone/{slug}": {
+    "/api/v1/runestone/{slug}": {
       "get": {
         "operationId": "getRunestone",
         "summary": "Read one JSON document by slug",
@@ -4605,7 +4605,7 @@
         }
       }
     },
-    "/api/runestone/{id}": {
+    "/api/v1/runestone/{id}": {
       "put": {
         "operationId": "updateRunestone",
         "summary": "Rename a JSON document or replace its content",
@@ -4927,7 +4927,7 @@
         }
       }
     },
-    "/api/edda": {
+    "/api/v1/edda": {
       "get": {
         "operationId": "listEddas",
         "summary": "List saved Markdown documents",
@@ -5344,7 +5344,7 @@
         }
       }
     },
-    "/edda/api/{slug}": {
+    "/edda/api/v1/{slug}": {
       "get": {
         "operationId": "getEddaRaw",
         "summary": "The raw document text, as a public data URL",
@@ -5473,7 +5473,7 @@
         }
       }
     },
-    "/api/edda/{slug}": {
+    "/api/v1/edda/{slug}": {
       "get": {
         "operationId": "getEdda",
         "summary": "Read one Markdown document by slug",
@@ -5618,7 +5618,7 @@
         }
       }
     },
-    "/api/edda/{id}": {
+    "/api/v1/edda/{id}": {
       "put": {
         "operationId": "updateEdda",
         "summary": "Rename a Markdown document or replace its content",
@@ -5911,7 +5911,7 @@
         }
       }
     },
-    "/api/groot": {
+    "/api/v1/groot": {
       "get": {
         "operationId": "listGrootDocs",
         "summary": "List saved YAML documents",
@@ -6328,7 +6328,7 @@
         }
       }
     },
-    "/groot/api/{slug}": {
+    "/groot/api/v1/{slug}": {
       "get": {
         "operationId": "getGrootDocRaw",
         "summary": "The raw document text, as a public data URL",
@@ -6457,7 +6457,7 @@
         }
       }
     },
-    "/api/groot/{slug}": {
+    "/api/v1/groot/{slug}": {
       "get": {
         "operationId": "getGrootDoc",
         "summary": "Read one YAML document by slug",
@@ -6602,7 +6602,7 @@
         }
       }
     },
-    "/api/groot/{id}": {
+    "/api/v1/groot/{id}": {
       "put": {
         "operationId": "updateGrootDoc",
         "summary": "Rename a YAML document or replace its content",
@@ -6895,7 +6895,7 @@
         }
       }
     },
-    "/api/atlas": {
+    "/api/v1/atlas": {
       "get": {
         "operationId": "listAtlasDocs",
         "summary": "List saved XML documents",
@@ -7312,7 +7312,7 @@
         }
       }
     },
-    "/atlas/api/{slug}": {
+    "/atlas/api/v1/{slug}": {
       "get": {
         "operationId": "getAtlasDocRaw",
         "summary": "The raw document text, as a public data URL",
@@ -7441,7 +7441,7 @@
         }
       }
     },
-    "/api/atlas/{slug}": {
+    "/api/v1/atlas/{slug}": {
       "get": {
         "operationId": "getAtlasDoc",
         "summary": "Read one XML document by slug",
@@ -7586,7 +7586,7 @@
         }
       }
     },
-    "/api/atlas/{id}": {
+    "/api/v1/atlas/{id}": {
       "put": {
         "operationId": "updateAtlasDoc",
         "summary": "Rename a XML document or replace its content",
@@ -7879,7 +7879,7 @@
         }
       }
     },
-    "/api/loki/config": {
+    "/api/v1/loki/config": {
       "get": {
         "operationId": "getLokiConfig",
         "summary": "The runner's policy and the timeout bounds the page clamps to",
@@ -7932,7 +7932,7 @@
         }
       }
     },
-    "/api/loki/settings": {
+    "/api/v1/loki/settings": {
       "patch": {
         "operationId": "updateLokiSettings",
         "summary": "Change the runner's policy; open pages rebind live",
@@ -8123,7 +8123,7 @@
         }
       }
     },
-    "/api/brotli/config": {
+    "/api/v1/brotli/config": {
       "get": {
         "operationId": "getBrotliConfig",
         "summary": "The input and output caps and the quality presets",
@@ -8177,7 +8177,7 @@
         }
       }
     },
-    "/api/brotli/compress": {
+    "/api/v1/brotli/compress": {
       "post": {
         "operationId": "brotliCompress",
         "summary": "Brotli-compress the request body (application/octet-stream)",
@@ -8325,7 +8325,7 @@
         }
       }
     },
-    "/api/brotli/decompress": {
+    "/api/v1/brotli/decompress": {
       "post": {
         "operationId": "brotliDecompress",
         "summary": "Decompress a Brotli request body (application/octet-stream)",
@@ -8486,7 +8486,7 @@
         }
       }
     },
-    "/api/accio": {
+    "/api/v1/accio": {
       "get": {
         "operationId": "listLinks",
         "summary": "List saved links",
@@ -8951,7 +8951,7 @@
         }
       }
     },
-    "/api/accio/{id}": {
+    "/api/v1/accio/{id}": {
       "patch": {
         "operationId": "updateLink",
         "summary": "Change a link's title or tags",
@@ -9243,7 +9243,7 @@
         }
       }
     },
-    "/api/nimbus/config": {
+    "/api/v1/nimbus/config": {
       "get": {
         "operationId": "getNimbusConfig",
         "summary": "Test sizes, ping sample count, and whether a test is running now",
@@ -9305,7 +9305,7 @@
         }
       }
     },
-    "/api/nimbus/ping": {
+    "/api/v1/nimbus/ping": {
       "get": {
         "operationId": "pingNimbus",
         "summary": "An empty round trip for latency sampling",
@@ -9319,7 +9319,7 @@
         }
       }
     },
-    "/api/nimbus/down": {
+    "/api/v1/nimbus/down": {
       "get": {
         "operationId": "downloadTestPayload",
         "summary": "Download test: `mb` megabytes of incompressible bytes",
@@ -9424,7 +9424,7 @@
         }
       }
     },
-    "/api/nimbus/up": {
+    "/api/v1/nimbus/up": {
       "post": {
         "operationId": "uploadTestPayload",
         "summary": "Upload test: send an application/octet-stream body; the server times it",
@@ -9572,7 +9572,7 @@
         }
       }
     },
-    "/api/nimbus/release": {
+    "/api/v1/nimbus/release": {
       "post": {
         "operationId": "releaseNimbusLease",
         "summary": "Give up this device's test lease early",
@@ -9670,7 +9670,7 @@
         }
       }
     },
-    "/api/nimbus/results": {
+    "/api/v1/nimbus/results": {
       "post": {
         "operationId": "saveNimbusResult",
         "summary": "Record a finished test",
@@ -9980,7 +9980,7 @@
         }
       }
     },
-    "/api/portkey": {
+    "/api/v1/portkey": {
       "get": {
         "operationId": "listPortkeys",
         "summary": "List go-links",
@@ -10445,7 +10445,7 @@
         }
       }
     },
-    "/api/portkey/{slug}": {
+    "/api/v1/portkey/{slug}": {
       "patch": {
         "operationId": "updatePortkey",
         "summary": "Change a go-link's target or note",
@@ -10835,7 +10835,7 @@
         }
       }
     },
-    "/api/screensaver/config": {
+    "/api/v1/screensaver/config": {
       "get": {
         "operationId": "getScreensaverConfig",
         "summary": "The idle screensaver settings and the bounds the settings form clamps to",
@@ -10919,7 +10919,7 @@
         }
       }
     },
-    "/api/screensaver/settings": {
+    "/api/v1/screensaver/settings": {
       "patch": {
         "operationId": "updateScreensaverSettings",
         "summary": "Change the screensaver settings; open clients rebind live",
@@ -11155,7 +11155,7 @@
         }
       }
     },
-    "/api/client-logs/config": {
+    "/api/v1/client-logs/config": {
       "get": {
         "operationId": "getClientLogConfig",
         "summary": "The level floor below which the browser need not send, and the batch size",
@@ -11190,7 +11190,7 @@
         }
       }
     },
-    "/api/client-logs": {
+    "/api/v1/client-logs": {
       "post": {
         "operationId": "writeClientLogs",
         "summary": "Write a batch of the browser's log lines into the server's archive",
@@ -11420,7 +11420,7 @@
         }
       }
     },
-    "/api/offline-mode/config": {
+    "/api/v1/offline-mode/config": {
       "get": {
         "operationId": "getOfflineModeConfig",
         "summary": "The pages the offline toggle warms, and which an admin disabled",
@@ -11472,7 +11472,7 @@
         }
       }
     },
-    "/api/offline-mode/settings": {
+    "/api/v1/offline-mode/settings": {
       "patch": {
         "operationId": "updateOfflineModeSettings",
         "summary": "Enable or disable one warmable page; open tabs rebind live",
@@ -11694,7 +11694,7 @@
         }
       }
     },
-    "/api/capabilities": {
+    "/api/v1/capabilities": {
       "get": {
         "operationId": "getCapabilities",
         "summary": "The deployment profile and the modules it loaded",

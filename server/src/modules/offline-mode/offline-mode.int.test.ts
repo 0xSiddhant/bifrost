@@ -180,7 +180,7 @@ describe('offline-mode broadcast', () => {
 
     const res = await app.inject({
       method: 'PATCH',
-      url: '/api/offline-mode/settings',
+      url: '/api/v1/offline-mode/settings',
       payload: { id: 'edda', enabled: false },
     });
     expect(res.statusCode).toBe(200);

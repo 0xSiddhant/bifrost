@@ -79,7 +79,7 @@ the observability volumes from before PLAN-39 are reused.
 
 | Image | Build | Runtime |
 |---|---|---|
-| API | the server workspace only, with `python3`/`make`/`g++` in case `better-sqlite3` has no prebuilt binary; pruned to production dependencies | `node:20-bookworm-slim` + `tini` + `zip`/`unzip` (in-app backup); `HEALTHCHECK` on the API's `/api/health` |
+| API | the server workspace only, with `python3`/`make`/`g++` in case `better-sqlite3` has no prebuilt binary; pruned to production dependencies | `node:20-bookworm-slim` + `tini` + `zip`/`unzip` (in-app backup); `HEALTHCHECK` on the API's `/api/v1/health` |
 | Web host | both clients (Vite) and the web host (`tsc`); no native toolchain | `node:20-bookworm-slim` with the web host's own production dependencies and the two built clients; no `apt` at all; `HEALTHCHECK` on `/healthz` |
 | Standalone | the standalone client only | `nginx-unprivileged`, read-only, no backend |
 

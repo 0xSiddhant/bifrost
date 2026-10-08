@@ -96,7 +96,7 @@ describe('security', () => {
       expect(tampered).not.toBe(stale);
       // Revoked from another session: `stale` was valid a moment ago.
       const revoker = await suite.client('e2e-sec-revoker').login(suite.server.pin);
-      expect((await revoker.post('/api/heimdall/revoke')).status).toBe(204);
+      expect((await revoker.post('/api/v1/heimdall/revoke')).status).toBe(204);
 
       for (const [index, op] of adminOps().entries()) {
         const request = validRequest(op, index + 1);
@@ -126,7 +126,7 @@ describe('security', () => {
         expect(response.status, `${op.operationId}: ${response.text.slice(0, 200)}`).not.toBe(401);
         expect(response.status).toBeLessThan(500);
       }
-      expect((await admin.get('/api/heimdall/session')).status).toBe(401);
+      expect((await admin.get('/api/v1/heimdall/session')).status).toBe(401);
     });
   });
 
@@ -146,7 +146,7 @@ describe('security', () => {
     ];
     const targets = () =>
       suite.recorder.spec.operations.filter((op) =>
-        /^\/api\/(files\/\{name\}|downloads\/\{id\})/.test(op.template),
+        /^\/api\/v1\/(files\/\{name\}|downloads\/\{id\})/.test(op.template),
       );
 
     it('every file, folder and download parameter refuses every payload with a 4xx', async () => {
@@ -170,7 +170,9 @@ describe('security', () => {
     it('a rename and an upload folder that point outside are refused, and nothing lands outside', async () => {
       const api = suite.client('e2e-sec-traversal');
       for (const name of ['../../canary.txt', '..\\..\\canary.txt', '/etc/passwd']) {
-        const renamed = await api.patch(`/api/files/${encodeURIComponent(seeds.upload)}`, { name });
+        const renamed = await api.patch(`/api/v1/files/${encodeURIComponent(seeds.upload)}`, {
+          name,
+        });
         expect(renamed.status, `rename to ${name}`).toBe(422);
       }
       for (const folder of ['..', '../..', '..\\..', '/tmp', '.hidden', 'a/b']) {
@@ -202,9 +204,9 @@ describe('security', () => {
       for (const kind of ['runestone', 'edda', 'groot', 'atlas']) {
         const doc = (bytes: number) =>
           kind === 'runestone' ? `"${'a'.repeat(bytes - 2)}"` : 'a'.repeat(bytes);
-        expect((await api.post(`/api/${kind}`, { content: doc(cap) })).status).toBe(201);
+        expect((await api.post(`/api/v1/${kind}`, { content: doc(cap) })).status).toBe(201);
         expectRefused(
-          await api.post(`/api/${kind}`, { content: doc(cap + 1) }),
+          await api.post(`/api/v1/${kind}`, { content: doc(cap + 1) }),
           413,
           'PAYLOAD_TOO_LARGE',
         );
@@ -213,9 +215,9 @@ describe('security', () => {
 
     it('clipboard: 64 KB saves, one byte more is PAYLOAD_TOO_LARGE', async () => {
       const api = suite.client('e2e-sec-size');
-      expect((await api.post('/api/clipboard', { text: 'a'.repeat(64 * KB) })).status).toBe(201);
+      expect((await api.post('/api/v1/clipboard', { text: 'a'.repeat(64 * KB) })).status).toBe(201);
       expectRefused(
-        await api.post('/api/clipboard', { text: 'a'.repeat(64 * KB + 1) }),
+        await api.post('/api/v1/clipboard', { text: 'a'.repeat(64 * KB + 1) }),
         413,
         'PAYLOAD_TOO_LARGE',
       );
@@ -231,7 +233,7 @@ describe('security', () => {
         return `${head}${' '.repeat(bytes - head.length - 1)}}`;
       };
       const raw = (body: string) =>
-        api.post('/api/client-logs', undefined, {
+        api.post('/api/v1/client-logs', undefined, {
           body,
           headers: { 'content-type': 'application/json' },
         });
@@ -241,8 +243,8 @@ describe('security', () => {
       const batch = (count: number) => ({
         entries: Array.from({ length: count }, () => ({ level: 'warn', msg: 'b' })),
       });
-      expect((await api.post('/api/client-logs', batch(50))).status).toBe(202);
-      expectRefused(await api.post('/api/client-logs', batch(51)), 400, 'BAD_REQUEST');
+      expect((await api.post('/api/v1/client-logs', batch(50))).status).toBe(202);
+      expectRefused(await api.post('/api/v1/client-logs', batch(51)), 400, 'BAD_REQUEST');
     });
 
     it('brotli input and nimbus test size: the cap passes, one byte over is PAYLOAD_TOO_LARGE', async () => {
@@ -254,11 +256,15 @@ describe('security', () => {
       const headers = { 'content-type': 'application/octet-stream' };
       const MiB = 1024 * 1024;
       expect(
-        (await api.post('/api/brotli/compress', undefined, { body: Buffer.alloc(MiB, 7), headers }))
-          .status,
+        (
+          await api.post('/api/v1/brotli/compress', undefined, {
+            body: Buffer.alloc(MiB, 7),
+            headers,
+          })
+        ).status,
       ).toBe(200);
       expectRefused(
-        await api.post('/api/brotli/compress', undefined, {
+        await api.post('/api/v1/brotli/compress', undefined, {
           body: Buffer.alloc(MiB + 1, 7),
           headers,
         }),
@@ -266,11 +272,11 @@ describe('security', () => {
         'PAYLOAD_TOO_LARGE',
       );
       expect(
-        (await api.post('/api/nimbus/up', undefined, { body: Buffer.alloc(MiB, 7), headers }))
+        (await api.post('/api/v1/nimbus/up', undefined, { body: Buffer.alloc(MiB, 7), headers }))
           .status,
       ).toBe(200);
       expectRefused(
-        await api.post('/api/nimbus/up', undefined, { body: Buffer.alloc(MiB + 1, 7), headers }),
+        await api.post('/api/v1/nimbus/up', undefined, { body: Buffer.alloc(MiB + 1, 7), headers }),
         413,
         'PAYLOAD_TOO_LARGE',
       );
@@ -293,11 +299,12 @@ describe('security', () => {
         ['upload', () => api.upload([{ name: 'rate.txt', content: 'r' }])],
         [
           'compress',
-          () => api.post('/api/brotli/compress', undefined, { body: Buffer.from('rate'), headers }),
+          () =>
+            api.post('/api/v1/brotli/compress', undefined, { body: Buffer.from('rate'), headers }),
         ],
         [
           'client logs',
-          () => api.post('/api/client-logs', { entries: [{ level: 'warn', msg: 'rate' }] }),
+          () => api.post('/api/v1/client-logs', { entries: [{ level: 'warn', msg: 'rate' }] }),
         ],
       ];
       for (const [name, call] of calls) {
@@ -314,21 +321,21 @@ describe('security', () => {
       const api = new Client(server.baseUrl, suite.recorder, 'e2e-sec-lockout');
       let locked: RecordedResponse | null = null;
       for (let attempt = 0; attempt < 12 && !locked; attempt += 1) {
-        const response = await api.post('/api/heimdall/login', { pin: `wrong-${attempt}` });
+        const response = await api.post('/api/v1/heimdall/login', { pin: `wrong-${attempt}` });
         if (response.status === 429) locked = response;
         else expect(response.status).toBe(401);
       }
       expect(locked, 'never locked out').not.toBeNull();
       expect(locked?.json<{ error: string }>().error).toBe('RATE_LIMITED');
       expect(Number(locked?.headers.get('retry-after'))).toBeGreaterThan(0);
-      expect((await api.post('/api/heimdall/login', { pin: server.pin })).status).toBe(429);
+      expect((await api.post('/api/v1/heimdall/login', { pin: server.pin })).status).toBe(429);
     }, 120_000);
 
     /** Bad PINs until the throttle answers 429; returns how many it took. */
     async function lockOut(api: Client, headers: Record<string, string>): Promise<number> {
       for (let attempt = 1; attempt <= 12; attempt += 1) {
         const response = await api.post(
-          '/api/heimdall/login',
+          '/api/v1/heimdall/login',
           { pin: `wrong-${attempt}` },
           { headers },
         );
@@ -346,13 +353,13 @@ describe('security', () => {
       const api = new Client(server.apiUrl, suite.recorder, 'e2e-sec-xff');
       await lockOut(api, { 'x-forwarded-for': '192.168.1.10' });
       const other = await api.post(
-        '/api/heimdall/login',
+        '/api/v1/heimdall/login',
         { pin: 'wrong-other' },
         { headers: { 'x-forwarded-for': '192.168.1.11' } },
       );
       expect(other.status, 'a second device is not locked out by the first').toBe(401);
       const back = await api.post(
-        '/api/heimdall/login',
+        '/api/v1/heimdall/login',
         { pin: server.pin },
         { headers: { 'x-forwarded-for': '192.168.1.10' } },
       );
@@ -369,7 +376,7 @@ describe('security', () => {
       let attempt = 0;
       for (; attempt < 12; attempt += 1) {
         const response = await api.post(
-          '/api/heimdall/login',
+          '/api/v1/heimdall/login',
           { pin: `wrong-${attempt}` },
           { headers: { 'x-forwarded-for': `10.9.8.${attempt}` } },
         );
@@ -404,11 +411,11 @@ describe('security', () => {
         await api.upload([
           { name, content: '<svg onload="alert(1)"><script>alert(1)</script></svg>' },
         ]);
-        const staged = await api.get(`/api/files/${name}/content?inline=1`);
+        const staged = await api.get(`/api/v1/files/${name}/content?inline=1`);
         expect(staged.headers.get('content-type'), `staged ${name}`).toMatch(/^text\/plain/);
-        expect((await api.post(`/api/files/${name}/publish`)).status).toBe(200);
+        expect((await api.post(`/api/v1/files/${name}/publish`)).status).toBe(200);
         const download = await waitForDownload(api, (entry) => entry.name === name);
-        const published = await api.get(`/api/downloads/${download.id}/content?inline=1`);
+        const published = await api.get(`/api/v1/downloads/${download.id}/content?inline=1`);
         expect(published.headers.get('content-type'), `published ${name}`).toMatch(/^text\/plain/);
       }
     });

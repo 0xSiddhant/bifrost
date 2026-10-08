@@ -8,7 +8,7 @@ export const healthModule: FeatureModule = {
   name: 'health',
   register(app, deps) {
     app.get(
-      '/api/health',
+      '/api/v1/health',
       {
         schema: {
           tags: ['health'],

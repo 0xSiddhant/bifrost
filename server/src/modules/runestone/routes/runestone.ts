@@ -137,7 +137,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   app.get<{ Querystring: ListQuery }>(
-    '/api/runestone',
+    '/api/v1/runestone',
     {
       schema: {
         tags: TAGS,
@@ -157,7 +157,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   );
 
   app.post<{ Body: { name?: string; content: string } }>(
-    '/api/runestone',
+    '/api/v1/runestone',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -181,12 +181,12 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   );
 
   // Public read-only data endpoint (owner requirement, post-Part-B): the raw
-  // document JSON at /runestone/api/:slug — outside /api/ so a saved runestone
+  // document JSON at /runestone/api/v1/:slug — outside /api/ so a saved runestone
   // doubles as a stable data URL for third-party tools. Registered routes win
   // over the SPA fallback, so only this exact shape escapes the client app.
   // CORS is wide open: it serves nothing but the document the URL names.
   app.get<{ Params: { slug: string } }>(
-    '/runestone/api/:slug',
+    '/runestone/api/v1/:slug',
     {
       schema: {
         tags: TAGS,
@@ -210,7 +210,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       const { record, canonical } = deps.get.execute(request.params.slug);
       reply.header('access-control-allow-origin', '*');
       if (!canonical) {
-        return reply.redirect(`/runestone/api/${encodeURIComponent(record.slug)}`, 301);
+        return reply.redirect(`/runestone/api/v1/${encodeURIComponent(record.slug)}`, 301);
       }
       // Raw stored text, not a re-serialization — formatting and number
       // precision survive exactly as carved.
@@ -221,7 +221,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   // :slug resolves saved docs; a stale-name slug with a valid id 301s to the
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
-    '/api/runestone/:slug',
+    '/api/v1/runestone/:slug',
     {
       schema: {
         tags: TAGS,
@@ -238,14 +238,14 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       if (!canonical) {
-        return reply.redirect(`/api/runestone/${encodeURIComponent(record.slug)}`, 301);
+        return reply.redirect(`/api/v1/runestone/${encodeURIComponent(record.slug)}`, 301);
       }
       return record;
     },
   );
 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
-    '/api/runestone/:id',
+    '/api/v1/runestone/:id',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -268,7 +268,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/runestone/:id',
+    '/api/v1/runestone/:id',
     {
       schema: {
         tags: TAGS,

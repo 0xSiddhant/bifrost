@@ -117,7 +117,7 @@ interface DownloadEntry {
 async function waitForDownloads(api: Api, names: Set<string>, timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const entries = (await api.get('/api/downloads')).json<DownloadEntry[]>();
+    const entries = (await api.get('/api/v1/downloads')).json<DownloadEntry[]>();
     const found = entries.filter((entry) => names.has(entry.name));
     if (found.length === names.size) return found;
     if (Date.now() > deadline) {
@@ -141,7 +141,7 @@ export async function seed(api: Api, plan: SeedPlan = FULL_SEED): Promise<Seeded
     16,
     async (index) => {
       const kind = DOCUMENT_KINDS[index % DOCUMENT_KINDS.length] ?? 'runestone';
-      const response = await api.post(`/api/${kind}`, {
+      const response = await api.post(`/api/v1/${kind}`, {
         name: `Load ${kind} ${tag} ${index}`,
         content: documentOf(kind, documentSize(index), index),
       });
@@ -156,7 +156,7 @@ export async function seed(api: Api, plan: SeedPlan = FULL_SEED): Promise<Seeded
     async (index) => {
       // Always with a title, so enrichment has nothing to fetch, and on a
       // loopback discard port, so even a fetch would never leave the machine.
-      await api.post('/api/accio', {
+      await api.post('/api/v1/accio', {
         url: `http://127.0.0.1:9/load/${tag}/${index}`,
         title: `Load link ${index}`,
         tags: [`load-${index % 10}`],
@@ -170,7 +170,7 @@ export async function seed(api: Api, plan: SeedPlan = FULL_SEED): Promise<Seeded
     16,
     async (index) => {
       const slug = `load-${tag}-${index}`;
-      await api.post('/api/portkey', { slug, url: `http://127.0.0.1:9/go/${index}` });
+      await api.post('/api/v1/portkey', { slug, url: `http://127.0.0.1:9/go/${index}` });
       requests += 1;
       return slug;
     },
@@ -182,7 +182,7 @@ export async function seed(api: Api, plan: SeedPlan = FULL_SEED): Promise<Seeded
   );
   await pool(fileNames, 4, async (name, index) => {
     await api.upload([{ name, content: prose(64 * 1024 * (1 + (index % 16)), index) }]);
-    await api.post(`/api/files/${encodeURIComponent(name)}/publish`);
+    await api.post(`/api/v1/files/${encodeURIComponent(name)}/publish`);
     requests += 2;
   });
   const folderNames = Array.from(

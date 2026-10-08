@@ -107,7 +107,7 @@ interface ListQuery {
 
 export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
-    '/api/portkey',
+    '/api/v1/portkey',
     {
       schema: {
         tags: TAGS,
@@ -127,7 +127,7 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   );
 
   app.post<{ Body: { slug: string; url: string; note?: string } }>(
-    '/api/portkey',
+    '/api/v1/portkey',
     {
       schema: {
         tags: TAGS,
@@ -149,7 +149,7 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   );
 
   app.patch<{ Params: { slug: string }; Body: { url?: string; note?: string } }>(
-    '/api/portkey/:slug',
+    '/api/v1/portkey/:slug',
     {
       schema: {
         tags: TAGS,
@@ -169,7 +169,7 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   );
 
   app.delete<{ Params: { slug: string } }>(
-    '/api/portkey/:slug',
+    '/api/v1/portkey/:slug',
     {
       schema: {
         tags: TAGS,

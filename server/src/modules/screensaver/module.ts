@@ -12,8 +12,8 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * the line/mouse toggles, and the quote rotation.
  *
  * Same shape as the Loki settings module: DB `settings` overlay over the
- * env-seeded defaults, a public `GET /api/screensaver/config` the client reads
- * to arm the idle timer, an admin `PATCH /api/screensaver/settings`, and a
+ * env-seeded defaults, a public `GET /api/v1/screensaver/config` the client reads
+ * to arm the idle timer, an admin `PATCH /api/v1/screensaver/settings`, and a
  * `screensaver.settingsUpdated` broadcast so open clients rebind without a
  * reload. Registered in BOTH profiles; the overlay is additionally gated to
  * desktop pointers client-side.
@@ -100,7 +100,7 @@ export const screensaverModule: FeatureModule = {
     // idle timer and configure the canvas. Read-only, carries no secrets. The
     // caps let the Heimdall control clamp its inputs.
     app.get(
-      '/api/screensaver/config',
+      '/api/v1/screensaver/config',
       {
         schema: {
           tags: TAGS,
@@ -147,7 +147,7 @@ export const screensaverModule: FeatureModule = {
     };
 
     app.patch<{ Body: Partial<ScreensaverSettings> }>(
-      '/api/screensaver/settings',
+      '/api/v1/screensaver/settings',
       {
         ...guard,
         schema: {

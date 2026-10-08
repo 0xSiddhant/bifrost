@@ -14,20 +14,20 @@ const suite = apiSuite('cloud-profile', { profile: 'cloud' });
 
 /** One route of each local-only module, plus the write paths that matter most. */
 const LOCAL_ONLY: [method: 'get' | 'post' | 'delete', path: string][] = [
-  ['get', '/api/files/config'],
-  ['get', '/api/downloads'],
-  ['get', '/api/clipboard'],
-  ['post', '/api/clipboard'],
-  ['get', '/api/presence'],
-  ['get', '/api/heimdall/audit'],
-  ['get', '/api/accio'],
-  ['get', '/api/nimbus/config'],
-  ['get', '/api/portkey'],
+  ['get', '/api/v1/files/config'],
+  ['get', '/api/v1/downloads'],
+  ['get', '/api/v1/clipboard'],
+  ['post', '/api/v1/clipboard'],
+  ['get', '/api/v1/presence'],
+  ['get', '/api/v1/heimdall/audit'],
+  ['get', '/api/v1/accio'],
+  ['get', '/api/v1/nimbus/config'],
+  ['get', '/api/v1/portkey'],
 ];
 
 describe('cloud profile', () => {
   it('names the cloud module set in capabilities (the CLI still reads it)', async () => {
-    const body = (await suite.client().get('/api/capabilities')).json<{
+    const body = (await suite.client().get('/api/v1/capabilities')).json<{
       profile: string;
       modules: string[];
     }>();
@@ -65,9 +65,9 @@ describe('cloud profile', () => {
 
   it('still serves what both profiles share', async () => {
     const api = suite.client();
-    expect((await api.get('/api/health')).status).toBe(200);
-    expect((await api.get('/api/runestone')).status).toBe(200);
-    expect((await api.get('/api/loki/config')).status).toBe(200);
+    expect((await api.get('/api/v1/health')).status).toBe(200);
+    expect((await api.get('/api/v1/runestone')).status).toBe(200);
+    expect((await api.get('/api/v1/loki/config')).status).toBe(200);
   });
 });
 

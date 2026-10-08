@@ -15,7 +15,7 @@
 # is actually due (newest backup older than BACKUP_INTERVAL_DAYS). launchd has
 # no "every 14 days", and a daily check survives sleep and reboots.
 #
-# A backup only happens while the API server answers /api/health on its own
+# A backup only happens while the API server answers /api/v1/health on its own
 # port (API_PORT, PLAN-36), so a stopped web host never skips a backup — a down
 # API is a skip (retried at the next daily check), not a failure. In web-only
 # mode (BIFROST_RUN=web) there is no hub data in use, so every run skips.
@@ -144,7 +144,7 @@ newest_backup() {
   ls -1 "$1" 2>/dev/null | grep -E '^bifrost-backup-' | sort | tail -n 1
 }
 
-server_up() { curl -fsS -m 5 "http://127.0.0.1:$API_PORT/api/health" >/dev/null 2>&1; }
+server_up() { curl -fsS -m 5 "http://127.0.0.1:$API_PORT/api/v1/health" >/dev/null 2>&1; }
 
 # ---------------------------------------------------------------- run
 

@@ -43,7 +43,7 @@ export async function waitForDownload(
 ): Promise<DownloadEntry> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const found = (await client.get('/api/downloads')).json<DownloadEntry[]>().find(match);
+    const found = (await client.get('/api/v1/downloads')).json<DownloadEntry[]>().find(match);
     if (found) return found;
     if (Date.now() > deadline) throw new Error('the download never appeared in the listing');
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -61,7 +61,7 @@ export async function seedAll(client: Client, sinkBaseUrl: string): Promise<Seed
   const documents = {} as Seeds['documents'];
   for (const kind of DOCUMENT_KINDS) {
     documents[kind] = ok(
-      await client.post(`/api/${kind}`, {
+      await client.post(`/api/v1/${kind}`, {
         name: `Seed ${kind} ${tag}`,
         content: DOCUMENT_CONTENT[kind],
       }),
@@ -77,7 +77,7 @@ export async function seedAll(client: Client, sinkBaseUrl: string): Promise<Seed
     await client.upload([{ name: published, content: '0123456789abcdefghij\n' }]),
     'publish source',
   );
-  ok(await client.post(`/api/files/${encodeURIComponent(published)}/publish`), 'publish');
+  ok(await client.post(`/api/v1/files/${encodeURIComponent(published)}/publish`), 'publish');
   const folderName = `Seed folder ${tag}`;
   ok(
     await client.upload(
@@ -97,16 +97,16 @@ export async function seedAll(client: Client, sinkBaseUrl: string): Promise<Seed
   await waitForDownload(client, (entry) => entry.parent === folderName && entry.name === 'two.txt');
 
   const clipboard = ok<{ id: string }>(
-    await client.post('/api/clipboard', { text: `seed clip ${tag}` }),
+    await client.post('/api/v1/clipboard', { text: `seed clip ${tag}` }),
     'clipboard',
   ).id;
   const accio = ok<{ id: string }>(
-    await client.post('/api/accio', { url: `${sinkBaseUrl}/page/seed-${tag}`, tags: ['seed'] }),
+    await client.post('/api/v1/accio', { url: `${sinkBaseUrl}/page/seed-${tag}`, tags: ['seed'] }),
     'accio',
   ).id;
   const portkey = `seed-${tag}`;
   ok(
-    await client.post('/api/portkey', { slug: portkey, url: 'http://127.0.0.1:9/router' }),
+    await client.post('/api/v1/portkey', { slug: portkey, url: 'http://127.0.0.1:9/router' }),
     'portkey',
   );
 
@@ -125,17 +125,18 @@ export async function seedAll(client: Client, sinkBaseUrl: string): Promise<Seed
 export function readPath(op: Operation, seeds: Seeds): string {
   const kind = DOCUMENT_KINDS.find(
     (candidate) =>
-      op.template.startsWith(`/api/${candidate}/`) || op.template.startsWith(`/${candidate}/api/`),
+      op.template.startsWith(`/api/v1/${candidate}/`) ||
+      op.template.startsWith(`/${candidate}/api/v1/`),
   );
   const value = (name: string): string => {
     if (kind) return name === 'slug' ? seeds.documents[kind].slug : seeds.documents[kind].id;
-    if (op.template.startsWith('/api/downloads/')) {
+    if (op.template.startsWith('/api/v1/downloads/')) {
       return op.template.endsWith('/archive') ? seeds.downloadFolder : seeds.downloadFile;
     }
-    if (op.template.startsWith('/api/files/')) return seeds.upload;
-    if (op.template.startsWith('/api/clipboard/')) return seeds.clipboard;
-    if (op.template.startsWith('/api/accio/')) return seeds.accio;
-    if (op.template.startsWith('/api/portkey/') || op.template.startsWith('/go/'))
+    if (op.template.startsWith('/api/v1/files/')) return seeds.upload;
+    if (op.template.startsWith('/api/v1/clipboard/')) return seeds.clipboard;
+    if (op.template.startsWith('/api/v1/accio/')) return seeds.accio;
+    if (op.template.startsWith('/api/v1/portkey/') || op.template.startsWith('/go/'))
       return seeds.portkey;
     throw new Error(`no seed for {${name}} in ${op.template}`);
   };

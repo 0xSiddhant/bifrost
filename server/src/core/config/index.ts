@@ -92,7 +92,7 @@ const envFields = z.object({
   BROTLI_MAX_OUTPUT_MB: z.coerce.number().int().positive().default(512),
   BROTLI_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   // Nimbus (PLAN-14) — the largest payload one speed test may move in either
-  // direction. Also the upload cap: past it /api/nimbus/up answers 413.
+  // direction. Also the upload cap: past it /api/v1/nimbus/up answers 413.
   NIMBUS_MAX_TEST_MB: z.coerce.number().int().min(1).max(1024).default(100),
   // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
   LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
@@ -140,7 +140,7 @@ const envFields = z.object({
   // Floor for browser-side logging (PLAN-16a). Every client line crosses the
   // network into an unauthenticated endpoint, so the economics invert against
   // the server's `trace`: warn+ only, lowered temporarily when chasing a bug.
-  // Shipped to the static bundle via GET /api/client-logs/config.
+  // Shipped to the static bundle via GET /api/v1/client-logs/config.
   CLIENT_LOG_LEVEL: z.enum(LOG_LEVELS).default('warn'),
   // Bounds on that unauthenticated write path: a misbehaving tab must not be
   // able to fill storage/logs/. Batches per minute per IP, entries per batch,
@@ -261,9 +261,9 @@ export interface AppConfig {
     titleMaxBytes: number;
   };
   brotli: {
-    /** Largest body /api/brotli/compress will accept (413 past it). */
+    /** Largest body /api/v1/brotli/compress will accept (413 past it). */
     maxInputMb: number;
-    /** Largest output /api/brotli/decompress may produce — the bomb guard. */
+    /** Largest output /api/v1/brotli/decompress may produce — the bomb guard. */
     maxOutputMb: number;
     /** Per-IP requests per minute, budgeted per route rather than shared. */
     rateLimitPerMin: number;

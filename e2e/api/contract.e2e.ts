@@ -53,7 +53,7 @@ describe('contract journeys', () => {
       // what the socket said — a 200 with the declared media type.
       suite.recorder.record({
         method: 'GET',
-        path: '/api/events',
+        path: '/api/v1/events',
         status: 200,
         operationId: null,
         text: '',
@@ -61,10 +61,10 @@ describe('contract journeys', () => {
       });
       // Presence now knows this device, so a name can be claimed for it.
       await status(
-        api.patch('/api/presence/name', { deviceId: 'e2e-contract-stream', name: 'Contract' }),
+        api.patch('/api/v1/presence/name', { deviceId: 'e2e-contract-stream', name: 'Contract' }),
         200,
       );
-      await status(api.post('/api/presence/prune'), 200);
+      await status(api.post('/api/v1/presence/prune'), 200);
     } finally {
       stream.close();
     }
@@ -72,65 +72,68 @@ describe('contract journeys', () => {
 
   it('documents: create, update, delete each kind', async () => {
     for (const kind of DOCUMENT_KINDS) {
-      const created = await api.post(`/api/${kind}`, { content: DOCUMENT_CONTENT[kind] });
+      const created = await api.post(`/api/v1/${kind}`, { content: DOCUMENT_CONTENT[kind] });
       expect(created.status).toBe(201);
       const { id } = created.json<{ id: string }>();
-      await status(api.put(`/api/${kind}/${id}`, { name: `Contract ${kind}` }), 200);
-      await status(api.delete(`/api/${kind}/${id}`), 204);
+      await status(api.put(`/api/v1/${kind}/${id}`, { name: `Contract ${kind}` }), 200);
+      await status(api.delete(`/api/v1/${kind}/${id}`), 204);
     }
   });
 
   it('file-transfer: upload, rename, publish, delete', async () => {
     await status(api.upload([{ name: 'contract-a.txt', content: 'a\n' }]), 201);
-    await status(api.patch('/api/files/contract-a.txt', { name: 'contract-b.txt' }), 200);
-    await status(api.post('/api/files/contract-b.txt/publish'), 200);
+    await status(api.patch('/api/v1/files/contract-a.txt', { name: 'contract-b.txt' }), 200);
+    await status(api.post('/api/v1/files/contract-b.txt/publish'), 200);
     await status(api.upload([{ name: 'contract-c.txt', content: 'c\n' }]), 201);
-    await status(api.delete('/api/files/contract-c.txt'), 204);
+    await status(api.delete('/api/v1/files/contract-c.txt'), 204);
   });
 
   it('clipboard, accio and portkey: add, change, delete', async () => {
-    const clip = await api.post('/api/clipboard', {
+    const clip = await api.post('/api/v1/clipboard', {
       text: 'contract clip',
       kind: 'code',
       lang: 'ts',
     });
     expect(clip.status).toBe(201);
-    await status(api.delete(`/api/clipboard/${clip.json<{ id: string }>().id}`), 204);
+    await status(api.delete(`/api/v1/clipboard/${clip.json<{ id: string }>().id}`), 204);
 
-    const link = await api.post('/api/accio', {
+    const link = await api.post('/api/v1/accio', {
       url: `${sink.baseUrl}/page/contract`,
       title: 'Contract',
     });
     expect(link.status).toBe(201);
     const linkId = link.json<{ id: string }>().id;
-    await status(api.patch(`/api/accio/${linkId}`, { tags: ['contract'] }), 200);
-    await status(api.delete(`/api/accio/${linkId}`), 204);
+    await status(api.patch(`/api/v1/accio/${linkId}`, { tags: ['contract'] }), 200);
+    await status(api.delete(`/api/v1/accio/${linkId}`), 204);
 
-    await status(api.post('/api/portkey', { slug: 'contract', url: 'http://127.0.0.1:9/x' }), 201);
-    await status(api.patch('/api/portkey/contract', { note: 'from the contract suite' }), 200);
-    await status(api.delete('/api/portkey/contract'), 204);
+    await status(
+      api.post('/api/v1/portkey', { slug: 'contract', url: 'http://127.0.0.1:9/x' }),
+      201,
+    );
+    await status(api.patch('/api/v1/portkey/contract', { note: 'from the contract suite' }), 200);
+    await status(api.delete('/api/v1/portkey/contract'), 204);
   });
 
   it('brotli and nimbus: every tool call', async () => {
     const headers = { 'content-type': 'application/octet-stream' };
-    const packed = await api.post('/api/brotli/compress', undefined, {
+    const packed = await api.post('/api/v1/brotli/compress', undefined, {
       body: Buffer.from('contract '.repeat(100)),
       headers,
     });
     expect(packed.status).toBe(200);
     await status(
-      api.post('/api/brotli/decompress', undefined, { body: packed.bytes, headers }),
+      api.post('/api/v1/brotli/decompress', undefined, { body: packed.bytes, headers }),
       200,
     );
 
-    await status(api.get('/api/nimbus/down?mb=0.05'), 200);
+    await status(api.get('/api/v1/nimbus/down?mb=0.05'), 200);
     await status(
-      api.post('/api/nimbus/up', undefined, { body: Buffer.alloc(64 * 1024, 1), headers }),
+      api.post('/api/v1/nimbus/up', undefined, { body: Buffer.alloc(64 * 1024, 1), headers }),
       200,
     );
-    await status(api.post('/api/nimbus/release'), 204);
+    await status(api.post('/api/v1/nimbus/release'), 204);
     await status(
-      api.post('/api/nimbus/results', {
+      api.post('/api/v1/nimbus/results', {
         downMbps: 940.5,
         upMbps: 870.25,
         latencyMs: 1.5,
@@ -142,7 +145,7 @@ describe('contract journeys', () => {
 
   it('client-logs: a batch is accepted', async () => {
     await status(
-      api.post('/api/client-logs', {
+      api.post('/api/v1/client-logs', {
         entries: [
           { level: 'warn', msg: 'contract journey', module: 'e2e', route: '/', ts: Date.now() },
         ],
@@ -152,19 +155,25 @@ describe('contract journeys', () => {
   });
 
   it('admin: settings and the module policies', async () => {
-    const settings = (await admin.get('/api/heimdall/settings')).json<{ tapCount: number }>();
-    await status(admin.patch('/api/heimdall/settings', { tapCount: settings.tapCount }), 200);
-    await status(admin.patch('/api/loki/settings', { runTimeoutMs: 5000 }), 200);
-    await status(admin.patch('/api/screensaver/settings', { idleSeconds: 300 }), 200);
-    await status(admin.patch('/api/offline-mode/settings', { id: 'toolbox', enabled: false }), 200);
-    await status(admin.patch('/api/offline-mode/settings', { id: 'toolbox', enabled: true }), 200);
+    const settings = (await admin.get('/api/v1/heimdall/settings')).json<{ tapCount: number }>();
+    await status(admin.patch('/api/v1/heimdall/settings', { tapCount: settings.tapCount }), 200);
+    await status(admin.patch('/api/v1/loki/settings', { runTimeoutMs: 5000 }), 200);
+    await status(admin.patch('/api/v1/screensaver/settings', { idleSeconds: 300 }), 200);
+    await status(
+      admin.patch('/api/v1/offline-mode/settings', { id: 'toolbox', enabled: false }),
+      200,
+    );
+    await status(
+      admin.patch('/api/v1/offline-mode/settings', { id: 'toolbox', enabled: true }),
+      200,
+    );
   });
 
   it('heimdall: logout ends one session, revoke ends all — last, because it ends this one too', async () => {
     const other = await suite.client('e2e-contract-other').login(suite.server.pin);
-    await status(other.post('/api/heimdall/logout'), 204);
-    await status(admin.post('/api/heimdall/revoke'), 204);
-    await status(admin.get('/api/heimdall/session'), 401);
+    await status(other.post('/api/v1/heimdall/logout'), 204);
+    await status(admin.post('/api/v1/heimdall/revoke'), 204);
+    await status(admin.get('/api/v1/heimdall/session'), 401);
   });
 
   it('every operation in openapi.json produced a success in this file', () => {
