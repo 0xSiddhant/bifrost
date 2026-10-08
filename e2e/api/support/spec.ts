@@ -25,7 +25,7 @@ export interface ResponseSpec {
 
 export interface Operation {
   method: string;
-  /** The OpenAPI path template, `/api/runestone/{slug}`. */
+  /** The OpenAPI path template, `/api/v1/runestone/{slug}`. */
   template: string;
   operationId: string;
   tags: string[];

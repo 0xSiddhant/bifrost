@@ -65,7 +65,7 @@ async function waitForHealth(timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      const response = await fetch(`${BASE}/api/health`);
+      const response = await fetch(`${BASE}/api/v1/health`);
       if (response.ok) return true;
     } catch {
       /* not up yet */
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
     const server = spawnServer();
     await waitForHealth(15_000);
     const burst = Array.from({ length: 30 }, (_unused, i) =>
-      fetch(`${BASE}/api/clipboard`, {
+      fetch(`${BASE}/api/v1/clipboard`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-bifrost-device': 'resilience' },
         body: JSON.stringify({ text: `entry ${i} ${'x'.repeat(500)}` }),

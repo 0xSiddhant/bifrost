@@ -33,10 +33,10 @@ describe('boot', () => {
 
   it('answers health and capabilities', async () => {
     const api = suite.client();
-    const health = await api.get('/api/health');
+    const health = await api.get('/api/v1/health');
     expect(health.status).toBe(200);
     expect(health.json()).toMatchObject({ ok: true, profile: 'local' });
-    const capabilities = await api.get('/api/capabilities');
+    const capabilities = await api.get('/api/v1/capabilities');
     expect(capabilities.json<{ modules: string[] }>().modules).toEqual(
       expect.arrayContaining(['health', 'file-transfer', 'runestone', 'heimdall']),
     );
@@ -46,7 +46,7 @@ describe('boot', () => {
     const first = await startServer({ keepStorage: true });
     try {
       const api = new Client(first.baseUrl, suite.recorder, 'e2e-api-boot-restart');
-      const saved = await api.post('/api/runestone', {
+      const saved = await api.post('/api/v1/runestone', {
         name: 'Survives a restart',
         content: '{"a":1}',
       });
@@ -60,8 +60,8 @@ describe('boot', () => {
       const second = await startServer({ storageRoot: first.storageRoot });
       try {
         const again = new Client(second.baseUrl, suite.recorder, 'e2e-api-boot-restart');
-        expect((await again.get('/api/health')).status).toBe(200);
-        const list = await again.get('/api/runestone');
+        expect((await again.get('/api/v1/health')).status).toBe(200);
+        const list = await again.get('/api/v1/runestone');
         expect(list.json<{ name: string }[]>().map((doc) => doc.name)).toContain(
           'Survives a restart',
         );

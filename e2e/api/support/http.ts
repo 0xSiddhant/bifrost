@@ -38,7 +38,7 @@ export class Recorder {
   readonly responses: Recorded[] = [];
   readonly problems: string[] = [];
   readonly covered = new Set<string>();
-  /** Requests to no operation in the spec (the SPA fallback, assets, a deliberate `/api/nope`). */
+  /** Requests to no operation in the spec (the SPA fallback, assets, a deliberate `/api/v1/nope`). */
   readonly unmatched: string[] = [];
 
   /**
@@ -161,7 +161,7 @@ export class Client {
 
   /** Log in with the PIN; later requests carry the session cookie. */
   async login(pin: string): Promise<this> {
-    const response = await this.post('/api/heimdall/login', { pin });
+    const response = await this.post('/api/v1/heimdall/login', { pin });
     if (response.status !== 200) throw new Error(`login → ${response.status}: ${response.text}`);
     this.cookie = response.headers
       .getSetCookie()
@@ -177,7 +177,7 @@ export class Client {
       const content = typeof file.content === 'string' ? Buffer.from(file.content) : file.content;
       form.append('files', new Blob([new Uint8Array(content)]), file.name);
     }
-    return this.request('POST', `/api/files${query}`, { body: form });
+    return this.request('POST', `/api/v1/files${query}`, { body: form });
   }
 }
 

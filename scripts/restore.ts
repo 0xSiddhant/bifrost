@@ -38,7 +38,7 @@ async function serverIsLive(port: number): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 800);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: controller.signal });
+    const response = await fetch(`http://127.0.0.1:${port}/api/v1/health`, { signal: controller.signal });
     return response.ok;
   } catch {
     return false;

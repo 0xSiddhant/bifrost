@@ -18,11 +18,11 @@ export function openEventStream(baseUrl: string, deviceId: string): Promise<Even
     let received = '';
     const waiters: (() => void)[] = [];
     const request = http.get(
-      `${baseUrl}/api/events?deviceId=${encodeURIComponent(deviceId)}`,
+      `${baseUrl}/api/v1/events?deviceId=${encodeURIComponent(deviceId)}`,
       { headers: { 'user-agent': 'bifrost-e2e-api' } },
       (response) => {
         if (response.statusCode !== 200) {
-          reject(new Error(`/api/events → ${response.statusCode}`));
+          reject(new Error(`/api/v1/events → ${response.statusCode}`));
           return;
         }
         response.setEncoding('utf8');
