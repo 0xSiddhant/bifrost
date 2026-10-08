@@ -168,7 +168,7 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   app.get<{ Querystring: ListQuery }>(
-    '/api/groot',
+    '/api/v1/groot',
     {
       schema: {
         tags: TAGS,
@@ -188,7 +188,7 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   );
 
   app.post<{ Body: { name?: string; content: string } }>(
-    '/api/groot',
+    '/api/v1/groot',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -212,12 +212,12 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   );
 
   // Public read-only raw endpoint, the runestone/edda pattern: the stored bytes
-  // at /groot/api/:slug, outside /api/ so a saved document doubles as a stable
+  // at /groot/api/v1/:slug, outside /api/ so a saved document doubles as a stable
   // data URL. Registered routes win over the SPA fallback, so only this exact
   // shape escapes the client app. CORS is wide open: it serves nothing but the
   // document the URL names. `?download=1` → attachment.
   app.get<{ Params: { slug: string }; Querystring: { download?: string } }>(
-    '/groot/api/:slug',
+    '/groot/api/v1/:slug',
     {
       schema: {
         tags: TAGS,
@@ -243,7 +243,7 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
       reply.header('access-control-allow-origin', '*');
       if (!canonical) {
         const suffix = request.query.download ? '?download=1' : '';
-        return reply.redirect(`/groot/api/${encodeURIComponent(record.slug)}${suffix}`, 301);
+        return reply.redirect(`/groot/api/v1/${encodeURIComponent(record.slug)}${suffix}`, 301);
       }
       if (request.query.download) {
         reply.header(
@@ -261,7 +261,7 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   // :slug resolves saved docs; a stale-name slug with a valid id 301s to the
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
-    '/api/groot/:slug',
+    '/api/v1/groot/:slug',
     {
       schema: {
         tags: TAGS,
@@ -278,14 +278,14 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       if (!canonical) {
-        return reply.redirect(`/api/groot/${encodeURIComponent(record.slug)}`, 301);
+        return reply.redirect(`/api/v1/groot/${encodeURIComponent(record.slug)}`, 301);
       }
       return record;
     },
   );
 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
-    '/api/groot/:id',
+    '/api/v1/groot/:id',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -308,7 +308,7 @@ export function registerGrootRoutes(app: FastifyInstance, deps: GrootRoutesDeps)
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/groot/:id',
+    '/api/v1/groot/:id',
     {
       schema: {
         tags: TAGS,

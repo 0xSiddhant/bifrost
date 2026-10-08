@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # PLAN-35: server/src/openapi-removals.test.ts diffs the spec against
+      # PLAN-37: server/src/openapi-compat.test.ts diffs the spec against
       # develop's, so develop must be here; the test fails rather than skips
       # in CI when it is not.
       - name: Fetch develop

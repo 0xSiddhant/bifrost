@@ -124,7 +124,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
 
   /** Limits live in .env, so the page reads them instead of hardcoding a menu. */
   app.get(
-    '/api/nimbus/config',
+    '/api/v1/nimbus/config',
     {
       schema: {
         tags: TAGS,
@@ -164,7 +164,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
    * for them would mean a busy server couldn't even be pinged.
    */
   app.get(
-    '/api/nimbus/ping',
+    '/api/v1/nimbus/ping',
     {
       schema: {
         tags: TAGS,
@@ -177,7 +177,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
   );
 
   app.get<{ Querystring: { mb?: number; warmup?: string } }>(
-    '/api/nimbus/down',
+    '/api/v1/nimbus/down',
     {
       schema: {
         tags: TAGS,
@@ -220,7 +220,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
   );
 
   app.post<{ Body: UpBody }>(
-    '/api/nimbus/up',
+    '/api/v1/nimbus/up',
     {
       schema: {
         tags: TAGS,
@@ -265,7 +265,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
    * out the grace window for no reason; with it, cancel frees the guard at once.
    */
   app.post(
-    '/api/nimbus/release',
+    '/api/v1/nimbus/release',
     {
       schema: {
         tags: TAGS,
@@ -281,7 +281,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
   );
 
   app.post<{ Body: { downMbps: number; upMbps: number; latencyMs: number; testMb: number } }>(
-    '/api/nimbus/results',
+    '/api/v1/nimbus/results',
     {
       schema: {
         tags: TAGS,
@@ -298,7 +298,7 @@ export function registerNimbusRoutes(app: FastifyInstance, deps: NimbusRoutesDep
   );
 
   app.get<{ Querystring: { device?: string; limit?: number } }>(
-    '/api/nimbus/results',
+    '/api/v1/nimbus/results',
     {
       schema: {
         tags: TAGS,

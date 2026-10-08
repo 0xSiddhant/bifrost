@@ -167,7 +167,7 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   const bodyLimit = documentBodyLimit(deps.maxDocKb);
   const tooLarge = bodyTooLargeAs('document exceeds the size limit');
   app.get<{ Querystring: ListQuery }>(
-    '/api/edda',
+    '/api/v1/edda',
     {
       schema: {
         tags: TAGS,
@@ -187,7 +187,7 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   );
 
   app.post<{ Body: { name?: string; content: string } }>(
-    '/api/edda',
+    '/api/v1/edda',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -211,12 +211,12 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   );
 
   // Public read-only raw endpoint (owner spec — "api" literally in the path):
-  // the raw Markdown at /edda/api/:slug, outside /api/ so a saved edda doubles
+  // the raw Markdown at /edda/api/v1/:slug, outside /api/ so a saved edda doubles
   // as a stable data URL. Registered routes win over the SPA fallback, so only
   // this exact shape escapes the client app. CORS is wide open: it serves
   // nothing but the document the URL names. `?download=1` → attachment.
   app.get<{ Params: { slug: string }; Querystring: { download?: string } }>(
-    '/edda/api/:slug',
+    '/edda/api/v1/:slug',
     {
       schema: {
         tags: TAGS,
@@ -242,7 +242,7 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
       reply.header('access-control-allow-origin', '*');
       if (!canonical) {
         const suffix = request.query.download ? '?download=1' : '';
-        return reply.redirect(`/edda/api/${encodeURIComponent(record.slug)}${suffix}`, 301);
+        return reply.redirect(`/edda/api/v1/${encodeURIComponent(record.slug)}${suffix}`, 301);
       }
       if (request.query.download) {
         reply.header(
@@ -258,7 +258,7 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   // :slug resolves saved docs; a stale-name slug with a valid id 301s to the
   // canonical slug so renamed documents keep every shared link alive.
   app.get<{ Params: { slug: string } }>(
-    '/api/edda/:slug',
+    '/api/v1/edda/:slug',
     {
       schema: {
         tags: TAGS,
@@ -275,14 +275,14 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
     async (request, reply) => {
       const { record, canonical } = deps.get.execute(request.params.slug);
       if (!canonical) {
-        return reply.redirect(`/api/edda/${encodeURIComponent(record.slug)}`, 301);
+        return reply.redirect(`/api/v1/edda/${encodeURIComponent(record.slug)}`, 301);
       }
       return record;
     },
   );
 
   app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
-    '/api/edda/:id',
+    '/api/v1/edda/:id',
     {
       bodyLimit,
       errorHandler: tooLarge,
@@ -305,7 +305,7 @@ export function registerEddaRoutes(app: FastifyInstance, deps: EddaRoutesDeps): 
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/edda/:id',
+    '/api/v1/edda/:id',
     {
       schema: {
         tags: TAGS,

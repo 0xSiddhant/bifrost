@@ -111,7 +111,7 @@ interface ListQuery {
 
 export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
-    '/api/accio',
+    '/api/v1/accio',
     {
       schema: {
         tags: TAGS,
@@ -131,7 +131,7 @@ export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps)
   );
 
   app.post<{ Body: { url: string; title?: string; tags?: string[] } }>(
-    '/api/accio',
+    '/api/v1/accio',
     {
       schema: {
         tags: TAGS,
@@ -156,7 +156,7 @@ export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps)
   );
 
   app.patch<{ Params: { id: string }; Body: { title?: string; tags?: string[] } }>(
-    '/api/accio/:id',
+    '/api/v1/accio/:id',
     {
       schema: {
         tags: TAGS,
@@ -176,7 +176,7 @@ export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps)
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/accio/:id',
+    '/api/v1/accio/:id',
     {
       schema: {
         tags: TAGS,

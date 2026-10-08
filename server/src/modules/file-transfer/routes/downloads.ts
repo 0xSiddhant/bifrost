@@ -34,7 +34,7 @@ const contentSchema = {
 
 export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoutesDeps): void {
   app.get(
-    '/api/downloads',
+    '/api/v1/downloads',
     {
       schema: {
         tags: TAGS,
@@ -48,7 +48,7 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
   );
 
   app.get<{ Params: { id: string }; Querystring: { inline?: string } }>(
-    '/api/downloads/:id/content',
+    '/api/v1/downloads/:id/content',
     {
       schema: {
         tags: TAGS,
@@ -73,7 +73,7 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
   // A folder id → a zip of its files. Same id family as /content, because the
   // id already resolves to an entry that knows whether it is a folder.
   app.get<{ Params: { id: string } }>(
-    '/api/downloads/:id/archive',
+    '/api/v1/downloads/:id/archive',
     {
       schema: {
         tags: TAGS,

@@ -62,7 +62,7 @@ describe('atlas module', () => {
 
     const stale = await inject({ method: 'GET', url: `/api/atlas/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/api/atlas/${renamed.slug}`);
+    expect(stale.headers.location).toBe(`/api/v1/atlas/${renamed.slug}`);
 
     const remove = await inject({ method: 'DELETE', url: `/api/atlas/${created.id}` });
     expect(remove.statusCode).toBe(204);
@@ -99,10 +99,10 @@ describe('atlas module', () => {
     });
     const stale = await inject({ method: 'GET', url: `/atlas/api/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/atlas/api/${rename.json().slug}`);
+    expect(stale.headers.location).toBe(`/atlas/api/v1/${rename.json().slug}`);
     // download flag survives the 301
     const staleDl = await inject({ method: 'GET', url: `/atlas/api/${created.slug}?download=1` });
-    expect(staleDl.headers.location).toBe(`/atlas/api/${rename.json().slug}?download=1`);
+    expect(staleDl.headers.location).toBe(`/atlas/api/v1/${rename.json().slug}?download=1`);
 
     const missing = await inject({ method: 'GET', url: '/atlas/api/never-was-zz9zz9' });
     expect(missing.statusCode).toBe(404);

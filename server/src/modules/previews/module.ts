@@ -56,7 +56,7 @@ export const previewsModule: FeatureModule = {
     const uploadMeta = new GetPreviewMetaUseCase(new FsFileInspector(deps.config.storage.uploads));
 
     app.get<{ Params: { id: string } }>(
-      '/api/downloads/:id/meta',
+      '/api/v1/downloads/:id/meta',
       {
         schema: {
           tags: TAGS,
@@ -70,7 +70,7 @@ export const previewsModule: FeatureModule = {
     );
 
     app.get<{ Params: { name: string } }>(
-      '/api/files/:name/preview',
+      '/api/v1/files/:name/preview',
       {
         schema: {
           tags: TAGS,

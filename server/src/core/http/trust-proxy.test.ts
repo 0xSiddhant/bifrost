@@ -13,7 +13,7 @@ let app: FastifyInstance | null = null;
 
 async function echoApp(): Promise<FastifyInstance> {
   app = await buildHttp({ logger: pino({ level: 'silent' }) });
-  app.get('/api/ip', async (request) => ({ ip: request.ip }));
+  app.get('/api/v1/ip', async (request) => ({ ip: request.ip }));
   return app;
 }
 
@@ -26,7 +26,7 @@ describe('trustProxy is loopback-only', () => {
   it('believes X-Forwarded-For from the loopback web host', async () => {
     const http = await echoApp();
     const response = await http.inject({
-      url: '/api/ip',
+      url: '/api/v1/ip',
       remoteAddress: '127.0.0.1',
       headers: { 'x-forwarded-for': '192.168.1.23' },
     });
@@ -36,7 +36,7 @@ describe('trustProxy is loopback-only', () => {
   it('ignores X-Forwarded-For from anywhere else', async () => {
     const http = await echoApp();
     const response = await http.inject({
-      url: '/api/ip',
+      url: '/api/v1/ip',
       remoteAddress: '192.168.1.50',
       headers: { 'x-forwarded-for': '10.0.0.1' },
     });
@@ -46,7 +46,7 @@ describe('trustProxy is loopback-only', () => {
   it('takes the last untrusted hop, so a client cannot prepend a fake one', async () => {
     const http = await echoApp();
     const response = await http.inject({
-      url: '/api/ip',
+      url: '/api/v1/ip',
       remoteAddress: '127.0.0.1',
       headers: { 'x-forwarded-for': '6.6.6.6, 192.168.1.23' },
     });

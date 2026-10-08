@@ -17,7 +17,7 @@ export interface ModuleDeps {
   auth: AuthService;
   /**
    * A logger for lines this process did not produce — browser reports relayed
-   * through `POST /api/client-logs`. Only the `client-logs` module uses it.
+   * through `POST /api/v1/client-logs`. Only the `client-logs` module uses it.
    *
    * It is a factory off the ROOT logger rather than something a module could
    * derive from its own `log`, because pino appends child bindings to the

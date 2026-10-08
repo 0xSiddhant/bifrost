@@ -13,8 +13,8 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * may call fetch(), the watchdog timeout, and the console budget.
  *
  * These ride the DB `settings` table (env-seeded, Heimdall-writable) exposed as
- * a public `GET /api/loki/config` the page reads to honour the gates live, plus
- * an admin `PATCH /api/loki/settings`. A `loki.settingsUpdated` broadcast lets
+ * a public `GET /api/v1/loki/config` the page reads to honour the gates live, plus
+ * an admin `PATCH /api/v1/loki/settings`. A `loki.settingsUpdated` broadcast lets
  * open pages + the Heimdall card rebind without a reload.
  *
  * Registered in BOTH profiles (transforms/regex everywhere); the run UI is
@@ -89,7 +89,7 @@ export const lokiModule: FeatureModule = {
     // limits. Read-only; carries no secrets. Also exposes the caps so the
     // per-run timeout control can clamp itself.
     app.get(
-      '/api/loki/config',
+      '/api/v1/loki/config',
       {
         schema: {
           tags: TAGS,
@@ -135,7 +135,7 @@ export const lokiModule: FeatureModule = {
         consoleMaxEntries: number;
       }>;
     }>(
-      '/api/loki/settings',
+      '/api/v1/loki/settings',
       {
         ...guard,
         schema: {

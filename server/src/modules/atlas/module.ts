@@ -14,7 +14,7 @@ import {
  * document workspace beside Runestone (JSON), Edda (Markdown) and Groot (YAML).
  * Its own `atlas_docs` table and CRUD, plus `atlas.saved`/`atlas.deleted` on the
  * bus so open Pensieves live-update and audit-log records activity, and the raw
- * `/atlas/api/:slug` data URL.
+ * `/atlas/api/v1/:slug` data URL.
  *
  * **The server never parses XML**, and knows nothing about plists. Every
  * document is stored and served as bytes with the byte cap as the only rule —

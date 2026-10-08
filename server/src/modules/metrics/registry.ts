@@ -26,6 +26,8 @@ export interface MetricsRegistry {
   observeRequest(labels: { route: string; method: string; status: number }, seconds: number): void;
   /** Count one upload (a counter here; the log line carries deltas). */
   recordUpload(): void;
+  /** Count one call on a legacy, unversioned API path (PLAN-37). */
+  recordLegacyRequest(route: string): void;
   /** Mirror a snapshot into the gauges. */
   publish(snapshot: Snapshot): void;
 }
@@ -37,7 +39,7 @@ export function createMetricsRegistry(): MetricsRegistry {
   const requestDuration = new Histogram({
     name: 'bifrost_http_request_duration_seconds',
     help: 'HTTP request duration in seconds',
-    // `route` is the Fastify route TEMPLATE (/api/downloads/:id/content), never
+    // `route` is the Fastify route TEMPLATE (/api/v1/downloads/:id/content), never
     // the concrete URL — one series per endpoint instead of one per file id,
     // which is how a label set quietly becomes a cardinality problem.
     labelNames: ['route', 'method', 'status'],
@@ -79,6 +81,15 @@ export function createMetricsRegistry(): MetricsRegistry {
     registers: [registry],
   });
 
+  // PLAN-37: what still calls the paths from before versions. The old paths
+  // stay until this reads zero for a release; then the owner decides.
+  const legacyRequests = new Counter({
+    name: 'bifrost_legacy_api_requests_total',
+    help: 'Requests on a legacy, unversioned API path, answered by the v1 route (by route template)',
+    labelNames: ['route'],
+    registers: [registry],
+  });
+
   return {
     contentType: registry.contentType,
     scrape: () => registry.metrics(),
@@ -86,6 +97,7 @@ export function createMetricsRegistry(): MetricsRegistry {
       requestDuration.observe({ route, method, status: String(status) }, seconds);
     },
     recordUpload: () => uploads.inc(),
+    recordLegacyRequest: (route) => legacyRequests.inc({ route }),
     publish: (snapshot) => {
       cpuPct.set(snapshot.cpuPct);
       // Milliseconds in the log line (what a human reads), seconds here (what

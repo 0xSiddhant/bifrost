@@ -41,7 +41,7 @@ const contentQuerySchema = {
 export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDeps): void {
   // Move to downloads/ — the one action that makes a file visible to the LAN.
   app.post<{ Params: { name: string } }>(
-    '/api/files/:name/publish',
+    '/api/v1/files/:name/publish',
     {
       schema: {
         tags: TAGS,
@@ -61,7 +61,7 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
   );
 
   app.patch<{ Params: { name: string }; Body: { name: string } }>(
-    '/api/files/:name',
+    '/api/v1/files/:name',
     {
       schema: {
         tags: TAGS,
@@ -79,7 +79,7 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
   );
 
   app.delete<{ Params: { name: string } }>(
-    '/api/files/:name',
+    '/api/v1/files/:name',
     {
       schema: {
         tags: TAGS,
@@ -97,7 +97,7 @@ export function registerUploadRoutes(app: FastifyInstance, deps: UploadRoutesDep
 
   // Bytes for the preview (`previews` serves the metadata for the same file).
   app.get<{ Params: { name: string }; Querystring: { inline?: string } }>(
-    '/api/files/:name/content',
+    '/api/v1/files/:name/content',
     {
       schema: {
         tags: TAGS,

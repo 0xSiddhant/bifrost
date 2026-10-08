@@ -129,7 +129,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   // PLAN-35 it also carries the household default theme: themes are client
   // code, and every device (not only an admin) must still learn the default.
   app.get(
-    '/api/heimdall/access',
+    '/api/v1/heimdall/access',
     {
       schema: {
         tags: TAGS,
@@ -156,7 +156,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.post<{ Body: { pin: string } }>(
-    '/api/heimdall/login',
+    '/api/v1/heimdall/login',
     {
       schema: {
         tags: TAGS,
@@ -204,7 +204,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.post(
-    '/api/heimdall/logout',
+    '/api/v1/heimdall/logout',
     {
       schema: {
         tags: TAGS,
@@ -222,7 +222,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   // Session probe: 200 when a live session exists, 401 otherwise. The client
   // uses this to decide panel-vs-404 on a direct /heimdall visit or refresh.
   app.get(
-    '/api/heimdall/session',
+    '/api/v1/heimdall/session',
     {
       ...guard,
       schema: {
@@ -237,7 +237,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.post(
-    '/api/heimdall/revoke',
+    '/api/v1/heimdall/revoke',
     {
       ...guard,
       schema: {
@@ -256,7 +256,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.get(
-    '/api/heimdall/settings',
+    '/api/v1/heimdall/settings',
     {
       ...guard,
       schema: {
@@ -271,7 +271,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.patch<{ Body: { shortcut?: string; tapCount?: number; defaultThemeId?: string | null } }>(
-    '/api/heimdall/settings',
+    '/api/v1/heimdall/settings',
     {
       ...guard,
       schema: {
@@ -287,7 +287,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.get<{ Querystring: { limit?: number; offset?: number } }>(
-    '/api/heimdall/uploads',
+    '/api/v1/heimdall/uploads',
     {
       ...guard,
       schema: {
@@ -303,7 +303,7 @@ export function registerHeimdallRoutes(app: FastifyInstance, deps: HeimdallRoute
   );
 
   app.get(
-    '/api/heimdall/stats',
+    '/api/v1/heimdall/stats',
     {
       ...guard,
       schema: {

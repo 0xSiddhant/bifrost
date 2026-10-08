@@ -33,7 +33,7 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
   const bodyCap = deps.maxUploadBytes * deps.maxFilesPerUpload + MULTIPART_OVERHEAD_BYTES;
 
   app.post<{ Querystring: { folder?: string } }>(
-    '/api/files',
+    '/api/v1/files',
     {
       schema: {
         tags: TAGS,
@@ -113,7 +113,7 @@ export function registerFileRoutes(app: FastifyInstance, deps: FileRoutesDeps): 
   // The client reads its pre-flight validation limits from here instead of
   // hardcoding values that actually live in .env.
   app.get(
-    '/api/files/config',
+    '/api/v1/files/config',
     {
       schema: {
         tags: TAGS,
