@@ -1,5 +1,7 @@
 import fs from 'node:fs';
+import type { ServerResponse } from 'node:http';
 import path from 'node:path';
+import { PassThrough, Readable } from 'node:stream';
 import Fastify, { LogController, type FastifyInstance, type FastifyReply } from 'fastify';
 import fastifyStatic from '@fastify/static';
 import httpProxy from '@fastify/http-proxy';
@@ -87,7 +89,46 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
 
   const { host, port } = options.upstream;
   const upstream = `http://${hostForUrl(host)}:${port}`;
+
+  // What this host refuses itself, it refuses in the API's error shape, so a
+  // client cannot tell which process said no. In practice that is
+  // reply-from's guard against a decoded `../` or `/..` in a forwarded path: a
+  // 400 the API would have answered anyway, because no stored name starts
+  // with a dot and every path parameter refuses one (the query is forwarded
+  // untouched and never checked here).
+  app.setErrorHandler((error: unknown, request, reply) => {
+    const { statusCode, code, message } = error as {
+      statusCode?: unknown;
+      code?: unknown;
+      message?: unknown;
+    };
+    if (typeof statusCode === 'number' && statusCode >= 400 && statusCode < 500) {
+      return reply.code(statusCode).send({
+        error:
+          statusCode === 400 ? 'BAD_REQUEST' : typeof code === 'string' ? code : 'REQUEST_ERROR',
+        message: typeof message === 'string' ? message : 'request refused',
+      });
+    }
+    request.log.error({ err: error }, 'web host error');
+    return reply.code(500).send({ error: 'INTERNAL', message: 'internal server error' });
+  });
   let upstreamDown = false;
+  // Event streams open through this host. Shutting down force-closes every
+  // connection, which would cut a stream mid-chunk (the browser reports
+  // ERR_INCOMPLETE_CHUNKED_ENCODING); the API ends its own SSE responses
+  // cleanly on shutdown, so this host does the same before it closes. Only
+  // event streams: ending a half-sent download cleanly would make a truncated
+  // file look complete, so those are still cut.
+  const eventStreams = new Map<ServerResponse, Readable>();
+  app.addHook('preClose', (done) => {
+    for (const [raw, body] of eventStreams) {
+      body.unpipe(raw);
+      body.destroy();
+      raw.end();
+    }
+    eventStreams.clear();
+    done();
+  });
 
   const upstreamFailed = (reply: FastifyReply, error: Error): void => {
     const request = reply.request;
@@ -115,9 +156,15 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
 
   for (const prefix of PROXIED_ROOTS) {
     await app.register(httpProxy, {
+      preHandler: (request, _reply, done) => {
+        if (request.body instanceof Readable) request.body = relayBody(request.body);
+        done();
+      },
       // reply-from logs every forwarded request at info ("fetching from
-      // remote server", "response received"); the API already logs each one.
-      logLevel: 'warn',
+      // remote server", "response received"), and every failed one at warn;
+      // the API already logs each request, and an outage is logged once
+      // below, so only reply-from's errors are kept.
+      logLevel: 'error',
       upstream,
       prefix,
       rewritePrefix: prefix,
@@ -136,14 +183,31 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
           'x-forwarded-for': request.ip,
           'x-forwarded-proto': request.protocol,
         }),
-        onResponse: (_request, reply, res) => {
+        onResponse: (request, reply, res) => {
+          if (!request.raw.complete) {
+            // The API answered before the client's body had all arrived (an
+            // upload refused early: a bad query, a size cap). reply-from marks
+            // that `connection: close`, and Node then closes the socket under
+            // a client still sending, which resets it and can lose this very
+            // answer. Directly, the API's Node discards the rest and keeps the
+            // connection; `relayBody` does the discarding, so keep it open.
+            reply.removeHeader('connection');
+          }
           if (upstreamDown) {
             upstreamDown = false;
             logger.info({ upstream }, 'api upstream answering again');
           }
           // reply-from hands over the upstream body as `stream` (its types
           // still describe the raw response object).
-          void reply.send((res as unknown as { stream: NodeJS.ReadableStream }).stream);
+          const body = (res as unknown as { stream: Readable }).stream;
+          const type = reply.getHeader('content-type');
+          if (typeof type === 'string' && type.startsWith('text/event-stream')) {
+            // reply-from types the reply for HTTP/2 too; this host is HTTP/1 only.
+            const raw = reply.raw as ServerResponse;
+            eventStreams.set(raw, body);
+            raw.once('close', () => eventStreams.delete(raw));
+          }
+          void reply.send(body);
         },
         // reply-from types the reply for HTTP/2 too; this host is HTTP/1 only.
         onError: (reply, { error }) => upstreamFailed(reply as unknown as FastifyReply, error),
@@ -162,6 +226,34 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
   }
 
   return app;
+}
+
+/**
+ * The request body undici reads, one-way coupled to the client's request
+ * (PLAN-36). undici destroys the body stream it was given once the API's side
+ * of the exchange ends, which, given the client's own request stream, destroys
+ * the client's socket: a client still sending an upload the API refused early
+ * gets a reset instead of the answer. So undici gets this relay instead:
+ *
+ * - the client going away mid-upload destroys the relay, so undici still
+ *   aborts the request to the API (the spike's abort check);
+ * - undici giving up on the relay unpipes the client's stream and discards
+ *   the rest of it, which is what the API's own Node did with a direct
+ *   connection.
+ */
+export function relayBody(source: Readable): PassThrough {
+  const relay = new PassThrough();
+  source.pipe(relay);
+  source.once('close', () => {
+    if (!(source as Readable & { complete?: boolean }).complete && !source.readableEnded) {
+      relay.destroy(new Error('the client went away mid-upload'));
+    }
+  });
+  relay.once('close', () => {
+    source.unpipe(relay);
+    if (!source.readableEnded && !source.destroyed) source.resume();
+  });
+  return relay;
 }
 
 async function registerStandalone(app: FastifyInstance, clientDir: string): Promise<void> {

@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -15,6 +16,8 @@ const silent = pino({ level: 'silent' });
 let clientDir: string;
 let standaloneDir: string;
 let upstream: FastifyInstance | null = null;
+/** When the stand-in API last saw an upload cut off before its end. */
+let uploadCutAt: number | null = null;
 let host: FastifyInstance | null = null;
 
 function writeTree(dir: string, files: Record<string, string>): void {
@@ -56,6 +59,7 @@ async function startUpstream(): Promise<number> {
   upstream = Fastify({ bodyLimit: 64 * 1024 * 1024 });
   upstream.addContentTypeParser('*', (_request, payload, done) => done(null, payload));
   upstream.get('/api/echo', async (request) => ({
+    url: request.url,
     xff: request.headers['x-forwarded-for'] ?? null,
     host: request.headers.host,
     proto: request.headers['x-forwarded-proto'] ?? null,
@@ -65,6 +69,22 @@ async function startUpstream(): Promise<number> {
     for await (const chunk of request.body as AsyncIterable<Buffer>) bytes += chunk.length;
     return { bytes };
   });
+  upstream.post('/api/sink', async (request) => {
+    let bytes = 0;
+    try {
+      for await (const chunk of request.body as AsyncIterable<Buffer>) bytes += chunk.length;
+    } catch {
+      uploadCutAt = Date.now();
+    }
+    return { bytes };
+  });
+  // Answers before reading the body, as a route whose query fails validation does.
+  upstream.post('/api/refuse-early', (_request, reply) => {
+    void reply.code(400).send({ error: 'BAD_REQUEST', message: 'refused before the body' });
+  });
+  upstream.get('/api/files/:name', async (request) => ({
+    name: (request.params as { name: string }).name,
+  }));
   upstream.get('/api/events', (_request, reply) => {
     reply.raw.writeHead(200, { 'content-type': 'text/event-stream' });
     reply.raw.write('data: first\n\n');
@@ -120,7 +140,7 @@ describe('hub mode', () => {
       remoteAddress: '192.168.1.23',
       headers: { host: 'bifrost.local:4646', 'x-forwarded-for': '6.6.6.6' },
     });
-    expect(response.json()).toEqual({
+    expect(response.json()).toMatchObject({
       xff: '192.168.1.23',
       host: 'bifrost.local:4646',
       proto: 'http',
@@ -139,6 +159,89 @@ describe('hub mode', () => {
     expect(response.json()).toEqual({ bytes: body.length });
   });
 
+  it("delivers the API's early answer to an upload it refused before reading the body", async () => {
+    const web = await hub(await startUpstream());
+    await web.listen({ port: 0, host: '127.0.0.1' });
+    const address = web.server.address();
+    const webPort = typeof address === 'object' && address ? address.port : 0;
+    for (const size of [64 * 1024, 8 * 1024 * 1024]) {
+      const response = await fetch(`http://127.0.0.1:${webPort}/api/refuse-early?folder=x`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: Buffer.alloc(size, 1),
+      });
+      expect(response.status, `${size} bytes`).toBe(400);
+      expect(await response.json()).toMatchObject({ error: 'BAD_REQUEST' });
+    }
+  });
+
+  it('keeps the connection when the API answers an upload before it has all arrived', async () => {
+    // The API refuses some uploads before reading them (a bad query, a size
+    // cap). Directly, Node then discards the rest of the body and keeps the
+    // connection; closing it under a client still sending resets the socket,
+    // and the client can lose the answer (seen once in 2,000 under load).
+    const web = await hub(await startUpstream());
+    await web.listen({ port: 0, host: '127.0.0.1' });
+    const address = web.server.address();
+    const webPort = typeof address === 'object' && address ? address.port : 0;
+    const socket = net.connect({ port: webPort, host: '127.0.0.1' });
+    await new Promise((resolve) => socket.once('connect', resolve));
+    let received = '';
+    socket.on('data', (chunk: Buffer) => (received += chunk.toString('latin1')));
+    const half = Buffer.alloc(100_000, 1);
+    socket.write(
+      'POST /api/refuse-early HTTP/1.1\r\nHost: x\r\n' +
+        'Content-Type: application/octet-stream\r\nContent-Length: 200000\r\n\r\n',
+    );
+    socket.write(half);
+    await expect.poll(() => received, { timeout: 5_000 }).toContain('refused before the body');
+    expect(received).toMatch(/^HTTP\/1\.1 400/);
+    expect(received.toLowerCase()).not.toContain('connection: close');
+
+    // The rest of the body, then a second request on the same connection.
+    received = '';
+    socket.write(half);
+    socket.write('GET /healthz HTTP/1.1\r\nHost: x\r\n\r\n');
+    await expect.poll(() => received, { timeout: 5_000 }).toContain('"ok":true');
+    expect(received).toMatch(/^HTTP\/1\.1 200/);
+    socket.destroy();
+  });
+
+  it('still tells the API at once when a client abandons an upload', async () => {
+    uploadCutAt = null;
+    const web = await hub(await startUpstream());
+    await web.listen({ port: 0, host: '127.0.0.1' });
+    const address = web.server.address();
+    const webPort = typeof address === 'object' && address ? address.port : 0;
+    const socket = net.connect({ port: webPort, host: '127.0.0.1' });
+    await new Promise((resolve) => socket.once('connect', resolve));
+    socket.write(
+      'POST /api/sink HTTP/1.1\r\nHost: x\r\n' +
+        'Content-Type: application/octet-stream\r\nContent-Length: 10000000\r\n\r\n',
+    );
+    socket.write(Buffer.alloc(1_000_000, 1));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const abandonedAt = Date.now();
+    socket.destroy();
+    await expect.poll(() => uploadCutAt, { timeout: 5_000 }).not.toBeNull();
+    expect(uploadCutAt! - abandonedAt).toBeLessThan(1_000);
+  });
+
+  it('forwards the query string untouched, dot segments and all', async () => {
+    const web = await hub(await startUpstream());
+    const url = '/api/echo?q=..%2Fnotes&q=a+b&flag&path=../x';
+    expect((await web.inject({ url })).json()).toMatchObject({ url });
+  });
+
+  it("refuses a dotted path in the API's error shape, as the API would have", async () => {
+    const web = await hub(await startUpstream());
+    for (const url of ['/api/files/..%2Fescape', '/api/files/..hidden', '/go/..%2Fx']) {
+      const response = await web.inject({ url });
+      expect(response.statusCode, url).toBe(400);
+      expect(response.json(), url).toMatchObject({ error: 'BAD_REQUEST' });
+    }
+  });
+
   it('passes an SSE stream through as it is written', async () => {
     const port = await startUpstream();
     const web = await hub(port);
@@ -153,6 +256,23 @@ describe('hub mode', () => {
     const { value } = await reader.read();
     expect(new TextDecoder().decode(value)).toContain('data: first');
     controller.abort();
+  });
+
+  it('ends an open event stream cleanly when it shuts down, rather than cutting it mid-chunk', async () => {
+    const web = await hub(await startUpstream());
+    await web.listen({ port: 0, host: '127.0.0.1' });
+    const address = web.server.address();
+    const webPort = typeof address === 'object' && address ? address.port : 0;
+    const response = await fetch(`http://127.0.0.1:${webPort}/api/events`);
+    const reader = response.body!.getReader();
+    await reader.read();
+    const closing = web.close();
+    host = null;
+    // A cut stream rejects the read ("terminated"); a clean end reports done.
+    let result = await reader.read();
+    while (!result.done) result = await reader.read();
+    expect(result.done).toBe(true);
+    await closing;
   });
 
   it('serves the hub client, with the SPA fallback for client routes', async () => {
