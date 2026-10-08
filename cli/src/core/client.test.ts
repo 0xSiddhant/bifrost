@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiClient,
@@ -111,6 +115,107 @@ describe('a transport failure', () => {
     );
     expect(describeTransportFailure({ cause: { code: 'ECONNREFUSED' } })).toBe('ECONNREFUSED');
     expect(describeTransportFailure(new Error('something else'))).toBe('something else');
+  });
+});
+
+describe('the same-machine fallback (PLAN-39)', () => {
+  const notFound = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } });
+  const refused = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+  const FALLBACKS = ['http://127.0.0.1:4646', 'http://127.0.0.1:4647'];
+
+  /** fetch that answers only for the origins in `up`, and records every URL asked. */
+  function network(up: string[]): string[] {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        const url = String(input);
+        asked.push(url);
+        if (up.some((origin) => url.startsWith(origin))) return jsonResponse(200, { ok: true });
+        throw url.startsWith(BASE) ? notFound() : refused();
+      }),
+    );
+    return asked;
+  }
+
+  it('moves to the web host on this machine when the default does not resolve', async () => {
+    const asked = network(['http://127.0.0.1:4646']);
+    const api = new ApiClient(BASE, 'cli-test-device', FALLBACKS);
+    await api.json('reading server health', 'GET', '/api/health');
+    expect(api.baseUrl).toBe('http://127.0.0.1:4646');
+    expect(api.fellBackFrom).toBe(BASE);
+    // The original, the probe, then the request again at the fallback.
+    expect(asked).toEqual([`${BASE}/api/health`, 'http://127.0.0.1:4646/api/health', 'http://127.0.0.1:4646/api/health']);
+  });
+
+  it('tries the API alone (BIFROST_RUN=api) when no web host answers', async () => {
+    network(['http://127.0.0.1:4647']);
+    const api = new ApiClient(BASE, 'cli-test-device', FALLBACKS);
+    await api.json('reading clipboard', 'GET', '/api/clipboard');
+    expect(api.baseUrl).toBe('http://127.0.0.1:4647');
+  });
+
+  it('names every address it tried when none answers, and probes only once per command', async () => {
+    const asked = network([]);
+    const api = new ApiClient(BASE, 'cli-test-device', FALLBACKS);
+    const error = await failure(api.json('reading server health', 'GET', '/api/health'));
+    expect(error.exitCode).toBe(EXIT.unreachable);
+    expect(error.message).toContain(BASE);
+    expect(error.message).toContain('127.0.0.1:4646 or http://127.0.0.1:4647');
+    await failure(api.json('reading server health', 'GET', '/api/health'));
+    expect(asked.filter((url) => url.startsWith('http://127.0.0.1'))).toHaveLength(2);
+  });
+
+  it('restarts an upload at the fallback when the default refused the connection', async () => {
+    let received = 0;
+    const server = http.createServer((request, response) => {
+      if (request.url === '/api/health') return void response.end('{"ok":true}');
+      request.on('data', (chunk: Buffer) => (received += chunk.length));
+      request.on('end', () => response.end('{"accepted":1}'));
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const up = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+    // A port nothing listens on: the connection is refused before a byte is sent.
+    const dead = http.createServer();
+    await new Promise<void>((resolve) => dead.listen(0, '127.0.0.1', resolve));
+    const deadUrl = `http://127.0.0.1:${(dead.address() as { port: number }).port}`;
+    await new Promise<void>((resolve) => dead.close(() => resolve()));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-cli-fallback-'));
+    const file = path.join(dir, 'a.txt');
+    fs.writeFileSync(file, 'x'.repeat(5000));
+    try {
+      const api = new ApiClient(deadUrl, 'cli-test-device', [up]);
+      const answer = await api.postFiles<{ accepted: number }>('uploading', '/api/files', [
+        { path: file, name: 'a.txt', size: 5000 },
+      ]);
+      expect(answer).toEqual({ accepted: 1 });
+      expect(api.baseUrl).toBe(up);
+      expect(received).toBeGreaterThan(5000);
+    } finally {
+      server.close();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('never falls back from an address the person chose (no fallbacks given)', async () => {
+    const asked = network(['http://127.0.0.1:4646']);
+    await failure(client().json('reading server health', 'GET', '/api/health'));
+    expect(asked).toEqual([`${BASE}/api/health`]);
+  });
+
+  it('never retries after a timeout: the request may have arrived', async () => {
+    const asked: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL) => {
+        asked.push(String(input));
+        throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+      }),
+    );
+    const api = new ApiClient(BASE, 'cli-test-device', FALLBACKS);
+    await failure(api.json('saving', 'POST', '/api/runestone', { body: {} }));
+    expect(asked).toHaveLength(1);
+    expect(api.fellBackFrom).toBeNull();
   });
 });
 

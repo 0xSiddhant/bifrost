@@ -2,7 +2,7 @@ import dns from 'node:dns/promises';
 import type { Command } from 'commander';
 import { ApiClient, describeTransportFailure } from '../core/client.js';
 import { configPath, deviceId, readConfig } from '../core/config.js';
-import { resolveBaseUrl, unreachableMessage } from '../core/discover.js';
+import { LOCAL_FALLBACKS, resolveBaseUrl, unreachableMessage } from '../core/discover.js';
 import { checkLatest, cliVersion, compareVersions } from '../core/selfUpdate.js';
 import { attention, bad, dim, EXIT, heading, ok, print } from '../core/output.js';
 import type { Capabilities } from './status.js';
@@ -76,9 +76,12 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
     });
   }
 
-  // 3/4 — the bridge itself.
-  const client = new ApiClient(baseUrl, deviceId());
-  if (!resolved) {
+  // 3/4 — the bridge itself. With the default address, a hub on this machine
+  // is tried too when bifrost.local does not answer (PLAN-39), as every
+  // command does; doctor then says so, and how to skip the detour.
+  const fallbacks = source === 'default' ? LOCAL_FALLBACKS : [];
+  const client = new ApiClient(baseUrl, deviceId(), fallbacks);
+  if (!resolved && fallbacks.length === 0) {
     const skipped = 'skipped — the host did not resolve';
     checks.push({ name: 'server reachable', status: 'fail', detail: skipped });
     checks.push({ name: 'server profile', status: 'fail', detail: skipped });
@@ -86,8 +89,18 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
     try {
       const response = await client.probe('/api/health', { signal: AbortSignal.timeout(5_000) });
       await response.arrayBuffer();
+      const moved = client.fellBackFrom;
       checks.push(
-        response.ok
+        response.ok && moved !== null
+          ? {
+              name: 'server reachable',
+              status: 'warn',
+              detail:
+                `${moved} did not answer; a hub on this machine did, at ${client.baseUrl}. ` +
+                'Every command finds it the same way; save it to skip the detour: ' +
+                `bifrost config set-host ${new URL(client.baseUrl).host}`,
+            }
+          : response.ok
           ? { name: 'server reachable', status: 'pass', detail: `${baseUrl}/api/health answered 200` }
           : {
               name: 'server reachable',
