@@ -12,17 +12,18 @@
   "workspaces": [
     "server",
     "client",
+    "web",
     "cli",
     "e2e"
   ],
   "scripts": {
     "setup": "tsx scripts/setup.ts",
-    "dev": "concurrently -n server,client -c blue,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
-    "build": "npm run build -w client && npm run build -w server && tsx scripts/cli-sync.ts",
+    "dev": "concurrently -n api,client,mdns -c blue,magenta,gray \"npm run dev -w server\" \"npm run dev -w client\" \"npm run mdns:dev -w web\"",
+    "build": "npm run build -w client && npm run build:standalone -w client && npm run build -w server && npm run build -w web && tsx scripts/cli-sync.ts",
     "dev:standalone": "npm run dev:standalone -w client",
     "build:standalone": "npm run build:standalone -w client",
     "preview:standalone": "npm run build:standalone && npm run preview:standalone -w client",
-    "start": "tsx scripts/cli-sync.ts && node --import ./server/dist/otel.js server/dist/bootstrap.js",
+    "start": "tsx scripts/cli-sync.ts && tsx scripts/start.ts",
     "logs": "tail -F storage/logs/current.log | pino-pretty --levelKey logLevel",
     "db:studio": "npm run db:studio -w server",
     "changelog": "changelogen --output CHANGELOG.md",
@@ -39,7 +40,7 @@
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces --if-present",
-    "test:all": "npm run lint && npm run typecheck && npm test && npm run build && npm run build:standalone && npm run test:e2e",
+    "test:all": "npm run lint && npm run typecheck && npm test && npm run build && npm run test:e2e",
     "prepare": "husky",
     "test:e2e": "npm run test:e2e -w e2e",
     "test:load": "npm run test:load -w e2e --"

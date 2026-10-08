@@ -8,7 +8,7 @@ import {
   mdnsErrorHandler,
   networkSignature,
   watchNetworkChanges,
-} from './index.js';
+} from './mdns.js';
 
 const silent = () => pino({ level: 'silent' });
 
