@@ -10,13 +10,15 @@ bifrost/
 ├── .env / .env.example
 ├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
 ├── package.json               # npm workspaces: server, client, cli, e2e, web
-├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web, picked by BIFROST_RUN (PLAN-36)
-├── Dockerfile / .dockerignore # Linux-target hub image (CI-built; not the macOS run mode),
-│                              #   plus the `standalone` target (client only, nginx-unprivileged, PLAN-35)
-├── docker/nginx-standalone.conf   # the standalone site's nginx: static files, no proxy_pass
-├── docker-compose.yml         # run on a Linux host (host networking): services bifrost-api + bifrost-web
-├── docker-compose.standalone.yml  # the standalone site behind an existing reverse proxy
-├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
+├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web (+ bifrost-mdns), picked by BIFROST_RUN
+│                              #   and MDNS_ADVERTISER (PLAN-36, PLAN-39)
+├── docker/                    # one image per process (PLAN-39): api.Dockerfile (server, native toolchain),
+│                              #   web.Dockerfile (web host + both clients, no apt), standalone.Dockerfile
+│                              #   (nginx-unprivileged), nginx-standalone.conf (the standalone site's rules)
+├── .dockerignore
+├── compose/                   # one compose file per piece: api.yml, web.yml, web.bridge.yml (Mac override),
+│                              #   observability.yml (profiled), standalone.yml (cloud machine)
+├── docker-compose.yml         # includes api + web + observability: `docker compose up` is the hub
 ├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
 │                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
@@ -25,7 +27,8 @@ bifrost/
 │   ├── THEME-SPEC.md          # rules + JSON schema for the bundled themes
 │   ├── standalone.md          # the standalone site: what it has, Docker, build args (PLAN-35)
 │   ├── pm2.md · launchd.md    # run as a service on macOS
-│   ├── docker-linux.md        # Docker on a Linux host
+│   ├── docker-linux.md        # Docker on a Linux host: the images, the compose combinations
+│   ├── docker-mac.md          # the web host in Docker beside the native API, and the Mac spike (PLAN-39)
 │   ├── observability.md       # the optional Grafana stack
 │   ├── cloud-profile.md       # internet-deployment checklist
 │   ├── releasing.md           # automated release flow
@@ -174,7 +177,9 @@ bifrost/
 │       ├── standalone-rules.ts  # the nginx-standalone.conf rules, parity-tested
 │       ├── config.ts  logger.ts  # its own zod view of .env; app-web.N.log, source: "web"
 │       ├── mdns.ts            #   the Bonjour responder (moved from server/src/core/mdns, PLAN-36)
-│       ├── mdns-dev.ts        #   advertiser-only process for `npm run dev`
+│       ├── advertiser.ts      #   an advertiser-only process: `bifrost-mdns` (advertise.ts) and `npm run dev`
+│       │                      #     (mdns-dev.ts), each with its own decision (PLAN-39)
+│       ├── processes.ts       #   the processes a run needs (BIFROST_RUN, MDNS_ADVERTISER), for npm start
 │       └── supervise.ts       #   runs a mode's processes as one for `npm start` (scripts/start.ts)
 ├── e2e/                       # FOURTH workspace (PLAN-32a): sees only the BUILT system, from
 │   │                          #   outside — lint-banned from importing server/client/cli src

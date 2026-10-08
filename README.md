@@ -212,7 +212,8 @@ Operating & deploying:
 
 - [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
 - [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy + Prometheus + Tempo stack
-- [`docs/docker-linux.md`](docs/docker-linux.md) — Docker image for a Linux host (not the macOS run mode)
+- [`docs/docker-linux.md`](docs/docker-linux.md) — Docker on a Linux host: one image per process, compose files you can combine (`docker compose up` is the hub, `--profile observability` adds Grafana)
+- [`docs/docker-mac.md`](docs/docker-mac.md) — on the Mac, the web host in Docker beside the native API, with a native advertiser for `bifrost.local`
 - [`docs/standalone.md`](docs/standalone.md) — the standalone site: the browser-only tools, run locally (`npm run dev:standalone` / `preview:standalone`) or as a static container behind your reverse proxy
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment

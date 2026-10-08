@@ -146,16 +146,16 @@ None. No route is added, changed or removed; `server/openapi.json` stays unchang
 
 ## Task checklist
 
-- [ ] `docker/api.Dockerfile`, `docker/web.Dockerfile`, `docker/standalone.Dockerfile`; remove the root `Dockerfile`; `.dockerignore` checked for the new layout
-- [ ] `compose/api.yml`, `compose/web.yml` (caps build-args anchor), `compose/web.bridge.yml`, `compose/observability.yml` (profiled), `compose/standalone.yml`; root `docker-compose.yml` as `include:`; `name: bifrost` everywhere; paths rebased to `../`
-- [ ] `MDNS_ADVERTISER` (`web` | `host` | `off`) in both config loaders, `.env.example`, `mdnsDecision`; `web/src/advertise.ts` + `web/dist/advertise.js`; `mdns-dev.ts` on top of it
-- [ ] `scripts/start.ts`, `ecosystem.config.cjs`, `start-pm2.sh`, `start-launchd.sh`: the `bifrost-mdns` process when `MDNS_ADVERTISER=host`, removed again when it is not
-- [ ] CLI: the same-machine fallback in `client.ts` (default address only), `doctor`'s line, unit tests
-- [ ] `scripts/observability.sh` → `compose/observability.yml`
-- [ ] CI: build the three images; `docker compose config` for every combination; the standalone smoke against the new file
-- [ ] Docs: `docs/docker-linux.md` (rewritten around the combinations), a new `docs/docker-mac.md` (the bridge override, the advertiser, the spike's results), `docs/observability.md`, `docs/standalone.md`, `README.md`, `architecture.md`, `project-structure.md`, `tech-stack.md`, the verify skill's Docker step
+- [x] `docker/api.Dockerfile`, `docker/web.Dockerfile`, `docker/standalone.Dockerfile`; remove the root `Dockerfile`; `.dockerignore` checked for the new layout
+- [x] `compose/api.yml`, `compose/web.yml` (caps build-args anchor), `compose/web.bridge.yml`, `compose/observability.yml` (profiled), `compose/standalone.yml`; root `docker-compose.yml` as `include:`; `name: bifrost` everywhere; paths rebased to `../`
+- [x] `MDNS_ADVERTISER` (`web` | `host` | `off`) in both config loaders, `.env.example`, `mdnsDecision`; `web/src/advertise.ts` + `web/dist/advertise.js`; `mdns-dev.ts` on top of it
+- [x] `scripts/start.ts`, `ecosystem.config.cjs`, `start-pm2.sh`, `start-launchd.sh`: the `bifrost-mdns` process when `MDNS_ADVERTISER=host`, removed again when it is not
+- [x] CLI: the same-machine fallback in `client.ts` (default address only), `doctor`'s line, unit tests
+- [x] `scripts/observability.sh` → `compose/observability.yml`
+- [x] CI: build the three images; `docker compose config` for every combination; the standalone smoke against the new file
+- [x] Docs: `docs/docker-linux.md` (rewritten around the combinations), a new `docs/docker-mac.md` (the bridge override, the advertiser, the spike's results), `docs/observability.md`, `docs/standalone.md`, `README.md`, `architecture.md`, `project-structure.md`, `tech-stack.md`, the verify skill's Docker step
 - [ ] Hand-run on Linux here: hub, hub + observability, each piece alone, standalone; the owner runs the Mac spike and the Mac combination
-- [ ] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
 
 ## Acceptance criteria
 
@@ -171,12 +171,12 @@ None. No route is added, changed or removed; `server/openapi.json` stays unchang
 ## Test checklist
 
 **Unit**
-- [ ] CLI fallback: default address fails then `127.0.0.1:4646` answers; both fail then `:4647` answers; none answers (the error names all three); an explicit `--host` and a saved host never fall back
-- [ ] `mdnsDecision` with `MDNS_ADVERTISER` web/host/off; the advertiser entry honours the same decision
-- [ ] `processesFor` and the launchers' process set include `bifrost-mdns` only for `host`
+- [x] CLI fallback: default address fails then `127.0.0.1:4646` answers; both fail then `:4647` answers; none answers (the error names all three); an explicit `--host` and a saved host never fall back
+- [x] `mdnsDecision` with `MDNS_ADVERTISER` web/host/off; the advertiser entry honours the same decision
+- [x] `processesFor` and the launchers' process set include `bifrost-mdns` only for `host`
 
 **CI**
-- [ ] The three images build; `docker compose config -q` for the root file, `--profile observability`, each piece alone, and `web.yml` + `web.bridge.yml`
+- [x] The three images build; `docker compose config -q` for the root file, `--profile observability`, each piece alone, and `web.yml` + `web.bridge.yml`
 
 **Manual**
 - [ ] Linux (here): the hub, hub + observability, the API alone, the web host alone, and the standalone site, each up and healthy; volumes reused across the move

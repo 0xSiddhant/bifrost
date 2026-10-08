@@ -63,7 +63,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 One client source, two builds, picked by the Vite mode:
 
 - **The hub** (`npm run build` → `client/dist/`): everything, served by the hub's web host (PLAN-36). Behaviour is what it was before the split.
-- **The standalone site** (`npm run build:standalone` → `client/dist-standalone/`): the features that work in a browser with no server, as static files in their own container (`Dockerfile` target `standalone`, `docker/nginx-standalone.conf`, `docker-compose.standalone.yml`; see `docs/standalone.md`).
+- **The standalone site** (`npm run build:standalone` → `client/dist-standalone/`): the features that work in a browser with no server, as static files in their own container (`docker/standalone.Dockerfile`, `docker/nginx-standalone.conf`, `compose/standalone.yml`; see `docs/standalone.md`).
 
 **The feature manifest is not the server's `MANIFEST`.** `client/src/core/features.ts` declares each client feature once (id, URL roots, nav category, `needsHub`); the standalone build ships the `needsHub: false` ones. Nav, hubs, routes and Heimdall's sections read it through `hasFeature`. The server's `MANIFEST` still decides what a given server **serves**, a security boundary no client build can be; `/api/capabilities` stays for the CLI. A new feature declares itself in `features.ts` or it exists in neither build.
 
@@ -176,7 +176,11 @@ Four things about it are load-bearing rather than incidental:
   Windows needs Bonjour. Nothing browses `_http._tcp`. What makes that safe is
   that **one** wording (`discover.ts`'s `unreachableMessage`) names the two
   fixes — `--host` or `bifrost config set-host` — and `client.ts` and `doctor`
-  both raise exactly it rather than inventing a second vocabulary.
+  both raise exactly it rather than inventing a second vocabulary. Since
+  PLAN-39 the **default** address alone has a same-machine fallback: a
+  connection that never reached a server (not found, refused; never a timeout)
+  is retried once at `127.0.0.1:4646`, then `:4647`, and `doctor` says so. The
+  CLI still knows nothing of Docker: native or containerised, the ports match.
 - **A slug names a document but not its kind.** `open`/`preview` ask all four
   raw endpoints concurrently and use the one that answers; `--type` skips the
   fan-out; a cross-kind collision is reported, never resolved by guessing. The
@@ -229,9 +233,9 @@ presentation-aware, still with **zero server change**:
 `scripts/cli-sync.ts` keeps that global install honest: `npm run build` and `npm
 run start` both `npm pack` the workspace and `npm install -g` the tarball — the
 same mechanism a real install uses, never `npm link`, so a packaging bug cannot
-hide until release day. It skips the global install under `CI` (and the
-Dockerfile sets `CI=true` for its build), and PM2 never runs it at all, since
-`ecosystem.config.cjs` execs `server/dist/bootstrap.js` directly.
+hide until release day. It skips the global install under `CI`, no Docker image
+builds the CLI at all (PLAN-39: each image builds only its own workspace), and
+PM2 never runs it, since `ecosystem.config.cjs` execs the entries directly.
 
 ## The end-to-end safety net (PLAN-32a)
 
@@ -286,6 +290,7 @@ Shared pieces live in core (`core/http/schemas.ts`, `core/paging.ts`'s envelope 
 
 - **Production entries are `server/src/bootstrap.ts` and `web/src/bootstrap.ts`**, not `app.ts`/`main.ts`. `app.ts` self-starts only when it is the *direct* entry (`import.meta.url === argv[1]`); PM2's fork mode wraps the script so that guard never fires. `bootstrap.ts` calls `main()` unconditionally; `npm start`, PM2, launchd, and Docker all point at it (and at the web host's, which has the same shape). (`app.ts` keeps the guard so tests / the resilience suite can spawn it directly.)
 - **Run modes:** macOS runs **native** (PM2 or launchd — mDNS + FSEvents need it) via `ecosystem.config.cjs` / a launchd plist, with one-command `scripts/start-*.sh`. **Docker targets a future Linux host** (`--network host`); it is deliberately not the macOS run mode.
+- **Docker (PLAN-39):** one image per process (`docker/api.Dockerfile`, `docker/web.Dockerfile`, `docker/standalone.Dockerfile`) and one compose file per piece (`compose/api.yml`, `web.yml`, `observability.yml`, `standalone.yml`, plus `web.bridge.yml`). The root `docker-compose.yml` includes the hub's pieces: `docker compose up` is the hub, `--profile observability` adds the stack, `up <service>` runs one piece. Every file pins `name: bifrost` and resolves paths from `compose/`; a single file needs `--env-file .env`. **Linux** runs everything with host networking. **On the Mac only the web host may run in Docker** (bridge override, `host.docker.internal` to the native API), and `bifrost.local` then comes from `bifrost-mdns`, a native advertiser (`MDNS_ADVERTISER=host`): publishing a port carries no multicast. Whether Docker Desktop keeps real client addresses is the owner's spike (`docs/docker-mac.md`). The **CLI** never knows how the hub runs; with the default address it falls back to `127.0.0.1:4646`, then `:4647`, when `bifrost.local` does not connect.
 - **Backup/restore:** `npm run backup` / `restore` wrap `core/backup` (online-safe snapshot, rotation, `--include-env` opt-in; restore refuses a live server).
-- **Observability (optional, detachable):** `docker-compose.observability.yml` runs Grafana + Loki + Alloy; Alloy tails `storage/logs/app*.log` (both processes' series), so it works with any run mode and backfills after downtime.
+- **Observability (optional, detachable):** `compose/observability.yml` runs Grafana + Loki + Alloy + Prometheus + Tempo, every service in the `observability` profile, so the root `docker-compose.yml` includes it without starting it; Alloy tails `storage/logs/app*.log` (both processes' series), so it works with any run mode and backfills after downtime.
 - **Releases are automated:** `.github/workflows/release.yml` on push to `main` computes the semver bump from conventional commits, tags, publishes a GitHub Release + tarball, and back-merges to `develop` (needs a `RELEASE_TOKEN` PAT). Since PLAN-27 the release carries **two** assets — the PM2 deployment bundle and `bifrost-cli-<version>.tgz` — and the same commit rewrites root `README.md`'s `<!-- CLI_INSTALL_START -->` block with that version's real install URL, since a hand-written one would go stale on the next release.
