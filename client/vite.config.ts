@@ -12,10 +12,14 @@ import {
   type BuildDefaults,
 } from './buildDefaults';
 
-// Dev proxy target must match the server's PORT from the repo-root .env
-// (vite runs with cwd=client/, so resolve the path explicitly).
+// PLAN-36: in dev, Vite plays the web host. It serves on PORT (the address
+// people open, as in production) and proxies the API paths to the API server
+// on API_PORT, read from the repo-root .env (vite runs with cwd=client/, so
+// the path is explicit). API_PORT defaults to PORT + 1, as the server's does.
 dotenv.config({ path: '../.env', quiet: true });
-const serverPort = Number(process.env.PORT) || 4646;
+const webPort = Number(process.env.PORT) || 4646;
+const apiPort = Number(process.env.API_PORT) || webPort + 1;
+const apiHost = process.env.API_HOST || '127.0.0.1';
 const mdnsHost = `${process.env.MDNS_NAME || 'bifrost'}.local`;
 
 /**
@@ -64,7 +68,12 @@ export default defineConfig(({ mode }) => {
   // Tests read the documented defaults, never a developer's own .env.
   const defaults = readBuildDefaults(mode === 'test' ? {} : process.env);
   const standalone = build === 'standalone';
-  const hubTarget = { target: `http://localhost:${serverPort}` };
+  // xfwd: the API trusts X-Forwarded-For from loopback, so dev sees each
+  // device's own address exactly as it does behind the production web host.
+  const hubTarget = {
+    target: `http://${apiHost.includes(':') ? `[${apiHost}]` : apiHost}:${apiPort}`,
+    xfwd: true,
+  };
   // The standalone build talks to no server, so its dev server proxies nothing.
   const proxy: Record<string, typeof hubTarget> = standalone
     ? {}
@@ -120,7 +129,12 @@ export default defineConfig(({ mode }) => {
       // Explicit IPv4 wildcard: `host: true` binds an IPv6 socket whose
       // v4-mapped dual-stack accept does not work reliably on macOS, leaving
       // LAN devices unable to reach the dev server by IPv4 address.
-      host: '0.0.0.0',
+      host: process.env.WEB_HOST || '0.0.0.0',
+      // The hub's dev server and production share one URL (PLAN-36), so a
+      // taken PORT is an error, not a silent move to a port nothing points
+      // at. The standalone dev server keeps Vite's own port, so it can run
+      // beside the hub's (docs/standalone.md).
+      ...(standalone ? {} : { port: webPort, strictPort: true }),
       allowedHosts: [mdnsHost],
       proxy,
     },

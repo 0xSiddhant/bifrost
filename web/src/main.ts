@@ -64,9 +64,19 @@ export async function main(): Promise<void> {
   });
 
   if (config.runMode === 'api') {
-    log.info(
-      'BIFROST_RUN=api runs the API alone; this mode has no web host, so it is not starting',
+    // The launchers never start the web host in this mode. A container still
+    // started by compose idles rather than exits: under `restart:
+    // unless-stopped`, exiting would only restart it in a loop.
+    log.warn(
+      'BIFROST_RUN=api runs the API alone; this web host serves nothing and idles until stopped',
     );
+    const idle = setInterval(() => {}, 60_000);
+    const stop = () => {
+      clearInterval(idle);
+      log.flush(() => process.exit(0));
+    };
+    process.once('SIGINT', stop);
+    process.once('SIGTERM', stop);
     return;
   }
 

@@ -17,6 +17,7 @@ COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
 COPY cli/package.json ./cli/
+COPY web/package.json ./web/
 # The root devDependency that replaces micromatch (tools/micromatch-shim/README.md).
 COPY tools/micromatch-shim ./tools/micromatch-shim/
 RUN npm ci
@@ -46,6 +47,7 @@ COPY package.json package-lock.json ./
 COPY server/package.json ./server/
 COPY client/package.json ./client/
 COPY cli/package.json ./cli/
+COPY web/package.json ./web/
 COPY e2e/package.json ./e2e/
 COPY tools/micromatch-shim ./tools/micromatch-shim/
 RUN npm ci --workspace client --include-workspace-root --ignore-scripts
@@ -107,16 +109,23 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/server/drizzle ./server/drizzle
 COPY --from=builder /app/client/dist ./client/dist
+# PLAN-36: the web host, and the standalone client it serves in web mode.
+COPY --from=builder /app/client/dist-standalone ./client/dist-standalone
+COPY --from=builder /app/web/dist ./web/dist
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server/package.json ./server/package.json
 COPY --from=builder /app/client/package.json ./client/package.json
+COPY --from=builder /app/web/package.json ./web/package.json
 # Runtime state (bind-mounted in compose), owned by the unprivileged node user.
 RUN mkdir -p storage && chown -R node:node /app
 USER node
+# PLAN-36: one image, two processes. The API is this image's default command,
+# on loopback API_PORT; docker-compose.yml runs the web host from the same
+# image as a second service. Only PORT (the web host's) is a public port.
 EXPOSE 4646
 # Node 20 ships global fetch — no curl/wget needed in the image.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4646)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const p=process.env.API_PORT||Number(process.env.PORT||4646)+1;fetch('http://127.0.0.1:'+p+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/bin/tini", "--"]
 # --import loads the OTel SDK before the app; see ecosystem.config.cjs.
 CMD ["node", "--import", "./server/dist/otel.js", "server/dist/bootstrap.js"]
