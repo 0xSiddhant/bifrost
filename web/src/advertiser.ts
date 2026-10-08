@@ -1,5 +1,5 @@
 import { isLoopbackHost, loadDotenv, loadWebConfig, type WebConfig } from './config.js';
-import { createWebLogger } from './logger.js';
+import { createWebLogger, logsDirProblem } from './logger.js';
 import { advertiserDecision, mdnsDecision, type MdnsDecision } from './main.js';
 import { advertiseMdns } from './mdns.js';
 
@@ -31,6 +31,11 @@ export function decisionFor(kind: AdvertiserKind, config: WebConfig): MdnsDecisi
 export function runAdvertiser(kind: AdvertiserKind): void {
   loadDotenv();
   const config = loadWebConfig();
+  const problem = logsDirProblem(config.logsDir);
+  if (problem) {
+    process.stderr.write(`mdns advertiser: ${problem}\n`);
+    process.exit(1);
+  }
   const log = createWebLogger({
     level: config.logLevel,
     logsDir: config.logsDir,

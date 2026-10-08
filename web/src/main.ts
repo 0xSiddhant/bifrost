@@ -9,7 +9,7 @@ import {
   type WebConfig,
 } from './config.js';
 import { buildWebHost } from './host.js';
-import { createWebLogger, type Logger } from './logger.js';
+import { createWebLogger, logsDirProblem, type Logger } from './logger.js';
 import { advertiseMdns, type MdnsHandle } from './mdns.js';
 
 /**
@@ -87,6 +87,11 @@ export async function main(): Promise<void> {
       process.exit(1);
     }
     throw error;
+  }
+  const problem = logsDirProblem(config.logsDir);
+  if (problem) {
+    process.stderr.write(`web host: ${problem}\n`);
+    process.exit(1);
   }
   const log: Logger = createWebLogger({
     level: config.logLevel,
