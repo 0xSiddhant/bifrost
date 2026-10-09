@@ -132,7 +132,7 @@ No new `.env` keys.
 - [x] `server/src/core/http/docs.int.test.ts`: `/docs` served; `/docs/json` equals the committed spec minus `info.version`; CSP header present
 - [x] `e2e/browser/docs.spec.ts` (Playwright, against the API server's port): the UI renders every tag; no request leaves for an external host; \"Try it out\" on `GET /api/v1/health` returns 200; a write operation offers \"Try it out\" and the real-data note is visible
 - [x] e2e (Vitest): through the web host on `PORT`, `/docs`, `/docs/json` and `/docs/static/index.html` return the client's not-found page or 404, never the docs or the spec
-- [ ] PLAN-33's API suites and PLAN-37's spec check pass on the merged `/{key}` paths
+- [x] PLAN-33's API suites and PLAN-37's spec check pass on the merged `/{key}` paths
 
 **Docs & cleanup**
 - [x] `docs/api.md`: where the docs are (the loopback URL, and why `bifrost.local:4647` does not work), the SSH tunnel recipe, that "Try it out" sends real requests, how to log in for admin calls; linked from `README.md` and `docs/testing.md`
