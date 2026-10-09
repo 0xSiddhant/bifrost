@@ -63,7 +63,7 @@ Usecases depend on **repository interfaces**, never on Drizzle/fs/chokidar direc
 One client source, two builds, picked by the Vite mode:
 
 - **The hub** (`npm run build` → `client/dist/`): everything, served by the hub's web host (PLAN-36). Behaviour is what it was before the split.
-- **The standalone site** (`npm run build:standalone` → `client/dist-standalone/`): the features that work in a browser with no server, as static files in their own container (`docker/standalone.Dockerfile`, `docker/nginx-standalone.conf`, `compose/standalone.yml`; see `docs/standalone.md`).
+- **The standalone site** (`./bifrost build --standalone` → `client/dist-standalone/`): the features that work in a browser with no server, as static files in their own container (`docker/standalone.Dockerfile`, `docker/nginx-standalone.conf`, `compose/standalone.yml`; see `docs/standalone.md`).
 
 **The feature manifest is not the server's `MANIFEST`.** `client/src/core/features.ts` declares each client feature once (id, URL roots, nav category, `needsHub`); the standalone build ships the `needsHub: false` ones. Nav, hubs, routes and Heimdall's sections read it through `hasFeature`. The server's `MANIFEST` still decides what a given server **serves**, a security boundary no client build can be; `/api/v1/capabilities` stays for the CLI. A new feature declares itself in `features.ts` or it exists in neither build.
 
@@ -303,7 +303,7 @@ Swagger UI for the live spec is served by the **API server** at `/docs` (`/docs/
 - Aborted uploads leave junk only in `storage/tmp/` — swept on boot.
 - Boot reconciliation: chokidar initial scan rebuilds the download listing; audit tables reconciled against the folder.
 - Drizzle migrations are idempotent and tracked in-DB.
-- Proven by `npm run test:resilience` (50 restarts + SIGKILL mid-write / mid-migration + tmp-sweep, all `integrity_check`ed).
+- Proven by `./bifrost test resilience` (50 restarts + SIGKILL mid-write / mid-migration + tmp-sweep, all `integrity_check`ed).
 
 ## Storage layout
 

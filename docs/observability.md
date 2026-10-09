@@ -2,7 +2,7 @@
 
 Bifrost logs structured pino JSON to `storage/logs/` — rotated `app.N.log` files
 with a `current.log` symlink on the active one, kept to `LOG_RETENTION_FILES`
-rotations. That alone is the source of truth (`npm run logs` pretty-prints it).
+rotations. That alone is the source of truth (`./bifrost logs` pretty-prints it).
 Since PLAN-36 the web host in front of the API writes its own series beside it,
 `app-web.N.log` (no symlink; `current.log` stays the API's), every line tagged
 `source: "web"`: its start and stop, the API going away and coming back, and

@@ -2,7 +2,7 @@
 
 Every kind of test this repo runs, how to run and replay each one, and which of them are permanent. `.agents/rules/coding.md` says what each change must ship; this page says how to run what is already here.
 
-**One command runs them all:** `npm run test:all`. It runs `npm audit` → lint → typecheck → `npm test` → build → `test:e2e`, stopping at the first failure: the same gate as CI and the `verify` skill. Use the narrower commands below to run or replay one slice.
+**One command runs them all:** `./bifrost test all`. It runs `npm audit` → lint → typecheck → `npm test` → build → `test:e2e`, stopping at the first failure: the same gate as CI and the `verify` skill. Use the narrower commands below to run or replay one slice.
 
 **Why tests live in more than one place.** Unit and integration tests sit beside the code they test, in `server/`, `client/` and `cli/`. They import that code directly, run without a build, and come first in CI because they are fast. End-to-end tests live in `e2e/` and are _forbidden_ from importing product code: that rule is what proves they test what actually ships. Merging the two would lose that guarantee.
 
@@ -14,7 +14,7 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 | End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, after Build   |
 | Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, after Build   |
 | All three of the above       |                                                                       | `npm run test:e2e`                      | yes            | yes                |
-| Restart resilience           | `scripts/resilience.ts`                                               | `npm run test:resilience`               | no             | no (on demand)     |
+| Restart resilience           | `scripts/resilience.ts`                                               | `./bifrost test resilience`               | no             | no (on demand)     |
 | Load, stress, soak (PLAN-34) | `e2e/perf/` ([`docs/performance.md`](performance.md))                 | `npm run test:load -- --profile <name>` | yes            | no (on demand)     |
 | Live verification            | `.claude/skills/live-verify`                                          | the skill                               | yes            | no (manual)        |
 
@@ -74,7 +74,7 @@ Where Playwright's own browser download is unavailable but a Chromium is install
 
 ### The standalone project (PLAN-35)
 
-`e2e/standalone/` runs against `client/dist-standalone/` (build it first: `npm run build:standalone`), served by `e2e/support/static-server.ts` with the location rules of the committed `docker/nginx-standalone.conf`; `static-server.test.ts` parses that file and fails if the two disagree. No Bifrost server starts.
+`e2e/standalone/` runs against `client/dist-standalone/` (build it first: `./bifrost build --standalone`), served by `e2e/support/static-server.ts` with the location rules of the committed `docker/nginx-standalone.conf`; `static-server.test.ts` parses that file and fails if the two disagree. No Bifrost server starts.
 
 On top of the usual guard, every context carries a **no-request guard**: the page may ask its own origin only for files of the build (and navigations). Anything else, an `/api/…` call above all, fails the test at teardown, even though the static server would have answered it with the app shell. The hub stubs never touch the network, so the cold-load journey also reads their call counter (`globalThis.__bifrostStubCalls`) and expects zero.
 

@@ -127,5 +127,5 @@ sh scripts/start-launchd.sh
 - Bifrost loads `.env` itself from `WorkingDirectory`, so no secrets go in the
   plist. Set the PIN in `.env`.
 - Logs: structured pino JSON is at `storage/logs/current.log` for the API
-  (`npm run logs`) and `storage/logs/app-web.N.log` for the web host; the
+  (`./bifrost logs`) and `storage/logs/app-web.N.log` for the web host; the
   plists' `StandardOut/ErrorPath` only capture boot banners and crashes.

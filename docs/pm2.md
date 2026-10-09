@@ -89,7 +89,7 @@ After changing code: `npm run build && pm2 restart all`.
 
 - **Structured app logs** (what you actually want): pino JSON. The API writes
   `storage/logs/app.N.log` (`current.log` points at the active one, and
-  `npm run logs` pretty-prints it); the web host writes its own series,
+  `./bifrost logs` pretty-prints it); the web host writes its own series,
   `storage/logs/app-web.N.log`, with `source: "web"`. The optional
   [observability stack](observability.md) tails both into Grafana.
 - **Process logs** (boot banner, uncaught crashes):
@@ -103,5 +103,5 @@ accepting → drain/abort in-flight uploads → close chokidar + SSE → checkpo
 the SQLite WAL → exit. The web host's: stop advertising `bifrost.local` → end
 open event streams cleanly → close. `kill_timeout` in `ecosystem.config.cjs`
 (10 s) is the grace window before PM2 escalates to SIGKILL. The restart-
-resilience suite (`npm run test:resilience`) proves state survives even a hard
+resilience suite (`./bifrost test resilience`) proves state survives even a hard
 SIGKILL, so a rare timeout is not data-threatening.

@@ -94,7 +94,7 @@ An unknown id at any step (a deleted theme someone still has chosen, say) simply
 
 ## Adding / removing
 
-Save `<id>.json` into `client/src/assets/themes/`, add its file name to the list the first test in `themes.test.ts` pins (so a file can never ship or vanish by accident), run `npm test -w client`, then rebuild (`npm run build`, and `npm run build:standalone` for the standalone site). Delete the file to remove a theme; a device that had chosen it falls back to the next step above. There is no theme API and no enable/disable switch any more (PLAN-35): what ships is what the files say.
+Save `<id>.json` into `client/src/assets/themes/`, add its file name to the list the first test in `themes.test.ts` pins (so a file can never ship or vanish by accident), run `npm test -w client`, then rebuild (`npm run build`, and `./bifrost build --standalone` for the standalone site). Delete the file to remove a theme; a device that had chosen it falls back to the next step above. There is no theme API and no enable/disable switch any more (PLAN-35): what ships is what the files say.
 
 ## Troubleshooting
 
