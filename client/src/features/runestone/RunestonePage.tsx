@@ -23,7 +23,8 @@ import {
 } from '../../core/json';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
-import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
+import { useDraftCache, showsRestore } from '../../core/draftCache';
+import { takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
@@ -147,11 +148,6 @@ export function RunestonePage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // What is on screen right now, for the leave handler below — it has to flush
-  // the current buffer on unmount, not the one that existed when it registered.
-  const bufferRef = useRef({ title, text, isScratch });
-  bufferRef.current = { title, text, isScratch };
-
   // On arriving at the scratch editor, in order of how directly the person
   // asked for it:
   //   1. a hand-off from another tool (Groot's "Open in Runestone") — a
@@ -180,26 +176,21 @@ export function RunestonePage() {
     }
   }, [isScratch]);
 
-  // Leaving flushes the buffer and records that it was still open, closing the
-  // window where clicking away within half a second of typing loses the last
-  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
-  // before this runs, so the guard keeps a saved document from resurrecting it.
-  useEffect(() => {
-    return () => {
-      const left = bufferRef.current;
-      if (!left.isScratch || left.text.trim() === '') return;
-      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
-      markLeftOpen(DRAFT_ID);
-    };
-  }, []);
-
-  // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
-  // nothing. Saved documents live on the server instead.
-  useEffect(() => {
-    if (!isScratch || text.trim() === '') return;
-    const id = window.setTimeout(() => saveDraft({ title, text, savedAt: Date.now() }), 500);
-    return () => window.clearTimeout(id);
-  }, [isScratch, title, text]);
+  // The cache mirrors the scratch buffer, so a refresh mid-edit loses nothing,
+  // and leaving flushes it and marks it left open for the silent return above.
+  // Saving clears the draft deliberately and flips `isScratch` before leaving,
+  // so a saved document cannot resurrect it.
+  const blank = text.trim() === '';
+  useDraftCache({
+    isScratch,
+    title,
+    text,
+    blank,
+    offered: restorable,
+    save: saveDraft,
+    clear: clearDraft,
+    returnId: DRAFT_ID,
+  });
 
   useEffect(() => {
     if (!notice) return;
@@ -529,7 +520,7 @@ export function RunestonePage() {
         className="stack rune-workspace panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
-        {restorable && (
+        {showsRestore(restorable, blank) && (
           <Toast kind="info">
             <span className="rune-restore">
               Restore the draft from your last visit?
