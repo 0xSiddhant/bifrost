@@ -1,22 +1,24 @@
 /**
  * PM2 process definitions — the production run mode on macOS (see docs/pm2.md).
  *
- *   sh scripts/start-pm2.sh           # build + start (+ the upgrade from one app)
- *   pm2 startup && pm2 save           # survive reboots
+ *   ./bifrost service pm2 [--web docker|none] [--standalone] [--otel]
+ *   sh scripts/start-pm2.sh [same flags]   # the same, before `npm install`
+ *   pm2 startup && pm2 save                # survive reboots
  *
  * PLAN-36: two apps, `bifrost-api` (the API on loopback API_PORT) and
- * `bifrost-web` (the web host on PORT, which also answers for bifrost.local).
- * BIFROST_RUN in .env picks which exist: full (both), api, or web; and
- * MDNS_ADVERTISER=host adds `bifrost-mdns` (PLAN-39). The apps load .env
- * themselves; this file reads it only to know which to define.
+ * `bifrost-web` (the web host on PORT, which also answers for bifrost.local),
+ * plus `bifrost-mdns` for a web host in Docker (PLAN-39). Which apps exist and
+ * the launcher keys they get come from start-pm2.sh's flags, exported as
+ * BIFROST_APPS and the keys themselves — never from .env (owner, 2026-10-09).
+ * Run without the script, this defines the plain hub. The apps load the rest
+ * of .env themselves.
  */
-const path = require('node:path');
-require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
-
-const mode = process.env.BIFROST_RUN || 'full';
-// PLAN-39: who answers for bifrost.local. `host` adds bifrost-mdns, a native
-// advertiser, for a web host running in Docker on the Mac.
-const advertiser = process.env.MDNS_ADVERTISER || 'web';
+const apps = (process.env.BIFROST_APPS || 'api web').split(/\s+/).filter(Boolean);
+const launcherEnv = {
+  BIFROST_RUN: process.env.BIFROST_RUN || 'full',
+  MDNS_ADVERTISER: process.env.MDNS_ADVERTISER || 'web',
+  OTEL_ENABLED: process.env.OTEL_ENABLED || 'false',
+};
 
 const common = {
   cwd: __dirname,
@@ -25,7 +27,7 @@ const common = {
   instances: 1,
   autorestart: true,
   watch: false,
-  env: { NODE_ENV: 'production' },
+  env: { NODE_ENV: 'production', ...launcherEnv },
   // PM2 stops/restarts with SIGINT, which is each process's graceful trigger.
   // Give it room before PM2 escalates to SIGKILL; matches the shutdown budget.
   kill_timeout: 10000,
@@ -70,7 +72,10 @@ const mdns = {
 
 // The API first, so the web host's first proxied request has an upstream.
 // Mirrors web/src/processes.ts, which `npm start` uses (and which is tested).
-const base = mode === 'api' ? [api] : mode === 'web' ? [web] : [api, web];
 module.exports = {
-  apps: advertiser === 'host' ? [...base, mdns] : base,
+  apps: [
+    ...(apps.includes('api') ? [api] : []),
+    ...(apps.includes('web') ? [web] : []),
+    ...(apps.includes('mdns') ? [mdns] : []),
+  ],
 };

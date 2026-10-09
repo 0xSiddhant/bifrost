@@ -1,8 +1,8 @@
 # Override for compose/web.yml on the Mac (PLAN-39): Docker Desktop has no
 # host networking onto the LAN, so the web host runs in a bridge network,
 # publishes PORT, and reaches the native API through host.docker.internal.
-# bifrost.local comes from the native advertiser (MDNS_ADVERTISER=host in
-# .env), because multicast does not leave Docker Desktop's VM.
+# bifrost.local comes from the native advertiser, bifrost-mdns, because
+# multicast does not leave Docker Desktop's VM.
 #
 #   docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d
 #
@@ -25,3 +25,6 @@ services:
       API_HOST: host.docker.internal
       # Inside the container it must listen on every interface to be published.
       WEB_HOST: 0.0.0.0
+      # Multicast cannot leave Docker Desktop's VM: bifrost-mdns answers for
+      # the name natively (./bifrost start|service --web docker starts it).
+      MDNS_ADVERTISER: host

@@ -61,11 +61,11 @@ function listening(host: string, port: number): Promise<boolean> {
   });
 }
 
-async function startHub(env: Record<string, string>): Promise<Hub> {
+async function startHub(env: Record<string, string>, flags: string[] = []): Promise<Hub> {
   const port = await freePort();
   const apiPort = await freePort();
   const storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-e2e-modes-'));
-  const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/start.ts'], {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'scripts/start.ts', ...flags], {
     cwd: REPO_ROOT,
     env: serverEnv({
       NODE_ENV: 'production',
@@ -117,9 +117,11 @@ const hubIndex = () => fs.readFileSync(fromRepoRoot('client', 'dist', 'index.htm
 const standaloneIndex = () =>
   fs.readFileSync(fromRepoRoot('client', 'dist-standalone', 'index.html'), 'utf8');
 
+// The run's shape is start.ts's flags, never the environment (owner, 2026-10-09).
 describe('run modes through npm start (PLAN-36)', () => {
   it('full, the default: the hub client on PORT for the LAN, the API on loopback only', async () => {
-    const hub = await startHub({});
+    // A BIFROST_RUN left in the environment no longer reshapes the run.
+    const hub = await startHub({ BIFROST_RUN: 'api' });
     const health = await answers(hub, `http://127.0.0.1:${hub.port}/api/health`);
     expect(health.headers.get('content-type')).toContain('application/json');
     expect(await (await answers(hub, `http://127.0.0.1:${hub.port}/`)).text()).toBe(hubIndex());
@@ -133,23 +135,23 @@ describe('run modes through npm start (PLAN-36)', () => {
       expect(await listening(lan, hub.port), 'the web host is on the LAN').toBe(true);
       expect(await listening(lan, hub.apiPort), 'the API is not').toBe(false);
     }
-    expect(hub.output()).toContain('[start] BIFROST_RUN=full: api + web');
+    expect(hub.output()).toContain('[start] api + web');
 
     expect(await hub.stop()).toBe(0);
     expect(await listening('127.0.0.1', hub.port)).toBe(false);
     expect(await listening('127.0.0.1', hub.apiPort)).toBe(false);
   });
 
-  it('api: only the API, on loopback; nothing on PORT', async () => {
-    const hub = await startHub({ BIFROST_RUN: 'api' });
+  it('--web none: only the API, on loopback; nothing on PORT', async () => {
+    const hub = await startHub({}, ['--web', 'none']);
     await answers(hub, `http://127.0.0.1:${hub.apiPort}/api/health`);
     expect(await listening('127.0.0.1', hub.port)).toBe(false);
-    expect(hub.output()).toContain('[start] BIFROST_RUN=api: api');
+    expect(hub.output()).toContain('[start] api\n');
     expect(await hub.stop()).toBe(0);
   });
 
-  it('web: the standalone client on PORT, forwarding nothing, and no API', async () => {
-    const hub = await startHub({ BIFROST_RUN: 'web' });
+  it('--standalone: the standalone client on PORT, forwarding nothing, and no API', async () => {
+    const hub = await startHub({}, ['--standalone']);
     expect(await (await answers(hub, `http://127.0.0.1:${hub.port}/`)).text()).toBe(
       standaloneIndex(),
     );
@@ -161,7 +163,7 @@ describe('run modes through npm start (PLAN-36)', () => {
     const api = await answers(hub, `http://127.0.0.1:${hub.port}/api/health`);
     expect(await api.text()).toBe(standaloneIndex());
     expect(await listening('127.0.0.1', hub.apiPort)).toBe(false);
-    expect(hub.output()).toContain('[start] BIFROST_RUN=web: web');
+    expect(hub.output()).toContain('[start] web\n');
     expect(await hub.stop()).toBe(0);
   });
 

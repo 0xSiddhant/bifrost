@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
@@ -18,8 +19,35 @@ export function fromRepoRoot(...segments: string[]): string {
   return path.resolve(REPO_ROOT, ...segments);
 }
 
-export function loadDotenv(): void {
-  dotenv.config({ path: fromRepoRoot('.env'), quiet: true });
+/**
+ * How a run is shaped, decided by the launcher and never read from .env (the
+ * server's LAUNCHER_KEYS, repeated here because workspaces do not import each
+ * other; config.test.ts pins the two lists together).
+ */
+export const LAUNCHER_KEYS = ['BIFROST_RUN', 'MDNS_ADVERTISER', 'OTEL_ENABLED'] as const;
+
+/**
+ * Load the repo-root .env, except the launcher keys; a variable already in the
+ * environment wins, as with dotenv. Returns the launcher keys .env still sets.
+ */
+export function loadDotenv(file = fromRepoRoot('.env')): string[] {
+  let parsed: Record<string, string>;
+  try {
+    parsed = dotenv.parse(fs.readFileSync(file));
+  } catch {
+    // No .env is a valid state (a container passes real environment
+    // variables); config validation names anything required that is missing.
+    return [];
+  }
+  const ignored: string[] = [];
+  for (const [key, value] of Object.entries(parsed)) {
+    if ((LAUNCHER_KEYS as readonly string[]).includes(key)) {
+      ignored.push(key);
+    } else if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+  return ignored;
 }
 
 export const RUN_MODES = ['full', 'api', 'web'] as const;

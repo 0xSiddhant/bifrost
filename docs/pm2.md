@@ -24,9 +24,13 @@ The address people open is unchanged: `http://bifrost.local:4646`. Stopping
 `bifrost-api` alone leaves the page loading and showing "The Bifröst is
 closed" until it is back; stopping `bifrost-web` takes the page off the LAN.
 
-`BIFROST_RUN` in `.env` decides which apps exist: `full` (both, the default),
-`api` (the API alone, for the CLI on this Mac) or `web` (the standalone client
-alone, no API). `start-pm2.sh` removes the apps the chosen mode does not run.
+The flags decide which apps exist, never `.env`: none (both, the default),
+`--web none` (the API alone, for the CLI on this Mac), `--web docker` (the API
+and `bifrost-mdns`, for a web host in Docker: [`docker-mac.md`](docker-mac.md))
+or `--standalone` (the standalone client alone, no API); `--otel` turns the
+API's traces on. `start-pm2.sh` removes the apps the chosen shape does not run,
+and PM2 keeps the flags' values with each app (`pm2 save`), so they hold across
+reboots. Re-running without flags puts back the plain hub.
 
 ## One-time setup
 
@@ -89,7 +93,7 @@ After changing code: `npm run build && pm2 restart all`.
 
 - **Structured app logs** (what you actually want): pino JSON. The API writes
   `storage/logs/app.N.log` (`current.log` points at the active one, and
-  `npm run logs` pretty-prints it); the web host writes its own series,
+  `./bifrost logs` pretty-prints it); the web host writes its own series,
   `storage/logs/app-web.N.log`, with `source: "web"`. The optional
   [observability stack](observability.md) tails both into Grafana.
 - **Process logs** (boot banner, uncaught crashes):
@@ -103,5 +107,5 @@ accepting → drain/abort in-flight uploads → close chokidar + SSE → checkpo
 the SQLite WAL → exit. The web host's: stop advertising `bifrost.local` → end
 open event streams cleanly → close. `kill_timeout` in `ecosystem.config.cjs`
 (10 s) is the grace window before PM2 escalates to SIGKILL. The restart-
-resilience suite (`npm run test:resilience`) proves state survives even a hard
+resilience suite (`./bifrost test resilience`) proves state survives even a hard
 SIGKILL, so a rare timeout is not data-threatening.

@@ -2,7 +2,7 @@
 # loopback API_PORT, which is where the web host (native or compose/web.yml)
 # forwards to. Never run on the Mac: the API is native there (docs/docker-mac.md).
 #
-#   docker compose -f compose/api.yml --env-file .env up -d   # with BIFROST_RUN=api in .env
+#   docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env up -d   # the API alone
 #
 # Paths are relative to this file. `name: bifrost` keeps the project (and its
 # volumes) the same however the file is reached: alone, or included by the root
@@ -25,6 +25,12 @@ services:
       - ../.env
     environment:
       NODE_ENV: production
+      # The run's shape is set here, never by .env (owner, 2026-10-09):
+      # `environment:` wins over env_file. `full`: a web host is beside it
+      # (compose/web.yml); api.alone.yml says otherwise, api.otel.yml turns
+      # traces on.
+      BIFROST_RUN: full
+      OTEL_ENABLED: 'false'
     volumes:
       # State that must survive container replacement (and the shared log archive).
       - ../storage:/app/storage

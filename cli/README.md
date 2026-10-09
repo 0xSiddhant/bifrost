@@ -89,7 +89,7 @@ bifrost config set-host 192.168.1.20   # saved default for later invocations
 **On the machine that runs the hub** there is a shortcut (PLAN-39): when the
 default `bifrost.local` cannot be connected to, the CLI tries this machine
 itself, `127.0.0.1:4646` (the web host) and then `127.0.0.1:4647` (the API run
-alone, `BIFROST_RUN=api`), and uses the first that answers. It does not matter
+alone: `./bifrost start --web none`), and uses the first that answers. It does not matter
 whether the hub runs natively or in Docker: both publish the same ports.
 `bifrost doctor` reports when it fell back and prints the `set-host` command
 that skips the detour. An address you gave (`--host`, or a saved one) is never

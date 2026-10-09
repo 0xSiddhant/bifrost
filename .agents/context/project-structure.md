@@ -3,6 +3,8 @@
 ```
 bifrost/
 ├── CLAUDE.md                  # entry point for AI agents → points to .agents/
+├── bifrost                    # `./bifrost`: the repo's task runner (sh shim → scripts/bifrost/main.ts via tsx);
+│                              #   NOT the `bifrost` LAN client, which is cli/
 ├── README.md
 ├── .agents/                    # plans, context, rules, memory (this folder)
 ├── .github/workflows/         # ci.yml (lint/typecheck/test/build + e2e + docker build + backup smoke)
@@ -10,8 +12,8 @@ bifrost/
 ├── .env / .env.example
 ├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
 ├── package.json               # npm workspaces: server, client, cli, e2e, web
-├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web (+ bifrost-mdns), picked by BIFROST_RUN
-│                              #   and MDNS_ADVERTISER (PLAN-36, PLAN-39)
+├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web (+ bifrost-mdns), picked by start-pm2.sh's
+│                              #   flags (BIFROST_APPS + the launcher keys), never .env (PLAN-36/39, 2026-10-09)
 ├── docker/                    # one image per process (PLAN-39): api.Dockerfile (server, native toolchain),
 │                              #   web.Dockerfile (web host + both clients, no apt), standalone.Dockerfile
 │                              #   (nginx-unprivileged), nginx-standalone.conf (the standalone site's rules)
@@ -179,7 +181,7 @@ bifrost/
 │       ├── mdns.ts            #   the Bonjour responder (moved from server/src/core/mdns, PLAN-36)
 │       ├── advertiser.ts      #   an advertiser-only process: `bifrost-mdns` (advertise.ts) and `npm run dev`
 │       │                      #     (mdns-dev.ts), each with its own decision (PLAN-39)
-│       ├── processes.ts       #   the processes a run needs (BIFROST_RUN, MDNS_ADVERTISER), for npm start
+│       ├── processes.ts       #   the processes a run needs + launchFor/parseRunShape (the launchers' flags)
 │       └── supervise.ts       #   runs a mode's processes as one for `npm start` (scripts/start.ts)
 ├── e2e/                       # FOURTH workspace (PLAN-32a): sees only the BUILT system, from
 │   │                          #   outside — lint-banned from importing server/client/cli src
@@ -203,7 +205,10 @@ bifrost/
 │   │                          #   profiles/{load,stress,spike,soak,fanout}.ts; never in CI
 ├── tools/micromatch-shim/     # stands in for micromatch (no `braces`): the 3 functions eslint-plugin-boundaries
 │                              #   uses, copied verbatim; wired by package.json devDependency + override
-├── scripts/                   # setup, backup, restore, resilience (test:resilience),
+├── scripts/                   # bifrost/ (`./bifrost`: commands.ts is the one task table — runs, help, man,
+│                              #   list --json; main.ts executes it; commands.test.ts fails on a named script
+│                              #   or file that does not exist), setup, backup, restore, resilience,
+│                              #   run-shape.sh (start-pm2/launchd's --web/--standalone/--otel flags),
 │                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
 │                              #   skipped under CI) + start.ts (`npm start`), start-pm2.sh, start-launchd.sh,
 │                              #   observability.sh, check-standalone.ts (the standalone bundle reaches

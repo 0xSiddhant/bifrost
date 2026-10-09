@@ -2,7 +2,7 @@
 
 Bifrost logs structured pino JSON to `storage/logs/` — rotated `app.N.log` files
 with a `current.log` symlink on the active one, kept to `LOG_RETENTION_FILES`
-rotations. That alone is the source of truth (`npm run logs` pretty-prints it).
+rotations. That alone is the source of truth (`./bifrost logs` pretty-prints it).
 Since PLAN-36 the web host in front of the API writes its own series beside it,
 `app-web.N.log` (no symlink; `current.log` stays the API's), every line tagged
 `source: "web"`: its start and stop, the API going away and coming back, and
@@ -33,7 +33,7 @@ Or drive compose directly:
 
 ```bash
 docker compose -f compose/observability.yml --env-file .env --profile observability up -d
-open http://localhost:3000        # admin / bifrost  — change the password
+open http://localhost:4648        # admin / bifrost  — change the password
 
 docker compose -f compose/observability.yml --env-file .env --profile observability down      # stop
 docker compose -f compose/observability.yml --env-file .env --profile observability down -v   # + wipe stored logs
@@ -87,10 +87,15 @@ Two details that follow from this:
 
 ## Tracing (off by default)
 
-`OTEL_ENABLED=false` ships as the default deliberately: a dead OTLP endpoint
-makes the exporter retry and log connection errors into `storage/logs/` —
-observability tooling degrading the observability record. Turn it on when the
-stack is up.
+Traces are off unless the launcher turns them on, deliberately: a dead OTLP
+endpoint makes the exporter retry and log connection errors into
+`storage/logs/`, observability tooling degrading the observability record.
+`./bifrost start --obs` (or `service … --obs`) starts this stack and turns them
+on together; `--otel` turns them on alone, for a stack that is already up; in
+Docker on Linux, `./bifrost docker up --obs` adds `compose/api.otel.yml`. It is
+never an `.env` setting (owner, 2026-10-09): `OTEL_ENABLED` in `.env` is
+ignored. The endpoint and the rest (`OTEL_EXPORTER_OTLP_ENDPOINT`, …) stay in
+`.env`.
 
 The SDK is loaded with **`node --import ./server/dist/otel.js`** (npm start, PM2
 and Docker all do this). It cannot be initialised from application code: ESM
@@ -145,8 +150,14 @@ spans ────────────────push──────▶ 
   absent: in Docker on macOS it would measure the Linux VM rather than the Mac,
   producing numbers that look real and mean nothing. Every process metric comes
   from inside Node instead.
-- **Tempo** (`observability/tempo/tempo.yml`) accepts OTLP/HTTP on 4318 and
-  keeps blocks for 48h — recent investigation only, by design.
+- **Tempo** (`observability/tempo/tempo.yml`) accepts OTLP/HTTP on 4318 inside
+  the network, published on this machine as **4650** (the API's
+  `OTEL_EXPORTER_OTLP_ENDPOINT`), and keeps blocks for 48h — recent
+  investigation only, by design. The API sends traces only: metrics are
+  Prometheus's scrape and logs are files, so the SDK's OTLP metrics and logs
+  exporters stay off.
+- **Ports on this machine** run on from Bifrost's: 4648 Grafana, 4649
+  Prometheus, 4650 traces in, 4651 Loki, 4652 Tempo's query API.
 - **Grafana** provisions the Loki datasource and the dashboard from
   `observability/grafana/`.
 
@@ -184,7 +195,7 @@ halves of a feature and adding `source="client"` narrows it to the browser.
   against your real logs in Grafana and re-export the JSON to
   `observability/grafana/dashboards/bifrost.json` to keep it provisioned.
 - Change the Grafana admin password (`GF_SECURITY_ADMIN_PASSWORD`) before
-  exposing port 3000 anywhere but localhost.
+  exposing port 4648 anywhere but localhost.
 - Three alert rules ship provisioned (`observability/grafana/provisioning/
   alerting/`): error rate, event-loop lag, and **contract mismatch** (PLAN-32:
   any `contract mismatch` line from the response contract guard's `fallback`

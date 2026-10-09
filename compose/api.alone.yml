@@ -1,0 +1,12 @@
+# Override for compose/api.yml: the API with no web host beside it (a Linux
+# host where only the CLI talks to it). It prints the CLI hint instead of the
+# LAN address and QR, and does not look for a web host on PORT.
+#
+#   docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env up -d
+#   ./bifrost docker up api
+name: bifrost
+
+services:
+  bifrost-api:
+    environment:
+      BIFROST_RUN: api

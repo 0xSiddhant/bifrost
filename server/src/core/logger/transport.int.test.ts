@@ -63,7 +63,7 @@ describe('createLogger → real transport', () => {
     expect(readLines()[0]).toMatchObject({ logLevel: 'info', msg: 'production line' });
   });
 
-  it('symlinks current.log at the active file, which npm run logs tails', async () => {
+  it('symlinks current.log at the active file, which ./bifrost logs tails', async () => {
     const logger = createLogger({ level: 'info', logsDir, pretty: false, retainFiles: 3 });
     logger.info('anything');
     await new Promise<void>((resolve) => logger.flush(() => resolve()));

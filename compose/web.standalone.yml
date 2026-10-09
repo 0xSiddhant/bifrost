@@ -1,0 +1,12 @@
+# Override for compose/web.yml: the web host alone, serving the standalone
+# client to the LAN (no API, no hub data). The client's own settings are baked
+# in at build time from the build args in compose/web.yml.
+#
+#   docker compose -f compose/web.yml -f compose/web.standalone.yml --env-file .env up -d --build
+#   ./bifrost docker up web-standalone
+name: bifrost
+
+services:
+  bifrost-web:
+    environment:
+      BIFROST_RUN: web

@@ -3,7 +3,7 @@
 Bifrost has two client builds (PLAN-35):
 
 - **The hub** (`npm run build`, `client/dist/`): the whole app, served by the Bifrost server on your LAN.
-- **The standalone site** (`npm run build:standalone`, `client/dist-standalone/`): only what works in a browser on its own, with no Bifrost server at all. It is meant for a public machine, so the tools you use daily are one URL away from anywhere.
+- **The standalone site** (`./bifrost build --standalone`, `client/dist-standalone/`): only what works in a browser on its own, with no Bifrost server at all. It is meant for a public machine, so the tools you use daily are one URL away from anywhere.
 
 ## What it has, and what it doesn't
 
@@ -15,7 +15,7 @@ Bifrost has two client builds (PLAN-35):
 | Every Diagon Alley toolbox tool | The Join Bifrost QR |
 | Themes, and Heimdall with this browser's own settings | Heimdall's household settings, stats and history |
 
-Anything that needs the hub explains itself instead of failing: a link or button to it shows **"The Bifröst is closed"**, with "Download instead" where there is a local copy to offer. The bundle cannot reach a server: every request path is compiled out of it, and `npm run build:standalone` fails if one survives (`scripts/check-standalone.ts`).
+Anything that needs the hub explains itself instead of failing: a link or button to it shows **"The Bifröst is closed"**, with "Download instead" where there is a local copy to offer. The bundle cannot reach a server: every request path is compiled out of it, and `./bifrost build --standalone` fails if one survives (`scripts/check-standalone.ts`).
 
 Heimdall opens by the same shortcut and taps as on the hub, with **no PIN**: there is no server to check one against, and a PIN checked in the browser would protect nothing. Its sections (theme, the shortcut and taps, Sky Relics, Loki's run policy, the screensaver, About) are stored in this browser's `localStorage` under `bifrost.local.*`, and say so.
 
@@ -24,19 +24,41 @@ Heimdall opens by the same shortcut and taps as on the hub, with **no PIN**: the
 No Docker needed to try it or work on it:
 
 ```bash
-npm run dev:standalone       # Vite dev server in standalone mode, hot reload: http://localhost:5173
-npm run preview:standalone   # build dist-standalone/, then serve exactly that: http://localhost:4173
+./bifrost dev --standalone   # Vite dev server in standalone mode, hot reload: http://localhost:5173
+./bifrost preview            # build dist-standalone/, then serve exactly that: http://localhost:4173
 ```
 
 Neither starts a Bifrost server, and none is needed: the standalone build has no proxy and no request path to one, so anything hub-only shows "The Bifröst is closed", exactly as the deployed site does. Running `npm run dev` (the hub) at the same time is fine: since PLAN-36 the hub's dev server holds `PORT` (4646) and these keep Vite's own ports.
 
-To serve it from this Mac to the LAN the way the hub is served, set `BIFROST_RUN=web` in `.env` and run `npm start` (or `sh scripts/start-pm2.sh` / `start-launchd.sh`): the web host serves `dist-standalone/` on `PORT` with the container's exact rules, forwards nothing, and answers for `bifrost.local`.
+To serve it from this Mac to the LAN the way the hub is served, run `./bifrost start --standalone` (or `./bifrost service pm2 --standalone`, or `sh scripts/start-pm2.sh --standalone`; no `.env` change): the web host serves `dist-standalone/` on `PORT` with the container's exact rules, forwards nothing, and answers for `bifrost.local`.
 
-`preview:standalone` serves the real build output, so it is the one to check before deploying. It falls back to the app for any unknown path, a little more loosely than the container's nginx (which 404s a missing `/assets/` file); the e2e `standalone` project serves the build with the container's exact rules (`e2e/support/static-server.ts`). The baked defaults come from your root `.env`, as they do for every build.
+`./bifrost preview` serves the real build output, so it is the one to check before deploying. It falls back to the app for any unknown path, a little more loosely than the container's nginx (which 404s a missing `/assets/` file); the e2e `standalone` project serves the build with the container's exact rules (`e2e/support/static-server.ts`). The baked defaults come from your root `.env`, as they do for every build.
 
 ## Run it in Docker
 
 The site is a container: static files behind `nginx-unprivileged`, running as a non-root user on port 8080, read-only, with every capability dropped. Its nginx has no `proxy_pass` anywhere, so not even the web server can reach a backend.
+
+### On this machine, in one command
+
+```bash
+./bifrost docker up standalone              # build, then serve on http://localhost:8080
+./bifrost docker up standalone --port 9000  # another port
+./bifrost docker logs standalone            # follow nginx
+./bifrost docker down standalone            # stop and remove it
+```
+
+The container runs with the same lockdown as below (read-only, every capability dropped, no new privileges) and restarts with Docker. It publishes its port on every interface, so other devices on your network can open `http://<this machine>:8080` too. Build arguments go after `--`: `./bifrost docker up standalone -- --build-arg LOKI_EXECUTION_ENABLED=false`. `--no-build` restarts the image already built.
+
+Without `node_modules`, the same with plain Docker:
+
+```bash
+docker build -f docker/standalone.Dockerfile -t bifrost-standalone:latest .
+docker run -d --name bifrost-standalone --restart unless-stopped \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+  -p 9000:8080 bifrost-standalone:latest       # http://localhost:9000
+```
+
+### Behind your reverse proxy
 
 It is built to sit behind the reverse proxy you already run, beside your other containers:
 

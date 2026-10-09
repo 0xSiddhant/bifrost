@@ -11,7 +11,13 @@
 #   docker compose --profile observability up -d                       # the hub + this stack
 #   docker compose -f compose/observability.yml --env-file .env --profile observability up -d   # alone
 #   sh scripts/observability.sh                                         # the same, wrapped
-#   open http://localhost:3000   (admin / bifrost — change it)
+#   open http://localhost:4648   (admin / bifrost — change it)
+#
+# Host ports run on from Bifrost's own (4646 web, 4647 API): 4648 Grafana,
+# 4649 Prometheus, 4650 Tempo's OTLP intake (the API sends traces here),
+# 4651 Loki, 4652 Tempo's query API. Inside the network the services keep
+# their standard ports (grafana:3000, loki:3100, …), so the provisioning and
+# the Alloy config do not change.
 #
 # `name: bifrost` is the project the old root file got from the repo directory,
 # so the existing Grafana/Loki/Prometheus volumes are reused, not recreated.
@@ -30,7 +36,7 @@ services:
       - ../observability/loki/config.yml:/etc/loki/config.yml:ro
       - loki-data:/loki
     ports:
-      - '3100:3100'
+      - '4651:3100'
     restart: unless-stopped
 
   alloy:
@@ -62,7 +68,7 @@ services:
       - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - '9090:9090'
+      - '4649:9090'
     # Bifrost runs native on macOS, so the scrape target is the host, not a
     # sibling container. Docker Desktop resolves host.docker.internal already;
     # this keeps the same config working on Linux, where it does not.
@@ -71,9 +77,10 @@ services:
     restart: unless-stopped
 
   # Traces. Pushed to, so the least durable of the three signals — see
-  # observability/tempo/tempo.yml. OTEL_ENABLED must be true in .env for the app
-  # to send anything, and it defaults to false so a dead endpoint never degrades
-  # the log archive with retry noise (PLAN-16b).
+  # observability/tempo/tempo.yml. The API sends traces only when its launcher
+  # says so (./bifrost start|service --obs or --otel, or compose/api.otel.yml),
+  # never by default, so a dead endpoint never degrades the log archive with
+  # retry noise (PLAN-16b).
   tempo:
     profiles: [observability]
     image: grafana/tempo:2.6.0
@@ -83,8 +90,8 @@ services:
       - tempo-data:/var/tempo
     ports:
       # OTLP/HTTP in, and the query API Grafana uses.
-      - '4318:4318'
-      - '3200:3200'
+      - '4650:4318'
+      - '4652:3200'
     restart: unless-stopped
 
   grafana:
@@ -99,7 +106,7 @@ services:
       - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - '3000:3000'
+      - '4648:3000'
     depends_on:
       - loki
       - prometheus

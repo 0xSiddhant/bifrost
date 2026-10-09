@@ -25,3 +25,4 @@ All project knowledge lives in `.agents/`.
 - Keep all storage paths, limits, and secrets in `.env` — never hardcode.
 - **`npm audit` must report 0 vulnerabilities, and a finding is fixed before any other work**: from `npm install`, CI, the daily `audit.yml` or anywhere else. The procedure is in `.agents/rules/coding.md` ("Dependencies").
 - Project skills live in `.claude/skills/`. `.agents/skills` is a symlink to that directory so Codex and other AGENTS.md-aware tools discover the same skills. Create or edit a project skill only in `.claude/skills/`; do not duplicate it or add a per-skill symlink under `.agents/`. Prefer invoking a matching skill over an ad-hoc procedure; run `verify` before every PR.
+- Run repo tasks through `./bifrost` (`./bifrost help`, `./bifrost list --json`), not by reading `package.json` files; see `rules/coding.md`, "Repo tasks".

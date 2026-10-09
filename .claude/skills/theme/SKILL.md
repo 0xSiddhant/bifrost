@@ -96,7 +96,7 @@ accident.
 ## Ship
 
 - Any theme change, values included, needs a client rebuild (`npm run build`,
-  and `npm run build:standalone` for the standalone site). Nothing hot-reloads.
+  and `./bifrost build --standalone` for the standalone site). Nothing hot-reloads.
 - Built-in theme files can be edited directly; note in the PR that you changed
   a shipped built-in's appearance.
 - Prove it with the `live-verify` skill (screenshot the hub in the theme) before

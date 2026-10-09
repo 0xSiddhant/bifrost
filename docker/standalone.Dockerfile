@@ -48,7 +48,7 @@ ARG HEIMDALL_TAP_COUNT=7
 # The commit Heimdall's About shows (there is no .git in the build context).
 ARG BIFROST_COMMIT=unknown
 # The build's postbuild step fails it if the bundle can reach a server.
-RUN npm run build:standalone
+RUN npm run build:standalone -w client
 
 # ---- standalone: static files behind nginx, non-root, no backend ----
 # Serves on 8080; compose/standalone.yml puts it behind the reverse proxy

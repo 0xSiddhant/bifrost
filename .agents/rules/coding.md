@@ -9,7 +9,7 @@
 ## Two client builds (PLAN-35)
 
 - **A new client feature declares itself in `client/src/core/features.ts`**, with its route roots and `needsHub`. Gate UI on `hasFeature(id)`, never on the server's capabilities. `needsHub: false` means it works with no Bifrost server at all, and the standalone build ships it.
-- **Every client call to the server is hub-only.** Write it as `export const x: typeof hubX = __HUB__ ? hubX : hubOnly('x')` (or go through `apiGet`/`apiSend`, which already are), and a hub-only lazy page as an inline `__HUB__ ? page(() => import(…)) : BridgeClosedPage`. `npm run build:standalone` fails if a server path survives in the bundle.
+- **Every client call to the server is hub-only.** Write it as `export const x: typeof hubX = __HUB__ ? hubX : hubOnly('x')` (or go through `apiGet`/`apiSend`, which already are), and a hub-only lazy page as an inline `__HUB__ ? page(() => import(…)) : BridgeClosedPage`. `./bifrost build --standalone` fails if a server path survives in the bundle.
 - A server action that fails offers the sheet (`showBridgeClosed`), with `download` when there is a local copy to offer. A hand-off to a hub-only page uses `hubNavigate`.
 - Settings a standalone visitor can change go through `core/settings/` (`SettingsStore`), with a rule per field in `rules.ts` and cases in `rules.cases.json` that the server's overlay test runs too.
 
@@ -78,7 +78,14 @@
 - Every plan's acceptance criteria get at least one automated test where feasible; manual steps go in the PR description.
 - A "kill test" (SIGINT mid-operation, restart, assert no corruption) is required for any plan touching storage.
 - **A new client page ships with a journey** in `e2e/browser/` that declares its route with `routes('/the/path')` (written literally). `routes.spec.ts` reads `App.tsx` as text and fails CI for any route no journey names (PLAN-32a). A `needsHub: false` feature also needs a journey in `e2e/standalone/` naming its root, because `routes.spec.ts` checks `features.ts` per build (PLAN-35).
-- `npm run test:e2e` must stay green after `npm run build` and `npm run build:standalone`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped; the pin comes out in the PR that fixes it. See `docs/testing.md`.
+- `npm run test:e2e` must stay green after `npm run build` and `./bifrost build --standalone`. A failure there is a client break, never a flake to retry. A bug the net finds that is out of a PR's scope is pinned with `test.fail(…)` and a comment naming it, never skipped; the pin comes out in the PR that fixes it. See `docs/testing.md`.
+
+## Repo tasks (`./bifrost`)
+
+- **Every repo task runs through `./bifrost`** (`scripts/bifrost/commands.ts`, one table): `./bifrost help` lists them, `./bifrost help <cmd>` shows what each runs, `./bifrost list --json` gives the whole table. Reach for it before reading a `package.json`.
+- **A new script or workflow gets a row in that table in the same change**, with examples. A command only plans an existing npm or shell script; logic stays in that script. `scripts/bifrost/commands.test.ts` plans every example and fails on any npm script, file or compose file that does not exist, and keeps `docker config` equal to CI's compose list.
+- **Root `package.json` keeps only what npm, CI, husky and muscle memory need** (`setup dev build start test lint typecheck backup restore api:spec test:e2e test:load prepare`). Variants are flags or subcommands of `./bifrost`, not new root scripts.
+- Not the `bifrost` LAN client: that is `cli/`, installed globally. `./bifrost` needs the checkout and never ships.
 
 ## Frontend
 

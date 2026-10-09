@@ -1,5 +1,6 @@
+import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { isLoopbackHost, loadWebConfig } from './config.js';
+import { fromRepoRoot, isLoopbackHost, LAUNCHER_KEYS, loadWebConfig } from './config.js';
 import { decisionFor } from './advertiser.js';
 import { advertiserDecision, clientFor, mdnsDecision } from './main.js';
 
@@ -100,5 +101,17 @@ describe('mode decisions', () => {
     expect(isLoopbackHost('::1')).toBe(true);
     expect(isLoopbackHost('0.0.0.0')).toBe(false);
     expect(isLoopbackHost('192.168.1.5')).toBe(false);
+  });
+});
+
+describe('launcher keys', () => {
+  it('are the same keys the API server ignores in .env', () => {
+    // Workspaces do not import each other, so the server's list is read as text.
+    const server = fs.readFileSync(
+      fromRepoRoot('server', 'src', 'core', 'config', 'dotenv.ts'),
+      'utf8',
+    );
+    const list = /LAUNCHER_KEYS = \[([^\]]*)\]/.exec(server)?.[1] ?? '';
+    expect([...list.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1])).toEqual([...LAUNCHER_KEYS]);
   });
 });

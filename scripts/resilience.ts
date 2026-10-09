@@ -1,5 +1,5 @@
 /**
- * `npm run test:resilience` — hammer the real built server and prove SQLite
+ * `./bifrost test resilience` — hammer the real built server and prove SQLite
  * survives it. Runs against `server/dist` (build first), on a scratch
  * STORAGE_ROOT, so it never touches real data.
  *

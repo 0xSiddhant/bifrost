@@ -21,9 +21,9 @@ The root `docker-compose.yml` includes the first three, so from the repo root:
 ```bash
 cp .env.example .env                                  # set HEIMDALL_PIN (required) and any limits
 docker compose up -d --build                          # the hub: API + web host
-docker compose --profile observability up -d --build  # the hub + the Grafana stack
-docker compose up -d bifrost-api                      # the API alone (set BIFROST_RUN=api)
-docker compose up -d bifrost-web                      # the web host alone (BIFROST_RUN=web: the standalone client)
+docker compose -f docker-compose.yml -f compose/api.otel.yml --profile observability up -d --build  # the hub + the Grafana stack, traces on
+docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env up -d --build        # the API alone
+docker compose -f compose/web.yml -f compose/web.standalone.yml --env-file .env up -d --build   # the standalone client alone
 docker compose logs -f                                # the boot banner / QR
 ```
 
@@ -94,4 +94,4 @@ combination above.
 3. Drop a file into `storage/downloads/` on the host: it appears live in the
    Receive page (the watcher works under host networking).
 4. `docker compose --profile observability up -d` adds the stack, and Grafana
-   at `:3000` shows the existing history.
+   at `:4648` shows the existing history.

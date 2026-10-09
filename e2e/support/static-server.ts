@@ -111,7 +111,7 @@ export interface StaticSite {
 
 export async function startStaticSite(root = STANDALONE_DIR): Promise<StaticSite> {
   if (!fs.existsSync(path.join(root, 'index.html'))) {
-    throw new Error(`no standalone build in ${root} — run \`npm run build:standalone\` first`);
+    throw new Error(`no standalone build in ${root} — run \`./bifrost build --standalone\` first`);
   }
   const requests: string[] = [];
   const server = http.createServer((request, response) => {

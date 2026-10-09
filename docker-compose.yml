@@ -1,10 +1,13 @@
 # Bifrost in Docker (PLAN-39): every piece has its own image (docker/) and its
 # own compose file (compose/); this file puts the hub's pieces in one project.
+# Each service sets its own run shape in `environment:`; .env never does
+# (owner, 2026-10-09). `./bifrost docker …` runs every combination below.
 #
-#   docker compose up -d --build                         # the hub: API + web host (BIFROST_RUN=full)
-#   docker compose --profile observability up -d         # … plus Grafana/Loki/Alloy/Prometheus/Tempo
-#   docker compose up -d bifrost-api                     # one piece (BIFROST_RUN=api)
-#   docker compose up -d bifrost-web                     # one piece (BIFROST_RUN=web: the standalone client)
+#   docker compose up -d --build                         # the hub: API + web host
+#   docker compose -f docker-compose.yml -f compose/api.otel.yml --profile observability up -d --build
+#                                                        # … plus Grafana/Loki/Alloy/Prometheus/Tempo, traces on
+#   docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env up -d          # the API alone
+#   docker compose -f compose/web.yml -f compose/web.standalone.yml --env-file .env up -d     # the standalone client alone
 #
 # Linux hosts (host networking: bifrost.local, real client addresses, the API on
 # loopback). On a Mac the API runs natively and only the web host may run here,

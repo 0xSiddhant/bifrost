@@ -37,7 +37,7 @@ export const LEVEL_FORMATTER = {
 
 /**
  * pino-roll options for the JSON file sink: daily rotation, 20 MB size cap,
- * `current.log` symlink always pointing at the active file (what `npm run logs`
+ * `current.log` symlink always pointing at the active file (what `./bifrost logs`
  * tails), and a file-count retention limit so rotated files can't accumulate
  * forever on an appliance meant to run unattended.
  *
@@ -92,7 +92,7 @@ export function createLogger(options: LoggerOptions): Logger {
       // then treats `logLevel` as the level (not as an extra property) and
       // still hides the numeric `level` as a known key — so the redundant pair
       // shows up in neither. Without it, every dev line trails a dangling
-      // `logLevel: "info"`. The `npm run logs` script passes the same flag.
+      // `logLevel: "info"`. `./bifrost logs` passes the same flag.
       options: { colorize: true, translateTime: 'HH:MM:ss', levelKey: 'logLevel' },
       level: 'trace',
     });

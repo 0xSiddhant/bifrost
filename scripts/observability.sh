@@ -49,7 +49,8 @@ case "$CMD" in
     $DC $OBS up -d
     echo ""
     echo "✔ observability stack is up."
-    echo "  Grafana:    http://localhost:3000   (admin / bifrost — change it)"
+    echo "  Grafana:    http://localhost:4648   (admin / bifrost — change it)"
+    echo "  Prometheus: http://localhost:4649   traces in: http://localhost:4650   Loki: :4651   Tempo: :4652"
     echo "  Dashboard:  'Bifrost' (auto-provisioned)"
     echo "  follow logs: sh scripts/observability.sh logs"
     echo "  stop:        sh scripts/observability.sh down"
