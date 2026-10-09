@@ -1,0 +1,14 @@
+# Override for compose/api.yml (or the root docker-compose.yml): the API sends
+# traces to the Tempo that compose/observability.yml publishes on this host's
+# port 4650 (host networking, so localhost is the host). Set here, not taken
+# from .env, so the two files cannot disagree.
+#
+#   docker compose -f docker-compose.yml -f compose/api.otel.yml --profile observability up -d --build
+#   ./bifrost docker up --obs
+name: bifrost
+
+services:
+  bifrost-api:
+    environment:
+      OTEL_ENABLED: 'true'
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4650

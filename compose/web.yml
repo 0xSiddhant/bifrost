@@ -34,6 +34,11 @@ services:
       - ../.env
     environment:
       NODE_ENV: production
+      # The run's shape is set here, never by .env (owner, 2026-10-09). Host
+      # networking reaches the LAN, so this web host answers for the name
+      # itself; web.bridge.yml (the Mac) and web.standalone.yml say otherwise.
+      BIFROST_RUN: full
+      MDNS_ADVERTISER: web
     volumes:
       # Its own log series (app-web.N.log) beside the API's.
       - ../storage:/app/storage

@@ -17,8 +17,8 @@
 #
 # A backup only happens while the API server answers /api/v1/health on its own
 # port (API_PORT, PLAN-36), so a stopped web host never skips a backup — a down
-# API is a skip (retried at the next daily check), not a failure. In web-only
-# mode (BIFROST_RUN=web) there is no hub data in use, so every run skips.
+# API is a skip (retried at the next daily check), not a failure. A web host
+# serving the standalone client alone runs no API, so every run skips there.
 #
 # Settings (.env): BACKUP_CLOUD, BACKUP_CLOUD_ROOT, BACKUP_CLOUD_SUBDIR,
 # BACKUP_INTERVAL_DAYS, BACKUP_SCHEDULE_TIME, BACKUP_KEEP, BACKUP_EXCLUDE.
@@ -46,7 +46,6 @@ env_get() {
 PORT="$(env_get PORT 4646)"
 # The same default the API's config applies: API_PORT, else PORT + 1.
 API_PORT="$(env_get API_PORT "$((PORT + 1))")"
-RUN_MODE="$(env_get BIFROST_RUN full)"
 STORAGE="$(env_get STORAGE_ROOT ./storage)"
 case "$STORAGE" in /*) ;; *) STORAGE="$ROOT/${STORAGE#./}" ;; esac
 LOG_DIR="$STORAGE/logs"
@@ -169,10 +168,6 @@ cmd_run() {
     fi
   fi
 
-  if [ "$RUN_MODE" = web ]; then
-    log SKIP "web-only mode (BIFROST_RUN=web): nothing to back up"
-    return 0
-  fi
   if ! server_up; then
     log SKIP "API server not running on port $API_PORT — will retry at the next daily check"
     return 0

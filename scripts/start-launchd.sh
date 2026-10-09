@@ -1,11 +1,16 @@
 #!/bin/sh
 # Build and run Bifrost under launchd — dependency-free always-on on macOS.
-# Usage:  sh scripts/start-launchd.sh
-# Idempotent: safe to re-run after code changes (rebuilds + reloads).
+# Usage:  sh scripts/start-launchd.sh [--web native|docker|none] [--standalone] [--otel]
+#         (or ./bifrost service launchd …, which also starts the Docker pieces)
+# Idempotent: safe to re-run after code changes (rebuilds + reloads). The flags
+# decide the run's shape, never .env, and are written into each plist, so they
+# hold across logins; re-running without them restores the plain hub.
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+. "$ROOT/scripts/run-shape.sh"
+parse_run_shape "$@"
 AGENTS="$HOME/Library/LaunchAgents"
 # PLAN-36: two services, the API and the web host. LEGACY is the single plist
 # every install before PLAN-36 has; re-running this script replaces it.
@@ -14,7 +19,7 @@ API_LABEL="local.bifrost.api"
 WEB_LABEL="local.bifrost.web"
 # PLAN-39: the native advertiser, for a web host in Docker on the Mac.
 MDNS_LABEL="local.bifrost.mdns"
-echo "▶ Bifrost · launchd · $ROOT"
+echo "▶ Bifrost · launchd · $ROOT · $SHAPE"
 
 # 1. prerequisites
 command -v node >/dev/null 2>&1 || { echo "✖ node not found — install Node.js >= 20"; exit 1; }
@@ -32,33 +37,22 @@ if [ ! -f .env ]; then
   cp .env.example .env
   echo "✔ created .env from .env.example"
 fi
+
+# 4. setup + build
+# setup asks for a missing PIN on a terminal, and removes leftover run keys.
+echo "▶ setup (folders + migrations)..."
+npm run setup
 PIN="$(grep -E '^HEIMDALL_PIN=' .env | cut -d= -f2- | tr -d '[:space:]')"
 if [ "${#PIN}" -lt 4 ]; then
   echo "✖ HEIMDALL_PIN is not set (need >= 4 chars). Edit .env, then re-run."
   exit 1
 fi
-
-# 4. setup + build
-echo "▶ setup (folders + migrations)..."
-npm run setup
 echo "▶ build..."
 npm run build
 
-# 5. which processes this run mode needs (BIFROST_RUN: full | api | web)
+# 5. which processes this shape needs (from the flags; scripts/run-shape.sh)
 env_get() { v="$(grep -E "^$1=" .env | tail -n1 | cut -d= -f2- | tr -d '[:space:]')"; [ -n "$v" ] && echo "$v" || echo "$2"; }
-MODE="$(env_get BIFROST_RUN full)"
-case "$MODE" in
-  full) WANT="api web" ;;
-  api)  WANT="api" ;;
-  web)  WANT="web" ;;
-  *) echo "✖ BIFROST_RUN must be full, api or web (got \"$MODE\")"; exit 1 ;;
-esac
-ADVERTISER="$(env_get MDNS_ADVERTISER web)"
-case "$ADVERTISER" in
-  host) WANT="$WANT mdns" ;;
-  web|off) ;;
-  *) echo "✖ MDNS_ADVERTISER must be web, host or off (got \"$ADVERTISER\")"; exit 1 ;;
-esac
+WANT="$APPS"
 
 remove_plist() {
   label="$1"; plist="$AGENTS/$label.plist"
@@ -105,6 +99,12 @@ $args  </array>
   <dict>
     <key>NODE_ENV</key>
     <string>production</string>
+    <key>BIFROST_RUN</key>
+    <string>$RUN</string>
+    <key>MDNS_ADVERTISER</key>
+    <string>$ADVERTISER</string>
+    <key>OTEL_ENABLED</key>
+    <string>$OTEL_ENABLED</string>
   </dict>
   <key>RunAtLoad</key>
   <true/>
@@ -144,15 +144,15 @@ NAME="$(env_get MDNS_NAME bifrost)"
 API_PORT="$(env_get API_PORT $((PORT + 1)))"
 
 echo ""
-echo "✔ Bifrost ($MODE) loaded under launchd (starts now + on every login)."
-case "$MODE" in
-  full) echo "  open:    http://$NAME.local:$PORT" ;;
-  web)  echo "  open:    http://$NAME.local:$PORT   (the standalone client; no API in this mode)" ;;
-  api)  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)" ;;
-esac
-if [ "$ADVERTISER" = host ]; then
-  echo "  name:    bifrost-mdns answers for $NAME.local here (MDNS_ADVERTISER=host)"
-  echo "  web:     the web host runs in Docker: docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d"
+echo "✔ Bifrost loaded under launchd (starts now + on every login): $SHAPE."
+if [ "$RUN" = api ]; then
+  echo "  api:     http://127.0.0.1:$API_PORT   (no web page; the CLI: bifrost --host 127.0.0.1:$API_PORT)"
+else
+  echo "  open:    http://$NAME.local:$PORT$([ "$RUN" = web ] && echo '   (the standalone client; no API)')"
+fi
+if [ "$WEB" = docker ]; then
+  echo "  name:    bifrost-mdns answers for $NAME.local here"
+  echo "  web:     in Docker: ./bifrost docker up web-mac   (./bifrost service launchd --web docker starts it for you)"
 fi
 echo "  status:  launchctl list | grep bifrost"
 echo "  logs:    ./bifrost logs    # or storage/logs/launchd-*.log"
