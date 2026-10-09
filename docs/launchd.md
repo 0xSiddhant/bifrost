@@ -18,9 +18,12 @@ Bifrost runs as two processes, so launchd runs two services:
 | `local.bifrost.web` | the web host: serves the client, forwards the API's paths, answers for `bifrost.local` | `WEB_HOST:PORT` (default `0.0.0.0:4646`) |
 
 The address people open is unchanged: `http://bifrost.local:4646`.
-`BIFROST_RUN` in `.env` decides which services exist: `full` (both, the
-default), `api` or `web`. Re-running the script after changing it removes the
-services the new mode does not run.
+The flags decide which services exist, never `.env`: none (both, the
+default), `--web none`, `--web docker` (the API and `bifrost-mdns`) or
+`--standalone`; `--otel` turns traces on. They are written into each plist's
+`EnvironmentVariables`, so they hold across logins. Re-running the script with
+other flags removes the services the new shape does not run; without flags it
+puts back the plain hub.
 
 ## Upgrading from the single `local.bifrost` service
 

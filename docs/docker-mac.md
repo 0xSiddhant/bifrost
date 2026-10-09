@@ -14,8 +14,8 @@ open questions below before choosing Docker.
 
 | On the Mac (native) | In Docker Desktop |
 |---|---|
-| the API on `127.0.0.1:4647` (`BIFROST_RUN=api`) | the web host, publishing `4646` |
-| `bifrost-mdns`, answering for `bifrost.local` (`MDNS_ADVERTISER=host`) | |
+| the API on `127.0.0.1:4647` | the web host, publishing `4646` |
+| `bifrost-mdns`, answering for `bifrost.local` | the Grafana stack, if you add `--obs` |
 
 - **Why the advertiser is native:** publishing a port does not carry mDNS.
   `bifrost.local` is answered by multicast to 224.0.0.251:5353, Docker forwards
@@ -30,24 +30,36 @@ open questions below before choosing Docker.
 
 ## Set it up
 
-In `.env`:
+One command, no `.env` changes (the flags decide the run's shape; `.env` keeps
+the PIN, paths, limits and ports):
 
 ```bash
-BIFROST_RUN=api          # the launchers start the API (not a native web host)
-MDNS_ADVERTISER=host     # … and bifrost-mdns; the containerised web host stays quiet
+./bifrost start --web docker --obs        # in the foreground; Ctrl-C stops all of it
+./bifrost service pm2 --web docker --obs  # always on (or: service launchd …)
 ```
 
-Then:
+That starts, in order:
+
+1. the Grafana stack in Docker (`--obs`; leave it out for none),
+2. the web host in Docker: `compose/web.yml` + `compose/web.bridge.yml`,
+   which set its run shape in `environment:` (bridge network, `API_HOST=host.docker.internal`,
+   `MDNS_ADVERTISER=host` so it stays quiet),
+3. natively, the API (as `full`, so it prints the address and the join QR,
+   and finds the container answering on `4646`) and `bifrost-mdns`, with
+   traces on.
+
+The `service` form starts the native processes first and keeps all of it
+running across reboots. Without `./bifrost`, the same by hand:
 
 ```bash
-sh scripts/start-pm2.sh          # or: sh scripts/start-launchd.sh  → bifrost-api + bifrost-mdns
+sh scripts/start-pm2.sh --web docker --otel     # or start-launchd.sh: bifrost-api + bifrost-mdns
 docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d --build
+sh scripts/observability.sh                     # the Grafana stack, if you want it
 ```
 
-Both launchers print the compose command when `MDNS_ADVERTISER=host`. To go
-back to the native web host, set `BIFROST_RUN=full` and `MDNS_ADVERTISER=web`,
-re-run the launcher (it removes `bifrost-mdns`), and stop the container:
-`docker compose -f compose/web.yml down`.
+To go back to the native web host, re-run the launcher without `--web docker`
+(it removes `bifrost-mdns`) and stop the container:
+`./bifrost docker down web-mac`.
 
 ## Two questions only a Mac can answer (the PLAN-39 spike)
 

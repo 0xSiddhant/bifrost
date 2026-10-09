@@ -75,101 +75,109 @@ Each stateful page keeps its own URL; the Diagon Alley utilities open inline at 
 
 ## Quick start
 
-> Prerequisites: **Node.js ≥ 20**, **npm ≥ 10**, macOS (primary host target).
+You need **Node.js 20+** and **npm 10+**. macOS is the main host.
 
 ```bash
-# 1. install dependencies
-npm install
-
-# 2. create local env from template
-cp .env.example .env
-
-# 3. create runtime folders (storage/{uploads,downloads,tmp,data,logs}) and the database
-./bifrost setup
-
-# 4. run in dev (API + client, hot reload)
-./bifrost dev
+npm install                  # install dependencies
+./bifrost setup              # creates .env, asks you for an admin PIN, makes the storage folders + database
+./bifrost dev                # run with hot reload
 ```
 
-Then open `http://bifrost.local:<PORT>` from any device on the same Wi-Fi — or scan the QR printed in the terminal.
+Open `http://bifrost.local:4646` from any device on the same Wi-Fi, or scan the QR code printed in the terminal.
 
-Every task in this repo runs through **`./bifrost`**: `./bifrost help` lists them all. See [Commands](#commands-bifrost) below.
+Every task in this repo runs through `./bifrost`. Run `./bifrost help` to see them all.
 
-## Run it as a service (macOS)
+## Run Bifrost
 
-For an always-on hub that survives crashes and reboots, run it natively (this is
-the production mode — mDNS/`bifrost.local` works, unlike Docker on macOS). One
-command builds and starts it:
+### On your Mac
 
 ```bash
-./bifrost service pm2          # via PM2 (rich logs/monitoring; installs pm2)
-# — or —
-./bifrost service launchd      # via launchd (zero extra deps, native)
+./bifrost build                          # build once after every pull
+
+./bifrost start                          # run now, in this terminal (Ctrl-C stops it)
+./bifrost service pm2                    # or keep it running: restarts on crash and at login
+./bifrost service launchd                # the same without installing PM2 (pick one)
 ```
 
-Pick one, not both. On a machine that has not run `npm install` yet, the
-scripts behind them work on their own: `sh scripts/start-pm2.sh`,
-`sh scripts/start-launchd.sh`. Details + how to choose: [`docs/pm2.md`](docs/pm2.md) ·
-[`docs/launchd.md`](docs/launchd.md).
+Add flags to change what runs. They work the same with `start` and with `service`:
 
-Bifrost runs as **two processes** (PLAN-36): the **web host** on `PORT` (4646),
-which serves the page, answers for `bifrost.local` and forwards API calls, and
-the **API server** behind it on `127.0.0.1:API_PORT` (default 4647, never on the
-LAN). The address is the same as ever. Restarting the API alone leaves the page
-up, showing "The Bifröst is closed" until it is back. `BIFROST_RUN` in `.env`
-picks what runs: `full` (both, the default), `api` (the API alone, for the CLI
-on this Mac: `bifrost --host 127.0.0.1:4647`) or `web` (the standalone tools
-site alone).
+```bash
+./bifrost start --obs                    # + Grafana, Loki, Prometheus and Tempo in Docker, traces on
+./bifrost start --web docker             # API on the Mac, web host in Docker
+./bifrost start --web docker --obs       # API on the Mac, web host + Grafana in Docker, all connected
+./bifrost start --web none               # the API alone (for the CLI)
+./bifrost start --standalone             # only the browser tools site, no API
+./bifrost start --otel                   # traces on, without starting Grafana
 
-The API is versioned in its path (PLAN-37): every call is `/api/v1/…`, and a
-saved document's raw content is at `/<kind>/api/v1/<slug>`, which is what the
-Pensieve's "API" link and "Copy curl" give you:
+./bifrost service pm2 --web docker --obs # any of the above, always on
+```
+
+No `.env` changes are needed for any of these: the flags decide, and an old `BIFROST_RUN`, `MDNS_ADVERTISER` or `OTEL_ENABLED` line in `.env` is removed for you. `.env` holds the PIN, folders, limits and ports. With `start`, Ctrl-C also stops the containers it started.
+
+Grafana is at `http://localhost:4648` (admin / bifrost). The `--web docker` setups need Docker Desktop with Docker Compose 2.20 or newer. See [`docs/docker-mac.md`](docs/docker-mac.md).
+
+### In Docker
+
+**The client alone**: the browser tools site, with no server behind it. Works with any Docker version:
+
+```bash
+./bifrost docker up standalone               # http://localhost:8080
+./bifrost docker up standalone --port 9000   # http://localhost:9000
+./bifrost docker logs standalone             # follow its logs
+./bifrost docker down standalone             # stop it
+```
+
+**Behind your reverse proxy** on a server (Caddy, Traefik, nginx…):
+
+```bash
+./bifrost docker up standalone --network <proxy-network>   # find the name with: docker network ls
+```
+
+**The whole hub on a Linux host** (a Raspberry Pi, a home server):
+
+```bash
+./bifrost docker up                      # API + web host
+./bifrost docker up --obs                # + Grafana stack, traces on
+./bifrost docker up api                  # the API alone
+./bifrost docker up web-standalone       # the browser tools site, served to your network
+./bifrost docker logs                    # follow the hub's logs
+./bifrost docker down                    # stop it (add --obs if you started it with --obs)
+```
+
+**Only the Grafana stack**, next to Bifrost running natively:
+
+```bash
+./bifrost docker up obs                  # Grafana at http://localhost:4648
+./bifrost docker down obs                # stop it (add -v to also delete its data)
+```
+
+Everything except the standalone site needs Docker Compose 2.20 or newer (`docker compose version`). A machine without `node_modules` can use the plain `docker compose` commands in [`docs/docker-linux.md`](docs/docker-linux.md) and [`docs/standalone.md`](docs/standalone.md).
+
+### Back up and restore
+
+```bash
+./bifrost backup                         # zip the database and storage/ now (safe while running)
+./bifrost backup agent install           # macOS: back up to a cloud folder on a schedule (BACKUP_* in .env)
+./bifrost backup agent status            # last run, next due date
+./bifrost restore <zip-or-folder>        # stop Bifrost first
+```
+
+## The API
+
+Every call is under `/api/v1/`, and a saved document's raw content is at `/<kind>/api/v1/<slug>`:
 
 ```bash
 curl -sS http://bifrost.local:4646/api/v1/health
 curl -sS http://bifrost.local:4646/edda/api/v1/<slug>
 ```
 
-Paths from before versioning (`/api/health`, `/edda/api/<slug>`) still answer,
-identically, as v1, with a `Deprecation` header pointing at the new path. Links
-saved elsewhere and older scripts and CLIs keep working.
-
-Every operation is browsable, and can be tried, in Swagger UI at
-`http://127.0.0.1:4647/docs` on the server machine (not `bifrost.local`: the API
-listens on loopback). See [`docs/api.md`](docs/api.md).
-
-### Upgrading from a version before PLAN-36
-
-Re-run the same command you installed with. `start-pm2.sh` deletes the old
-`bifrost` app and `start-launchd.sh` the old `local.bifrost` plist **before**
-starting the two new processes, so nothing old holds the API's port or
-advertises a second `bifrost.local`. On Linux, `./bifrost docker up -- --remove-orphans`
-(see [Docker](#docker)). If the web host is ever missing after an upgrade, the API
-logs an error saying so ten seconds after it starts.
-
-**Optional Grafana view of the logs** (Docker containers; works alongside the
-native run — Alloy tails `storage/logs/`). In a second terminal:
-
-```bash
-./bifrost docker up obs        # http://localhost:3000  (admin / bifrost)
-```
-
-See [`docs/observability.md`](docs/observability.md). Back up all state
-(`storage/`) any time with `./bifrost backup`, or schedule it
-(macOS): set `BACKUP_CLOUD` (dropbox / icloud / onedrive / gdrive / path) in
-`.env` and run `./bifrost backup agent install` — a launchd agent checks daily
-and backs up every `BACKUP_INTERVAL_DAYS` into the cloud folder, only while the
-server is running. `./bifrost backup agent status` shows the schedule, last run,
-and next due date; `backup agent stop` / `backup agent start` pause and resume it.
+Browse and try every endpoint in Swagger UI at `http://127.0.0.1:4647/docs`, on the machine running Bifrost. See [`docs/api.md`](docs/api.md).
 
 ## CLI
 
-`bifrost` is a command-line client for a running hub — push and pull files, read
-and write the shared clipboard, fetch saved documents, resolve go-links, check
-server and device state, run a speed test. It is a third npm workspace
-(`cli/`) that consumes the existing API and adds no server routes of its own.
+`bifrost` is a command-line client for a running hub. It pushes and pulls files, reads and writes the shared clipboard, fetches saved documents, resolves go-links and runs a speed test.
 
-Install it from the latest release's tarball:
+Install it from the latest release:
 
 <!-- CLI_INSTALL_START -->
 
@@ -180,122 +188,74 @@ npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v1.4.0/bi
 <!-- CLI_INSTALL_END -->
 
 ```bash
-bifrost push ~/Desktop/notes.pdf     # send a file to the bridge
+bifrost push ~/Desktop/notes.pdf     # send a file
 bifrost pull                         # list what Downloads is offering
 bifrost clip | pbcopy                # read the shared clipboard
-bifrost doctor                       # check config, host, server, CLI version
+bifrost doctor                       # check config, connection and version
 ```
 
-Every command, the config file, the `--host`/discovery story, and how to run it
-straight from a checkout without installing: [`cli/README.md`](cli/README.md).
-On the host machine `./bifrost build` and `./bifrost start` re-install the global
-`bifrost` from what is checked out, so it never drifts from the server it talks
-to.
+Every command is described in [`cli/README.md`](cli/README.md). On the machine running Bifrost, `./bifrost build` and `./bifrost start` keep the installed `bifrost` in step with the code.
 
-## Commands (`./bifrost`)
+`./bifrost` (with `./`) is this repo's task runner; plain `bifrost` is this client.
 
-`./bifrost` at the repo root runs every task in the repo from one place: develop,
-test, run, back up, and every Docker combination. Each command runs the same npm
-or shell script as before, so nothing about how a task works changes.
+## All `./bifrost` commands
 
 ```bash
-./bifrost help              # every command, grouped
-./bifrost help test         # one command: usage, options, examples, and what each runs
-./bifrost man               # the full manual
-./bifrost list --json       # the whole table, for scripts and AI agents
-./bifrost -n build          # --dry-run: print what would run, run nothing
-./bifrost test unit server -- documents   # anything after -- goes to the underlying tool
+./bifrost help                           # every command
+./bifrost help <command>                 # usage, options, and what each example runs
+./bifrost man                            # the full manual
+./bifrost -n <command>                   # dry run: show what would run
 ```
 
-`./bifrost` (with `./`) is the repo's task runner. Plain `bifrost` on your PATH
-is the [LAN client](#cli), a different program. `./bifrost` needs `npm install`
-to have run once.
-
-| Command | What it does |
-| --- | --- |
-| **Develop** | |
-| `./bifrost setup` | First run: storage folders, `.env` from the template (warns about keys it is missing), DB migrations |
-| `./bifrost dev [--standalone]` | Hot reload: the API, Vite on `PORT` and the mDNS name. `--standalone`: the browser-only site on Vite's own port |
-| `./bifrost build [--standalone]` | Production build (both clients, the API, the web host), then re-installs the global `bifrost` CLI. `--standalone`: only `client/dist-standalone/`, failing if the bundle can reach a server |
-| `./bifrost preview` | Build the standalone site, then serve exactly that output on `:4173` ([`docs/standalone.md`](docs/standalone.md)) |
-| `./bifrost spec` | Regenerate `server/openapi.json` after changing a route (commit it) |
-| `./bifrost db migrate` · `db generate --name <slug>` · `db studio` | Apply migrations · write a new one from `schema.ts` · browse the data in [Drizzle Studio](https://local.drizzle.studio) |
-| **Check & test** | |
-| `./bifrost lint [--fix]` · `typecheck` · `audit` | ESLint with the module boundaries · `tsc` over `scripts/` and every workspace · `npm audit` (must be 0) |
-| `./bifrost test` | Every unit suite. `test unit <workspace> [-- <filter>]` runs one: `server`, `client`, `cli`, `web`, `e2e`, `scripts` |
-| `./bifrost test e2e [ui\|cli\|api]` | End-to-end against the build (run `build` first): all of it, or one suite |
-| `./bifrost test load [-- --profile <name>]` | On-demand load, stress, spike, soak and fan-out runs ([`docs/performance.md`](docs/performance.md)) |
-| `./bifrost test resilience [--cycles <n>]` | 50 restarts with SIGKILLs mid-write, the database integrity-checked each time (on demand) |
-| `./bifrost test all` | **Everything, as CI runs it:** audit → lint → typecheck → unit → build → e2e. See [Testing](#testing) |
-| **Run** | |
-| `./bifrost start [--mode full\|api\|web]` | Run the build in the foreground: the processes `BIFROST_RUN` picks (or `--mode`), as one. Ctrl-C stops the web host, then the API |
-| `./bifrost service pm2\|launchd` | Always-on on macOS: build, then (re)start under PM2 or launchd ([`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md)) |
-| `./bifrost logs` | Pretty-tail the API's JSON log |
-| **Data** | |
-| `./bifrost backup [--include-env] [--meta]` | Archive the database and `storage/` to `BACKUP_DIR` (safe while running) |
-| `./bifrost backup agent install\|uninstall\|start\|stop\|status` | The scheduled cloud backup (macOS launchd; `BACKUP_*` in `.env`): add/remove it, pause/resume it, or see the last run and next due date |
-| `./bifrost backup agent run [--force]` | Run the scheduled job now; `--force` skips the "not due yet" check |
-| `./bifrost restore <path> [--force]` | Restore a `.zip`, one backup's folder, or a folder of backups (the newest). Checks the checksum; refuses a live server unless `--force` |
-| **Docker** | |
-| `./bifrost docker up\|down\|logs\|ps [<target>]` | Any combination below. `up` builds and starts detached; `down -v` also deletes volumes |
-| `./bifrost docker config` · `docker smoke [<image>]` | Check every compose combination parses · smoke-test a standalone image (both as CI does) |
-
-The npm scripts the root `package.json` keeps (`npm run dev`, `npm run build`,
-`npm start`, `npm test`, `npm run lint`, …) still work: CI, husky and your
-muscle memory use them. Their variants moved into `./bifrost` as flags and
-subcommands.
-
-## Docker
-
-Each process has its own image (`docker/`) and its own compose file
-(`compose/`); the root `docker-compose.yml` puts the hub's pieces in one
-project. Every combination is one `./bifrost docker` target. The plain
-`docker compose` command is shown beside it for a machine with only Docker and a
-clone (no `node_modules`). Before any of them: `cp .env.example .env` and set
-`HEIMDALL_PIN`. Needs **Docker Compose ≥ 2.20** (`docker compose version`): the
-files use `include:` and a top-level `name:`, which older Compose rejects.
-
-| # | Where | Runs in Docker | `.env` | `./bifrost` | Plain `docker compose` |
-| --- | --- | --- | --- | --- | --- |
-| 1 | Linux host | The hub: API + web host | `BIFROST_RUN=full` | `./bifrost docker up` | `docker compose up -d --build` |
-| 2 | Linux host | The hub + Grafana, Loki, Alloy, Prometheus, Tempo | `BIFROST_RUN=full` | `./bifrost docker up --obs` | `docker compose --profile observability up -d --build` |
-| 3 | Linux host | The API alone | `BIFROST_RUN=api` | `./bifrost docker up api` | `docker compose -f compose/api.yml --env-file .env up -d --build` |
-| 4 | Linux host | The web host alone, serving the standalone site to the LAN | `BIFROST_RUN=web` | `./bifrost docker up web` | `docker compose -f compose/web.yml --env-file .env up -d --build` |
-| 5 | Mac | The web host, beside the native API and advertiser | `BIFROST_RUN=api`, `MDNS_ADVERTISER=host` | `./bifrost service pm2` (or `launchd`), then `./bifrost docker up web-mac` | `docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d --build` |
-| 6 | Mac or Linux | Only the Grafana stack, beside a native hub | any | `./bifrost docker up obs` | `docker compose -f compose/observability.yml --env-file .env --profile observability up -d` |
-| 7 | A cloud machine | The standalone site, behind your reverse proxy | none needed | `./bifrost docker up standalone --network <proxy-network>` | `BIFROST_DOCKER_NETWORK=<proxy-network> docker compose -f compose/standalone.yml up -d --build` |
-
-Combination 6 runs beside any of 1, 3, 4 or 5, or beside a native hub (the
-default on the Mac). It tails `storage/logs/`, so it never needs the hub to be in
-Docker. The Mac never runs the API in Docker (Finder drops need native file
-watching), so 1–4 are Linux only. 5 is the one piece that may run in Docker on
-the Mac; read [`docs/docker-mac.md`](docs/docker-mac.md) first.
-
-The same target works with every verb:
+**Develop**
 
 ```bash
-./bifrost docker ps  web-mac          # docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env ps
-./bifrost docker logs                 # follow the hub: docker compose logs -f
-./bifrost docker down api             # docker compose -f compose/api.yml --env-file .env down
-./bifrost docker down obs -v          # stop the Grafana stack and wipe its stored logs and dashboards
-./bifrost docker up --no-build        # start the images already built
-./bifrost docker up -- --remove-orphans   # upgrading from the single pre-PLAN-36 service
-./bifrost docker config               # every combination above still parses (CI runs the same list)
-./bifrost docker smoke                # run bifrost-standalone:latest read-only and check it (as CI does)
+./bifrost setup                          # storage folders + database (first run, safe to repeat)
+./bifrost dev                            # hot reload
+./bifrost dev --standalone               # hot reload, browser tools site only
+./bifrost build                          # production build
+./bifrost build --standalone             # only the browser tools site
+./bifrost preview                        # build the browser tools site and serve it on :4173
+./bifrost spec                           # regenerate server/openapi.json after changing a route
+./bifrost db migrate                     # apply database migrations
+./bifrost db generate --name <slug>      # create a migration from schema.ts
+./bifrost db studio                      # browse the database
 ```
 
-Linux hosts use host networking: `bifrost.local`, each device's real address,
-and the API on the host's loopback. State is the `./storage` bind mount, shared
-by every container. Details: [`docs/docker-linux.md`](docs/docker-linux.md) (images,
-permissions, upgrading), [`docs/docker-mac.md`](docs/docker-mac.md),
-[`docs/standalone.md`](docs/standalone.md) (the proxy, build arguments) and
-[`docs/observability.md`](docs/observability.md).
+**Check and test**
+
+```bash
+./bifrost lint                           # ESLint (add --fix to fix)
+./bifrost typecheck                      # TypeScript
+./bifrost audit                          # npm audit, must find 0
+./bifrost test                           # all unit tests
+./bifrost test unit server               # one workspace: server, client, cli, web, e2e or scripts
+./bifrost test e2e                       # end-to-end, against the build
+./bifrost test e2e ui                    # one e2e suite: ui, cli or api
+./bifrost test load -- --profile stress  # load tests, on demand
+./bifrost test resilience                # restart and crash tests, on demand
+./bifrost test all                       # everything CI runs
+```
+
+**Run, data and Docker**: see [Run Bifrost](#run-bifrost) above, plus:
+
+```bash
+./bifrost logs                           # follow the API's log
+./bifrost docker ps                      # what is running in Docker
+./bifrost docker config                  # check every compose file still parses
+./bifrost docker smoke                   # check the standalone image
+```
+
+`npm run dev`, `npm run build`, `npm start` and `npm test` still work too.
 
 ## Testing
 
-**One command runs everything:** `./bifrost test all` (`npm audit`, lint, typecheck, unit + integration tests, build, end-to-end). The first time, install Playwright's browsers once: `cd e2e && npx playwright install chromium webkit`.
+```bash
+cd e2e && npx playwright install chromium webkit && cd ..   # once, for the browser tests
+./bifrost test all                                          # audit, lint, typecheck, unit, build, end-to-end
+```
 
-Tests live in two kinds of place, on purpose. Unit and integration tests sit **beside the code they test**, in `server/`, `client/` and `cli/`. End-to-end tests live in **`e2e/`** and only ever drive the built app from outside. [`docs/testing.md`](docs/testing.md) is the map: every kind of test, where it lives, how to run and replay one, and what each one protects. Load, stress and soak runs are on demand, never in CI: `./bifrost test load` ([`docs/performance.md`](docs/performance.md)).
+Unit tests live next to the code they test. End-to-end tests live in `e2e/` and drive the built app from outside. [`docs/testing.md`](docs/testing.md) explains every kind of test and how to run each one.
 
 ## Project docs
 
@@ -305,9 +265,9 @@ Operating & deploying:
 
 - [`docs/pm2.md`](docs/pm2.md) · [`docs/launchd.md`](docs/launchd.md) — run as a service on macOS
 - [`docs/observability.md`](docs/observability.md) — optional Grafana + Loki + Alloy + Prometheus + Tempo stack
-- [`docs/docker-linux.md`](docs/docker-linux.md) — Docker on a Linux host: one image per process, compose files you can combine (`docker compose up` is the hub, `--profile observability` adds Grafana)
+- [`docs/docker-linux.md`](docs/docker-linux.md) — Docker on a Linux host, including the plain `docker compose` commands
 - [`docs/docker-mac.md`](docs/docker-mac.md) — on the Mac, the web host in Docker beside the native API, with a native advertiser for `bifrost.local`
-- [`docs/standalone.md`](docs/standalone.md) — the standalone site: the browser-only tools, run locally (`./bifrost dev --standalone` / `./bifrost preview`) or as a static container behind your reverse proxy
+- [`docs/standalone.md`](docs/standalone.md) — the browser tools site: what it includes, its build settings, running it behind a proxy
 - [`docs/releasing.md`](docs/releasing.md) — automated releases (develop → main)
 - [`docs/cloud-profile.md`](docs/cloud-profile.md) — checklist for a future internet deployment
 - [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops
