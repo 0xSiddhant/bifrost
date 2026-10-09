@@ -1,3 +1,4 @@
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../support/fixtures.js';
 
 /**
@@ -10,6 +11,24 @@ import { test, expect } from '../support/fixtures.js';
 
 interface Spec {
   tags: { name: string }[];
+}
+
+/**
+ * Open one operation the way a person does: its module's section, then its
+ * summary. Not a deep link (`/docs#/health/getHealth`): Swagger UI applies one
+ * after the spec loads, and on CI's WebKit it sometimes never did (PLAN-38).
+ */
+async function openOperation(page: Page, tag: string, operationId: string): Promise<Locator> {
+  const section = page.locator(`.opblock-tag[data-tag="${tag}"]`);
+  const operation = page.locator(`#operations-${tag}-${operationId}`);
+  await expect(section).toBeVisible();
+  if ((await section.getAttribute('data-is-open')) !== 'true') await section.click();
+  await expect(operation).toBeVisible();
+  if (!/\bis-open\b/.test((await operation.getAttribute('class')) ?? '')) {
+    await operation.locator('.opblock-summary-control').click();
+  }
+  await expect(operation).toHaveClass(/\bis-open\b/);
+  return operation;
 }
 
 test.describe('API docs', { tag: '@api-docs' }, () => {
@@ -27,9 +46,8 @@ test.describe('API docs', { tag: '@api-docs' }, () => {
   });
 
   test('"Try it out" runs a read against the live hub', async ({ page, server }) => {
-    await page.goto(`${server.apiUrl}/docs#/health/getHealth`);
-    const operation = page.locator('#operations-health-getHealth');
-    await expect(operation).toHaveClass(/is-open/);
+    await page.goto(`${server.apiUrl}/docs`);
+    const operation = await openOperation(page, 'health', 'getHealth');
     await operation.getByRole('button', { name: 'Try it out' }).click();
     await operation.getByRole('button', { name: 'Execute' }).click();
     const live = operation.locator('.live-responses-table');
@@ -41,16 +59,12 @@ test.describe('API docs', { tag: '@api-docs' }, () => {
     page,
     server,
   }) => {
+    await page.goto(`${server.apiUrl}/docs`);
     for (const [tag, id] of [
       ['clipboard', 'addClipboardEntry'],
       ['runestone', 'updateRunestone'],
     ] as const) {
-      // A hash-only change is not a navigation, and Swagger UI reads the deep
-      // link once, on load: load each one fresh.
-      await page.goto(`${server.apiUrl}/docs#/${tag}/${id}`);
-      await page.reload();
-      const operation = page.locator(`#operations-${tag}-${id}`);
-      await expect(operation).toHaveClass(/is-open/);
+      const operation = await openOperation(page, tag, id);
       await expect(operation.getByRole('button', { name: 'Try it out' })).toBeVisible();
     }
     await expect(page.locator('#operations-runestone-updateRunestone')).toContainText(
