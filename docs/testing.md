@@ -2,7 +2,7 @@
 
 Every kind of test this repo runs, how to run and replay each one, and which of them are permanent. `.agents/rules/coding.md` says what each change must ship; this page says how to run what is already here.
 
-**One command runs them all:** `npm run test:all`. It runs lint → typecheck → `npm test` → build → `test:e2e`, stopping at the first failure: the same gate as CI and the `verify` skill. Use the narrower commands below to run or replay one slice.
+**One command runs them all:** `npm run test:all`. It runs `npm audit` → lint → typecheck → `npm test` → build → `test:e2e`, stopping at the first failure: the same gate as CI and the `verify` skill. Use the narrower commands below to run or replay one slice.
 
 **Why tests live in more than one place.** Unit and integration tests sit beside the code they test, in `server/`, `client/` and `cli/`. They import that code directly, run without a build, and come first in CI because they are fast. End-to-end tests live in `e2e/` and are _forbidden_ from importing product code: that rule is what proves they test what actually ships. Merging the two would lose that guarantee.
 

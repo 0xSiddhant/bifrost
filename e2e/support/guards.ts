@@ -67,19 +67,21 @@ export const ALLOWLIST: AllowEntry[] = [
 /**
  * Allowed only after a test has deliberately taken the server away
  * (`guard.allowConnectionLoss()`): every request the page makes then fails to
- * connect, and the browser says so on the console. Page errors, 5xx and any
- * other console line still fail the test.
+ * connect, and the browser says so on the console. A request already in
+ * flight when the server stops is cut off instead (Chromium's
+ * `ERR_CONNECTION_RESET`, WebKit's "Connection reset by peer"). Page errors,
+ * 5xx and any other console line still fail the test.
  */
 export const CONNECTION_LOSS: AllowEntry = {
   reason:
     'The test stopped the server on purpose (offline mode): a refused connection is the expected state, and the browser logs each one.',
   matches: (v) =>
     (v.kind === 'requestfailed' &&
-      /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|Could not connect|Connection refused|network connection was lost/i.test(
+      /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|Could not connect|Connection refused|Connection reset by peer|network connection was lost/i.test(
         v.detail,
       )) ||
     (v.kind === 'console.error' &&
-      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE|Could not connect)/i.test(
+      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE|Could not connect|Error receiving data: Connection reset by peer)/i.test(
         v.detail,
       )) ||
     // Vite's own preload helper reports a lazy chunk's stylesheet it could not

@@ -26,6 +26,12 @@ jobs:
       - name: Install
         run: npm ci
 
+      # A known vulnerability at any severity fails the PR, before anything
+      # else runs (.agents/rules/coding.md, "Dependencies"). New advisories
+      # land without a code change, so audit.yml also checks every day.
+      - name: Audit dependencies
+        run: npm audit --audit-level=low
+
       - name: Lint
         run: npm run lint
 

@@ -23,4 +23,5 @@ All project knowledge lives in `.agents/`.
 - After completing any task, update `.agents/memory/progress.md`. After making any non-trivial decision not covered by a plan, append it to `.agents/memory/decisions.md` with date and reasoning.
 - Never modify plan files without being asked. Ask the user when a plan is ambiguous instead of guessing.
 - Keep all storage paths, limits, and secrets in `.env` — never hardcode.
+- **`npm audit` must report 0 vulnerabilities, and a finding is fixed before any other work**: from `npm install`, CI, the daily `audit.yml` or anywhere else. The procedure is in `.agents/rules/coding.md` ("Dependencies").
 - Project skills live in `.claude/skills/`. `.agents/skills` is a symlink to that directory so Codex and other AGENTS.md-aware tools discover the same skills. Create or edit a project skill only in `.claude/skills/`; do not duplicate it or add a per-skill symlink under `.agents/`. Prefer invoking a matching skill over an ad-hoc procedure; run `verify` before every PR.
