@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   API_OUTAGE,
+  CONNECTION_LOSS,
   isAllowed,
   isExternal,
   isNavigationCancelShaped,
@@ -58,6 +59,43 @@ describe('isAllowed', () => {
       isAllowed({ kind: 'external', page: '', url: 'https://example.com/', detail: 'blocked' }),
     ).toBe(false);
     expect(isAllowed({ kind: 'console.error', page: '', detail: 'boom' })).toBe(false);
+  });
+});
+
+describe('CONNECTION_LOSS', () => {
+  it("allows each browser's refused or cut-off request, and nothing else", () => {
+    const url = 'http://127.0.0.1:1/api/v1/runestone/x';
+    const allowed: Violation[] = [
+      { kind: 'requestfailed', page: '', url, detail: 'net::ERR_CONNECTION_REFUSED' },
+      { kind: 'requestfailed', page: '', url, detail: 'net::ERR_CONNECTION_RESET' },
+      { kind: 'requestfailed', page: '', url, detail: 'Could not connect to the server.' },
+      {
+        kind: 'requestfailed',
+        page: '',
+        url,
+        detail: 'Error receiving data: Connection reset by peer',
+      },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: 'Failed to load resource: net::ERR_CONNECTION_RESET',
+      },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: 'Failed to load resource: Error receiving data: Connection reset by peer',
+      },
+    ];
+    for (const violation of allowed) expect(CONNECTION_LOSS.matches(violation)).toBe(true);
+    const refused: Violation[] = [
+      { kind: 'requestfailed', page: '', url, detail: 'net::ERR_CERT_INVALID' },
+      { kind: 'pageerror', page: '', detail: 'Error receiving data: Connection reset by peer' },
+      { kind: 'console.error', page: '', detail: 'Error receiving data: Connection reset by peer' },
+      { kind: 'http5xx', page: '', url, detail: '500 Internal Server Error' },
+    ];
+    for (const violation of refused) expect(CONNECTION_LOSS.matches(violation)).toBe(false);
+    // Without the allowance, the reset is still a failure.
+    expect(isAllowed(allowed[3]!)).toBe(false);
   });
 });
 
