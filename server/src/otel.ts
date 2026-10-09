@@ -58,6 +58,15 @@ if (settings.enabled) {
     '@opentelemetry/instrumentation-fs': { enabled: false },
   });
 
+  // Traces only. NodeSDK 0.2xx also starts an OTLP *metrics* and *logs*
+  // exporter whenever OTEL_METRICS_EXPORTER / OTEL_LOGS_EXPORTER are unset,
+  // aimed at the same endpoint; Tempo answers those paths 404, so every
+  // export failed into stderr (owner's report, 2026-10-09). Bifrost's metrics
+  // are Prometheus's scrape of /metrics and its logs are files Alloy tails, so
+  // neither is sent here unless someone asks for it explicitly.
+  process.env.OTEL_METRICS_EXPORTER ??= 'none';
+  process.env.OTEL_LOGS_EXPORTER ??= 'none';
+
   const sdk = new NodeSDK({
     serviceName: settings.serviceName,
     traceExporter: exporter,
