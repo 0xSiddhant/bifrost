@@ -173,7 +173,7 @@ A client test fails on any `'/api/` string literal in `client/src` or `cli/src` 
 - [x] CLI `client.ts`: probe 200 → v1; 404 → legacy + hint; hint suppressed in `--json`; other failures unchanged (criterion 6)
 
 **End-to-end**
-- [ ] Full `test:e2e` on 37a and on 37b (criterion 7)
+- [x] Full `test:e2e` on 37a and on 37b (criterion 7)
 - [x] CLI with forced fallback (criterion 6)
 
 **Manual (one-time)**
