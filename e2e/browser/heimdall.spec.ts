@@ -75,7 +75,7 @@ test(
     await expect
       .poll(
         async () =>
-          (await admin.get('/api/loki/config')).json<{ executionEnabled: boolean }>()
+          (await admin.get('/api/v1/loki/config')).json<{ executionEnabled: boolean }>()
             .executionEnabled,
       )
       .toBe(false);
@@ -86,7 +86,7 @@ test(
     await expect
       .poll(
         async () =>
-          (await admin.get('/api/screensaver/config')).json<{ enabled: boolean }>().enabled,
+          (await admin.get('/api/v1/screensaver/config')).json<{ enabled: boolean }>().enabled,
       )
       .toBe(false);
     await toggle(dialog.getByLabel('Enable the screensaver'), true);
@@ -100,7 +100,7 @@ test(
     await expect
       .poll(
         async () =>
-          (await admin.get('/api/offline-mode/config')).json<{ disabled: string[] }>().disabled
+          (await admin.get('/api/v1/offline-mode/config')).json<{ disabled: string[] }>().disabled
             .length,
       )
       .toBe(1);
@@ -120,7 +120,7 @@ test(
     await fresh.goto(`${server.baseUrl}/`);
     await expect(fresh.locator('html')).toHaveAttribute('data-theme', 'tokyo');
     await fresh.close();
-    await admin.patch('/api/heimdall/settings', { defaultThemeId: null });
+    await admin.patch('/api/v1/heimdall/settings', { defaultThemeId: null });
 
     // Settings: a new tap count, then the taps themselves open the gate.
     await page.keyboard.press('Shift+Meta+Comma');
@@ -141,14 +141,14 @@ test(
     await waitForLive(deviceB);
     await deviceB.keyboard.press('Shift+Meta+Comma');
     await unlock(deviceB, server.pin);
-    expect((await deviceB.request.get(`${server.baseUrl}/api/heimdall/session`)).status()).toBe(
+    expect((await deviceB.request.get(`${server.baseUrl}/api/v1/heimdall/session`)).status()).toBe(
       200,
     );
 
     await section(page, 'Settings').click();
     await dialog.getByRole('button', { name: 'Revoke all sessions' }).click();
     await expect(dialog).toBeHidden();
-    expect((await deviceB.request.get(`${server.baseUrl}/api/heimdall/session`)).status()).toBe(
+    expect((await deviceB.request.get(`${server.baseUrl}/api/v1/heimdall/session`)).status()).toBe(
       401,
     );
   },

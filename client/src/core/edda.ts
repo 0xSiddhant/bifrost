@@ -1,4 +1,5 @@
 import {
+  API_V1,
   ApiError,
   apiGet,
   apiSend,
@@ -62,7 +63,7 @@ function listParams(query: EddaListQuery): URLSearchParams {
 
 function hubListEddas(query: EddaListQuery = {}): Promise<EddaSummary[]> {
   const qs = listParams(query).toString();
-  return apiGet<EddaSummary[]>(`/api/edda${qs ? `?${qs}` : ''}`);
+  return apiGet<EddaSummary[]>(`${API_V1}/edda${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
@@ -71,7 +72,7 @@ function hubListEddasPage(
   request: OffsetRequest,
 ): Promise<DocumentListPage<EddaSummary>> {
   return apiGet<DocumentListPage<EddaSummary>>(
-    `/api/edda?${pagedParams(listParams(query), request)}`,
+    `${API_V1}/edda?${pagedParams(listParams(query), request)}`,
   );
 }
 
@@ -82,7 +83,7 @@ function hubListEddasPage(
  */
 async function hubFetchEdda(slug: string): Promise<EddaDoc | null> {
   try {
-    return await apiGet<EddaDoc>(`/api/edda/${encodeURIComponent(slug)}`);
+    return await apiGet<EddaDoc>(`${API_V1}/edda/${encodeURIComponent(slug)}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -90,12 +91,13 @@ async function hubFetchEdda(slug: string): Promise<EddaDoc | null> {
 }
 
 const hubSaveEdda = (input: { name?: string; content: string }): Promise<EddaDoc> =>
-  apiSend<EddaDoc>('POST', '/api/edda', input);
+  apiSend<EddaDoc>('POST', `${API_V1}/edda`, input);
 
 const hubUpdateEdda = (id: string, input: { name?: string; content?: string }): Promise<EddaDoc> =>
-  apiSend<EddaDoc>('PUT', `/api/edda/${id}`, input);
+  apiSend<EddaDoc>('PUT', `${API_V1}/edda/${id}`, input);
 
-const hubDeleteEdda = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/edda/${id}`);
+const hubDeleteEdda = (id: string): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/edda/${id}`);
 
 /*
  * The hub's document API. On the standalone site each is a stub that throws

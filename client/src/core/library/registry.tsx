@@ -4,6 +4,7 @@ import { deleteGroot, listGrootsPage } from '../groot';
 import { deleteRunestone, listRunestonesPage } from '../runestone';
 import { BracesIcon, DocFileIcon, GlobeIcon, TreeIcon } from '../ui/icons';
 import type { LibraryEntry, LibraryItem, LibraryKind } from './types';
+import { API_V1 } from '../api';
 
 /**
  * The document-kind registry behind the Pensieve (PLAN-21).
@@ -50,7 +51,7 @@ const runestoneEntry: LibraryEntry = {
     })),
   remove: (id: string) => deleteRunestone(id),
   editorRoute: (item) => `/runestone/${item.slug}`,
-  apiRoute: (item) => `/runestone/api/${item.slug}`,
+  apiRoute: (item) => `/runestone${API_V1}/${item.slug}`,
   mimeType: 'application/json',
 };
 
@@ -68,7 +69,7 @@ const eddaEntry: LibraryEntry = {
     listEddasPage(query, request).then((page) => ({ ...page, items: tag('edda', page.items) })),
   remove: (id: string) => deleteEdda(id),
   editorRoute: (item) => `/edda/${item.slug}`,
-  apiRoute: (item) => `/edda/api/${item.slug}`,
+  apiRoute: (item) => `/edda${API_V1}/${item.slug}`,
   mimeType: 'text/markdown',
   readRoute: (item) => `/edda/preview/${item.slug}`,
   presentRoute: (item) => `/saga/${item.slug}`,
@@ -88,7 +89,7 @@ const grootEntry: LibraryEntry = {
     listGrootsPage(query, request).then((page) => ({ ...page, items: tag('groot', page.items) })),
   remove: (id: string) => deleteGroot(id),
   editorRoute: (item) => `/groot/${item.slug}`,
-  apiRoute: (item) => `/groot/api/${item.slug}`,
+  apiRoute: (item) => `/groot${API_V1}/${item.slug}`,
   mimeType: 'application/yaml',
 };
 
@@ -109,7 +110,7 @@ const atlasEntry: LibraryEntry = {
     listAtlasesPage(query, request).then((page) => ({ ...page, items: tag('atlas', page.items) })),
   remove: (id: string) => deleteAtlas(id),
   editorRoute: (item) => `/atlas/${item.slug}`,
-  apiRoute: (item) => `/atlas/api/${item.slug}`,
+  apiRoute: (item) => `/atlas${API_V1}/${item.slug}`,
   mimeType: 'application/xml',
 };
 

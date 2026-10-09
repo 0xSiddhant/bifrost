@@ -171,7 +171,7 @@ for (const kind of KINDS) {
       routes('/pensieve'),
       async ({ page, server }) => {
         const name = `E2E pensieve ${kind.kind} ${Date.now().toString(36)}`;
-        const created = await page.request.post(`${server.baseUrl}/api/${kind.kind}`, {
+        const created = await page.request.post(`${server.baseUrl}/api/v1/${kind.kind}`, {
           data: { name, content: kind.content },
         });
         expect(created.status()).toBe(201);
@@ -182,7 +182,7 @@ for (const kind of KINDS) {
 
         const api = row.getByRole('link', { name: `Open ${name} as raw data` });
         const href = await api.getAttribute('href');
-        expect(href).toMatch(new RegExp(`^/${kind.kind}/api/`));
+        expect(href).toMatch(new RegExp(`^/${kind.kind}/api/v1/`));
         const raw = await page.request.get(`${server.baseUrl}${href}`);
         expect(raw.headers()['content-type']).toContain(kind.mime);
         expect(raw.headers()['access-control-allow-origin']).toBe('*');
@@ -224,7 +224,7 @@ for (const kind of KINDS) {
         const saved = page.waitForResponse(
           (response) =>
             response.request().method() === 'POST' &&
-            new URL(response.url()).pathname === `/api/${kind.kind}`,
+            new URL(response.url()).pathname === `/api/v1/${kind.kind}`,
           { timeout: 60_000 },
         );
         await page.getByRole('button', { name: 'Save to Pensieve' }).click();
@@ -234,7 +234,7 @@ for (const kind of KINDS) {
         });
         await expect(page).toHaveURL(new RegExp(`/${kind.kind}/[a-z0-9-]+$`));
         const raw = await page.request.get(
-          `${server.baseUrl}/${kind.kind}/api/${slugFrom(page, kind.kind)}`,
+          `${server.baseUrl}/${kind.kind}/api/v1/${slugFrom(page, kind.kind)}`,
         );
         expect(raw.status()).toBe(200);
         expect((await raw.body()).length).toBe(Buffer.byteLength(big));

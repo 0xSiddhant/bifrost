@@ -20,13 +20,13 @@ test(
     // Another device's test holds the single-flight lease (it lingers for a
     // grace period after its last request): this one must be told, not measured.
     const other = new Api(server.baseUrl, 'e2e-other-broom');
-    await other.get('/api/nimbus/down?mb=1');
+    await other.get('/api/v1/nimbus/down?mb=1');
     await page.getByRole('button', { name: /Fly/ }).click();
     await expect(
       page.getByRole('status').filter({ hasText: 'another broom is flying' }),
     ).toBeVisible();
 
-    await other.post('/api/nimbus/release');
+    await other.post('/api/v1/nimbus/release');
     await page.getByRole('button', { name: /Fly/ }).click();
     await expect(page.getByText(/10 MB each way · recorded/)).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();

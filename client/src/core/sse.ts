@@ -1,5 +1,6 @@
 import { getDeviceId } from './deviceId';
 import { log } from './log';
+import { API_V1 } from './api';
 
 export type SseStatus = 'connecting' | 'open' | 'closed';
 
@@ -10,7 +11,7 @@ const RETRY_BASE_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
 
 /**
- * Thin wrapper over EventSource for the app-wide `/api/events` stream.
+ * Thin wrapper over EventSource for the app-wide `/api/v1/events` stream.
  * EventSource reconnects transient drops natively; this adds typed
  * subscriptions, status reporting, and backoff re-open after hard closes.
  */
@@ -31,7 +32,7 @@ export class BifrostEvents {
     if (this.source) return;
     this.setStatus('connecting');
     // deviceId lets the presence module (PLAN-06) identify this connection.
-    this.source = new EventSource(`/api/events?deviceId=${encodeURIComponent(getDeviceId())}`);
+    this.source = new EventSource(`${API_V1}/events?deviceId=${encodeURIComponent(getDeviceId())}`);
     this.source.onopen = () => {
       this.retryAttempt = 0;
       this.setStatus('open');

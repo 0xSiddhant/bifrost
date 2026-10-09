@@ -62,7 +62,7 @@ are checked by hand on the Mac, and this page records the answers.
    - If it arrives from another address, the API cannot be reached with
      `API_HOST=127.0.0.1`. This setup then needs a follow-up: the API listening
      on Docker's address, and that address trusted.
-   - *Check:* with the container up, `curl http://bifrost.local:4646/api/health`
+   - *Check:* with the container up, `curl http://bifrost.local:4646/api/v1/health`
      from another device answers 200, and the API's log shows the request.
 2. **Does the web host see each device's own address?** Docker Desktop's port
    forwarding has historically replaced the client's address with its own

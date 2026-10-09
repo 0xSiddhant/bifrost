@@ -97,7 +97,7 @@ describe('BridgeClosedHost', () => {
 
     fetch.mockResolvedValue(new Response('{}', { status: 200 }));
     await act(async () => tryAgain()?.click());
-    expect(fetch).toHaveBeenLastCalledWith('/api/health', expect.anything());
+    expect(fetch).toHaveBeenLastCalledWith('/api/v1/health', expect.anything());
     expect(sheets()).toHaveLength(0);
   });
 

@@ -1,4 +1,4 @@
-import { apiGet } from './api';
+import { API_V1, apiGet } from './api';
 import { log } from './log';
 import { bifrostEvents } from './sse';
 
@@ -38,7 +38,7 @@ export function startDeviceRegistry(): void {
   // Presence is the hub's view of who is connected; standalone has no hub.
   if (!__HUB__ || started) return;
   started = true;
-  apiGet<{ devices: PresenceDevice[] }>('/api/presence')
+  apiGet<{ devices: PresenceDevice[] }>(`${API_V1}/presence`)
     .then((res) => apply(res.devices))
     // Not fatal — names fall back to raw ids — but every device label in the
     // app is wrong for the rest of the session, and nothing on screen says why.

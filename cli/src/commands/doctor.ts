@@ -1,6 +1,11 @@
 import dns from 'node:dns/promises';
 import type { Command } from 'commander';
-import { ApiClient, describeTransportFailure } from '../core/client.js';
+import {
+  API_V1,
+  ApiClient,
+  describeTransportFailure,
+  LEGACY_SERVER_HINT,
+} from '../core/client.js';
 import { configPath, deviceId, readConfig } from '../core/config.js';
 import { LOCAL_FALLBACKS, resolveBaseUrl, unreachableMessage } from '../core/discover.js';
 import { checkLatest, cliVersion, compareVersions } from '../core/selfUpdate.js';
@@ -87,9 +92,10 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
     checks.push({ name: 'server profile', status: 'fail', detail: skipped });
   } else {
     try {
-      const response = await client.probe('/api/health', { signal: AbortSignal.timeout(5_000) });
+      const response = await client.probe(`${API_V1}/health`, { signal: AbortSignal.timeout(5_000) });
       await response.arrayBuffer();
       const moved = client.fellBackFrom;
+      const healthUrl = client.url(`${API_V1}/health`);
       checks.push(
         response.ok && moved !== null
           ? {
@@ -101,13 +107,18 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
                 `bifrost config set-host ${new URL(client.baseUrl).host}`,
             }
           : response.ok
-          ? { name: 'server reachable', status: 'pass', detail: `${baseUrl}/api/health answered 200` }
+          ? { name: 'server reachable', status: 'pass', detail: `${healthUrl} answered 200` }
           : {
               name: 'server reachable',
               status: 'fail',
-              detail: `${baseUrl}/api/health answered HTTP ${response.status}`,
+              detail: `${healthUrl} answered HTTP ${response.status}`,
             },
       );
+      // A hub from before PLAN-37 works (the CLI falls back to its unversioned
+      // paths), but --json hides the run's own hint, so doctor says it too.
+      if (client.apiVersion === 'legacy') {
+        checks.push({ name: 'API version', status: 'warn', detail: LEGACY_SERVER_HINT });
+      }
     } catch (error) {
       // Already worded by `client.ts` (it raises `discover.ts`'s own
       // remediation text) — re-wrapping it would print the sentence twice.
@@ -118,7 +129,7 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
       const capabilities = await client.json<Capabilities>(
         'reading server capabilities',
         'GET',
-        '/api/capabilities',
+        `${API_V1}/capabilities`,
       );
       checks.push(
         PROFILES.includes(capabilities.profile)

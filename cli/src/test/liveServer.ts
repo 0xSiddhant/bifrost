@@ -88,7 +88,9 @@ export async function startLiveServer(env: Record<string, string> = {}): Promise
       throw new Error(`server exited early (${child.exitCode}):\n${output}`);
     }
     try {
-      const response = await fetch(`${baseUrl}/api/health`, { signal: AbortSignal.timeout(1_000) });
+      const response = await fetch(`${baseUrl}/api/v1/health`, {
+        signal: AbortSignal.timeout(1_000),
+      });
       if (response.ok) {
         await response.arrayBuffer();
         break;

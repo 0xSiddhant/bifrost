@@ -102,7 +102,7 @@ test(
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
 
-    const raw = await page.request.get(`${server.baseUrl}/atlas/api/${doc.slug}`);
+    const raw = await page.request.get(`${server.baseUrl}/atlas/api/v1/${doc.slug}`);
     // Only the edited value's bytes changed — the surgical-edit promise.
     expect(await raw.text()).toBe(
       PLIST.replace('<string>Bifrost</string>', '<string>Asgard</string>'),

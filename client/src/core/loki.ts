@@ -1,4 +1,4 @@
-import { apiGet, apiSend, hubOnly } from './api';
+import { API_V1, apiGet, apiSend, hubOnly } from './api';
 
 /**
  * Loki execution policy (PLAN-12 Part B). The workbench reads the public config
@@ -22,10 +22,10 @@ export type LokiSettingsPatch = Partial<{
   consoleMaxEntries: number;
 }>;
 
-const hubFetchLokiConfig = (): Promise<LokiConfig> => apiGet<LokiConfig>('/api/loki/config');
+const hubFetchLokiConfig = (): Promise<LokiConfig> => apiGet<LokiConfig>(`${API_V1}/loki/config`);
 
 const hubPatchLokiSettings = (patch: LokiSettingsPatch): Promise<LokiConfig> =>
-  apiSend<LokiConfig>('PATCH', '/api/loki/settings', patch);
+  apiSend<LokiConfig>('PATCH', `${API_V1}/loki/settings`, patch);
 
 // Hub-only: on the standalone site each is a stub that makes no request (PLAN-35).
 export const fetchLokiConfig: typeof hubFetchLokiConfig = __HUB__ ? hubFetchLokiConfig : hubOnly('fetchLokiConfig');

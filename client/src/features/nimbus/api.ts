@@ -1,4 +1,4 @@
-import { apiGet, apiSend, ApiError } from '../../core/api';
+import { API_V1, apiGet, apiSend, ApiError } from '../../core/api';
 import { getDeviceId } from '../../core/deviceId';
 
 /**
@@ -47,11 +47,11 @@ export type ProgressFn = (bytes: number, ms: number) => void;
 const MB = 1024 * 1024;
 
 export const fetchNimbusConfig = (): Promise<NimbusConfig> =>
-  apiGet<NimbusConfig>('/api/nimbus/config');
+  apiGet<NimbusConfig>(`${API_V1}/nimbus/config`);
 
 export const listResults = (device?: string): Promise<NimbusResult[]> =>
   apiGet<NimbusResult[]>(
-    `/api/nimbus/results${device ? `?device=${encodeURIComponent(device)}` : ''}`,
+    `${API_V1}/nimbus/results${device ? `?device=${encodeURIComponent(device)}` : ''}`,
   );
 
 export const saveResult = (input: {
@@ -59,7 +59,7 @@ export const saveResult = (input: {
   upMbps: number;
   latencyMs: number;
   testMb: number;
-}): Promise<NimbusResult> => apiSend<NimbusResult>('POST', '/api/nimbus/results', input);
+}): Promise<NimbusResult> => apiSend<NimbusResult>('POST', `${API_V1}/nimbus/results`, input);
 
 /**
  * Tells the server this device is done (finished or cancelled) so the next one
@@ -67,14 +67,14 @@ export const saveResult = (input: {
  * release just means the guard expires on its own.
  */
 export const releaseGuard = (): Promise<void> =>
-  apiSend<null>('POST', '/api/nimbus/release')
+  apiSend<null>('POST', `${API_V1}/nimbus/release`)
     .then(() => undefined)
     .catch(() => undefined);
 
 /** One latency round trip, measured client-side (the server sends no body). */
 export async function pingOnce(signal?: AbortSignal): Promise<number> {
   const started = performance.now();
-  const response = await fetch('/api/nimbus/ping', { cache: 'no-store', signal });
+  const response = await fetch(`${API_V1}/nimbus/ping`, { cache: 'no-store', signal });
   const elapsed = performance.now() - started;
   if (!response.ok) throw new ApiError(response.status, 'ping failed');
   return elapsed;
@@ -92,7 +92,7 @@ export async function downloadTest(options: {
   signal?: AbortSignal;
   onProgress?: ProgressFn;
 }): Promise<TransferOutcome> {
-  const response = await fetch(`/api/nimbus/down?mb=${options.mb}`, {
+  const response = await fetch(`${API_V1}/nimbus/down?mb=${options.mb}`, {
     cache: 'no-store',
     headers: { 'x-bifrost-device': getDeviceId() },
     signal: options.signal,
@@ -133,7 +133,7 @@ export function uploadTest(options: {
     const started = performance.now();
     const onAbort = () => xhr.abort();
 
-    xhr.open('POST', '/api/nimbus/up');
+    xhr.open('POST', `${API_V1}/nimbus/up`);
     xhr.setRequestHeader('content-type', 'application/octet-stream');
     xhr.setRequestHeader('x-bifrost-device', getDeviceId());
     xhr.responseType = 'text';

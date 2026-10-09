@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ApiClient, UploadInput } from './client.js';
 import { CliError, EXIT, type ProgressHandle } from './output.js';
+import { API_V1 } from './client.js';
 
 /**
  * Push and pull. The listing shape is the server's own `DownloadEntry`, folder
@@ -50,7 +51,7 @@ export function displayPath(entry: Pick<DownloadEntry, 'name' | 'parent'>): stri
 }
 
 export function getUploadConfig(client: ApiClient): Promise<UploadConfig> {
-  return client.json<UploadConfig>('reading the upload limits', 'GET', '/api/files/config');
+  return client.json<UploadConfig>('reading the upload limits', 'GET', `${API_V1}/files/config`);
 }
 
 export interface ExpandedInputs {
@@ -154,7 +155,7 @@ export interface PushOptions {
 /**
  * Sends every named file, in as few requests as the server allows.
  *
- * One request per `MAX_FILES_PER_UPLOAD` files — read from `/api/files/config`
+ * One request per `MAX_FILES_PER_UPLOAD` files — read from `/api/v1/files/config`
  * rather than assumed, because past that cap busboy aborts the **whole**
  * request and a 50-file `push .` would otherwise fail entirely instead of
  * landing in three batches.
@@ -173,7 +174,7 @@ export async function pushFiles(
       batches.length === 1 ? 'sending' : `sending batch ${index + 1}/${batches.length}`;
     let bar: ProgressHandle | undefined;
     try {
-      const result = await client.postFiles<UploadResult>('pushing files', '/api/files', batch, {
+      const result = await client.postFiles<UploadResult>('pushing files', `${API_V1}/files`, batch, {
         ...(options.folder === undefined ? {} : { query: { folder: options.folder } }),
         onProgress: (sent, total) => {
           bar ??= options.progress?.(label, total);
@@ -190,7 +191,7 @@ export async function pushFiles(
 }
 
 export function listDownloads(client: ApiClient): Promise<DownloadEntry[]> {
-  return client.json<DownloadEntry[]>('listing downloads', 'GET', '/api/downloads');
+  return client.json<DownloadEntry[]>('listing downloads', 'GET', `${API_V1}/downloads`);
 }
 
 /**
@@ -276,8 +277,8 @@ export async function pullEntry(
   const label = displayPath(entry);
   const route =
     entry.type === 'folder'
-      ? `/api/downloads/${entry.id}/archive`
-      : `/api/downloads/${entry.id}/content`;
+      ? `${API_V1}/downloads/${entry.id}/archive`
+      : `${API_V1}/downloads/${entry.id}/content`;
   const response = await client.open(`pulling ${label}`, route);
   if (response.body === null) {
     throw new CliError(`pulling ${label} failed: the bridge sent no body`);

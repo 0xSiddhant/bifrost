@@ -40,7 +40,7 @@ function countFetches(): { urls: string[]; restore: () => void } {
 }
 
 async function seed(kind: string, name: string, content: string): Promise<void> {
-  const response = await fetch(`${server.baseUrl}/api/${kind}`, {
+  const response = await fetch(`${server.baseUrl}/api/v1/${kind}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -79,7 +79,7 @@ describe('clip', () => {
 
     // Visible to any other client immediately, which is what a browser's Hermes
     // page picks up over SSE.
-    const listed = (await (await fetch(`${server.baseUrl}/api/clipboard`)).json()) as unknown[];
+    const listed = (await (await fetch(`${server.baseUrl}/api/v1/clipboard`)).json()) as unknown[];
     expect(listed).toHaveLength(1);
 
     const read = await runCli([...host, 'clip']);
@@ -87,7 +87,7 @@ describe('clip', () => {
 
     const removed = await runCli([...host, '--json', 'clip', '--rm', entry.id]);
     expect(removed.exitCode).toBe(0);
-    expect(await (await fetch(`${server.baseUrl}/api/clipboard`)).json()).toEqual([]);
+    expect(await (await fetch(`${server.baseUrl}/api/v1/clipboard`)).json()).toEqual([]);
   });
 
   it('says the clipboard is empty rather than printing nothing', async () => {
@@ -190,7 +190,7 @@ describe('preview', () => {
       launch.mockClear();
       const run = await runCli([...host, 'preview', slugs[kind] as string]);
 
-      expect(launch).toHaveBeenCalledWith(`${server.baseUrl}/${kind}/api/${slugs[kind]}`);
+      expect(launch).toHaveBeenCalledWith(`${server.baseUrl}/${kind}/api/v1/${slugs[kind]}`);
       expect(run.stderr).toContain('no rendered page yet');
     }
   });

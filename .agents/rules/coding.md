@@ -50,6 +50,14 @@
 - A new route joins the black-box suite on its own: the fuzzer and the security sweep read it from the spec. It needs one success in `e2e/api/contract.e2e.ts` (a `GET` is covered automatically if `seed.ts` can fill its parameters), because the coverage report fails on any operation that never succeeded (PLAN-33).
 - A server test builds its app with `createTestApp(overrides)` from `server/src/testing/app.ts`, never `createApp(loadConfig(...))` by hand.
 
+## API versions (PLAN-37)
+
+- **Every route is versioned from its first commit**: `/api/v1/<module>/…`, or a raw document at `/<kind>/api/v1/:slug`. `api-coverage.test.ts` fails anything else; its allowlist (`/go/:slug`, `/metrics`) names a reason per entry, and a new entry needs one too.
+- **v1 only grows.** Add operations, add response fields, add optional request fields. Never remove or rename an operation, a status or a response field, never make a returned field optional, never tighten a request. `openapi-compat.test.ts` fails a PR that does, against `develop`'s spec.
+- **A breaking change is a new version for that module alone**: `/api/v2/<module>/…` beside the v1 routes, which keep answering. There is no global v2.
+- **Callers build paths from the constant**: `API_V1` in `client/src/core/api.ts` and in `cli/src/core/client.ts`. `client/src/core/no-unversioned-api.test.ts` fails any unversioned `/api/` literal in either tree; its only allowlisted file is the CLI's fallback for pre-PLAN-37 hubs.
+- **The old unversioned paths still answer, as v1** (rewritten before routing, `Deprecation` + `successor-version` headers, counted in `bifrost_legacy_api_requests_total`). Never register a route on one, and never remove the rewrite without the owner: removal is a PLAN-99 row, gated on that metric reading zero for a release.
+
 ## Testing
 
 - Vitest. Every usecase gets unit tests (repos mocked via interfaces). Routes tested with `fastify.inject`.

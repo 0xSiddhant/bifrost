@@ -53,7 +53,7 @@ describe('preview', () => {
     expect(edda.code).toBe(0);
     expect(edda.stdout).toContain(`/edda/preview/${saved.edda.slug}`);
     const rune = await cli.bifrost(['preview', saved.runestone.slug, '--no-open']);
-    expect(rune.stdout).toContain(`/runestone/api/${saved.runestone.slug}`);
+    expect(rune.stdout).toContain(`/runestone/api/v1/${saved.runestone.slug}`);
   });
 
   it('--json never launches a browser; without it, one is launched', async () => {

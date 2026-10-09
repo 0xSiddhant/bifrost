@@ -1,4 +1,5 @@
 import {
+  API_V1,
   ApiError,
   apiGet,
   apiSend,
@@ -59,7 +60,7 @@ function listParams(query: GrootListQuery): URLSearchParams {
 
 function hubListGroots(query: GrootListQuery = {}): Promise<GrootSummary[]> {
   const qs = listParams(query).toString();
-  return apiGet<GrootSummary[]>(`/api/groot${qs ? `?${qs}` : ''}`);
+  return apiGet<GrootSummary[]>(`${API_V1}/groot${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
@@ -68,7 +69,7 @@ function hubListGrootsPage(
   request: OffsetRequest,
 ): Promise<DocumentListPage<GrootSummary>> {
   return apiGet<DocumentListPage<GrootSummary>>(
-    `/api/groot?${pagedParams(listParams(query), request)}`,
+    `${API_V1}/groot?${pagedParams(listParams(query), request)}`,
   );
 }
 
@@ -79,7 +80,7 @@ function hubListGrootsPage(
  */
 async function hubFetchGroot(slug: string): Promise<GrootDoc | null> {
   try {
-    return await apiGet<GrootDoc>(`/api/groot/${encodeURIComponent(slug)}`);
+    return await apiGet<GrootDoc>(`${API_V1}/groot/${encodeURIComponent(slug)}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -87,14 +88,15 @@ async function hubFetchGroot(slug: string): Promise<GrootDoc | null> {
 }
 
 const hubSaveGroot = (input: { name?: string; content: string }): Promise<GrootDoc> =>
-  apiSend<GrootDoc>('POST', '/api/groot', input);
+  apiSend<GrootDoc>('POST', `${API_V1}/groot`, input);
 
 const hubUpdateGroot = (
   id: string,
   input: { name?: string; content?: string },
-): Promise<GrootDoc> => apiSend<GrootDoc>('PUT', `/api/groot/${id}`, input);
+): Promise<GrootDoc> => apiSend<GrootDoc>('PUT', `${API_V1}/groot/${id}`, input);
 
-const hubDeleteGroot = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/groot/${id}`);
+const hubDeleteGroot = (id: string): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/groot/${id}`);
 
 /*
  * The hub's document API. On the standalone site each is a stub that throws

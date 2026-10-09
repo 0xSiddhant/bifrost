@@ -57,7 +57,7 @@ test.describe('hermes', () => {
       const TTL_SECONDS = 5;
       const text = `self-destructing ${Date.now().toString(36)}`;
       const postedAt = Date.now();
-      await new Api(server.baseUrl).post('/api/clipboard', { text, ttlSeconds: TTL_SECONDS });
+      await new Api(server.baseUrl).post('/api/v1/clipboard', { text, ttlSeconds: TTL_SECONDS });
       await page.goto('/hermes');
       const entry = page.locator('.clip-entry').filter({ hasText: text });
       await expect(entry).toBeVisible();

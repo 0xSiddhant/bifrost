@@ -34,11 +34,11 @@ function entry(partial: Partial<LibraryEntry>): LibraryEntry {
 describe('buildCurlCommand', () => {
   it('builds an absolute-URL curl with an Accept header matching the endpoint', () => {
     const withRoute = entry({
-      apiRoute: (i) => `/runestone/api/${i.slug}`,
+      apiRoute: (i) => `/runestone/api/v1/${i.slug}`,
       mimeType: 'application/json',
     });
     expect(buildCurlCommand(withRoute, item, 'http://bifrost.local:4646')).toBe(
-      "curl -sS -H 'Accept: application/json' 'http://bifrost.local:4646/runestone/api/beta-config-aaa111'",
+      "curl -sS -H 'Accept: application/json' 'http://bifrost.local:4646/runestone/api/v1/beta-config-aaa111'",
     );
   });
 
@@ -47,7 +47,7 @@ describe('buildCurlCommand', () => {
   });
 
   it('returns null if apiRoute exists but mimeType was left off — the pairing is enforced at build time, not just by convention', () => {
-    const missingMime = entry({ apiRoute: (i) => `/runestone/api/${i.slug}` });
+    const missingMime = entry({ apiRoute: (i) => `/runestone/api/v1/${i.slug}` });
     expect(buildCurlCommand(missingMime, item, 'http://bifrost.local:4646')).toBeNull();
   });
 });

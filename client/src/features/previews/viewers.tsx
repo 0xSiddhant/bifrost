@@ -6,8 +6,8 @@ import { FileIcon } from '../../core/ui/icons';
 
 /**
  * Viewers take the inline content URL, not an id: since PLAN-17b the same
- * viewers render a staged upload (`/api/files/:name/content`) as well as a
- * download (`/api/downloads/:id/content`), and the modal is the only thing
+ * viewers render a staged upload (`/api/v1/files/:name/content`) as well as a
+ * download (`/api/v1/downloads/:id/content`), and the modal is the only thing
  * that needs to know which is which.
  */
 export function ImageViewer({ src, name }: { src: string; name: string }) {

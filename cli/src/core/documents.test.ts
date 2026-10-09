@@ -21,11 +21,13 @@ const TYPES: Record<string, string> = {
 
 /**
  * A fetch that answers 200 for the named kinds and 404 for the rest — the shape
- * the four raw endpoints really have.
+ * the four raw endpoints really have — on a hub that speaks v1 (PLAN-37: the
+ * client's first versioned request probes `/api/v1/health` once).
  */
 function fakeFetch(present: Record<string, string>): ReturnType<typeof vi.fn> {
   return vi.fn((input: string | URL) => {
     const url = String(input);
+    if (url.endsWith('/api/v1/health')) return Promise.resolve(Response.json({ ok: true }));
     const kind = Object.keys(present).find((name) => url.includes(`/${name}/api/`));
     if (kind === undefined) {
       return Promise.resolve(
@@ -59,7 +61,8 @@ describe('resolveDocument without --type', () => {
 
     expect(document.kind).toBe('groot');
     expect(document.body).toBe('name: bifrost\n');
-    expect(call).toHaveBeenCalledTimes(DOCUMENT_KINDS.length);
+    // One shared version probe, then one request per kind.
+    expect(call).toHaveBeenCalledTimes(DOCUMENT_KINDS.length + 1);
   });
 
   it('reports a clean not-found when no kind answers', async () => {
@@ -108,8 +111,9 @@ describe('resolveDocument with --type', () => {
     const document = await resolveDocument(client(), 'trip-notes-a1b2c3', 'edda');
 
     expect(document.kind).toBe('edda');
-    expect(call).toHaveBeenCalledTimes(1);
-    expect(String(call.mock.calls[0]?.[0])).toContain('/edda/api/');
+    expect(call).toHaveBeenCalledTimes(2);
+    expect(String(call.mock.calls[0]?.[0])).toContain('/api/v1/health');
+    expect(String(call.mock.calls[1]?.[0])).toContain('/edda/api/v1/');
   });
 
   it('names the kind in the not-found message', async () => {

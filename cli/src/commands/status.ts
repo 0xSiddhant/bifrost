@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { clientFromOptions } from '../core/client.js';
+import { API_V1, clientFromOptions } from '../core/client.js';
 import { accent, dim, fields, heading, print } from '../core/output.js';
 
 export interface Health {
@@ -20,8 +20,8 @@ export function registerStatus(program: Command): void {
     .action(async (_options: unknown, command: Command) => {
       const client = clientFromOptions(command.optsWithGlobals());
       const [health, capabilities] = await Promise.all([
-        client.json<Health>('reading server health', 'GET', '/api/health'),
-        client.json<Capabilities>('reading server capabilities', 'GET', '/api/capabilities'),
+        client.json<Health>('reading server health', 'GET', `${API_V1}/health`),
+        client.json<Capabilities>('reading server capabilities', 'GET', `${API_V1}/capabilities`),
       ]);
 
       print({ host: client.baseUrl, ...health, modules: capabilities.modules }, (value) =>

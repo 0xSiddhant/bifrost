@@ -56,7 +56,7 @@ describe('MarkdownViewer', () => {
 
   it('renders a diagram from a .md file on disk', async () => {
     serve('# Notes\n\n```mermaid\ngraph TD\n  A-->B\n```');
-    act(() => root.render(<MarkdownViewer src="/api/downloads/1/content" />));
+    act(() => root.render(<MarkdownViewer src="/api/v1/downloads/1/content" />));
     await settle();
 
     expect(container.querySelector('figure.mermaid svg')).not.toBeNull();
@@ -67,7 +67,7 @@ describe('MarkdownViewer', () => {
     // with a document property, which is a pre-existing quirk of the shared
     // renderer and nothing to do with this surface.
     serve('# Release notes\n\n```js\nconst x = 1;\n```');
-    act(() => root.render(<MarkdownViewer src="/api/downloads/2/content" />));
+    act(() => root.render(<MarkdownViewer src="/api/v1/downloads/2/content" />));
     await settle();
 
     expect(container.querySelector('h1')?.id).toBe('release-notes');
@@ -78,7 +78,7 @@ describe('MarkdownViewer', () => {
 
   it('still renders a script-bearing file inert', async () => {
     serve('hello\n\n<script>window.pwned = 1</script>');
-    act(() => root.render(<MarkdownViewer src="/api/downloads/3/content" />));
+    act(() => root.render(<MarkdownViewer src="/api/v1/downloads/3/content" />));
     await settle();
 
     expect(container.querySelector('script')).toBeNull();
