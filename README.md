@@ -130,6 +130,10 @@ Paths from before versioning (`/api/health`, `/edda/api/<slug>`) still answer,
 identically, as v1, with a `Deprecation` header pointing at the new path. Links
 saved elsewhere and older scripts and CLIs keep working.
 
+Every operation is browsable, and can be tried, in Swagger UI at
+`http://127.0.0.1:4647/docs` on the server machine (not `bifrost.local`: the API
+listens on loopback). See [`docs/api.md`](docs/api.md).
+
 ### Upgrading from a version before PLAN-36
 
 Re-run the same script you installed with. `start-pm2.sh` deletes the old
@@ -233,6 +237,7 @@ Operating & deploying:
 - [`docs/offline-mode.md`](docs/offline-mode.md) — how pure-client pages keep working after the LAN drops
 - [`docs/THEME-SPEC.md`](docs/THEME-SPEC.md) · [`docs/DESIGN.md`](docs/DESIGN.md) — themes & design system
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
+- [`docs/api.md`](docs/api.md) — the API docs (Swagger UI) at `http://127.0.0.1:4647/docs` on the server machine, and how to reach them from another one
 - [`docs/testing.md`](docs/testing.md) — every kind of test, where it lives and how to run it
 - [`docs/performance.md`](docs/performance.md) — the on-demand load harness: profiles, numbers, comparing two builds
 

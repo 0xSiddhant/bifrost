@@ -281,6 +281,21 @@ A response schema is compiled into Fastify's serializer, so a wrong one silently
 
 Shared pieces live in core (`core/http/schemas.ts`, `core/paging.ts`'s envelope builders); each module owns its own shapes, the four document kinds deliberately duplicating theirs like their repositories do.
 
+## API docs (PLAN-38)
+
+Swagger UI for the live spec is served by the **API server** at `/docs` (`/docs/json`, `/docs/yaml`), registered from `core/http/docs.ts` in `buildHttp`, not as a module: no profile switches it, `/api/capabilities` does not list it, and the UI reads the root instance's whole spec. There are no `.env` keys: it is always on, with "Try it out" for every method under a real-data note.
+
+- **Invisible to the client by construction.** The API listens on loopback, and the web host forwards only the API prefixes, so `/docs` never reaches `PORT` or another device (`e2e/api/docs-exposure.e2e.ts`). The docs are opened at `http://127.0.0.1:<API_PORT>/docs`. `bifrost.local:<API_PORT>` resolves to the LAN address and fails even on the Mac. Remote reading is an SSH tunnel (`docs/api.md`). `docs` is a reserved root, and the coverage test allowlists `/docs` with its reason (hidden routes are now checked too).
+- **Offline and locked down.** `validatorUrl: null`, the plugin's bundled assets, and its own CSP (`DOCS_CSP`): same-origin only, with inline styles allowed because Swagger UI injects one, and scripts `'self'`.
+- **The spec's content lives in `core/http/openapi-content.ts`:**
+  - the description (real-data note first, then auth, versioning, coercion, errors);
+  - one tag per module;
+  - `servers: [/]` and the MIT license;
+  - `security: []` on public operations, plus examples (the error envelope, paged envelopes, raw documents);
+  - the spec-only `/{key}` merge, so each document kind's `GET /:slug` and `PUT`/`DELETE /:id` share `/api/v1/<kind>/{key}`, with per-operation constraints kept and routes untouched.
+
+  The spec passes Redocly's `recommended` lint, with reasoned exceptions limited to named operations.
+
 ## Restart safety (server is stopped/started constantly)
 
 - SQLite in **WAL mode**, `synchronous=NORMAL`, `busy_timeout` set; better-sqlite3 is synchronous so no half-finished async writes.

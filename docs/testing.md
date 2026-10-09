@@ -186,6 +186,16 @@ The contract suite found a third: the spec described raw JSON documents as a JSO
 - **Size limits:** for the documents, clipboard, client logs, Brotli and Nimbus, the cap itself must pass and one byte (or one entry) more must be refused with the domain's code.
 - **Rate limits and login lockout:** each runs on a server of its own, because the state they change is process-wide.
 
+## The API docs (PLAN-38)
+
+Swagger UI on the API server ([`api.md`](api.md)) has three checks:
+
+- `server/src/core/http/docs.int.test.ts`: `/docs` is served, `/docs/json` is the committed spec, the CSP allows nothing off-origin, and the validator badge is off.
+- `e2e/browser/docs.spec.ts`: the UI on the API port renders every module and the real-data note, and "Try it out" runs `GET /api/v1/health`. A write offers it too. The usual guard proves no external request and no CSP violation.
+- `e2e/api/docs-exposure.e2e.ts`: through the web host, `/docs` and its spec are never served, and neither client build names them.
+
+The spec itself passes Redocly's `recommended` lint in `server/src/openapi.test.ts`, with each unmet rule listed and justified.
+
 ## What stays and what is temporary
 
 | Item                                                                                               | Fate                                                                                               |
