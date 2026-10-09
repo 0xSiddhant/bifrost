@@ -51,9 +51,11 @@ const ABORT_REASONS =
 export const ALLOWLIST: AllowEntry[] = [
   {
     reason:
-      'The SSE stream (`/api/events`) is a request that never finishes by design: every navigation, reload and context close cancels it, and the browser reports that as a failed request.',
+      'The SSE stream (`/api/v1/events`) is a request that never finishes by design: every navigation, reload and context close cancels it, and the browser reports that as a failed request.',
     matches: (v) =>
-      v.kind === 'requestfailed' && pathOf(v.url) === '/api/events' && ABORT_REASONS.test(v.detail),
+      v.kind === 'requestfailed' &&
+      pathOf(v.url) === '/api/v1/events' &&
+      ABORT_REASONS.test(v.detail),
   },
   {
     reason:

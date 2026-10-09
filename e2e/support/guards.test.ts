@@ -34,9 +34,9 @@ describe('isAllowed', () => {
   });
 
   it('allows the SSE stream being cancelled by a navigation', () => {
-    expect(isAllowed(failed('http://127.0.0.1:1/api/events?deviceId=x', 'net::ERR_ABORTED'))).toBe(
-      true,
-    );
+    expect(
+      isAllowed(failed('http://127.0.0.1:1/api/v1/events?deviceId=x', 'net::ERR_ABORTED')),
+    ).toBe(true);
   });
 
   it('allows a request the page aborted itself', () => {

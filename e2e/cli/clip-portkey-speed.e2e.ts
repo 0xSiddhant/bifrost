@@ -104,10 +104,10 @@ describe('speed', () => {
 
   it('a test while another device holds the bridge exits 5', async () => {
     // Another device's test holds the single-flight lease for a grace period.
-    await new Api(cli.server().baseUrl, 'e2e-other-broom').get('/api/nimbus/down?mb=1');
+    await new Api(cli.server().baseUrl, 'e2e-other-broom').get('/api/v1/nimbus/down?mb=1');
     const busy = await cli.bifrost(['speed', '--mb', '1']);
     expect(busy.code).toBe(5);
     expect(busy.stderr).toContain('another broom is flying');
-    await new Api(cli.server().baseUrl, 'e2e-other-broom').post('/api/nimbus/release');
+    await new Api(cli.server().baseUrl, 'e2e-other-broom').post('/api/v1/nimbus/release');
   });
 });

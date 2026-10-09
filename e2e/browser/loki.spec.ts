@@ -71,7 +71,7 @@ test.describe('loki', () => {
       await expect(page.locator('.loki-line--result')).toContainText('42');
 
       const admin = await new Api(server.baseUrl).login(server.pin);
-      await admin.patch('/api/loki/settings', { executionEnabled: false });
+      await admin.patch('/api/v1/loki/settings', { executionEnabled: false });
       await expect(page.getByRole('button', { name: 'Run' })).toBeHidden();
       await expect(page.getByText('(sandboxed execution) is turned off in Heimdall')).toBeVisible();
     },

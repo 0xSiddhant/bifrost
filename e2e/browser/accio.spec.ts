@@ -18,7 +18,7 @@ test(
       const server = await ownServer();
       const seed = new Api(server.baseUrl);
       for (let index = 0; index < 35; index += 1) {
-        await seed.post('/api/accio', {
+        await seed.post('/api/v1/accio', {
           url: `https://example.invalid/${index}`,
           title: `Seeded link ${String(index).padStart(2, '0')}`,
           tags: ['seeded'],
