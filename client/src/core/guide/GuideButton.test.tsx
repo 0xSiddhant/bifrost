@@ -25,13 +25,17 @@ async function tick(): Promise<void> {
 /**
  * Wait for a real dynamic import to land. A fixed number of ticks would be a
  * flake waiting to happen — how many turns `import()` takes is Vite's business,
- * not this test's — so this waits on the outcome instead.
+ * not this test's — so this waits on the outcome, against a time budget: 50
+ * zero-delay ticks were ~50 ms, which a cold transform of the guide outran
+ * while the full suite loaded every core.
  */
-async function settleUntil(done: () => boolean, tries = 50): Promise<void> {
-  for (let attempt = 0; attempt < tries; attempt += 1) {
+async function settleUntil(done: () => boolean, budgetMs = 5_000): Promise<void> {
+  const deadline = Date.now() + budgetMs;
+  while (Date.now() < deadline) {
     if (done()) return;
     await tick();
   }
+  if (done()) return;
   throw new Error('the guide panel never finished loading');
 }
 
