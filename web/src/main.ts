@@ -77,7 +77,7 @@ export function clientFor(config: Pick<WebConfig, 'runMode'>): {
 }
 
 export async function main(): Promise<void> {
-  loadDotenv();
+  const ignoredEnvKeys = loadDotenv();
   let config: WebConfig;
   try {
     config = loadWebConfig();
@@ -99,6 +99,12 @@ export async function main(): Promise<void> {
     retainFiles: config.logRetentionFiles,
     pretty: process.env.NODE_ENV !== 'production',
   });
+  if (ignoredEnvKeys.length > 0) {
+    log.warn(
+      { keys: ignoredEnvKeys },
+      `${ignoredEnvKeys.join(', ')} in .env ignored: the launcher decides how a run is shaped. Delete the line from .env`,
+    );
+  }
 
   if (config.runMode === 'api') {
     // The launchers never start the web host in this mode. A container still

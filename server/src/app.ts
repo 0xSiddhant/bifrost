@@ -11,9 +11,15 @@ import {
   type AppConfig,
   type DeployProfile,
 } from './core/config/index.js';
-import { loadDotenv } from './core/config/dotenv.js';
+import { ignoredKeysWarning, loadDotenv } from './core/config/dotenv.js';
 import { clientLogger, createLogger, moduleLogger, type Logger } from './core/logger/index.js';
-import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
+import {
+  checkpointAndClose,
+  openDb,
+  readSettings,
+  runMigrations,
+  writeSetting,
+} from './core/db/index.js';
 import { checkClientBuild } from './core/client-build.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
@@ -297,7 +303,7 @@ async function flushAndExit(logger: Logger, code: number): Promise<never> {
 }
 
 export async function main(): Promise<void> {
-  loadDotenv();
+  const ignoredEnvKeys = loadDotenv();
 
   let baseConfig: AppConfig;
   try {
@@ -323,6 +329,8 @@ export async function main(): Promise<void> {
   const app = await createApp(baseConfig);
   const { fastify, config } = app;
   const rootLog = fastify.log as Logger;
+  const ignoredWarning = ignoredKeysWarning(ignoredEnvKeys);
+  if (ignoredWarning) rootLog.warn({ keys: ignoredEnvKeys }, ignoredWarning);
 
   // A crash used to leave nothing at all behind — the exact case the archive
   // exists to explain. Deliberately no graceful shutdown: process state is
@@ -342,7 +350,10 @@ export async function main(): Promise<void> {
   // web host on PORT is what people open, and it answers for bifrost.local.
   const { host, port } = config.api;
   await fastify.listen({ port, host });
-  fastify.log.info({ host, port, runMode: config.runMode }, `api listening on http://${host}:${port}`);
+  fastify.log.info(
+    { host, port, runMode: config.runMode },
+    `api listening on http://${host}:${port}`,
+  );
   // An address this machine can open: a wildcard bind is reached on loopback.
   const reach = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
   // PLAN-38: the docs are on this server, never on the web host's PORT; and
@@ -371,7 +382,9 @@ export async function main(): Promise<void> {
     if (primaryUrl) {
       // Straight to stdout, not the logger: a multi-line ASCII QR inside a JSON
       // log line would be unreadable. Android fallback per tech-stack.md.
-      process.stdout.write(`\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`);
+      process.stdout.write(
+        `\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`,
+      );
     }
     if (config.runMode === 'full') {
       cancelWebHostCheck = checkWebHostLater({
