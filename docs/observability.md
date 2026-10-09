@@ -157,7 +157,7 @@ browser itself. Bifrost is opened from phones and tablets the owner is not
 sitting at, so a React crash or a failed upload there reaches the archive
 through nothing else: the failure never touches the server.
 
-The client batches those reports to `POST /api/client-logs`, and the
+The client batches those reports to `POST /api/v1/client-logs`, and the
 `client-logs` module re-emits them through the same pino instance — same files,
 same rotation, same Alloy, same backfill. Ten feature names exist on both sides
 (`accio`, `edda`, `file-transfer`, `heimdall`, `loki`, `nimbus`, `previews`,
@@ -166,7 +166,7 @@ halves of a feature and adding `source="client"` narrows it to the browser.
 
 - The client ships **`warn` and above** — every line crosses the network into an
   unauthenticated endpoint. `CLIENT_LOG_LEVEL` lowers the floor; clients pick it
-  up from `GET /api/client-logs/config` without a rebuild, and the server
+  up from `GET /api/v1/client-logs/config` without a rebuild, and the server
   enforces the same floor on the way in.
 - `CLIENT_LOG_RATE_LIMIT_PER_MIN`, `CLIENT_LOG_MAX_BATCH`, and
   `CLIENT_LOG_MAX_BODY_KB` bound that write path so a misbehaving tab cannot

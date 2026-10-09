@@ -23,7 +23,7 @@ module imports early.
 
 ## The flow
 
-1. On load, the app reads `GET /api/offline-mode/config` — the list of warmable
+1. On load, the app reads `GET /api/v1/offline-mode/config` — the list of warmable
    pages and which of them an admin has disabled in Heimdall. It re-reads on the
    `offlineMode.settingsUpdated` SSE event, so an open tab sees a change without
    a reload.
@@ -112,7 +112,7 @@ only a new document can undo it. The same rule applies to warming: a target
 whose chunk hard-fails cannot be warmed again in that tab.
 
 Which case applies is **measured, not inferred**. On a failure the boundary
-probes `GET /api/health` (3s), and keeps asking every 5s while the answer is
+probes `GET /api/v1/health` (3s), and keeps asking every 5s while the answer is
 "down", spending one free retry when it flips to up. The obvious signal — the
 SSE reconnecting — is both slow (backoff to 15s) and wrong: an EventSource keeps
 reporting `open` for seconds after the network has gone, which had the panel

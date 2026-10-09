@@ -117,6 +117,19 @@ picks what runs: `full` (both, the default), `api` (the API alone, for the CLI
 on this Mac: `bifrost --host 127.0.0.1:4647`) or `web` (the standalone tools
 site alone).
 
+The API is versioned in its path (PLAN-37): every call is `/api/v1/…`, and a
+saved document's raw content is at `/<kind>/api/v1/<slug>`, which is what the
+Pensieve's "API" link and "Copy curl" give you:
+
+```bash
+curl -sS http://bifrost.local:4646/api/v1/health
+curl -sS http://bifrost.local:4646/edda/api/v1/<slug>
+```
+
+Paths from before versioning (`/api/health`, `/edda/api/<slug>`) still answer,
+identically, as v1, with a `Deprecation` header pointing at the new path. Links
+saved elsewhere and older scripts and CLIs keep working.
+
 ### Upgrading from a version before PLAN-36
 
 Re-run the same script you installed with. `start-pm2.sh` deletes the old

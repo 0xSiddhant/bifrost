@@ -96,6 +96,14 @@ that skips the detour. An address you gave (`--host`, or a saved one) is never
 second-guessed this way, and a timed-out request is never retried, since it may
 have arrived.
 
+**Against a hub older than the CLI** (PLAN-37): the CLI speaks the versioned
+API, `/api/v1/…`. At the first request of a run it checks `/api/v1/health`; a
+hub from before API versioning answers 404 there, so the CLI uses that hub's
+unversioned paths for the rest of the run and prints one line on stderr, "the
+server predates API versioning — consider updating it". Nothing is printed
+under `--json`, where `bifrost doctor` reports it as a warning instead. An older
+CLI works against a newer hub with no change at all.
+
 A bare host gets `http://` and port 4646; `10.0.0.5:8080` and full
 `http://…` URLs are taken as written.
 

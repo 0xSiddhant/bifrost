@@ -133,23 +133,23 @@ A client test fails on any `'/api/` string literal in `client/src` or `cli/src` 
 ## Task checklist
 
 **37a — server**
-- [ ] Spike already run (see "Verified"); re-run it against the real app once `rewriteUrl` is wired, as a permanent test
-- [ ] Every module's route literals → `/api/v1/…` and `/<kind>/api/v1/:slug`; core's `/api/capabilities` and `/api/events` likewise; **every redirect target built in a handler** (the stale-slug `301`s in the four document modules, for both `/api/<kind>/:slug` and the raw routes) points at the v1 path, so a renamed document redirects to its canonical v1 URL whichever path the client used
-- [ ] `core/http`: `rewriteUrl` (unversioned `/api/` and `/<kind>/api/` → v1; versioned paths untouched); `onRequest` deprecation headers; `bifrost_legacy_api_requests_total{route}` (metrics module subscribes via the bus, as for the request histogram); debug log line
-- [ ] `RESERVED_ROOTS` unchanged (first segments are the same), with a test asserting it
-- [ ] `npm run api:spec`; spec description states the old-path rule and the versioning policy
-- [ ] PLAN-32's coverage test: "every route is versioned" with the reasoned allowlist; PLAN-32's snapshot test: fail when a `v1` operation in `develop`'s spec is removed or loses a response field. Operations are matched by `operationId`, and path templates are compared with parameter names normalised (`/{slug}` ≡ `/{key}`), because a parameter's name never reaches the wire. An empty diff passes, so it never breaks `develop` after a merge; delete PLAN-35's one-off `openapi-removals.test.ts`, which this general rule replaces
-- [ ] `server/src/legacy-paths.int.test.ts`: for every operation in the spec, the old path and the v1 path return the same status and **byte-identical body**; the old path alone carries `Deprecation`/`Link`; one shared rate-limit bucket (alternating paths hit 429 at the configured count); admin routes refuse the old path without a session; SSE on `/api/events` receives events
-- [ ] Rewrite the testing logic this touches: server integration tests' URLs (to v1), PLAN-33's API suites (spec-driven, so they follow the spec; any hard-coded path updated), PLAN-34's load scenarios
+- [x] Spike already run (see "Verified"); re-run it against the real app once `rewriteUrl` is wired, as a permanent test
+- [x] Every module's route literals → `/api/v1/…` and `/<kind>/api/v1/:slug`; core's `/api/capabilities` and `/api/events` likewise; **every redirect target built in a handler** (the stale-slug `301`s in the four document modules, for both `/api/<kind>/:slug` and the raw routes) points at the v1 path, so a renamed document redirects to its canonical v1 URL whichever path the client used
+- [x] `core/http`: `rewriteUrl` (unversioned `/api/` and `/<kind>/api/` → v1; versioned paths untouched); `onRequest` deprecation headers; `bifrost_legacy_api_requests_total{route}` (metrics module subscribes via the bus, as for the request histogram); debug log line
+- [x] `RESERVED_ROOTS` unchanged (first segments are the same), with a test asserting it
+- [x] `npm run api:spec`; spec description states the old-path rule and the versioning policy
+- [x] PLAN-32's coverage test: "every route is versioned" with the reasoned allowlist; PLAN-32's snapshot test: fail when a `v1` operation in `develop`'s spec is removed or loses a response field. Operations are matched by `operationId`, and path templates are compared with parameter names normalised (`/{slug}` ≡ `/{key}`), because a parameter's name never reaches the wire. An empty diff passes, so it never breaks `develop` after a merge; delete PLAN-35's one-off `openapi-removals.test.ts`, which this general rule replaces
+- [x] `server/src/legacy-paths.int.test.ts`: for every operation in the spec, the old path and the v1 path return the same status and **byte-identical body**; the old path alone carries `Deprecation`/`Link`; one shared rate-limit bucket (alternating paths hit 429 at the configured count); admin routes refuse the old path without a session; SSE on `/api/events` receives events
+- [x] Rewrite the testing logic this touches: server integration tests' URLs (to v1), PLAN-33's API suites (spec-driven, so they follow the spec; any hard-coded path updated), PLAN-34's load scenarios
 
 **37b — clients**
-- [ ] `client/src/core/api.ts` `API_V1`; every client call site; `core/sse.ts` → `/api/v1/events`; `core/library/registry.tsx` `apiRoute` + "Copy curl" → `/<kind>/api/v1/:slug`
-- [ ] `cli/src/core/client.ts`: v1 with the `/api/v1/health` probe and legacy fallback + stderr hint (not in `--json`); every CLI path; `bifrost portkey` output unchanged (`/go` is unversioned)
-- [ ] `client/src/core/no-unversioned-api.test.ts` (text scan of `client/src` and `cli/src`)
-- [ ] e2e: hub journeys unchanged in intent (they now exercise v1); CLI suite passes against the new server; a CLI run with the probe forced to 404 uses old paths and still passes the core commands
-- [ ] One-time compatibility check (scripted in the PR, not kept): pack the CLI from the commit before 37a in a temporary `git worktree`, and run its `status`, `push`, `pull`, `clip` and `portkey ls` against the new server. Then delete the worktree
-- [ ] Docs: `README.md` and `cli/README.md` show v1 URLs; `docs/standalone.md` unaffected (no API); `architecture.md` + `coding.md` policy; `decisions.md`, `progress.md`; PLAN-99 row "remove the unversioned legacy paths once `bifrost_legacy_api_requests_total` reads zero for a release"; archive this file into `completed/` in 37b's PR
-- [ ] Cleanup: the compatibility worktree and any scratch storage removed; no probe scripts committed; the PR lists deletions
+- [x] `client/src/core/api.ts` `API_V1`; every client call site; `core/sse.ts` → `/api/v1/events`; `core/library/registry.tsx` `apiRoute` + "Copy curl" → `/<kind>/api/v1/:slug`
+- [x] `cli/src/core/client.ts`: v1 with the `/api/v1/health` probe and legacy fallback + stderr hint (not in `--json`); every CLI path; `bifrost portkey` output unchanged (`/go` is unversioned)
+- [x] `client/src/core/no-unversioned-api.test.ts` (text scan of `client/src` and `cli/src`)
+- [x] e2e: hub journeys unchanged in intent (they now exercise v1); CLI suite passes against the new server; a CLI run with the probe forced to 404 uses old paths and still passes the core commands
+- [x] One-time compatibility check (scripted in the PR, not kept): pack the CLI from the commit before 37a in a temporary `git worktree`, and run its `status`, `push`, `pull`, `clip` and `portkey ls` against the new server. Then delete the worktree
+- [x] Docs: `README.md` and `cli/README.md` show v1 URLs; `docs/standalone.md` unaffected (no API); `architecture.md` + `coding.md` policy; `decisions.md`, `progress.md`; PLAN-99 row "remove the unversioned legacy paths once `bifrost_legacy_api_requests_total` reads zero for a release"; archive this file into `completed/` in 37b's PR
+- [x] Cleanup: the compatibility worktree and any scratch storage removed; no probe scripts committed; the PR lists deletions
 
 ## Acceptance criteria
 
@@ -164,18 +164,18 @@ A client test fails on any `'/api/` string literal in `client/src` or `cli/src` 
 ## Test checklist
 
 **Integration (server)**
-- [ ] `legacy-paths.int.test.ts`: criteria 2 and 3
-- [ ] Coverage + spec tests: criterion 4
-- [ ] `rewriteUrl` edge cases: query strings, `/api/v1` exactly, `/api/v2/…` unregistered → 404, slugs beginning with `v1-` on raw routes, a slug that is exactly `v1` on a raw route (`/runestone/api/v1` → the slug `v1`, not the version), a stale slug through the old path redirects to the v1 canonical path
+- [x] `legacy-paths.int.test.ts`: criteria 2 and 3
+- [x] Coverage + spec tests: criterion 4
+- [x] `rewriteUrl` edge cases: query strings, `/api/v1` exactly, `/api/v2/…` unregistered → 404, slugs beginning with `v1-` on raw routes, a slug that is exactly `v1` on a raw route (`/runestone/api/v1` → the slug `v1`, not the version), a stale slug through the old path redirects to the v1 canonical path
 
 **Unit (client/CLI)**
-- [ ] `no-unversioned-api.test.ts`: criterion 5
-- [ ] CLI `client.ts`: probe 200 → v1; 404 → legacy + hint; hint suppressed in `--json`; other failures unchanged (criterion 6)
+- [x] `no-unversioned-api.test.ts`: criterion 5
+- [x] CLI `client.ts`: probe 200 → v1; 404 → legacy + hint; hint suppressed in `--json`; other failures unchanged (criterion 6)
 
 **End-to-end**
 - [ ] Full `test:e2e` on 37a and on 37b (criterion 7)
-- [ ] CLI with forced fallback (criterion 6)
+- [x] CLI with forced fallback (criterion 6)
 
 **Manual (one-time)**
-- [ ] The packed pre-37 CLI against the new server; then the worktree deleted (criterion 6)
-- [ ] A raw-document URL saved before 37a still opens in a browser and in `curl`
+- [x] The packed pre-37 CLI against the new server; then the worktree deleted (criterion 6)
+- [x] A raw-document URL saved before 37a still opens in a browser and in `curl`

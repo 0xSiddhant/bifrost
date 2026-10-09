@@ -87,7 +87,7 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 ## How themes are picked (resolution order)
 
 1. The visitor's own switcher choice (cached per device).
-2. The household default (hub build only): Heimdall's "Default theme" (`themes.default` in settings, PLAN-05), which every device reads from `GET /api/heimdall/access` (`defaultThemeId`). The standalone site has no household, so it skips this step.
+2. The household default (hub build only): Heimdall's "Default theme" (`themes.default` in settings, PLAN-05), which every device reads from `GET /api/v1/heimdall/access` (`defaultThemeId`). The standalone site has no household, so it skips this step.
 3. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak out of the box).
 
 An unknown id at any step (a deleted theme someone still has chosen, say) simply falls through to the next.
