@@ -1,4 +1,5 @@
 import {
+  API_V1,
   ApiError,
   apiGet,
   apiSend,
@@ -59,7 +60,7 @@ function listParams(query: RunestoneListQuery): URLSearchParams {
 
 function hubListRunestones(query: RunestoneListQuery = {}): Promise<RunestoneSummary[]> {
   const qs = listParams(query).toString();
-  return apiGet<RunestoneSummary[]>(`/api/runestone${qs ? `?${qs}` : ''}`);
+  return apiGet<RunestoneSummary[]>(`${API_V1}/runestone${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
@@ -68,7 +69,7 @@ function hubListRunestonesPage(
   request: OffsetRequest,
 ): Promise<DocumentListPage<RunestoneSummary>> {
   return apiGet<DocumentListPage<RunestoneSummary>>(
-    `/api/runestone?${pagedParams(listParams(query), request)}`,
+    `${API_V1}/runestone?${pagedParams(listParams(query), request)}`,
   );
 }
 
@@ -79,7 +80,7 @@ function hubListRunestonesPage(
  */
 async function hubFetchRunestone(slug: string): Promise<RunestoneDoc | null> {
   try {
-    return await apiGet<RunestoneDoc>(`/api/runestone/${encodeURIComponent(slug)}`);
+    return await apiGet<RunestoneDoc>(`${API_V1}/runestone/${encodeURIComponent(slug)}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -87,15 +88,15 @@ async function hubFetchRunestone(slug: string): Promise<RunestoneDoc | null> {
 }
 
 const hubSaveRunestone = (input: { name?: string; content: string }): Promise<RunestoneDoc> =>
-  apiSend<RunestoneDoc>('POST', '/api/runestone', input);
+  apiSend<RunestoneDoc>('POST', `${API_V1}/runestone`, input);
 
 const hubUpdateRunestone = (
   id: string,
   input: { name?: string; content?: string },
-): Promise<RunestoneDoc> => apiSend<RunestoneDoc>('PUT', `/api/runestone/${id}`, input);
+): Promise<RunestoneDoc> => apiSend<RunestoneDoc>('PUT', `${API_V1}/runestone/${id}`, input);
 
 const hubDeleteRunestone = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/runestone/${id}`);
+  apiSend<null>('DELETE', `${API_V1}/runestone/${id}`);
 
 /*
  * The hub's document API. On the standalone site each is a stub that throws

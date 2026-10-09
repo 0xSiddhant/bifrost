@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_V1 } from '../api';
 import { onBridgeClosed, type BridgeClosedRequest } from '../bridge';
 import { log } from '../log';
 import { bifrostEvents } from '../sse';
@@ -105,7 +106,7 @@ export function BridgeClosedHost() {
     if (!__HUB__) return;
     setRetrying(true);
     try {
-      const response = await fetch('/api/health', { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+      const response = await fetch(`${API_V1}/health`, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
       if (response.ok) setRequest(null);
     } catch (error) {
       // Still down: the sheet stays, which is itself the answer. Logged at

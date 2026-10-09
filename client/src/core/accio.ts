@@ -1,4 +1,4 @@
-import { apiGet, apiSend, type CursorListPage } from './api';
+import { API_V1, apiGet, apiSend, type CursorListPage } from './api';
 
 /**
  * Accio (read-later shelf) API client. Lives in `core/` rather than
@@ -46,7 +46,7 @@ export function listLinksPage(
   if (query.order) params.set('order', query.order);
   if (cursor) params.set('cursor', cursor);
   if (options.limit !== undefined) params.set('limit', String(options.limit));
-  return apiGet<AccioListPage>(`/api/accio?${params.toString()}`, { signal: options.signal });
+  return apiGet<AccioListPage>(`${API_V1}/accio?${params.toString()}`, { signal: options.signal });
 }
 
 /**
@@ -58,12 +58,12 @@ export const saveLink = (input: {
   url: string;
   title?: string;
   tags?: string[];
-}): Promise<AccioLink> => apiSend<AccioLink>('POST', '/api/accio', input);
+}): Promise<AccioLink> => apiSend<AccioLink>('POST', `${API_V1}/accio`, input);
 
 export const updateLink = (
   id: string,
   input: { title?: string; tags?: string[] },
-): Promise<AccioLink> => apiSend<AccioLink>('PATCH', `/api/accio/${id}`, input);
+): Promise<AccioLink> => apiSend<AccioLink>('PATCH', `${API_V1}/accio/${id}`, input);
 
 export const deleteLink = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/accio/${id}`);
+  apiSend<null>('DELETE', `${API_V1}/accio/${id}`);

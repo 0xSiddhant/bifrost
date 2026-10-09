@@ -1,4 +1,4 @@
-import { apiGet, apiSend, hubOnly } from './api';
+import { API_V1, apiGet, apiSend, hubOnly } from './api';
 
 /**
  * Offline mode (PLAN-22) — the policy half.
@@ -32,13 +32,13 @@ export interface OfflineModeConfig {
 const CONFIG_TIMEOUT_MS = 8_000;
 
 const hubFetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
-  apiGet<OfflineModeConfig>('/api/offline-mode/config', { timeoutMs: CONFIG_TIMEOUT_MS });
+  apiGet<OfflineModeConfig>(`${API_V1}/offline-mode/config`, { timeoutMs: CONFIG_TIMEOUT_MS });
 
 const hubSetOfflineModeTargetEnabled = (
   id: string,
   enabled: boolean,
 ): Promise<OfflineModeConfig> =>
-  apiSend<OfflineModeConfig>('PATCH', '/api/offline-mode/settings', { id, enabled });
+  apiSend<OfflineModeConfig>('PATCH', `${API_V1}/offline-mode/settings`, { id, enabled });
 
 /** The targets a click should warm: registry order, minus whatever is disabled. */
 export const enabledTargets = (config: OfflineModeConfig): OfflineModeTarget[] =>

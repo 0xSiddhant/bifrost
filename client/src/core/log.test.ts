@@ -157,15 +157,15 @@ describe('log sinks (PLAN-35)', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('httpSink still posts the batch to /api/client-logs and reads its config', async () => {
+  it('httpSink still posts the batch to /api/v1/client-logs and reads its config', async () => {
     const fetch = vi.fn(async () => new Response(JSON.stringify({ level: 'info' }), { status: 200 }));
     vi.stubGlobal('fetch', fetch);
     await httpSink.send([{ level: 'error', msg: 'boom', ts: 1 }]);
     expect(fetch).toHaveBeenCalledWith(
-      '/api/client-logs',
+      '/api/v1/client-logs',
       expect.objectContaining({ method: 'POST', keepalive: true, body: JSON.stringify({ entries: [{ level: 'error', msg: 'boom', ts: 1 }] }) }),
     );
     expect(await httpSink.config()).toEqual({ level: 'info' });
-    expect(fetch).toHaveBeenLastCalledWith('/api/client-logs/config', expect.anything());
+    expect(fetch).toHaveBeenLastCalledWith('/api/v1/client-logs/config', expect.anything());
   });
 });

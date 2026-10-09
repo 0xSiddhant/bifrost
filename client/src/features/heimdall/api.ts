@@ -1,4 +1,4 @@
-import { apiGet, apiSend, hubOnly } from '../../core/api';
+import { API_V1, apiGet, apiSend, hubOnly } from '../../core/api';
 
 export interface HeimdallSettings {
   shortcut: string;
@@ -40,26 +40,26 @@ export interface UploadFilesPage {
 }
 
 const hubLogin = (pin: string): Promise<{ ok: true }> =>
-  apiSend<{ ok: true }>('POST', '/api/heimdall/login', { pin });
+  apiSend<{ ok: true }>('POST', `${API_V1}/heimdall/login`, { pin });
 
-const hubLogout = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/logout');
+const hubLogout = (): Promise<null> => apiSend<null>('POST', `${API_V1}/heimdall/logout`);
 
-const hubFetchSession = (): Promise<{ ok: true }> => apiGet<{ ok: true }>('/api/heimdall/session');
+const hubFetchSession = (): Promise<{ ok: true }> => apiGet<{ ok: true }>(`${API_V1}/heimdall/session`);
 
-const hubRevokeSessions = (): Promise<null> => apiSend<null>('POST', '/api/heimdall/revoke');
+const hubRevokeSessions = (): Promise<null> => apiSend<null>('POST', `${API_V1}/heimdall/revoke`);
 
 const hubFetchSettings = (): Promise<HeimdallSettings> =>
-  apiGet<HeimdallSettings>('/api/heimdall/settings');
+  apiGet<HeimdallSettings>(`${API_V1}/heimdall/settings`);
 
 const hubUpdateSettings = (
   patch: Partial<{ shortcut: string; tapCount: number; defaultThemeId: string | null }>,
 ): Promise<HeimdallSettings> =>
-  apiSend<HeimdallSettings>('PATCH', '/api/heimdall/settings', patch);
+  apiSend<HeimdallSettings>('PATCH', `${API_V1}/heimdall/settings`, patch);
 
-const hubFetchStats = (): Promise<Stats> => apiGet<Stats>('/api/heimdall/stats');
+const hubFetchStats = (): Promise<Stats> => apiGet<Stats>(`${API_V1}/heimdall/stats`);
 
 const hubFetchUploads = (): Promise<UploadFilesPage> =>
-  apiGet<UploadFilesPage>('/api/heimdall/uploads');
+  apiGet<UploadFilesPage>(`${API_V1}/heimdall/uploads`);
 
 export interface AuditRecord {
   id: number;
@@ -86,17 +86,17 @@ export interface PresenceDevice {
 }
 
 const hubFetchPresence = (): Promise<{ devices: PresenceDevice[] }> =>
-  apiGet<{ devices: PresenceDevice[] }>('/api/presence');
+  apiGet<{ devices: PresenceDevice[] }>(`${API_V1}/presence`);
 
 /** Drop devices offline for > 7 days, then return the fresh roster. */
 const hubPrunePresence = (): Promise<{ removed: number; devices: PresenceDevice[] }> =>
-  apiSend<{ removed: number; devices: PresenceDevice[] }>('POST', '/api/presence/prune');
+  apiSend<{ removed: number; devices: PresenceDevice[] }>('POST', `${API_V1}/presence/prune`);
 
 const hubFetchAudit = (params: { event?: string; limit?: number } = {}): Promise<AuditPage> => {
   const query = new URLSearchParams();
   if (params.event) query.set('event', params.event);
   query.set('limit', String(params.limit ?? 100));
-  return apiGet<AuditPage>(`/api/heimdall/audit?${query.toString()}`);
+  return apiGet<AuditPage>(`${API_V1}/heimdall/audit?${query.toString()}`);
 };
 
 export interface AboutInfo {
@@ -109,10 +109,10 @@ export interface AboutInfo {
   profile: 'local' | 'cloud';
 }
 
-const hubFetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>('/api/heimdall/about');
+const hubFetchAbout = (): Promise<AboutInfo> => apiGet<AboutInfo>(`${API_V1}/heimdall/about`);
 
 const hubFetchChangelog = (): Promise<{ content: string }> =>
-  apiGet<{ content: string }>('/api/heimdall/changelog');
+  apiGet<{ content: string }>(`${API_V1}/heimdall/changelog`);
 
 /*
  * Heimdall's admin API: hub-only. On the standalone site each is a stub with

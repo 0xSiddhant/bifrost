@@ -1,4 +1,5 @@
 import {
+  API_V1,
   ApiError,
   apiGet,
   apiSend,
@@ -59,7 +60,7 @@ function listParams(query: AtlasListQuery): URLSearchParams {
 
 function hubListAtlases(query: AtlasListQuery = {}): Promise<AtlasSummary[]> {
   const qs = listParams(query).toString();
-  return apiGet<AtlasSummary[]>(`/api/atlas${qs ? `?${qs}` : ''}`);
+  return apiGet<AtlasSummary[]>(`${API_V1}/atlas${qs ? `?${qs}` : ''}`);
 }
 
 /** One page of the listing plus its total and author facet (PLAN-31). */
@@ -68,7 +69,7 @@ function hubListAtlasesPage(
   request: OffsetRequest,
 ): Promise<DocumentListPage<AtlasSummary>> {
   return apiGet<DocumentListPage<AtlasSummary>>(
-    `/api/atlas?${pagedParams(listParams(query), request)}`,
+    `${API_V1}/atlas?${pagedParams(listParams(query), request)}`,
   );
 }
 
@@ -79,7 +80,7 @@ function hubListAtlasesPage(
  */
 async function hubFetchAtlas(slug: string): Promise<AtlasDoc | null> {
   try {
-    return await apiGet<AtlasDoc>(`/api/atlas/${encodeURIComponent(slug)}`);
+    return await apiGet<AtlasDoc>(`${API_V1}/atlas/${encodeURIComponent(slug)}`);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -87,14 +88,15 @@ async function hubFetchAtlas(slug: string): Promise<AtlasDoc | null> {
 }
 
 const hubSaveAtlas = (input: { name?: string; content: string }): Promise<AtlasDoc> =>
-  apiSend<AtlasDoc>('POST', '/api/atlas', input);
+  apiSend<AtlasDoc>('POST', `${API_V1}/atlas`, input);
 
 const hubUpdateAtlas = (
   id: string,
   input: { name?: string; content?: string },
-): Promise<AtlasDoc> => apiSend<AtlasDoc>('PUT', `/api/atlas/${id}`, input);
+): Promise<AtlasDoc> => apiSend<AtlasDoc>('PUT', `${API_V1}/atlas/${id}`, input);
 
-const hubDeleteAtlas = (id: string): Promise<null> => apiSend<null>('DELETE', `/api/atlas/${id}`);
+const hubDeleteAtlas = (id: string): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/atlas/${id}`);
 
 /*
  * The hub's document API. On the standalone site each is a stub that throws

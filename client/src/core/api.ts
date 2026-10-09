@@ -1,6 +1,13 @@
 import { showBridgeClosed } from './bridge';
 import { getDeviceId } from './deviceId';
 
+/**
+ * The API version every call is built from (PLAN-37). The hub also answers the
+ * old unversioned paths, as v1, but nothing here may call them: a text scan
+ * (`no-unversioned-api.test.ts`) fails any `/api/` literal outside a version.
+ */
+export const API_V1 = '/api/v1';
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -257,7 +264,7 @@ export interface DownloadEntry {
 }
 
 export const listDownloads = (): Promise<DownloadEntry[]> =>
-  apiGet<DownloadEntry[]>('/api/downloads');
+  apiGet<DownloadEntry[]>(`${API_V1}/downloads`);
 
 export const downloadUrl = (id: string, options: { inline?: boolean } = {}): string =>
-  `/api/downloads/${id}/content${options.inline ? '?inline=1' : ''}`;
+  `${API_V1}/downloads/${id}/content${options.inline ? '?inline=1' : ''}`;

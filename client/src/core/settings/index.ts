@@ -1,4 +1,4 @@
-import { apiSend } from '../api';
+import { API_V1, apiSend } from '../api';
 import { fetchHeimdallAccess } from '../heimdallAccess';
 import { fetchLokiConfig, patchLokiSettings, type LokiConfig } from '../loki';
 import {
@@ -62,7 +62,7 @@ const hubAccess = async (): Promise<AccessConfig> => {
 };
 
 const hubPatchAccess = (patch: Partial<AccessConfig>): Promise<AccessConfig> =>
-  apiSend<AccessConfig>('PATCH', '/api/heimdall/settings', patch);
+  apiSend<AccessConfig>('PATCH', `${API_V1}/heimdall/settings`, patch);
 
 export const accessSettings: SettingsStore<AccessConfig> = __HUB__
   ? new HubSettingsStore(hubAccess, hubPatchAccess, 'settings.updated', (payload) =>

@@ -5,6 +5,7 @@ import { Button } from '../../core/ui/Button';
 import { CloseIcon } from '../../core/ui/icons';
 import { fetchUploadPreviewMeta } from './api';
 import { PreviewBody, usePreviewMeta } from './PreviewBody';
+import { API_V1 } from '../../core/api';
 
 /**
  * Preview of a file still staged in uploads/ (PLAN-17b), at
@@ -24,8 +25,8 @@ export function UploadPreviewModal() {
   const meta = usePreviewMeta(name, fetchUploadPreviewMeta);
 
   const close = () => navigate('/upload');
-  const src = `/api/files/${encodeURIComponent(name)}/content?inline=1`;
-  const href = `/api/files/${encodeURIComponent(name)}/content`;
+  const src = `${API_V1}/files/${encodeURIComponent(name)}/content?inline=1`;
+  const href = `${API_V1}/files/${encodeURIComponent(name)}/content`;
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

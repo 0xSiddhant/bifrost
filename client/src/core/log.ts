@@ -1,4 +1,5 @@
 import { getDeviceId } from './deviceId';
+import { API_V1 } from './api';
 
 /**
  * Browser-side logging (PLAN-16a).
@@ -28,8 +29,11 @@ export type ClientLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fa
 const LEVELS: ClientLogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
 
 const DEFAULT_LEVEL: ClientLogLevel = 'warn';
-const CONFIG_URL = '/api/client-logs/config';
-const INGEST_URL = '/api/client-logs';
+// Functions, not constants: a top-level template over an imported binding is
+// kept by the bundler even when nothing reads it, which would carry the API
+// prefix into the standalone build (PLAN-37; scripts/check-standalone.ts).
+const configUrl = (): string => `${API_V1}/client-logs/config`;
+const ingestUrl = (): string => `${API_V1}/client-logs`;
 
 /** Debounce window: an error burst (a render loop) becomes one request. */
 const FLUSH_DELAY_MS = 2000;
@@ -68,10 +72,10 @@ export interface LogSink {
   config: () => Promise<unknown>;
 }
 
-/** The hub's `/api/client-logs`, as since PLAN-16a. */
+/** The hub's `/api/v1/client-logs`, as since PLAN-16a. */
 export const httpSink: LogSink = {
   send: async (entries) => {
-    const response = await fetch(INGEST_URL, {
+    const response = await fetch(ingestUrl(), {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-bifrost-device': getDeviceId() },
       body: JSON.stringify({ entries }),
@@ -81,7 +85,7 @@ export const httpSink: LogSink = {
     if (!response.ok) throw new Error(`client-logs responded ${response.status}`);
   },
   config: async () => {
-    const response = await fetch(CONFIG_URL, { headers: { accept: 'application/json' } });
+    const response = await fetch(configUrl(), { headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error(`client-logs config responded ${response.status}`);
     return response.json();
   },

@@ -1,4 +1,4 @@
-import { apiGet, apiSend, type CursorListPage } from '../../core/api';
+import { API_V1, apiGet, apiSend, type CursorListPage } from '../../core/api';
 
 /**
  * Portkey (LAN go-links) API client. Feature-local — nothing outside this
@@ -31,7 +31,7 @@ export function listPortkeysPage(
   if (q) params.set('q', q);
   if (cursor) params.set('cursor', cursor);
   if (options.limit !== undefined) params.set('limit', String(options.limit));
-  return apiGet<CursorListPage<Portkey>>(`/api/portkey?${params.toString()}`, {
+  return apiGet<CursorListPage<Portkey>>(`${API_V1}/portkey?${params.toString()}`, {
     signal: options.signal,
   });
 }
@@ -41,16 +41,17 @@ export const createPortkey = (input: {
   slug: string;
   url: string;
   note?: string;
-}): Promise<Portkey> => apiSend<Portkey>('POST', '/api/portkey', input);
+}): Promise<Portkey> => apiSend<Portkey>('POST', `${API_V1}/portkey`, input);
 
 /** Slug is immutable — only url/note can change. */
 export const updatePortkey = (
   slug: string,
   input: { url?: string; note?: string },
-): Promise<Portkey> => apiSend<Portkey>('PATCH', `/api/portkey/${encodeURIComponent(slug)}`, input);
+): Promise<Portkey> =>
+  apiSend<Portkey>('PATCH', `${API_V1}/portkey/${encodeURIComponent(slug)}`, input);
 
 export const deletePortkey = (slug: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/portkey/${encodeURIComponent(slug)}`);
+  apiSend<null>('DELETE', `${API_V1}/portkey/${encodeURIComponent(slug)}`);
 
 /** The absolute address a QR encodes / a person types: this origin + /go/<slug>. */
 export const goUrl = (slug: string): string => `${window.location.origin}/go/${slug}`;
