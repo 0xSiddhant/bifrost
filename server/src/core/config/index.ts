@@ -162,7 +162,7 @@ const envFields = z.object({
   // observability tooling degrading the observability record. Flip it on only
   // when the stack is up.
   OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4318'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4650'),
   OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   OTEL_SERVICE_NAME: z.string().min(1).default('bifrost'),
   // The response contract guard (PLAN-32). `fallback` (the default until one
@@ -407,7 +407,7 @@ export function otelSettingsFromEnv(env: Env = process.env): OtelSettings {
   const timeout = Number(env.OTEL_EXPORT_TIMEOUT_MS);
   return {
     enabled: env.OTEL_ENABLED === 'true',
-    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
+    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4650',
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 3000,
     serviceName: env.OTEL_SERVICE_NAME || 'bifrost',
   };
