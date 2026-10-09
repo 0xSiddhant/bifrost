@@ -1,0 +1,36 @@
+name: Audit
+
+# Advisories are published without any change to this repo, so a PR gate
+# alone misses them until the next PR (it happened: handlebars, 2026-10-09).
+# Every day, both long-lived branches are audited against the current
+# advisory database; a failure here is top priority (.agents/rules/coding.md,
+# "Dependencies"). GitHub runs schedules from the default branch's copy of
+# this file; run it by hand from the Actions tab at any time.
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: [develop, main]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The lockfile is all npm audit needs: no install, so no install scripts.
+      - name: npm audit (${{ matrix.branch }})
+        run: npm audit --audit-level=low --package-lock-only
