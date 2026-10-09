@@ -1,0 +1,13 @@
+name: Node and dependencies
+description: Node 20 (the repo's floor) with npm's cache, then `npm ci`. Shared by every CI job that runs the repo's code.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+
+    - name: Install
+      shell: bash
+      run: npm ci

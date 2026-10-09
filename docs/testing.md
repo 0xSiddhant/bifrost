@@ -8,11 +8,11 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 
 | Kind                         | Where                                                                 | Command                                 | Needs a build? | In CI              |
 | ---------------------------- | --------------------------------------------------------------------- | --------------------------------------- | -------------- | ------------------ |
-| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, before Build  |
+| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, `checks` job  |
 | API description is current   | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no             | yes, in `npm test` |
-| End-to-end: browser          | `e2e/browser/`, `e2e/standalone/` (Playwright)                        | `npm run test:e2e:ui -w e2e`            | yes, both      | yes, after Build   |
-| End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, after Build   |
-| Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, after Build   |
+| End-to-end: browser          | `e2e/browser/`, `e2e/standalone/` (Playwright)                        | `npm run test:e2e:ui -w e2e`            | yes, both      | yes, 4 shards      |
+| End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, own job       |
+| Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, own job       |
 | All three of the above       |                                                                       | `npm run test:e2e`                      | yes            | yes                |
 | Restart resilience           | `scripts/resilience.ts`                                               | `./bifrost test resilience`               | no             | no (on demand)     |
 | Load, stress, soak (PLAN-34) | `e2e/perf/` ([`docs/performance.md`](performance.md))                 | `npm run test:load -- --profile <name>` | yes            | no (on demand)     |
@@ -59,7 +59,9 @@ npx vitest run --config vitest.e2e.config.ts cli/transfer.e2e.ts
 npx playwright show-trace test-results/<test>/trace.zip   # replay a failure step by step
 ```
 
-A failing Playwright test keeps its trace, a screenshot, and the output of the server it ran against (`server-output` in the report). In CI the report and `test-results/` are uploaded as the `playwright-report` artifact.
+A failing Playwright test keeps its trace, a screenshot, and the output of the server it ran against (`server-output` in the report). In CI the report and `test-results/` are uploaded as a `playwright-report-<shard>` artifact, one per failing shard.
+
+**How CI runs all this** (`.github/workflows/ci.yml`): every job in parallel, so the wall clock is the slowest job, not the sum. `checks` runs audit, lint, typecheck, `npm test` and the backup smoke; `e2e-cli-api` builds and runs the installed-CLI and black-box API suites; `e2e-ui` builds and runs the browser journeys in four shards (Chromium desktop + standalone, Chromium mobile, WebKit 1/2 and 2/2, since WebKit takes twice Chromium's time per test); `docker` builds the images. Each shard installs only its own browser. CI also runs on every push to `develop`, so the npm and Playwright caches are saved where every PR can restore them, and a newer push to a PR cancels its older run. To reproduce one shard locally: `./bifrost test e2e ui -- --project=webkit-mobile --shard=1/2`.
 
 Where Playwright's own browser download is unavailable but a Chromium is installed, `E2E_CHROMIUM_EXECUTABLE=/path/to/chrome` points the Chromium projects at it. WebKit has no such fallback.
 

@@ -1,13 +1,27 @@
 name: CI
 
+# Every job runs in parallel. Before, one job ran checks, build and every
+# e2e suite in a row (~17 min, the browser suite alone 9.5 of them); the wall
+# clock is now the slowest job.
+
 on:
   pull_request:
     branches: [develop, main]
   push:
-    branches: [main]
+    # develop too: a run there saves the npm and Playwright caches at develop's
+    # scope, which every PR into develop restores. A cache a PR run saves is
+    # visible to that PR alone, so every new PR used to install everything
+    # cold. It also checks the squash-merged result.
+    branches: [main, develop]
+
+# A new push makes the PR's running CI moot; a branch push always finishes.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ci:
+  checks:
+    name: checks (audit, lint, typecheck, unit)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,17 +32,11 @@ jobs:
       - name: Fetch develop
         run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
+      - uses: ./.github/actions/setup
 
-      - name: Install
-        run: npm ci
-
-      # A known vulnerability at any severity fails the PR, before anything
-      # else runs (.agents/rules/coding.md, "Dependencies"). New advisories
-      # land without a code change, so audit.yml also checks every day.
+      # A known vulnerability at any severity fails the PR (.agents/rules/
+      # coding.md, "Dependencies"). New advisories land without a code change,
+      # so audit.yml also checks every day.
       - name: Audit dependencies
         run: npm audit --audit-level=low
 
@@ -41,52 +49,6 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
-        run: npm run build
-
-      # PLAN-35: the standalone site, for the Playwright `standalone` project.
-      # Its postbuild step fails the job if the bundle can reach a server.
-      - name: Build standalone
-        run: npm run build:standalone -w client
-
-      # PLAN-32a: the end-to-end safety net runs against the build above —
-      # the production server, the built client in real browsers (Chromium
-      # desktop + mobile, WebKit for the household's iOS devices), and the
-      # packed CLI installed into a temporary prefix.
-      - name: Playwright version
-        id: playwright
-        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
-
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium webkit
-        working-directory: e2e
-
-      - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium webkit
-        working-directory: e2e
-
-      - name: End-to-end tests
-        run: npm run test:e2e
-
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: |
-            e2e/playwright-report
-            e2e/test-results
-          retention-days: 7
-
       - name: Backup smoke test
         env:
           HEIMDALL_PIN: ci-smoke-pin
@@ -95,6 +57,78 @@ jobs:
           npm run setup           # storage folders + migrations => a real app.db
           npm run backup          # VACUUM INTO + zip storage/
           ls "$BACKUP_DIR"/bifrost-backup-*.zip
+
+  # PLAN-32a/33: the out-of-process suites, against the build: the packed CLI
+  # installed into a temporary prefix, and the black-box API suite with its
+  # coverage report. No browser.
+  e2e-cli-api:
+    name: e2e (installed CLI + black-box API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      # Both clients (hub and standalone, whose postbuild step fails the job if
+      # the bundle can reach a server), the API, the web host, the CLI.
+      - name: Build
+        run: npm run build
+
+      - name: Installed CLI
+        run: npm run test:e2e:cli -w e2e
+
+      - name: Black-box API
+        run: npm run test:e2e:api -w e2e
+
+  # PLAN-32a: the browser journeys against the build, split so no job runs
+  # more than ~a quarter of them. WebKit (the household's iOS devices) takes
+  # twice Chromium's time per test, so it gets two shards.
+  e2e-ui:
+    name: e2e (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard reports: a failure in one says nothing about the others.
+      fail-fast: false
+      matrix:
+        include:
+          - name: chromium desktop + standalone
+            id: chromium-desktop
+            browser: chromium
+            args: --project=chromium-desktop --project=standalone
+          - name: chromium mobile
+            id: chromium-mobile
+            browser: chromium
+            args: --project=chromium-mobile
+          - name: webkit 1/2
+            id: webkit-1
+            browser: webkit
+            args: --project=webkit-mobile --shard=1/2
+          - name: webkit 2/2
+            id: webkit-2
+            browser: webkit
+            args: --project=webkit-mobile --shard=2/2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Build
+        run: npm run build
+
+      - uses: ./.github/actions/playwright
+        with:
+          browser: ${{ matrix.browser }}
+
+      - name: Browser journeys
+        run: npm run test:e2e:ui -w e2e -- ${{ matrix.args }}
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.id }}
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
 
   docker:
     runs-on: ubuntu-latest
