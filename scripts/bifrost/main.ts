@@ -66,8 +66,10 @@ function commandHelp(c: Command): string {
   lines.push(bold('Examples'));
   for (const [args, text] of c.examples) {
     lines.push(`  ./bifrost ${args}    # ${text}`);
-    const steps = c.plan(args.split(' ').slice(1), { cwd: ROOT });
-    for (const step of steps) lines.push(`      runs: ${describe(step)}`);
+    // Planned as on the Mac: some examples are the Mac's setups, and help shows them anywhere.
+    const steps = c.plan(args.split(' ').slice(1), { cwd: ROOT, platform: 'darwin' });
+    for (const step of steps)
+      lines.push(`      ${step.always ? 'then, on exit' : 'runs'}: ${describe(step)}`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -196,14 +198,22 @@ async function main(argv: string[]): Promise<number> {
   if (!command) throw new UsageError(`unknown command "${name}"`);
   if (args.includes('--help') || args.includes('-h')) return (void out(commandHelp(command)), 0);
 
-  const steps = command.plan(args, { cwd: process.cwd() });
+  const steps = command.plan(args, { cwd: process.cwd(), platform: process.platform });
+  // Stop at the first failure, except for `always` steps: the cleanup after a
+  // foreground run, which runs however that run ended (Ctrl-C included), but
+  // only once something was started: a failed preflight check leaves alone what
+  // was already running, such as a Grafana stack started on its own.
+  let failed = 0;
+  let started = false;
   for (const step of steps) {
-    err(`${dryRun ? '' : '▶ '}${describe(step)}\n`);
+    if (step.always ? !started && !dryRun : failed !== 0) continue;
+    err(`${dryRun ? '' : '▶ '}${step.always && dryRun ? '(afterwards) ' : ''}${describe(step)}\n`);
     if (dryRun) continue;
+    if (step.kind === 'exec' && !step.always) started = true;
     const code = await run(step);
-    if (code !== 0) return code;
+    if (code !== 0 && failed === 0 && !step.always) failed = code;
   }
-  return 0;
+  return failed;
 }
 
 main(process.argv.slice(2)).then(

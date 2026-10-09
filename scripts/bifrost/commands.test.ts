@@ -32,18 +32,24 @@ function problems(step: Step): string[] {
     if (file !== '-c' && !fs.existsSync(path.join(ROOT, file))) found.push(`no file ${file}`);
   }
   if (cmd === 'docker') {
-    // `-f <file>` before the compose verb; after it (`logs -f`) it means follow.
-    const verb = args.findIndex((arg) => ['up', 'down', 'logs', 'ps', 'config'].includes(arg));
-    args.slice(0, verb).forEach((arg, i) => {
-      if (arg === '-f' && !fs.existsSync(path.join(ROOT, args[i + 1] as string)))
-        found.push(`no file ${args[i + 1]}`);
+    // `-f <file>` names a compose file or Dockerfile; `logs -f` (follow) and
+    // `rm -f` (force) are flags, and name no file.
+    args.forEach((arg, i) => {
+      const file = args[i + 1];
+      if (
+        arg === '-f' &&
+        file &&
+        /(\.ya?ml|Dockerfile)$/.test(file) &&
+        !fs.existsSync(path.join(ROOT, file))
+      )
+        found.push(`no file ${file}`);
     });
   }
   return found;
 }
 
 describe('./bifrost task table', () => {
-  const ctx = { cwd: ROOT };
+  const ctx = { cwd: ROOT, platform: 'darwin' as const };
 
   it('has unique command names', () => {
     const names = COMMANDS.map((c) => c.name);
@@ -88,9 +94,71 @@ describe('./bifrost task table', () => {
     expect(() => plan('restore', [])).toThrow(UsageError);
   });
 
+  it('runs the standalone site on a port without a proxy, and behind one with --network', () => {
+    const docker = COMMANDS.find((c) => c.name === 'docker');
+    const local = docker?.plan(['up', 'standalone', '--port', '9000'], ctx) ?? [];
+    expect(local.map((step) => (step.kind === 'exec' ? step.args[0] : ''))).toEqual([
+      'build',
+      '-c',
+      'run',
+    ]);
+    expect(local[2]).toMatchObject({
+      args: expect.arrayContaining(['--read-only', '--cap-drop', 'ALL', '-p', '9000:8080']),
+    });
+    const proxied = docker?.plan(['up', 'standalone', '--network', 'proxy'], ctx) ?? [];
+    expect(proxied).toEqual([
+      expect.objectContaining({ cmd: 'docker', env: { BIFROST_DOCKER_NETWORK: 'proxy' } }),
+    ]);
+    expect(() =>
+      docker?.plan(['up', 'standalone', '--network', 'proxy', '--port', '9000'], ctx),
+    ).toThrow(UsageError);
+    expect(() => docker?.plan(['up', 'api', '--port', '9000'], ctx)).toThrow(UsageError);
+    expect(() => docker?.plan(['up', 'standalone', '--port', '70000'], ctx)).toThrow(UsageError);
+  });
+
+  it('runs the whole Mac setup from one command, and stops the Docker pieces after a foreground run', () => {
+    const plan = (name: string, args: string[], platform: NodeJS.Platform = 'darwin') =>
+      (COMMANDS.find((c) => c.name === name)?.plan(args, { cwd: ROOT, platform }) ?? []).map(
+        (step) =>
+          step.kind === 'exec'
+            ? `${step.always ? 'after: ' : ''}${step.cmd} ${step.args.join(' ')}`
+            : step.label,
+      );
+    const webMac = 'compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env';
+    expect(plan('start', ['--web', 'docker', '--obs'])).toEqual([
+      'check the ports this run needs are free',
+      'sh scripts/observability.sh up',
+      `docker ${webMac} up -d --build`,
+      'npm start -- --web docker --otel',
+      `after: docker ${webMac} down`,
+      'after: sh scripts/observability.sh down',
+    ]);
+    // A service stays up: its Docker pieces start after it and are never stopped.
+    expect(plan('service', ['pm2', '--web', 'docker', '--obs'])).toEqual([
+      'sh scripts/start-pm2.sh --web docker --otel',
+      'sh scripts/observability.sh up',
+      `docker ${webMac} up -d --build`,
+    ]);
+    expect(plan('start', [])).toEqual(['check the ports this run needs are free', 'npm start']);
+    expect(plan('service', ['launchd', '--standalone'])).toEqual([
+      'sh scripts/start-launchd.sh --standalone',
+    ]);
+    const refused = (name: string, args: string[], platform: NodeJS.Platform = 'darwin') =>
+      expect(() =>
+        COMMANDS.find((c) => c.name === name)?.plan(args, { cwd: ROOT, platform }),
+      ).toThrow(UsageError);
+    refused('start', ['--web', 'docker'], 'linux');
+    refused('start', ['--standalone', '--web', 'none']);
+    refused('start', ['--standalone', '--obs']);
+    refused('start', ['--obs', '--otel']);
+    refused('start', ['--web', 'cloud']);
+    refused('service', ['--web', 'docker']);
+  });
+
   it('runs a relative restore path from where the caller stood', () => {
     const steps = COMMANDS.find((c) => c.name === 'restore')?.plan(['backups/x.zip'], {
       cwd: '/tmp/somewhere',
+      platform: 'darwin',
     });
     expect(steps?.[0]).toMatchObject({
       args: ['scripts/restore.ts', '/tmp/somewhere/backups/x.zip'],

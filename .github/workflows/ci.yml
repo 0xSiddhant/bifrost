@@ -179,9 +179,10 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config -q
-          docker compose --profile observability config -q
-          docker compose -f compose/api.yml --env-file .env config -q
+          docker compose -f docker-compose.yml -f compose/api.otel.yml --profile observability config -q
+          docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env config -q
           docker compose -f compose/web.yml --env-file .env config -q
+          docker compose -f compose/web.yml -f compose/web.standalone.yml --env-file .env config -q
           docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env config -q
           docker compose -f compose/observability.yml --env-file .env --profile observability config -q
           BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml --env-file .env config -q
