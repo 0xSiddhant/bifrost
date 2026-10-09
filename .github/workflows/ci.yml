@@ -47,7 +47,7 @@ jobs:
       # PLAN-35: the standalone site, for the Playwright `standalone` project.
       # Its postbuild step fails the job if the bundle can reach a server.
       - name: Build standalone
-        run: npm run build:standalone
+        run: npm run build:standalone -w client
 
       # PLAN-32a: the end-to-end safety net runs against the build above —
       # the production server, the built client in real browsers (Chromium

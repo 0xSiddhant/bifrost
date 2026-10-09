@@ -4,7 +4,7 @@
  * should not be in the bundle at all; this reads `client/dist-standalone/`
  * and fails on any `/api/`, `EventSource` or `/go/` that survived.
  *
- * Runs after every `npm run build:standalone` (and so in the Docker build),
+ * Runs after every standalone build (`./bifrost build --standalone`, and so in the Docker build),
  * because a forgotten `fetch` in a shared component is exactly the bug this
  * exists to catch. Exits 1 with each hit and the text around it.
  */
@@ -56,7 +56,7 @@ function filesUnder(dir: string): string[] {
 }
 
 export function checkStandalone(dir = STANDALONE_DIR): Hit[] {
-  if (!fs.existsSync(dir)) throw new Error(`${dir} does not exist — run npm run build:standalone`);
+  if (!fs.existsSync(dir)) throw new Error(`${dir} does not exist — run ./bifrost build --standalone`);
   return filesUnder(dir).flatMap((file) =>
     findHits(fs.readFileSync(file, 'utf8'), path.relative(dir, file)),
   );

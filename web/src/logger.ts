@@ -42,7 +42,7 @@ export function logsDirProblem(logsDir: string): string | null {
  * the numbering. The name still matches Alloy's `app*.log` glob, and
  * pino-roll's retention only counts files named exactly `<base>.<N>.log`, so
  * neither process prunes the other's. No `current.log` symlink: that one is
- * the server's, and `npm run logs` tails it.
+ * the server's, and `./bifrost logs` tails it.
  */
 export function createWebLogger(options: WebLoggerOptions): Logger {
   const targets: pino.TransportTargetOptions[] = [

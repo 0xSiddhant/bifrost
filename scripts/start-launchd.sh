@@ -155,5 +155,5 @@ if [ "$ADVERTISER" = host ]; then
   echo "  web:     the web host runs in Docker: docker compose -f compose/web.yml -f compose/web.bridge.yml --env-file .env up -d"
 fi
 echo "  status:  launchctl list | grep bifrost"
-echo "  logs:    npm run logs      # or storage/logs/launchd-*.log"
+echo "  logs:    ./bifrost logs    # or storage/logs/launchd-*.log"
 echo "  stop:    launchctl unload $AGENTS/local.bifrost.*.plist"

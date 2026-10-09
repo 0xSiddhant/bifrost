@@ -1,0 +1,7 @@
+#!/bin/sh
+# Every repo task from one place: ./bifrost help. (Plain `bifrost` on PATH is
+# the installed LAN client from cli/, a different program.)
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+TSX="$ROOT/node_modules/.bin/tsx"
+[ -x "$TSX" ] || { echo "✖ run npm install first (./bifrost needs tsx from node_modules)" >&2; exit 1; }
+exec "$TSX" "$ROOT/scripts/bifrost/main.ts" "$@"
