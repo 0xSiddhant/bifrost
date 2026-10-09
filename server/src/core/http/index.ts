@@ -3,6 +3,7 @@ import type { EventBus } from '../bus/index.js';
 import type { ContractCheckMode } from '../config/index.js';
 import type { Logger } from '../logger/index.js';
 import { registerContractCheck } from './contract.js';
+import { registerDocs } from './docs.js';
 import { registerOpenApi } from './openapi.js';
 import { registerLegacyPathMarker, rewriteLegacyUrl } from './versioning.js';
 
@@ -77,6 +78,9 @@ export async function buildHttp(options: HttpOptions): Promise<FastifyInstance> 
   // Both before auth and every module: swagger's route collector and the
   // contract guard's hooks only see routes registered after them (PLAN-32).
   await registerOpenApi(app, { version: options.apiVersion ?? '0.0.0' });
+  // Swagger UI over that spec at /docs (PLAN-38): hidden routes on this
+  // loopback server, which the web host never forwards to the client's port.
+  await registerDocs(app);
   registerContractCheck(app, options.contractCheck ?? 'off', options.logger);
 
   // Registered on the ROOT instance, which is the point: hooks are scoped to

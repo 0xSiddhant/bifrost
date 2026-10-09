@@ -84,10 +84,14 @@ describe('legacy unversioned paths (PLAN-37)', () => {
   const fill = (operation: Operation): string => {
     const kind = /^\/(?:api\/v1\/)?([a-z-]+)/.exec(operation.template.replace('/api/v1/', '/'));
     const document = kind?.[1] && slugs[kind[1]];
-    return operation.template
-      .replace('{slug}', document || 'no-such-slug')
-      .replace('{id}', operation.template.includes('/downloads/') ? downloadId : 'no-such-id')
-      .replace('{name}', operation.method === 'GET' ? 'staged.txt' : 'no-such-file.txt');
+    return (
+      operation.template
+        .replace('{slug}', document || 'no-such-slug')
+        // A document kind's merged path (PLAN-38): read by slug, written by id.
+        .replace('{key}', operation.method === 'GET' ? document || 'no-such-slug' : 'no-such-id')
+        .replace('{id}', operation.template.includes('/downloads/') ? downloadId : 'no-such-id')
+        .replace('{name}', operation.method === 'GET' ? 'staged.txt' : 'no-such-file.txt')
+    );
   };
 
   const send = (operation: Operation, url: string, withCookie = true, payload?: Json) =>

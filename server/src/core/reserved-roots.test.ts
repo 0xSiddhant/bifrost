@@ -13,6 +13,8 @@ describe('reserved roots', () => {
     for (const root of [
       'metrics',
       'healthz',
+      // PLAN-38: the API docs (Swagger UI) on the API server.
+      'docs',
       'runestone',
       'edda',
       // PLAN-19: the YAML workspace, its SPA route and its raw data endpoint.

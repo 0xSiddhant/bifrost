@@ -3,7 +3,11 @@
   "info": {
     "title": "Bifrost",
     "version": "1.4.0",
-    "description": "The HTTP API of a Bifrost LAN hub — the same one its web app and its `bifrost` CLI use.\n\nFour things to know when reading this description:\n\n- **Every API is versioned in its path.** This describes v1: `/api/v1/…`, and each public\n  raw document at `/<kind>/api/v1/{slug}`. `/go/{slug}` and `/metrics` are not APIs and are\n  never versioned.\n- **The paths from before versions existed still mean v1.** `/api/<rest>` answers exactly as\n  `/api/v1/<rest>`, and `/<kind>/api/{slug}` as `/<kind>/api/v1/{slug}`: the same route, so the\n  same body, status, limits and guards. Their responses add `Deprecation: true` and a\n  `Link: <v1 path>; rel=\"successor-version\"` header. They are listed here only once, as v1.\n- **Versioning policy.** v1 only ever grows: no operation is removed and no response field\n  disappears. A breaking change gets a new version for the affected module alone\n  (`/api/v2/<module>/…`), and its v1 keeps answering.\n- **Sibling path parameters.** Each document kind reads a record at `/api/v1/<kind>/{slug}` and\n  writes it at `/api/v1/<kind>/{id}`. OpenAPI treats those as one path with two parameter\n  names, which it forbids; renaming a route parameter is a code change made only for the\n  description's sake, so both appear as written and the merge is left to the API docs plan.\n- **Request validation follows Fastify's defaults.** Properties a request schema does not\n  declare are stripped rather than refused, and scalar values are coerced to the declared\n  type (`\"7\"` for an integer is accepted as `7`)."
+    "description": "**\"Try it out\" sends real requests to this hub; writes change real data.** Every operation\nbelow is live: saved documents, uploads, go-links and settings are the household's own.\n\n- **Admin operations** (the padlock) need the Heimdall session cookie. Try\n  `POST /api/v1/heimdall/login` with `{\"pin\": \"…\"}` here first: it sets `bifrost_admin` on\n  this origin, and the admin operations then work from this page, as they do in the app.\n  `POST /api/v1/heimdall/logout` ends it.\n- **Every API is versioned in its path.** This describes v1: `/api/v1/…`, and each public\n  raw document at `/<kind>/api/v1/{slug}`. `/go/{slug}` and `/metrics` are not APIs and are\n  never versioned.\n- **The paths from before versions existed still mean v1.** `/api/<rest>` answers exactly as\n  `/api/v1/<rest>`, and `/<kind>/api/{slug}` as `/<kind>/api/v1/{slug}`: the same route, so the\n  same body, status, limits and guards. Their responses add `Deprecation: true` and a\n  `Link: <v1 path>; rel=\"successor-version\"` header. They are listed here only once, as v1.\n- **Versioning policy.** v1 only ever grows: no operation is removed and no response field\n  disappears. A breaking change gets a new version for the affected module alone\n  (`/api/v2/<module>/…`), and its v1 keeps answering.\n- **One document path, two keys.** Each document kind reads a record by its slug and writes\n  or deletes it by its id, at the same path: `/api/v1/<kind>/{key}`. Each operation says\n  which one its `key` is.\n- **Request validation follows Fastify's defaults.** Properties a request schema does not\n  declare are stripped rather than refused, and scalar values are coerced to the declared\n  type (`\"7\"` for an integer is accepted as `7`).\n- **Errors** share one envelope, `{\"error\": \"<CODE>\", \"message\": \"<why>\"}`, under every 4xx.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
   },
   "components": {
     "securitySchemes": {
@@ -36,7 +40,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/health": {
@@ -81,7 +86,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files": {
@@ -198,6 +204,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -226,6 +236,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
@@ -319,6 +333,10 @@
                       }
                     }
                   ]
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -379,7 +397,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files/config": {
@@ -419,7 +438,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/downloads": {
@@ -489,7 +509,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/downloads/{id}/content": {
@@ -611,6 +632,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -639,6 +664,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -679,7 +708,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/downloads/{id}/archive": {
@@ -743,6 +773,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -771,11 +805,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files/{name}/publish": {
@@ -846,6 +885,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -874,6 +917,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -902,11 +949,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files/{name}": {
@@ -999,6 +1051,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1027,6 +1083,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -1055,6 +1115,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
@@ -1083,6 +1147,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -1139,11 +1207,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteUpload",
@@ -1192,6 +1265,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1220,6 +1297,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -1248,11 +1329,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files/{name}/content": {
@@ -1376,6 +1462,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1404,6 +1494,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -1444,7 +1538,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/downloads/{id}/meta": {
@@ -1536,6 +1631,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1564,11 +1663,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/files/{name}/preview": {
@@ -1662,6 +1766,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1690,11 +1798,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/qr/server-url": {
@@ -1727,7 +1840,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/heimdall/access": {
@@ -1771,7 +1885,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/heimdall/login": {
@@ -1849,6 +1964,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -1877,6 +1996,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -1905,6 +2028,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -1973,7 +2100,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/heimdall/logout": {
@@ -2011,6 +2139,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -2039,6 +2171,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -2071,7 +2207,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/heimdall/session": {
@@ -2132,6 +2269,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2179,6 +2320,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -2207,6 +2352,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2235,6 +2384,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -2339,6 +2492,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2440,6 +2597,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -2468,6 +2629,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2496,6 +2661,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -2631,6 +2800,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -2659,6 +2832,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2777,6 +2954,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2868,6 +3049,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -2931,6 +3116,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -3000,7 +3189,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "addClipboardEntry",
@@ -3120,6 +3310,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -3148,6 +3342,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -3180,7 +3378,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/clipboard/{id}": {
@@ -3230,6 +3429,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -3258,11 +3461,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/presence": {
@@ -3333,7 +3541,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/presence/prune": {
@@ -3432,6 +3641,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -3460,6 +3673,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -3492,7 +3709,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/presence/name": {
@@ -3615,6 +3833,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -3643,6 +3865,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -3671,6 +3897,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -3703,7 +3933,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/heimdall/audit": {
@@ -3864,6 +4095,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -3892,6 +4127,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -4109,6 +4348,30 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "a1b2c3d4e5f6a7b8",
+                          "name": "Trip notes",
+                          "slug": "trip-notes-a1b2c3d4e5f6a7b8",
+                          "authorDeviceId": "mac-studio",
+                          "sizeBytes": 1234,
+                          "createdAt": 1,
+                          "modifiedAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "offset": 0,
+                      "authors": [
+                        "mac-studio"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -4137,11 +4400,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "createRunestone",
@@ -4254,6 +4522,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -4282,6 +4554,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -4338,11 +4614,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/runestone/api/v1/{slug}": {
@@ -4380,6 +4661,10 @@
               "application/json": {
                 "schema": {
                   "description": "Any JSON value: the stored document as written"
+                },
+                "example": {
+                  "name": "bifrost",
+                  "replicas": 2
                 }
               }
             }
@@ -4425,6 +4710,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -4453,14 +4742,19 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/v1/runestone/{slug}": {
+    "/api/v1/runestone/{key}": {
       "get": {
         "operationId": "getRunestone",
         "summary": "Read one JSON document by slug",
@@ -4475,8 +4769,9 @@
               "maxLength": 80
             },
             "in": "path",
-            "name": "slug",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's slug (`<kebab-name>-<id>`); a renamed document's old slug redirects"
           }
         ],
         "responses": {
@@ -4570,6 +4865,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -4598,14 +4897,17 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/runestone/{id}": {
+        },
+        "security": []
+      },
       "put": {
         "operationId": "updateRunestone",
         "summary": "Rename a JSON document or replace its content",
@@ -4644,8 +4946,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -4728,6 +5031,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -4756,6 +5063,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -4784,6 +5095,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -4840,11 +5155,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteRunestone",
@@ -4860,8 +5180,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -4892,6 +5213,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -4920,11 +5245,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/edda": {
@@ -5137,6 +5467,30 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "a1b2c3d4e5f6a7b8",
+                          "name": "Trip notes",
+                          "slug": "trip-notes-a1b2c3d4e5f6a7b8",
+                          "authorDeviceId": "mac-studio",
+                          "sizeBytes": 1234,
+                          "createdAt": 1,
+                          "modifiedAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "offset": 0,
+                      "authors": [
+                        "mac-studio"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -5165,11 +5519,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "createEdda",
@@ -5281,6 +5640,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -5309,6 +5672,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -5341,7 +5708,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/edda/api/v1/{slug}": {
@@ -5393,7 +5761,8 @@
               "text/markdown": {
                 "schema": {
                   "type": "string"
-                }
+                },
+                "example": "# Trip notes\n\n- Pack the charger\n"
               }
             }
           },
@@ -5438,6 +5807,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -5466,14 +5839,19 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/v1/edda/{slug}": {
+    "/api/v1/edda/{key}": {
       "get": {
         "operationId": "getEdda",
         "summary": "Read one Markdown document by slug",
@@ -5488,8 +5866,9 @@
               "maxLength": 80
             },
             "in": "path",
-            "name": "slug",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's slug (`<kebab-name>-<id>`); a renamed document's old slug redirects"
           }
         ],
         "responses": {
@@ -5583,6 +5962,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -5611,14 +5994,17 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/edda/{id}": {
+        },
+        "security": []
+      },
       "put": {
         "operationId": "updateEdda",
         "summary": "Rename a Markdown document or replace its content",
@@ -5656,8 +6042,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -5740,6 +6127,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -5768,6 +6159,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -5796,6 +6191,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -5828,7 +6227,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteEdda",
@@ -5844,8 +6244,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -5876,6 +6277,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -5904,11 +6309,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/groot": {
@@ -6121,6 +6531,30 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "a1b2c3d4e5f6a7b8",
+                          "name": "Trip notes",
+                          "slug": "trip-notes-a1b2c3d4e5f6a7b8",
+                          "authorDeviceId": "mac-studio",
+                          "sizeBytes": 1234,
+                          "createdAt": 1,
+                          "modifiedAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "offset": 0,
+                      "authors": [
+                        "mac-studio"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -6149,11 +6583,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "createGrootDoc",
@@ -6265,6 +6704,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -6293,6 +6736,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -6325,7 +6772,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/groot/api/v1/{slug}": {
@@ -6377,7 +6825,8 @@
               "application/yaml": {
                 "schema": {
                   "type": "string"
-                }
+                },
+                "example": "kind: Deployment\nspec:\n  replicas: 2\n"
               }
             }
           },
@@ -6422,6 +6871,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -6450,14 +6903,19 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/v1/groot/{slug}": {
+    "/api/v1/groot/{key}": {
       "get": {
         "operationId": "getGrootDoc",
         "summary": "Read one YAML document by slug",
@@ -6472,8 +6930,9 @@
               "maxLength": 80
             },
             "in": "path",
-            "name": "slug",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's slug (`<kebab-name>-<id>`); a renamed document's old slug redirects"
           }
         ],
         "responses": {
@@ -6567,6 +7026,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -6595,14 +7058,17 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/groot/{id}": {
+        },
+        "security": []
+      },
       "put": {
         "operationId": "updateGrootDoc",
         "summary": "Rename a YAML document or replace its content",
@@ -6640,8 +7106,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -6724,6 +7191,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -6752,6 +7223,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -6780,6 +7255,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -6812,7 +7291,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteGrootDoc",
@@ -6828,8 +7308,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -6860,6 +7341,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -6888,11 +7373,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/atlas": {
@@ -7105,6 +7595,30 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "a1b2c3d4e5f6a7b8",
+                          "name": "Trip notes",
+                          "slug": "trip-notes-a1b2c3d4e5f6a7b8",
+                          "authorDeviceId": "mac-studio",
+                          "sizeBytes": 1234,
+                          "createdAt": 1,
+                          "modifiedAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "offset": 0,
+                      "authors": [
+                        "mac-studio"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -7133,11 +7647,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "createAtlasDoc",
@@ -7249,6 +7768,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -7277,6 +7800,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -7309,7 +7836,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/atlas/api/v1/{slug}": {
@@ -7361,7 +7889,8 @@
               "application/xml": {
                 "schema": {
                   "type": "string"
-                }
+                },
+                "example": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<plist version=\"1.0\">\n<dict>\n\t<key>name</key>\n\t<string>bifrost</string>\n</dict>\n</plist>\n"
               }
             }
           },
@@ -7406,6 +7935,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -7434,14 +7967,19 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/v1/atlas/{slug}": {
+    "/api/v1/atlas/{key}": {
       "get": {
         "operationId": "getAtlasDoc",
         "summary": "Read one XML document by slug",
@@ -7456,8 +7994,9 @@
               "maxLength": 80
             },
             "in": "path",
-            "name": "slug",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's slug (`<kebab-name>-<id>`); a renamed document's old slug redirects"
           }
         ],
         "responses": {
@@ -7551,6 +8090,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -7579,14 +8122,17 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/v1/atlas/{id}": {
+        },
+        "security": []
+      },
       "put": {
         "operationId": "updateAtlasDoc",
         "summary": "Rename a XML document or replace its content",
@@ -7624,8 +8170,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -7708,6 +8255,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -7736,6 +8287,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -7764,6 +8319,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -7796,7 +8355,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteAtlasDoc",
@@ -7812,8 +8372,9 @@
               "maxLength": 16
             },
             "in": "path",
-            "name": "id",
-            "required": true
+            "name": "key",
+            "required": true,
+            "description": "The document's id, the stable suffix of its slug"
           }
         ],
         "responses": {
@@ -7844,6 +8405,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -7872,11 +8437,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/loki/config": {
@@ -7929,7 +8499,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/loki/settings": {
@@ -8032,6 +8603,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -8060,6 +8635,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -8088,6 +8667,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -8174,7 +8757,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/brotli/compress": {
@@ -8234,6 +8818,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -8262,6 +8850,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -8322,7 +8914,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/brotli/decompress": {
@@ -8367,6 +8960,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -8395,6 +8992,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -8451,6 +9052,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
@@ -8483,7 +9088,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/accio": {
@@ -8710,6 +9316,31 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "id": "a1b2c3d4e5f6a7b8",
+                          "url": "http://nas.local:5000/",
+                          "title": "A page worth reading",
+                          "tags": [
+                            "recipes"
+                          ],
+                          "authorDeviceId": "mac-studio",
+                          "createdAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "nextCursor": "eyJ0IjoxNzYwMDAwMDAwMDAwfQ",
+                      "tags": [
+                        "recipes"
+                      ]
+                    }
+                  }
                 }
               }
             }
@@ -8738,11 +9369,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "saveLink",
@@ -8860,6 +9496,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -8888,6 +9528,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -8944,11 +9588,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/accio/{id}": {
@@ -9072,6 +9721,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9100,6 +9753,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -9128,6 +9785,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -9160,7 +9821,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deleteLink",
@@ -9208,6 +9870,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9236,11 +9902,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/config": {
@@ -9302,7 +9973,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/ping": {
@@ -9316,7 +9988,8 @@
           "204": {
             "description": "No content"
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/down": {
@@ -9389,6 +10062,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9417,11 +10094,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/up": {
@@ -9481,6 +10163,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9509,6 +10195,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
@@ -9537,6 +10227,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -9569,7 +10263,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/release": {
@@ -9607,6 +10302,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9635,6 +10334,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -9667,7 +10370,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/nimbus/results": {
@@ -9781,6 +10485,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -9809,6 +10517,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -9865,11 +10577,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "get": {
         "operationId": "listNimbusResults",
@@ -9973,11 +10690,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/portkey": {
@@ -10174,6 +10896,27 @@
                       }
                     }
                   ]
+                },
+                "examples": {
+                  "paged": {
+                    "summary": "With paged=true: one page",
+                    "value": {
+                      "items": [
+                        {
+                          "slug": "trip-notes-a1b2c3d4e5f6a7b8",
+                          "url": "http://nas.local:5000/",
+                          "note": "string",
+                          "hits": 1,
+                          "authorDeviceId": "mac-studio",
+                          "createdAt": 1,
+                          "lastUsedAt": 1
+                        }
+                      ],
+                      "total": 42,
+                      "limit": 20,
+                      "nextCursor": "eyJ0IjoxNzYwMDAwMDAwMDAwfQ"
+                    }
+                  }
                 }
               }
             }
@@ -10202,11 +10945,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "post": {
         "operationId": "createPortkey",
@@ -10326,6 +11074,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -10354,6 +11106,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
                 }
               }
             }
@@ -10382,6 +11138,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -10438,11 +11198,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/portkey/{slug}": {
@@ -10568,6 +11333,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -10596,6 +11365,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -10624,6 +11397,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -10680,11 +11457,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNPROCESSABLE_ENTITY",
+                  "message": "the value could not be accepted"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       },
       "delete": {
         "operationId": "deletePortkey",
@@ -10732,6 +11514,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -10760,11 +11546,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/go/{slug}": {
@@ -10828,11 +11619,16 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/screensaver/config": {
@@ -10916,7 +11712,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/screensaver/settings": {
@@ -11064,6 +11861,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -11092,6 +11893,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -11120,6 +11925,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -11187,7 +11996,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/client-logs": {
@@ -11307,6 +12117,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -11335,6 +12149,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -11395,7 +12213,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/metrics": {
@@ -11417,7 +12236,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/offline-mode/config": {
@@ -11469,7 +12289,8 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/v1/offline-mode/settings": {
@@ -11575,6 +12396,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
                 }
               }
             }
@@ -11603,6 +12428,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
                 }
               }
             }
@@ -11631,6 +12460,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
                 }
               }
             }
@@ -11659,6 +12492,10 @@
                       "additionalProperties": true
                     }
                   }
+                },
+                "example": {
+                  "error": "PAYLOAD_TOO_LARGE",
+                  "message": "request body is too large"
                 }
               }
             }
@@ -11732,8 +12569,105 @@
               }
             }
           }
-        }
+        },
+        "security": []
       }
     }
-  }
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "This hub"
+    }
+  ],
+  "tags": [
+    {
+      "name": "core",
+      "description": "What the hub offers (capabilities) and its live event stream (SSE)"
+    },
+    {
+      "name": "health",
+      "description": "Liveness: the API answers, and with which profile"
+    },
+    {
+      "name": "file-transfer",
+      "description": "Uploads into a staging area (preview, rename, delete, publish) or straight into a download folder, and the read-only downloads listing, files and folder zips"
+    },
+    {
+      "name": "previews",
+      "description": "Preview metadata for a staged upload or a download"
+    },
+    {
+      "name": "qr-tool",
+      "description": "The addresses a device can join the hub at (the Join card's QR)"
+    },
+    {
+      "name": "heimdall",
+      "description": "The admin panel: PIN login and session, household settings, stats, uploads, About and the changelog"
+    },
+    {
+      "name": "clipboard",
+      "description": "The shared clipboard (Hermes): text that every device sees"
+    },
+    {
+      "name": "presence",
+      "description": "Connected devices (Wardens): the live list and names"
+    },
+    {
+      "name": "audit-log",
+      "description": "The activity history (admin)"
+    },
+    {
+      "name": "runestone",
+      "description": "Saved JSON documents, and each one's public raw URL"
+    },
+    {
+      "name": "edda",
+      "description": "Saved Markdown documents, and each one's public raw URL"
+    },
+    {
+      "name": "groot",
+      "description": "Saved YAML documents, stored as text, never parsed by the hub"
+    },
+    {
+      "name": "atlas",
+      "description": "Saved XML documents, stored as text, never parsed by the hub"
+    },
+    {
+      "name": "loki",
+      "description": "The JS workbench's policy: the run and fetch gates (admin to change)"
+    },
+    {
+      "name": "brotli",
+      "description": "Brotli compress and decompress, streamed, with two size caps"
+    },
+    {
+      "name": "accio",
+      "description": "The read-later shelf, with best-effort title lookup"
+    },
+    {
+      "name": "nimbus",
+      "description": "The LAN speed test: ping, download stream, upload sink, results"
+    },
+    {
+      "name": "portkey",
+      "description": "LAN go-links: a memorable slug that redirects (`/go/{slug}`)"
+    },
+    {
+      "name": "screensaver",
+      "description": "The idle overlay's settings (admin to change)"
+    },
+    {
+      "name": "client-logs",
+      "description": "Browser error reports relayed into the hub's log"
+    },
+    {
+      "name": "metrics",
+      "description": "Prometheus exposition of the hub's runtime metrics"
+    },
+    {
+      "name": "offline-mode",
+      "description": "Which pure-client pages the Offline switch warm-loads (admin to change)"
+    }
+  ]
 }
