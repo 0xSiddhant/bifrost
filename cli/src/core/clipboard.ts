@@ -1,4 +1,5 @@
 import type { ApiClient } from './client.js';
+import { API_V1 } from './client.js';
 
 /** Hermes, the shared clipboard. A thin pass-through: the server owns every rule. */
 
@@ -19,11 +20,11 @@ export interface AddClipboardInput {
 }
 
 export function listClipboard(client: ApiClient): Promise<ClipboardEntry[]> {
-  return client.json<ClipboardEntry[]>('reading the clipboard', 'GET', '/api/clipboard');
+  return client.json<ClipboardEntry[]>('reading the clipboard', 'GET', `${API_V1}/clipboard`);
 }
 
 export function addClipboard(client: ApiClient, input: AddClipboardInput): Promise<ClipboardEntry> {
-  return client.json<ClipboardEntry>('adding to the clipboard', 'POST', '/api/clipboard', {
+  return client.json<ClipboardEntry>('adding to the clipboard', 'POST', `${API_V1}/clipboard`, {
     body: input,
   });
 }
@@ -32,6 +33,6 @@ export function removeClipboard(client: ApiClient, id: string): Promise<void> {
   return client.voidCall(
     'removing a clipboard entry',
     'DELETE',
-    `/api/clipboard/${encodeURIComponent(id)}`,
+    `${API_V1}/clipboard/${encodeURIComponent(id)}`,
   );
 }

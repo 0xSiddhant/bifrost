@@ -1,5 +1,5 @@
 import type { Command } from 'commander';
-import { clientFromOptions } from '../core/client.js';
+import { API_V1, clientFromOptions } from '../core/client.js';
 import {
   formatMbps,
   getNimbusConfig,
@@ -39,7 +39,7 @@ export function registerSpeed(program: Command): void {
       // broom is flying that has already landed.
       const releaseOnCancel = (): void => {
         void client
-          .voidCall('releasing the speed-test lease', 'POST', '/api/nimbus/release')
+          .voidCall('releasing the speed-test lease', 'POST', `${API_V1}/nimbus/release`)
           .catch(() => undefined)
           .finally(() => process.exit(130));
       };

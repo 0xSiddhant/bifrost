@@ -223,7 +223,7 @@ describe('pull', () => {
     // blocks together for no reason.
     await vi.waitFor(
       async () => {
-        const response = await fetch(`${server.baseUrl}/api/downloads`);
+        const response = await fetch(`${server.baseUrl}/api/v1/downloads`);
         const entries = (await response.json()) as DownloadEntry[];
         const seen = new Set(entries.map((entry) => `${entry.type}:${entry.parent ?? ''}/${entry.name}`));
         for (const wanted of [
