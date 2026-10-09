@@ -41,6 +41,19 @@
 - Never serve a type the browser will execute same-origin: `core/http/mime.ts` maps `.html` **and `.svg`** to `text/plain` for both folders.
 - Validate all request bodies/params with Fastify JSON schemas.
 
+## Dependencies: `npm audit` is top priority
+
+- **`npm audit` must report 0 vulnerabilities, at every severity.** CI fails a PR otherwise (`ci.yml`, "Audit dependencies"). `audit.yml` re-audits `develop` and `main` every day, because advisories are published without any change here.
+- **A finding is fixed first.** When `npm install`, CI, the daily audit or anything else shows a vulnerability, stop the current task and fix it before resuming, in its own branch and PR unless it is one line in the PR already open. It is never left for a later plan or a backlog row.
+- **Fix in this order, smallest first:**
+  1. an update inside the existing ranges (`npm audit fix`, lockfile only);
+  2. a direct dependency bump;
+  3. a root `overrides` entry pinning the patched version of a transitive package, when upstream still pins the vulnerable one. Its reason goes in `decisions.md`.
+- **`npm audit fix --force` is never run blind.** It downgrades or major-bumps whatever it likes; read what it would change, and prefer an override.
+- **Prove the fix:** the audit at 0, plus the check of whatever uses the package. For a lint plugin, plant a violation and see it still fire. For a runtime package, run the tests that exercise it.
+- **A security release is taken even if it is days old.** The "pin a release at least two weeks old" caution applies to new features, never to the fix for a known vulnerability.
+- **No accepted residue without the owner.** If a vulnerability truly cannot be fixed (no patched version, no workable override), stop and ask the owner. Log their decision, the reason and a re-check date in `decisions.md`. Until they decide, the CI gate stays red.
+
 ## HTTP API (PLAN-32)
 
 - **Every route ships described**: `tags` (its module), a `summary`, a unique `operationId`, a response entry for **every status it can answer** (the shared `errorResponses(...)` envelope for 4xx; a `400` wherever a request schema exists; `415`/`413` on body routes), and `security: [{ adminSession: [] }]` exactly when `requireAdmin` guards it. `api-coverage.test.ts` enforces all of it.
