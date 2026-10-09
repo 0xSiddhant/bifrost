@@ -121,23 +121,23 @@ No new `.env` keys.
 ## Task checklist
 
 **Server**
-- [ ] `server/package.json`: `@fastify/swagger-ui` (dependency); `@redocly/openapi-core` (dev); `tech-stack.md` rows
-- [ ] Verify first: the plugin's routes are `schema.hide` (PLAN-32's coverage test skips them); record the result
-- [ ] `core/http/docs.ts`: register at `/docs` (`validatorUrl: null`, `staticCSP: true`, `deepLinking`, every method try-able); an `info` boot line with the docs URL
-- [ ] `core/http/openapi.ts`: the `/{key}` transform for the four document kinds (per-operation constraints and descriptions); tag descriptions; API description (auth, versioning, coercion, the real-data note); `examples` for envelopes, errors and raw endpoints
-- [ ] `RESERVED_ROOTS` + test: `docs`; PLAN-37's versioning allowlist: `/docs/*` with reason
-- [ ] `npm run api:spec`; the strict lint (`@redocly/openapi-core` `recommended`) added to `openapi.test.ts`, with any unmeetable rule listed and justified
+- [x] `server/package.json`: `@fastify/swagger-ui` (dependency); `@redocly/openapi-core` (dev); `tech-stack.md` rows
+- [x] Verify first: the plugin's routes are `schema.hide` (PLAN-32's coverage test skips them); record the result
+- [x] `core/http/docs.ts`: register at `/docs` (`validatorUrl: null`, `staticCSP: true`, `deepLinking`, every method try-able); an `info` boot line with the docs URL
+- [x] `core/http/openapi.ts`: the `/{key}` transform for the four document kinds (per-operation constraints and descriptions); tag descriptions; API description (auth, versioning, coercion, the real-data note); `examples` for envelopes, errors and raw endpoints
+- [x] `RESERVED_ROOTS` + test: `docs`; PLAN-37's versioning allowlist: `/docs/*` with reason
+- [x] `npm run api:spec`; the strict lint (`@redocly/openapi-core` `recommended`) added to `openapi.test.ts`, with any unmeetable rule listed and justified
 
 **Tests**
-- [ ] `server/src/core/http/docs.int.test.ts`: `/docs` served; `/docs/json` equals the committed spec minus `info.version`; CSP header present
-- [ ] `e2e/browser/docs.spec.ts` (Playwright, against the API server's port): the UI renders every tag; no request leaves for an external host; \"Try it out\" on `GET /api/v1/health` returns 200; a write operation offers \"Try it out\" and the real-data note is visible
-- [ ] e2e (Vitest): through the web host on `PORT`, `/docs`, `/docs/json` and `/docs/static/index.html` return the client's not-found page or 404, never the docs or the spec
-- [ ] PLAN-33's API suites and PLAN-37's spec check pass on the merged `/{key}` paths
+- [x] `server/src/core/http/docs.int.test.ts`: `/docs` served; `/docs/json` equals the committed spec minus `info.version`; CSP header present
+- [x] `e2e/browser/docs.spec.ts` (Playwright, against the API server's port): the UI renders every tag; no request leaves for an external host; \"Try it out\" on `GET /api/v1/health` returns 200; a write operation offers \"Try it out\" and the real-data note is visible
+- [x] e2e (Vitest): through the web host on `PORT`, `/docs`, `/docs/json` and `/docs/static/index.html` return the client's not-found page or 404, never the docs or the spec
+- [x] PLAN-33's API suites and PLAN-37's spec check pass on the merged `/{key}` paths
 
 **Docs & cleanup**
-- [ ] `docs/api.md`: where the docs are (the loopback URL, and why `bifrost.local:4647` does not work), the SSH tunnel recipe, that "Try it out" sends real requests, how to log in for admin calls; linked from `README.md` and `docs/testing.md`
-- [ ] `architecture.md` (docs in core, loopback-only by construction), `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
-- [ ] Cleanup: the spike stays in the scratchpad; no probe scripts committed; the PR lists deletions
+- [x] `docs/api.md`: where the docs are (the loopback URL, and why `bifrost.local:4647` does not work), the SSH tunnel recipe, that "Try it out" sends real requests, how to log in for admin calls; linked from `README.md` and `docs/testing.md`
+- [x] `architecture.md` (docs in core, loopback-only by construction), `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [x] Cleanup: the spike stays in the scratchpad; no probe scripts committed; the PR lists deletions
 
 ## Acceptance criteria
 
@@ -151,13 +151,13 @@ No new `.env` keys.
 ## Test checklist
 
 **Integration (server)**
-- [ ] `docs.int.test.ts`: criterion 1
-- [ ] `openapi.test.ts` strict lint and the `/{key}` merge: criterion 5
-- [ ] `reserved-roots.test.ts`: criterion 6
+- [x] `docs.int.test.ts`: criterion 1
+- [x] `openapi.test.ts` strict lint and the `/{key}` merge: criterion 5
+- [x] `reserved-roots.test.ts`: criterion 6
 
 **End-to-end**
-- [ ] `docs.spec.ts` (Playwright): criteria 3 and 4
-- [ ] Web-host exposure check (Vitest): criterion 2
+- [x] `docs.spec.ts` (Playwright): criteria 3 and 4
+- [x] Web-host exposure check (Vitest): criterion 2
 
 **Manual**
 - [ ] The owner opens the docs on the Mac, then through the documented SSH tunnel from another machine, and tries a read

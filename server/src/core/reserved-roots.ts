@@ -19,6 +19,8 @@ export const RESERVED_ROOTS: ReadonlySet<string> = new Set([
   'metrics',
   // The web host's own liveness check (PLAN-36), answered without the API.
   'healthz',
+  // The API docs on the API server (PLAN-38): Swagger UI and its spec.
+  'docs',
   // Public data/preview routes that escape the SPA fallback.
   'runestone',
   'edda',

@@ -1,5 +1,6 @@
 import swagger from '@fastify/swagger';
 import type { FastifyInstance, FastifySchema, RouteOptions } from 'fastify';
+import { addExamples, DESCRIPTION, mergeDocumentKeys, TAGS } from './openapi-content.js';
 
 /**
  * OpenAPI registration and the route catalog (PLAN-32).
@@ -8,8 +9,8 @@ import type { FastifyInstance, FastifySchema, RouteOptions } from 'fastify';
  * module, so its `onRoute` collector sees routes in every encapsulated scope.
  * It registers no route of its own; `fastify.swagger()` builds the spec from
  * what it collected, and `npm run api:spec` commits that as
- * `server/openapi.json`. No docs page is served (a later plan, on its own
- * loopback port).
+ * `server/openapi.json`. Its text, tags, the `/{key}` merge and the examples
+ * live in `openapi-content.ts`; `docs.ts` serves it as Swagger UI (PLAN-38).
  *
  * The catalog beside it exists because a test cannot add an `onRoute` hook
  * after `createApp` has run: it records every route's method, URL template,
@@ -37,35 +38,19 @@ export interface OpenApiInfo {
   version: string;
 }
 
-const DESCRIPTION = [
-  'The HTTP API of a Bifrost LAN hub — the same one its web app and its `bifrost` CLI use.',
-  '',
-  'Four things to know when reading this description:',
-  '',
-  '- **Every API is versioned in its path.** This describes v1: `/api/v1/…`, and each public',
-  '  raw document at `/<kind>/api/v1/{slug}`. `/go/{slug}` and `/metrics` are not APIs and are',
-  '  never versioned.',
-  '- **The paths from before versions existed still mean v1.** `/api/<rest>` answers exactly as',
-  '  `/api/v1/<rest>`, and `/<kind>/api/{slug}` as `/<kind>/api/v1/{slug}`: the same route, so the',
-  '  same body, status, limits and guards. Their responses add `Deprecation: true` and a',
-  '  `Link: <v1 path>; rel="successor-version"` header. They are listed here only once, as v1.',
-  '- **Versioning policy.** v1 only ever grows: no operation is removed and no response field',
-  '  disappears. A breaking change gets a new version for the affected module alone',
-  '  (`/api/v2/<module>/…`), and its v1 keeps answering.',
-  '- **Sibling path parameters.** Each document kind reads a record at `/api/v1/<kind>/{slug}` and',
-  '  writes it at `/api/v1/<kind>/{id}`. OpenAPI treats those as one path with two parameter',
-  '  names, which it forbids; renaming a route parameter is a code change made only for the',
-  "  description's sake, so both appear as written and the merge is left to the API docs plan.",
-  "- **Request validation follows Fastify's defaults.** Properties a request schema does not",
-  '  declare are stripped rather than refused, and scalar values are coerced to the declared',
-  '  type (`"7"` for an integer is accepted as `7`).',
-].join('\n');
-
 export async function registerOpenApi(app: FastifyInstance, info: OpenApiInfo): Promise<void> {
   await app.register(swagger, {
     openapi: {
       openapi: '3.1.0',
-      info: { title: 'Bifrost', version: info.version, description: DESCRIPTION },
+      info: {
+        title: 'Bifrost',
+        version: info.version,
+        description: DESCRIPTION,
+        license: { name: 'MIT', identifier: 'MIT' },
+      },
+      // This hub: the docs page and the CLI both call the origin they were reached on.
+      servers: [{ url: '/', description: 'This hub' }],
+      tags: TAGS,
       components: {
         securitySchemes: {
           adminSession: {
@@ -77,6 +62,12 @@ export async function registerOpenApi(app: FastifyInstance, info: OpenApiInfo): 
         },
       },
     },
+    transform: ({ schema, url }) =>
+      mergeDocumentKeys({ schema, url }) as { schema: FastifySchema; url: string },
+    transformObject: (document) =>
+      addExamples(
+        ('openapiObject' in document ? document.openapiObject : {}) as Record<string, unknown>,
+      ),
   });
 
   const catalog: RouteCatalogEntry[] = [];

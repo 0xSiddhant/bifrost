@@ -42,11 +42,16 @@ function problemsOf(route: RouteCatalogEntry): string[] {
 /**
  * Every route is versioned from its first commit (PLAN-37): `/api/v<n>/…`, or a
  * raw document at `/<kind>/api/v<n>/:slug`. Only these are not, each for a
- * reason; static files are hidden routes and skipped above.
+ * reason. Hidden routes count too: they are routes, just not in the spec.
  */
 const UNVERSIONED_ALLOWED: Record<string, string> = {
   'GET /go/:slug': 'a human URL printed on QR codes and typed by hand, not an API',
   'GET /metrics': 'Prometheus scrapes /metrics at the root by convention, not an API',
+};
+
+/** Unversioned prefixes, each for a reason (PLAN-38). */
+const UNVERSIONED_PREFIXES: Record<string, string> = {
+  '/docs': 'Swagger UI and the spec it reads (PLAN-38): a page about the API, not an API',
 };
 
 const VERSIONED = /^(?:\/api|\/(?:runestone|edda|groot|atlas)\/api)\/v\d+\//;
@@ -56,17 +61,26 @@ function unversioned(routes: readonly Pick<RouteCatalogEntry, 'method' | 'url'>[
   return routes
     .map(keyOf)
     .filter((key) => !(key in UNVERSIONED_ALLOWED))
-    .filter((key) => !VERSIONED.test(key.slice(key.indexOf(' ') + 1)));
+    .filter((key) => {
+      const url = key.slice(key.indexOf(' ') + 1);
+      const prefixed = Object.keys(UNVERSIONED_PREFIXES).some(
+        (prefix) => url === prefix || url.startsWith(`${prefix}/`),
+      );
+      return !prefixed && !VERSIONED.test(url);
+    });
 }
 
 describe('API coverage', () => {
   let app: RunningApp;
   let routes: RouteCatalogEntry[];
+  /** Hidden ones too: the versioning and reserved-root rules hold for every route. */
+  let allRoutes: RouteCatalogEntry[];
 
   beforeAll(async () => {
     app = await createTestApp();
     await app.fastify.ready();
-    routes = app.fastify.routeCatalog().filter((route) => route.method !== 'HEAD' && !route.hide);
+    allRoutes = app.fastify.routeCatalog().filter((route) => route.method !== 'HEAD');
+    routes = allRoutes.filter((route) => !route.hide);
   });
 
   afterAll(async () => {
@@ -82,7 +96,7 @@ describe('API coverage', () => {
   });
 
   it('versions every route but the reasoned allowlist', () => {
-    expect(unversioned(routes)).toEqual([]);
+    expect(unversioned(allRoutes)).toEqual([]);
   });
 
   it('would refuse a route registered outside a version', () => {
@@ -92,12 +106,14 @@ describe('API coverage', () => {
         { method: 'GET', url: '/runestone/api/:slug' },
         { method: 'GET', url: '/api/v2/fresh' },
         { method: 'GET', url: '/go/:slug' },
+        { method: 'GET', url: '/docs/json' },
+        { method: 'GET', url: '/docsearch' },
       ]),
-    ).toEqual(['GET /api/fresh', 'GET /runestone/api/:slug']);
+    ).toEqual(['GET /api/fresh', 'GET /runestone/api/:slug', 'GET /docsearch']);
   });
 
   it('reserves every first path segment a route uses (Portkey slugs cannot shadow one)', () => {
-    const roots = new Set(routes.map((route) => route.url.split('/')[1] ?? ''));
+    const roots = new Set(allRoutes.map((route) => route.url.split('/')[1] ?? ''));
     expect([...roots].filter((root) => !isReservedRoot(root))).toEqual([]);
   });
 
@@ -108,7 +124,9 @@ describe('API coverage', () => {
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([]);
   });
 
-  it('serves no API docs route (a later plan, on its own port)', () => {
-    expect(routes.filter((route) => /documentation|swagger|openapi/i.test(route.url))).toEqual([]);
+  it('serves the API docs only under /docs, all hidden from the spec (PLAN-38)', () => {
+    const docs = allRoutes.filter((route) => /documentation|swagger|openapi|docs/i.test(route.url));
+    expect(docs.map((route) => route.url)).toContain('/docs');
+    expect(docs.filter((route) => !route.url.startsWith('/docs') || !route.hide)).toEqual([]);
   });
 });

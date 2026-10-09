@@ -18,6 +18,7 @@ import { checkClientBuild } from './core/client-build.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
 import { buildHttp } from './core/http/index.js';
+import { DOCS_PREFIX } from './core/http/docs.js';
 import { AuthService, registerAuth } from './core/auth/index.js';
 import { lanIPv4Addresses } from './core/net.js';
 import { checkWebHostLater } from './core/web-host-check.js';
@@ -342,10 +343,14 @@ export async function main(): Promise<void> {
   const { host, port } = config.api;
   await fastify.listen({ port, host });
   fastify.log.info({ host, port, runMode: config.runMode }, `api listening on http://${host}:${port}`);
+  // An address this machine can open: a wildcard bind is reached on loopback.
+  const reach = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+  // PLAN-38: the docs are on this server, never on the web host's PORT; and
+  // bifrost.local resolves to the LAN address, which a loopback API ignores.
+  fastify.log.info(`api docs: http://${reach}:${port}${DOCS_PREFIX}`);
 
   let cancelWebHostCheck = (): void => {};
   if (config.runMode === 'api') {
-    const reach = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
     fastify.log.info(
       `api-only mode: no web host and no mDNS name — the CLI reaches it with ` +
         `\`bifrost --host ${reach}:${port}\``,

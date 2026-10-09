@@ -129,7 +129,8 @@ export function readPath(op: Operation, seeds: Seeds): string {
       op.template.startsWith(`/${candidate}/api/v1/`),
   );
   const value = (name: string): string => {
-    if (kind) return name === 'slug' ? seeds.documents[kind].slug : seeds.documents[kind].id;
+    // Only GETs come here, so a merged document path's `{key}` (PLAN-38) is the slug.
+    if (kind) return name === 'id' ? seeds.documents[kind].id : seeds.documents[kind].slug;
     if (op.template.startsWith('/api/v1/downloads/')) {
       return op.template.endsWith('/archive') ? seeds.downloadFolder : seeds.downloadFile;
     }

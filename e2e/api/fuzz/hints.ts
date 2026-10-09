@@ -74,9 +74,11 @@ export function hintsFor(context: HintContext): Record<string, Hint> {
     const Kind = { runestone: 'Runestone', edda: 'Edda', groot: 'GrootDoc', atlas: 'AtlasDoc' }[
       kind
     ];
-    hints[`get${Kind}`] = { params: { slug: either(doc.slug, word) } };
+    // The read and the write share `/api/v1/<kind>/{key}` in the spec (PLAN-38):
+    // a slug for the read, an id for the write. The raw route keeps `{slug}`.
+    hints[`get${Kind}`] = { params: { key: either(doc.slug, word) } };
     hints[`get${Kind}Raw`] = { params: { slug: either(doc.slug, word) } };
-    hints[`update${Kind}`] = { params: { id: either(doc.id, word) } };
+    hints[`update${Kind}`] = { params: { key: either(doc.id, word) } };
   }
   return hints;
 }
