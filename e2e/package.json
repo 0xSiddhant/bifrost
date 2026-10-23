@@ -20,6 +20,6 @@
     "autocannon": "^8.0.0",
     "fast-check": "^4.10.2",
     "fastify": "^5.12.5",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   }
 }

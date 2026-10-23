@@ -10,7 +10,7 @@
 # Only the client workspace (and the root's build tools) is installed, so this
 # stage needs none of the server's native toolchain: no better-sqlite3, no
 # python3/make/g++.
-FROM node:20-bookworm-slim AS standalone-build
+FROM node:22-bookworm-slim AS standalone-build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
