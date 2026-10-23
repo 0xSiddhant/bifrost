@@ -177,12 +177,12 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
   // 6 — the runtime this CLI needs.
   const major = Number(process.versions.node.split('.')[0]);
   checks.push(
-    Number.isFinite(major) && major >= 20 && typeof fetch === 'function'
+    Number.isFinite(major) && major >= 22 && typeof fetch === 'function'
       ? { name: 'node runtime', status: 'pass', detail: `node ${process.versions.node}, fetch present` }
       : {
           name: 'node runtime',
           status: 'fail',
-          detail: `node ${process.versions.node} — the CLI needs Node 20+ with a built-in fetch`,
+          detail: `node ${process.versions.node} — the CLI needs Node 22+ with a built-in fetch`,
         },
   );
 

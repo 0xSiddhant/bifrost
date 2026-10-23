@@ -10,7 +10,7 @@
 # adapts it for Docker Desktop on the Mac, beside a native API.
 
 # ---- clients: the hub and the standalone build ----
-FROM node:20-bookworm-slim AS clients
+FROM node:22-bookworm-slim AS clients
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
@@ -53,7 +53,7 @@ ARG BIFROST_COMMIT=unknown
 RUN npm run build -w client && npm run build:standalone -w client
 
 # ---- web: compile the web host ----
-FROM node:20-bookworm-slim AS web
+FROM node:22-bookworm-slim AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json ./server/
@@ -70,7 +70,7 @@ RUN npm run build -w web \
   && npm ci --workspace web --omit=dev --ignore-scripts
 
 # ---- runtime: slim, non-root, init ----
-FROM node:20-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 # No tini and no apt at all: the web host spawns no child process, so there is
 # nothing to reap, and it handles SIGTERM itself (web/src/main.ts). Compose's

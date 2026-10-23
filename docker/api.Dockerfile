@@ -10,7 +10,7 @@
 # no web host, no CLI.
 
 # ---- build: the server only ----
-FROM node:20-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 # Toolchain only needed if better-sqlite3 has no prebuilt binary for the arch
 # (discarded with this stage).
@@ -38,7 +38,7 @@ RUN BIFROST_COMMIT=$BIFROST_COMMIT npm run build -w server \
   && npm prune --omit=dev --workspace server --include-workspace-root
 
 # ---- runtime: slim, non-root, init ----
-FROM node:20-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production
 # tini = PID 1 signal forwarding + zombie reaping; zip/unzip for the in-app
 # backup path (PLAN-10 runs createBackup() in-process).
@@ -63,7 +63,7 @@ RUN mkdir -p storage && chown node:node storage
 USER node
 # Loopback only (API_HOST): nothing here is meant for the LAN.
 EXPOSE 4647
-# Node 20 ships global fetch — no curl/wget needed in the image.
+# Node ships global fetch — no curl/wget needed in the image.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "const p=process.env.API_PORT||Number(process.env.PORT||4646)+1;fetch('http://127.0.0.1:'+p+'/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ENTRYPOINT ["/usr/bin/tini", "--"]
