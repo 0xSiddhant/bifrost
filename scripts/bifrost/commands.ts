@@ -39,6 +39,12 @@ export interface Command {
   summary: string;
   /** Synopsis lines, without the leading `./bifrost`. */
   usage: string[];
+  /**
+   * Each subcommand as `<command> <sub>…`, and what it does. Help lists them,
+   * and `<command> <sub> --help` narrows to one branch. The drift test plans
+   * each one that names no placeholder.
+   */
+  subcommands?: Array<[args: string, text: string]>;
   /** Paragraphs for `help <command>` and the man page. */
   description: string[];
   options?: Array<[flag: string, text: string]>;
@@ -547,6 +553,11 @@ export const COMMANDS: Command[] = [
     group: 'Develop',
     summary: 'Database: migrate, generate a migration, or browse it in Drizzle Studio',
     usage: ['db migrate', 'db generate --name <slug>', 'db studio'],
+    subcommands: [
+      ['db migrate', 'apply pending migrations to storage/data/app.db'],
+      ['db generate --name <slug>', 'write a migration from a change to schema.ts'],
+      ['db studio', 'browse and edit the data in Drizzle Studio'],
+    ],
     description: [
       'migrate applies pending migrations to storage/data/app.db (setup and every start do this too).',
       'generate writes server/drizzle/NNNN_<slug>.sql from a change to server/src/core/db/schema.ts. Review the SQL before accepting it; the db-migration skill has the whole procedure.',
@@ -627,6 +638,16 @@ export const COMMANDS: Command[] = [
       'test load [-- <load options>]',
       'test resilience [--cycles <n>]',
       'test all',
+    ],
+    subcommands: [
+      ['test unit [<workspace>]', "every Vitest suite, or one workspace's (the default)"],
+      ['test e2e', 'the CLI, API and browser suites against the current build'],
+      ['test e2e ui', 'the browser journeys only'],
+      ['test e2e cli', 'the installed-CLI suite only'],
+      ['test e2e api', 'the black-box API suite only'],
+      ['test load', 'the load harness (on demand, never a gate)'],
+      ['test resilience', 'restart the built API under SIGKILLs, integrity-check the db'],
+      ['test all', 'the whole gate CI runs'],
     ],
     description: [
       "unit runs every workspace's Vitest suite and the scripts/ tests; name a workspace (server, client, cli, web, e2e, scripts) to run one, and filter it after --.",
@@ -733,6 +754,10 @@ export const COMMANDS: Command[] = [
     group: 'Run',
     summary: 'Always-on on macOS: build and (re)start under PM2 or launchd',
     usage: ['service pm2|launchd [--web native|docker|none] [--standalone] [--obs | --otel]'],
+    subcommands: [
+      ['service pm2', 'run under PM2: rich logs and monitoring, installs pm2'],
+      ['service launchd', 'run under launchd: no extra dependencies'],
+    ],
     description: [
       'Installs dependencies if needed, makes .env, builds, then runs the processes as services that restart on crash and start at login. Idempotent: re-run it after pulling to rebuild and restart. The flags mean what they mean for `start`, and are kept by PM2 and in the launchd plists, so they hold across reboots; re-running without them restores the plain hub. docs/pm2.md and docs/launchd.md have the detail.',
       'Docker pieces (--web docker, --obs) are started after the services and restart with Docker Desktop.',
@@ -780,37 +805,63 @@ export const COMMANDS: Command[] = [
     group: 'Data',
     summary: 'Back up the database and storage now, or manage the scheduled backups',
     usage: [
-      'backup [--include-env] [--meta]',
+      'backup',
+      'backup --local <dir> [--include-env] [--meta]',
       'backup agent install|uninstall|start|stop|status',
       'backup agent run [--force]',
     ],
+    subcommands: [
+      ['backup', 'back up to the cloud folder now (macOS, needs the API up)'],
+      ['backup --local <dir>', 'one zip into <dir> (any OS)'],
+      ['backup agent install', 'write and load the launchd agent, run it once now'],
+      ['backup agent uninstall', 'remove the agent (backups already made are kept)'],
+      ['backup agent stop', 'pause scheduled backups, across logins too'],
+      ['backup agent start', 'resume them after stop'],
+      ['backup agent status', 'schedule, last run, last backup, next due date'],
+      ['backup agent run', 'the scheduled job: back up if one is due (--force: now)'],
+    ],
     description: [
-      'Without agent: a consistent snapshot of the database (VACUUM INTO) and storage/ into one zip. --include-env adds .env (it holds secrets); --meta writes a checksum file beside the zip.',
+      'Without agent: backs up now through the scheduled job (scripts/backup-agent.sh run --force), so the backup lands in the cloud-synced folder (BACKUP_CLOUD) with its meta.json, rotation and run log, whatever its age. Like every agent run it needs the API answering on API_PORT, and it is macOS-only.',
+      '--local <dir> instead writes one zip into <dir> (relative to where you stand): a consistent snapshot of the database (VACUUM INTO) and storage/, on any OS. --include-env adds .env (it holds secrets); --meta writes a checksum file beside the zip.',
       'agent manages the macOS launchd job that backs up to a cloud-synced folder on a schedule (BACKUP_* in .env). install also runs it once; stop and start pause and resume it; status shows the schedule, the last run and the next due date; run is the job itself, and --force skips its "not due yet" check.',
     ],
     options: [
-      ['--include-env', 'put .env in the archive too'],
-      ['--meta', 'write <archive>.meta.json beside the zip'],
+      ['--local <dir>', 'one zip in <dir> instead of the cloud folder'],
+      ['--include-env', '--local only: put .env in the archive too'],
+      ['--meta', '--local only: write <archive>.meta.json beside the zip'],
       ['--force', 'agent run only: back up even if one is not due'],
     ],
     examples: [
-      ['backup', 'a zip in the backups folder'],
+      ['backup', 'back up to the cloud folder now (macOS)'],
+      ['backup --local /Volumes/Backup/bifrost', 'a zip on an external drive'],
       ['backup agent install', 'schedule backups (macOS)'],
       ['backup agent status', 'when the last one ran, when the next is due'],
-      ['backup agent run --force', 'run the scheduled job now'],
     ],
-    plan(args) {
-      const p = parse(args, { flags: ['--include-env', '--meta', '--force'] });
+    plan(args, ctx) {
+      const p = parse(args, { flags: ['--include-env', '--meta', '--force'], values: ['--local'] });
       noRest(p, 'backup takes no extra arguments');
+      const localOnly = p.flags.has('--include-env') || p.flags.has('--meta');
       if (p.positionals[0] !== 'agent') {
         noMore(p.positionals, 0);
         if (p.flags.has('--force')) throw new UsageError('--force is for `backup agent run`');
-        return [
-          tsx(
-            'scripts/backup.ts',
-            ['--include-env', '--meta'].filter((f) => p.flags.has(f)),
-          ),
-        ];
+        const dir = p.values.get('--local');
+        if (dir !== undefined) {
+          return [
+            tsx('scripts/backup.ts', [
+              '--out',
+              path.resolve(ctx.cwd, dir),
+              ...['--include-env', '--meta'].filter((f) => p.flags.has(f)),
+            ]),
+          ];
+        }
+        if (localOnly)
+          throw new UsageError('--include-env and --meta are for `backup --local <dir>`');
+        if (ctx.platform !== 'darwin') {
+          throw new UsageError(
+            'backup runs the macOS backup agent; use `backup --local <dir>` here',
+          );
+        }
+        return [sh('scripts/backup-agent.sh', ['run', '--force'])];
       }
       const sub = oneOf(
         p.positionals[1],
@@ -818,8 +869,10 @@ export const COMMANDS: Command[] = [
         'backup agent',
       );
       noMore(p.positionals, 2);
-      if (p.flags.has('--include-env') || p.flags.has('--meta')) {
-        throw new UsageError('--include-env and --meta are for a one-off `backup`');
+      if (p.values.has('--local') || localOnly) {
+        throw new UsageError(
+          '--local, --include-env and --meta are for a one-off `backup --local <dir>`',
+        );
       }
       if (p.flags.has('--force') && sub !== 'run')
         throw new UsageError('--force is for `backup agent run`');
@@ -859,6 +912,15 @@ export const COMMANDS: Command[] = [
       'docker ps [<target>]',
       'docker config',
       'docker smoke [<image>]',
+    ],
+    subcommands: [
+      ['docker up [<target>]', 'build and start a target, detached (default hub)'],
+      ['docker up standalone', 'the browser-only site, on http://localhost:8080'],
+      ['docker down [<target>]', 'stop a target'],
+      ['docker logs [<target>]', "follow a target's logs"],
+      ['docker ps [<target>]', "list a target's containers"],
+      ['docker config', 'check every compose combination parses'],
+      ['docker smoke [<image>]', 'check a built standalone image'],
     ],
     description: [
       'Targets (default hub): hub is the API and the web host on a Linux host; api is the API alone; web is the web host beside a native API on Linux; web-standalone is the web host alone, serving the standalone client; web-mac is the web host on Docker Desktop beside a native API (`start --web docker` runs both halves); obs is the Grafana stack alone, beside a native or containerised hub; standalone is the browser-only site (no server at all): on this machine at http://localhost:8080 (--port to change it), or behind your reverse proxy with --network.',

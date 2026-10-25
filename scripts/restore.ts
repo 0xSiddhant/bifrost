@@ -8,7 +8,7 @@
  * <path> may be:
  *   - a backup archive (`….zip`)                 → that archive
  *   - one backup's folder (`…/bifrost-backup-<stamp>`) → that backup only
- *   - a folder of backups (`…/Bifrost/backups`, or a flat BACKUP_DIR)
+ *   - a folder of backups (`…/Bifrost/backups`, or a flat folder of zips)
  *                                                → the newest one
  * When the backup has a meta file, its sha256 is checked before anything is
  * extracted — a corrupted or half-synced cloud copy is refused, not restored.

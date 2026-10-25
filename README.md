@@ -156,7 +156,8 @@ Everything except the standalone site needs Docker Compose 2.20 or newer (`docke
 ### Back up and restore
 
 ```bash
-./bifrost backup                         # zip the database and storage/ now (safe while running)
+./bifrost backup                         # macOS: back up to the cloud folder now (the agent's job, BACKUP_* in .env)
+./bifrost backup --local <dir>           # zip the database and storage/ into <dir> (safe while running)
 ./bifrost backup agent install           # macOS: back up to a cloud folder on a schedule (BACKUP_* in .env)
 ./bifrost backup agent status            # last run, next due date
 ./bifrost restore <zip-or-folder>        # stop Bifrost first

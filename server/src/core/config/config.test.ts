@@ -29,7 +29,6 @@ describe('loadConfig', () => {
     expect(config.clientLogs.level).toBe('warn');
     expect(config.clientLogs.maxBatch).toBe(50);
     expect(config.clientLogs.maxBodyBytes).toBe(64 * 1024);
-    expect(config.backupDir).toBeNull();
     expect(config.backupExclude).toEqual([]);
     expect(config.runestone.maxDocKb).toBe(2048);
   });
@@ -73,7 +72,9 @@ describe('loadConfig', () => {
     for (const mode of ['off', 'fallback', 'strict'] as const) {
       expect(loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: mode }).http.contractCheck).toBe(mode);
     }
-    expect(() => loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: 'loud' })).toThrow(/API_CONTRACT_CHECK/);
+    expect(() => loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: 'loud' })).toThrow(
+      /API_CONTRACT_CHECK/,
+    );
   });
 
   it('reads RUNESTONE_MAX_DOC_KB', () => {
@@ -108,10 +109,10 @@ describe('loadConfig', () => {
   });
 
   it('treats empty strings as unset (falls back to defaults)', () => {
-    const config = loadConfig({ ...VALID_ENV, LOG_LEVEL: '', BACKUP_DIR: '', MDNS_NAME: '' });
+    const config = loadConfig({ ...VALID_ENV, LOG_LEVEL: '', BACKUP_KEEP: '', MDNS_NAME: '' });
     expect(config.logLevel).toBe('trace');
     expect(config.mdnsName).toBe('bifrost');
-    expect(config.backupDir).toBeNull();
+    expect(config.backupKeep).toBe(0);
   });
 
   it('parses BACKUP_EXCLUDE into trimmed folder names', () => {
@@ -196,11 +197,15 @@ describe('the API port and run mode (PLAN-36)', () => {
   });
 
   it('refuses an API_PORT equal to PORT', () => {
-    expect(() => loadConfig({ ...VALID_ENV, API_PORT: '4646' })).toThrow(/API_PORT: must differ from PORT/);
+    expect(() => loadConfig({ ...VALID_ENV, API_PORT: '4646' })).toThrow(
+      /API_PORT: must differ from PORT/,
+    );
   });
 
   it('refuses a default API port past 65535, naming the fix', () => {
-    expect(() => loadConfig({ ...VALID_ENV, PORT: '65535' })).toThrow(/API_PORT: PORT \+ 1 is not a port/);
+    expect(() => loadConfig({ ...VALID_ENV, PORT: '65535' })).toThrow(
+      /API_PORT: PORT \+ 1 is not a port/,
+    );
     expect(loadConfig({ ...VALID_ENV, PORT: '65535', API_PORT: '65534' }).api.port).toBe(65534);
   });
 
