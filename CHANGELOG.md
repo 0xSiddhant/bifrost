@@ -1,6 +1,69 @@
 # Changelog
 
 
+## v2.0.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.4.0...v2.0.0)
+
+### 🚀 Enhancements
+
+- **client:** Add a new-document action to the ollivanders editors ([#76](https://github.com/0xSiddhant/bifrost/pull/76))
+- **ops:** Scheduled cloud backups with folder-aware restore ([#77](https://github.com/0xSiddhant/bifrost/pull/77))
+- **core:** Required env keys and .env drift check in setup ([#78](https://github.com/0xSiddhant/bifrost/pull/78))
+- **plan-31:** Pagination — pensieve pages, accio/portkey infinite scroll ([#80](https://github.com/0xSiddhant/bifrost/pull/80))
+- **plan-32a:** End-to-end safety net (browser, installed CLI, API diff) ([#81](https://github.com/0xSiddhant/bifrost/pull/81))
+- **core:** PLAN-32b — response contract guard, OpenAPI spec, core + document routes ([#83](https://github.com/0xSiddhant/bifrost/pull/83))
+- PLAN-32c — describe every remaining route, delete the ratchet ([#84](https://github.com/0xSiddhant/bifrost/pull/84))
+- PLAN-35 — client decoupling: hub and standalone builds ([#87](https://github.com/0xSiddhant/bifrost/pull/87))
+- **plan-36:** Separate ports — a web host in front of a loopback API ([#88](https://github.com/0xSiddhant/bifrost/pull/88))
+- **plan-39:** Docker per process, composable compose files ([#89](https://github.com/0xSiddhant/bifrost/pull/89))
+- **plan-37a:** Api versioning on the server, old paths rewritten to v1 ([#90](https://github.com/0xSiddhant/bifrost/pull/90))
+- **plan-37b:** The client and the cli speak /api/v1 ([#91](https://github.com/0xSiddhant/bifrost/pull/91))
+- **plan-38:** Api docs as swagger ui on the api server ([#92](https://github.com/0xSiddhant/bifrost/pull/92))
+- **ops:** ./bifrost task runner, parallel ci, run shape from flags ([#94](https://github.com/0xSiddhant/bifrost/pull/94))
+- **client:** Seo for the public standalone site ([#100](https://github.com/0xSiddhant/bifrost/pull/100))
+
+### 🩹 Fixes
+
+- The seven bugs the PLAN-32a e2e net found ([#82](https://github.com/0xSiddhant/bifrost/pull/82))
+- **chore:** Npm audit 3 → 0, and make audit findings a gated, top-priority rule ([#93](https://github.com/0xSiddhant/bifrost/pull/93))
+- **client:** Show the restore prompt only while the editor is blank ([#95](https://github.com/0xSiddhant/bifrost/pull/95))
+- **ci:** Node 22.23.4+ for the brotli decoder flaw, npm audit 5 → 0 ([#96](https://github.com/0xSiddhant/bifrost/pull/96))
+- **chore:** Npm audit 3 → 0 (zod, undici, fast-uri) ([#97](https://github.com/0xSiddhant/bifrost/pull/97))
+- **ops:** ./bifrost backup runs the backup agent, drop backup_dir ([#98](https://github.com/0xSiddhant/bifrost/pull/98))
+- **web:** Serve the standalone pages and 404s as nginx now does ([#101](https://github.com/0xSiddhant/bifrost/pull/101))
+
+### 📖 Documentation
+
+- **docs:** Rewrite readme to match current features and nav ([#73](https://github.com/0xSiddhant/bifrost/pull/73))
+- **docs:** Refresh agent context and archive old sessions ([#79](https://github.com/0xSiddhant/bifrost/pull/79))
+- **docs:** Add plan-31 for list pagination ([ac080ad](https://github.com/0xSiddhant/bifrost/commit/ac080ad))
+- **docs:** Add plans 32-34 for api schemas, e2e and load testing ([e6b5bc8](https://github.com/0xSiddhant/bifrost/commit/e6b5bc8))
+- **docs:** Add plans 35-37 and validate the 32-37 sequence ([fcf821b](https://github.com/0xSiddhant/bifrost/commit/fcf821b))
+- **docs:** Add plan-38 api docs, docker standalone, backlog cleanup ([eb91bc2](https://github.com/0xSiddhant/bifrost/commit/eb91bc2))
+- **docs:** Keep bifrost.local with the web host in plan-36 ([1077acb](https://github.com/0xSiddhant/bifrost/commit/1077acb))
+- **docs:** Add run modes to plan-36 ([c5c0322](https://github.com/0xSiddhant/bifrost/commit/c5c0322))
+- **release:** ⚠️  Sync agent context for the v2.0.0 release ([fa980a5](https://github.com/0xSiddhant/bifrost/commit/fa980a5))
+
+### ✅ Tests
+
+- **e2e:** PLAN-33 — black-box API suite (boot, transport, contract, fuzz, security) + 4 fixes ([#85](https://github.com/0xSiddhant/bifrost/pull/85))
+- **e2e:** PLAN-34 — on-demand load, stress and soak harness; API diff deleted ([#86](https://github.com/0xSiddhant/bifrost/pull/86))
+- **e2e:** Expect the 404 page from a hub path in standalone run mode ([4f94d37](https://github.com/0xSiddhant/bifrost/commit/4f94d37))
+
+### 🤖 CI
+
+- **ci:** Auto-merge main into develop on every non-develop push ([063ca10](https://github.com/0xSiddhant/bifrost/commit/063ca10))
+
+#### ⚠️ Breaking Changes
+
+- **release:** ⚠️  Sync agent context for the v2.0.0 release ([fa980a5](https://github.com/0xSiddhant/bifrost/commit/fa980a5))
+
+### ❤️ Contributors
+
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+
 ## v1.4.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.3.0...v1.4.0)
