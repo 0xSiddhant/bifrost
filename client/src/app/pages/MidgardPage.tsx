@@ -65,7 +65,10 @@ const PORTALS: Portal[] = [
     // Midgard, not Ollivanders: "drop a file, present it on the shared screen"
     // reads far closer to Send/Receive's audience than to Loki's (PLAN-28).
     title: 'Saga',
-    description: 'Present a markdown deck on the big screen — drop a file, or open a saved edda.',
+    // Saving an edda needs the hub, so the standalone site offers the file alone.
+    description: __HUB__
+      ? 'Present a markdown deck on the big screen — drop a file, or open a saved edda.'
+      : 'Present a markdown deck or a PDF on the big screen — drop a file and go.',
     go: 'a deck · every eye',
     module: 'saga',
   },

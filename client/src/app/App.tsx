@@ -399,11 +399,13 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
+        {/* The address this site answers on: the hub's mDNS name, or the
+            standalone site's own public host. */}
         <span className="mono caption footer-mark" aria-hidden="true">
-          bifrost.local
+          {__HUB__ ? 'bifrost.local' : window.location.host}
         </span>
         <span className="caption">
-          build: {__BIFROST_BUILD__} · v0.1.0
+          build: {__BIFROST_BUILD__} · v{__BIFROST_CLIENT__.version}
           {/* The standalone site holds no live connection to report on. */}
           {__HUB__ && (
             <>

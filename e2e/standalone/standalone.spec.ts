@@ -60,8 +60,12 @@ test.describe('standalone shell', () => {
       'Diagon Alley',
     ]);
     await expect(page.locator('.shell-footer')).toContainText('build: standalone');
+    // Its own address, not the hub's mDNS name, and the real version.
+    await expect(page.locator('.footer-mark')).toHaveText(new URL(page.url()).host);
+    await expect(page.locator('.shell-footer')).not.toContainText('v0.1.0');
     // The slim Midgard (owner's call): Saga alone, no transfer doors, no Join band.
     await expect(page.getByRole('link', { name: /Saga/ }).first()).toBeVisible();
+    await expect(page.getByText(/saved edda/)).toHaveCount(0);
     for (const door of ['Send files', 'Receive files', 'Hermes', 'Accio']) {
       await expect(page.getByText(door, { exact: true }), door).toHaveCount(0);
     }
