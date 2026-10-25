@@ -8,8 +8,9 @@ A Lighthouse run on the hub's home page (`bifrost.local:4646`, mobile preset) sc
 - **Every page loads the Guide panel's Markdown stack.** That's marked, all of highlight.js and DOMPurify, about 223 KB raw, though the panel only opens on a click.
 - **The home page loads `qrcode`** for the hub's "Join Bifrost" card.
 
-This plan fixes those, and adds three more things:
+This plan fixes those, and adds four more things:
 - the hub caches hashed assets the way the standalone site already does;
+- the two decorative animations that run on every page (the sky's relics and the bridge strip) move to the GPU, instead of re-running layout or paint every frame for as long as a tab is open;
 - a build-time **bundle budget** keeps the heavy libraries out of the first load from now on;
 - the two accessibility failures the same report found are fixed: accent-coloured text below 4.5:1 in two themes, and a skipped heading level.
 
@@ -61,7 +62,7 @@ PLAN-39 merged. Single PR.
   - the plain file for `identity`;
   - with the right `content-type` and `Vary: Accept-Encoding` every time.
 
-  This holds for a static route, **for `reply.sendFile()`**, and for the SPA fallback (`setNotFoundHandler` → `sendFile('index.html')`), which is what the hub and the web host's standalone mode both rely on.
+  This holds for a static route, **for `reply.sendFile()`**, and for the SPA fallback (`setNotFoundHandler` → `sendFile('index.html')`), which is what the hub relies on. It also holds with **`serve: false`** and a status set before `sendFile` (`reply.code(404).sendFile(…)` came back 404, `br`, with `Vary`), which is exactly how the web host's standalone mode serves pages and `404.html`.
 - **Where the first-load weight comes from** (hub build, measured from its source maps):
 
   | Chunk | Raw | Gzip | What it holds |
@@ -76,11 +77,17 @@ PLAN-39 merged. Single PR.
 - **Why `qrcode` is in the entry.** `App.tsx` imports `MidgardPage` eagerly, which imports `JoinBifrostCard` → `QrCard` → `qrcode` (`QRCode.create`, drawn in an effect). The other three `QrCard` users (Heimdall sections, Portkey, the toolbox's `QrTool`) are already in lazy chunks. In the standalone build the card sits under `__HUB__ &&` and is dropped.
 - **Offline mode warms pages, not the panel.** `app/offlineWarmLoad.ts` lists the page loaders (toolbox, runestone, groot, atlas, edda, variant, loki, saga, screensaver). Today the Guide panel is safe offline only because it is in the entry chunk.
 - **Contrast.** `color.ts`'s `contrastWarnings` checks only `--text` on `--bg` and `--surface`, at the existing `MIN_TEXT_CONTRAST = 4.5`. Measured with the repo's own `contrastRatio` over resolved themes:
-  - **Daybreak's `--accent` on `--bg` is 3.15:1**, and Daybreak is the first-visit theme for every light-preferring device;
+  - **Daybreak's `--accent` on `--bg` is 3.15:1**, and on the standalone site Daybreak is the first theme every light-preferring device gets (on the hub, the household default can decide first);
   - **Tokyo's** is 5.23:1 on `--bg` but 4.15:1 on `--surface`, and 3.92:1 on the active nav item's `--accent-soft` tint, which is the failure the report found;
   - the other five themes pass.
 
-  66 CSS rules use `color: var(--accent)` as a text colour (31 in `app.css`, 23 in `ui.css`, the rest in feature CSS).
+  44 CSS rules use the accent as a **text** colour (`color: var(--accent)`: 20 in `app.css`, 14 in `ui.css`, 2 in `base.css`, the rest in feature CSS). A further 22 use it as `background-color` or `border-color`, which need no text contrast and stay on `--accent`.
+- **Two animations can't run on the compositor** (both reports, "non-composited animations": 8 on the hub, 7 on the public site). They run on every page, forever:
+  - `.relic`'s `relic-float` animates **`margin-top`**, so every frame re-runs layout. It animates the margin because each relic already carries an inline `transform: rotate(…)` (`core/ui/SkyRelics.tsx`), which a `transform` animation would overwrite.
+  - `.bridge-strip`'s `bridge-flow` animates **`background-position`**, so every frame repaints.
+
+  Both are in `app/app.css`.
+- **Lighthouse versions differ.** The owner's two reports are Lighthouse 13.4.1. This plan's clean baseline was taken with Lighthouse 12, the version this machine's `npx` resolved, and its scores aren't directly comparable with 13's.
 - **Heading order.** `JoinBifrostCard` renders `<h3 class="join-card__title">` directly under the page's `<h1>`.
 - **The CSS is mostly global.** `main.tsx` imports `app.css` (86 KB source) and `ui.css` (48 KB). Most of `app.css` is per-page (Runestone's tree, Variant, Edda's preview, Loki, Groot, the Accio shelf, Heimdall). It ships as one 96 KB file, 17 KB gzipped.
 
@@ -93,6 +100,7 @@ PLAN-39 merged. Single PR.
 - A bundle budget that fails the build when a heavy library re-enters the first load.
 - A derived `--accent-text` token that passes 4.5:1 in every theme, used for accent-coloured text.
 - The Join card's heading level.
+- The relic float and the bridge flow animated with compositor-only properties.
 - `gzip_static` in the standalone nginx, which is also what Cloudflare passes on to visitors.
 - A preload for the two fonts the first paint uses, in both builds.
 - `docs/standalone.md`: running behind Cloudflare (what passes through, and which of its features cost what).
@@ -104,6 +112,7 @@ PLAN-39 merged. Single PR.
 - **Splitting `app.css` per page.** It would save about 10 KB gzipped, but moving rules out of one ordered file risks cascade-order regressions across every page. Better as its own plan with screenshot checks, if the numbers after this plan say it's still worth it.
 - **Cloudflare's injected scripts** (Web Analytics, bot detection) and the audits they fail. They are switches in the Cloudflare dashboard, not code, and keeping them is the owner's call. The docs say what each costs.
 - **Brotli at the public site's edge.** nginx-unprivileged has no Brotli module, and Cloudflare re-compresses only an uncompressed origin response. So it would mean either a custom nginx build or giving up compression whenever the site runs without Cloudflare.
+- **Security headers.** Both reports' informational checks find no CSP, no frame control, no COOP, and (on the public site) no HSTS. They're real gaps but not load performance, and a CSP needs its own design: the theme's inline script and style, JSON-LD, Loki's sandboxed runner and its optional `fetch`, Mermaid's SVG styles, CodeMirror's injected styles, pdf.js's worker and WebAssembly. So it gets its own plan.
 - **Smaller items:** lazy-loading the sky relics (22 KB of source, decorative), the report's 37 ms forced reflow, and font subsetting.
 
 ## Decisions & reasoning
@@ -117,9 +126,13 @@ The web host could add `@fastify/compress` and compress every response on the fl
 
 **What gets compressed:** `.js`, `.mjs`, `.css`, `.html`, `.svg`, `.json`, `.webmanifest`, `.txt`, `.xml` and `.wasm`, when larger than 1 KB and when compression saves at least 10%. Source maps are skipped: only devtools fetch them, and they are larger than everything else together.
 
-**Where it runs:** a Vite plugin beside `seoBuild.ts` (`client/precompress.ts`), in `closeBundle` so it also covers `public/` and the SEO pages. That's both builds; the Docker web image builds the clients inside, so it gets the files too.
+**Where it runs:** a Vite plugin beside `seoBuild.ts` (`client/precompress.ts`), in `closeBundle`, walking the output directory so it also covers `public/` and the SEO pages. That's both builds; the Docker web image builds the clients inside, so it gets the files too.
+
+⚠️ **Verify first** that the files Vite copies from `public/` are already on disk when `closeBundle` runs. If they aren't, the step runs as a postbuild script after the build instead, the way `scripts/check-standalone.ts` already does.
 
 **The standalone site:** nginx-unprivileged has no Brotli module, so it gains `gzip_static on;` for the prebuilt `.gz`, and keeps on-the-fly `gzip` as the fallback. Behind Cloudflare this matters more than it looks: Cloudflare passes the origin's gzip straight to visitors, so a level-9 file is what they download (the entry: 104 KB instead of today's 123 KB).
+
+⚠️ `gzip_static` obeys the same `gzip_http_version` (1.1) and `gzip_proxied` rules as on-the-fly gzip. On the owner's VPS, a host nginx sits in front of the container, so that proxy must send HTTP/1.1 (`proxy_http_version 1.1`, given in the deploy instructions) or the container sends nothing compressed. The deploy docs say so, and criterion 11 checks it on the live site rather than assuming it.
 
 ⚠️ **The `.br` and `.gz` files are public alternates of the same asset** (`@fastify/static`'s own warning about `allowedPath`). Nothing in either build is meant to be private, so this changes nothing about what can be fetched.
 
@@ -161,11 +174,20 @@ The budget is set **after** the code changes land: the measured total plus 10%, 
 
 The accent is used both as a fill and as a text colour, and only text needs 4.5:1. Changing `--accent` would recolour buttons, borders and the bridge in every theme. Instead:
 - **A new optional token `--accent-text`.** `resolveTheme` derives it when a theme doesn't author it: the accent, darkened in light themes or lightened in dark themes, in small steps until it reaches 4.5:1 against the hardest of its three backgrounds (`--bg`, `--surface`, and `--accent-soft` composited over `--bg`). If the accent already passes, it's unchanged. Stepping towards white (dark themes) or black (light themes) always reaches 4.5:1 against a background of the opposite lightness, but it may drift far from the accent's hue on an unusual theme. So if the derived value would need more than a fixed number of steps, `resolveTheme` stops and leaves the accent, `themes.test.ts` fails, and that theme authors its own `--accent-text` instead. A theme is never silently given an unreadable or unrecognisable colour.
-- **The 66 text uses switch** from `color: var(--accent)` to `color: var(--accent-text)`.
+- **The 44 text uses switch** from `color: var(--accent)` to `color: var(--accent-text)`. The 22 `background-color`/`border-color` uses stay on `--accent`: fills and borders need no text contrast, and changing them would recolour the theme.
 - **`contrastWarnings` checks the new token** against those three backgrounds, so `themes.test.ts` fails any future theme whose derived or authored value falls short.
 - **THEME-SPEC.md and the theme schema** gain the optional token.
 
 Five themes keep their exact look (their accent already passes). Daybreak's and Tokyo's accent *text* becomes slightly deeper or brighter, while their buttons and fills stay the same. That fits the 2026-07 house-theme bar ("calm, not glaring"), but it is a visible change, so the PR shows before/after screenshots of both, and the owner approves them before merge.
+
+### The sky and the bridge animate on the compositor
+
+Both animations stay exactly as they look. Only the property that moves them changes:
+- **The relics** animate the individual CSS `translate` property (`translate: 0 -0.75rem` ↔ `translate: 0 0.75rem`) instead of `margin-top`. `translate` combines with the inline `transform: rotate(…)` rather than replacing it, which is the only reason the margin was used, and it runs on the compositor the way `transform` does. It's supported since Chrome 104, Safari 14.1 and Firefox 72, older than this app's own floor (pdf.js's `legacy/` build, PLAN-29).
+- **The bridge strip** keeps its gradient on a `::before` layer twice its width, which slides with `transform: translateX(-50%)` inside the strip's `overflow: hidden`, instead of moving `background-position`. The 14-second cycle and the gradient are unchanged.
+- **`prefers-reduced-motion`** already stops both (`base.css`), and still does.
+
+⚠️ **Verify first** that Chrome treats an animated `translate` as compositor-only (Lighthouse's "non-composited animations" lists nothing for `.relic`). If it doesn't, the rotation moves to an inner element and the outer one animates `transform`, which is certain to be composited, at the cost of one extra element per relic.
 
 ### The Join card's heading is an `h2`
 
@@ -204,6 +226,7 @@ The measuring section notes that a Lighthouse report of the public site includes
 - run Lighthouse in a profile with no extensions (Incognito, or `npx lighthouse … --chrome-flags="--headless=new"`), since extensions inject scripts that land in the report as if they were Bifrost's;
 - use the **mobile** preset;
 - take the **median of three** runs;
+- use **one Lighthouse version** for a before and its after, and name it, since scores move between major versions. The PR re-takes the before numbers with the version it measures the after numbers with;
 - measure the hub's `/` and the standalone site's `/` and `/runestone`;
 - for the public site, read Cloudflare's injected scripts separately from Bifrost's, and record whether Bot Fight Mode and Web Analytics were on.
 
@@ -216,7 +239,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 ## Task checklist
 
 **Build**
-- [ ] `client/precompress.ts`: a Vite plugin (`closeBundle`) writing `.br` (quality 11) and `.gz` (level 9) beside eligible text files over 1 KB that compress by at least 10%; no `.map`; registered for both builds in `vite.config.ts`; `client/tsconfig.json` include
+- [ ] `client/precompress.ts`: verify first that `public/`'s files are on disk at `closeBundle` (otherwise a postbuild script); a Vite plugin (`closeBundle`) writing `.br` (quality 11) and `.gz` (level 9) beside eligible text files over 1 KB that compress by at least 10%; no `.map`; registered for both builds in `vite.config.ts`; `client/tsconfig.json` include
 - [ ] `client/bundleBudget.ts`: a Vite plugin (`generateBundle`) that walks the entry and its static imports transitively, fails on any forbidden package and on a gzip total over budget; both builds
 - [ ] `client/fontPreload.ts`: a Vite plugin preloading Space Grotesk 700 and Inter 400 from the build's asset names; fails the build if either is missing; both builds. Verify first that `transformIndexHtml`'s build context holds the font assets (otherwise edit `index.html` in `generateBundle`, before the SEO plugin)
 - [ ] Check that `scripts/check-standalone.ts` and the Docker build context ignore `.br`/`.gz` correctly (the check scans by extension; confirm, don't assume)
@@ -234,15 +257,16 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `app/offlineWarmLoad.ts`: the Guide panel's loader; check the guide texts, and add them if they are not warmed
 - [ ] `app/pages/MidgardPage.tsx`: `JoinBifrostCard` through `lazy()`, in `Suspense` with a reserved-height placeholder and a local error boundary that renders nothing
 - [ ] `core/ui/JoinBifrostCard.tsx`: `<h3>` → `<h2>`, same class
+- [ ] `app/app.css`: `relic-float` on `translate`, and `bridge-flow` as a sliding `::before` with `transform`; verify first that Chrome composites an animated `translate` (otherwise the rotation moves to an inner element)
 - [ ] `core/theme/resolve.ts`: derive `--accent-text`; `core/theme/color.ts`: `contrastWarnings` checks it against `--bg`, `--surface` and `--accent-soft` over `--bg`; `core/theme/schema.ts` + `docs/THEME-SPEC.md`: the optional token
-- [ ] The 66 `color: var(--accent)` text rules → `var(--accent-text)` (each one checked as text, not a fill, border or background)
+- [ ] The 44 text rules (`color: var(--accent)`) → `var(--accent-text)`; the 22 `background-color`/`border-color` uses stay on `--accent`
 
 **Measure, then set the budget**
 - [ ] Lighthouse, clean profile, mobile, median of three: the hub's `/`, the standalone `/` and `/runestone`, and the public site's `/` with its Cloudflare settings recorded, before (this plan's numbers) and after
 - [ ] Write the budget (the measured total plus 10%, with the date and figure in a comment)
 
 **Docs**
-- [ ] `docs/performance.md` "Page load" section, including reading a public-site report behind Cloudflare; `docs/standalone.md`: `http2 on;` for the VPS nginx, and a "Behind Cloudflare" section (what passes through, what Bot Fight Mode / JavaScript Detections and Web Analytics add, Rocket Loader off); `architecture.md` (precompressed assets, the budget, `--accent-text`), `tech-stack.md` (zlib at build time); `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
+- [ ] `docs/performance.md` "Page load" section, including reading a public-site report behind Cloudflare; `docs/standalone.md`: `http2 on;` for the VPS nginx, a "Behind a host nginx" section (the container on `127.0.0.1:<port>`, `proxy_http_version 1.1` so gzip survives, certbot for HTTPS, as set up on the owner's VPS), and a "Behind Cloudflare" section (what passes through, what Bot Fight Mode / JavaScript Detections and Web Analytics add, Rocket Loader off); `architecture.md` (precompressed assets, the budget, `--accent-text`), `tech-stack.md` (zlib at build time); `decisions.md`, `progress.md`; archive this file into `completed/` in the PR
 
 ## Acceptance criteria
 
@@ -254,10 +278,11 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 6. **Join card.** It renders on the hub's home page; if its chunk can't load, the rest of the home page still renders.
 7. **Contrast.** Every theme's `--accent-text` reaches 4.5:1 against `--bg`, `--surface` and `--accent-soft` over `--bg`, enforced by `themes.test.ts`. Lighthouse reports no colour-contrast failure on the home page in Tokyo or Daybreak.
 8. **Heading order.** Lighthouse reports no heading-order failure on the hub's home page.
-9. **Fonts.** Every HTML file both builds ship (the hub's `index.html`, each prerendered page and `404.html`) preloads exactly Space Grotesk 700 and Inter 400, and the build fails if either font is missing. The PR reports the standalone `/`'s layout shift. The target is none attributed to a web font, but it isn't a guarantee: the prerendered summary paints after the CSS alone, so on a slow enough link a font can still arrive after it.
-10. **Public site.** On `bifrost.0xsiddhant.com`, assets reach the browser gzipped at level 9 (the entry ~104 KB, from 123 KB). The PR records its before and after Lighthouse numbers with the Cloudflare settings they were taken under.
-11. **Budget.** The build fails, naming the package and the chunk, when a forbidden package is added to the first load or the first load grows past the budget.
-12. **Nothing else changes.** No behaviour change: `npm test` and the full `npm run test:e2e` pass unchanged.
+9. **Animations.** Lighthouse lists no non-composited animation on the hub's `/` or the standalone `/`, and the relics and the bridge strip look and move as before (screenshots in the PR).
+10. **Fonts.** Every HTML file both builds ship (the hub's `index.html`, each prerendered page and `404.html`) preloads exactly Space Grotesk 700 and Inter 400, and the build fails if either font is missing. The PR reports the standalone `/`'s layout shift. The target is none attributed to a web font, but it isn't a guarantee: the prerendered summary paints after the CSS alone, so on a slow enough link a font can still arrive after it.
+11. **Public site.** On `bifrost.0xsiddhant.com`, assets reach the browser gzipped at level 9 (the entry ~104 KB, from 123 KB), through the host nginx and Cloudflare. The PR records its before and after Lighthouse numbers with the Cloudflare settings they were taken under.
+12. **Budget.** The build fails, naming the package and the chunk, when a forbidden package is added to the first load or the first load grows past the budget.
+13. **Nothing else changes.** No behaviour change: `npm test` and the full `npm run test:e2e` pass unchanged.
 
 ## Test checklist
 
@@ -279,7 +304,8 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] The existing Guide, offline-mode, home and standalone journeys pass unchanged
 - [ ] `standalone-smoke.sh`: its gzip assertion still passes with `gzip_static` on
 - [ ] The standalone journey: every prerendered page and `404.html` carry the two font preloads
+- [ ] A shell journey: every running animation on `/` (`document.getAnimations()`, each effect's keyframes) moves only `transform`, `translate` or `opacity`
 
 **Live-verify / Manual**
-- [ ] Lighthouse before and after (criteria 3, 4, 7, 8, 9, 10), recorded in the PR, the public site's with its Cloudflare settings
+- [ ] Lighthouse before and after, one version for both (criteria 3, 4, 7, 8, 9, 10, 11), recorded in the PR, the public site's with its Cloudflare settings
 - [ ] Owner: before/after screenshots of Daybreak and Tokyo's accent text approved
