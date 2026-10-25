@@ -37,6 +37,9 @@ beforeAll(() => {
   standaloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-web-standalone-'));
   writeTree(standaloneDir, {
     'index.html': '<!doctype html><div id="root">standalone</div>',
+    '404.html': '<!doctype html><meta name="robots" content="noindex" /><div id="root"></div>',
+    'runestone/index.html': '<!doctype html><title>Runestone</title><div id="root"></div>',
+    'robots.txt': 'User-agent: *\nAllow: /\n',
     'assets/app-def.js': 'standalone()',
     'manifest.webmanifest': '{}',
   });
@@ -337,14 +340,27 @@ describe('standalone mode (BIFROST_RUN=web)', () => {
     return host;
   }
 
-  it('forwards nothing: hub paths land on the app, which shows the sheet', async () => {
+  it('forwards nothing: hub paths get the 404 page, as a 404, whose app shows the sheet', async () => {
     const web = await standalone();
-    for (const url of ['/api/health', '/go/router', '/edda/api/raw/x', '/hermes']) {
+    for (const url of ['/api/health', '/go/router', '/edda/api/raw/x', '/hermes', '/nope']) {
       const response = await web.inject({ url });
-      expect(response.statusCode, url).toBe(200);
-      expect(response.body, url).toContain('standalone');
+      expect(response.statusCode, url).toBe(404);
+      expect(response.body, url).toContain('noindex');
       expect(response.headers['cache-control'], url).toBe('no-cache');
     }
+  });
+
+  it('serves each public page from its own file, and robots.txt by name', async () => {
+    const web = await standalone();
+    expect((await web.inject({ url: '/' })).body).toContain('standalone');
+    for (const url of ['/runestone', '/runestone/']) {
+      const response = await web.inject({ url });
+      expect(response.statusCode, url).toBe(200);
+      expect(response.body, url).toContain('<title>Runestone</title>');
+    }
+    const robots = await web.inject({ url: '/robots.txt' });
+    expect(robots.statusCode).toBe(200);
+    expect(robots.headers['content-type']).toContain('text/plain');
   });
 
   it('caches hashed assets forever, 404s a missing one, and sends the security headers', async () => {
