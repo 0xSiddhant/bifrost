@@ -192,9 +192,9 @@ cmd_run() {
   log START "backing up to $dest"
 
   # Build locally, then move — the cloud client never syncs a half-written zip.
-  # BACKUP_DIR/BACKUP_KEEP are overridden for this call only: staging holds one
-  # archive, and rotation happens on the cloud folder below.
-  if ! out="$(BACKUP_DIR="$stage" BACKUP_KEEP=0 ./node_modules/.bin/tsx scripts/backup.ts --meta 2>&1)"; then
+  # Staging holds one archive (BACKUP_KEEP=0 for this call only); rotation
+  # happens on the cloud folder below.
+  if ! out="$(BACKUP_KEEP=0 ./node_modules/.bin/tsx scripts/backup.ts --out "$stage" --meta 2>&1)"; then
     fail "backup script failed: $(echo "$out" | tail -n 1)"
   fi
   zip="$(ls "$stage"/bifrost-backup-*.zip 2>/dev/null | head -n 1)"

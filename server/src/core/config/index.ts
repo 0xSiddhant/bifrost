@@ -123,10 +123,7 @@ const envFields = z.object({
   // Encryption key for the admin session cookie (@fastify/secure-session).
   // Optional: when unset, a random key is generated at boot — sessions then
   // reset on restart. Set it (≥ 32 chars) to keep sessions across restarts.
-  HEIMDALL_SESSION_SECRET: z
-    .string()
-    .min(32, 'must be at least 32 characters when set')
-    .optional(),
+  HEIMDALL_SESSION_SECRET: z.string().min(32, 'must be at least 32 characters when set').optional(),
   // Default `trace`, not `info` (PLAN-16a): with the in-app log viewer gone the
   // file is a pure archive feeding Loki, so level is a *query-time* decision,
   // not a write-time one that silently discards data you can never get back.
@@ -171,8 +168,7 @@ const envFields = z.object({
   // `strict` (every test and e2e server) turns any such change into a 500;
   // `off` runs no hooks at all.
   API_CONTRACT_CHECK: z.enum(['off', 'fallback', 'strict']).default('fallback'),
-  BACKUP_DIR: z.string().default(''),
-  // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
+  // Rotation: keep only the newest N archives in the backup folder. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
   // storage/ folders left out of every archive (comma list). Empty = back up all
   // of storage/ except tmp/.
@@ -341,7 +337,6 @@ export interface AppConfig {
     /** The response contract guard's mode (PLAN-32): see core/http/contract.ts. */
     contractCheck: ContractCheckMode;
   };
-  backupDir: string | null;
   /** Rotation: keep only the newest N archives (0 = keep all). */
   backupKeep: number;
   /** storage/ folder names left out of every archive. */
@@ -354,7 +349,7 @@ export class ConfigError extends Error {
 
 type Env = Record<string, string | undefined>;
 
-/** Empty strings in .env (e.g. `BACKUP_DIR=`) mean "unset" — fall through to defaults. */
+/** Empty strings in .env (e.g. `MDNS_NAME=`) mean "unset" — fall through to defaults. */
 function stripEmpty(env: Env): Record<string, string> {
   return Object.fromEntries(
     Object.entries(env).filter((entry): entry is [string, string] => Boolean(entry[1])),
@@ -511,7 +506,6 @@ export function loadConfig(env: Env = process.env): AppConfig {
     http: {
       contractCheck: raw.API_CONTRACT_CHECK,
     },
-    backupDir: raw.BACKUP_DIR || null,
     backupKeep: raw.BACKUP_KEEP,
     backupExclude: raw.BACKUP_EXCLUDE.split(',')
       .map((name) => name.trim())
@@ -567,10 +561,12 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
     if (Number.isInteger(n) && n >= 5 && n <= 3600) config.screensaver.idleSeconds = n;
   },
   'screensaver.density': (config, value) => {
-    if (value === 'low' || value === 'medium' || value === 'high') config.screensaver.density = value;
+    if (value === 'low' || value === 'medium' || value === 'high')
+      config.screensaver.density = value;
   },
   'screensaver.motion': (config, value) => {
-    if (value === 'calm' || value === 'normal' || value === 'lively') config.screensaver.motion = value;
+    if (value === 'calm' || value === 'normal' || value === 'lively')
+      config.screensaver.motion = value;
   },
   'screensaver.connectLines': (config, value) => {
     config.screensaver.connectLines = value === 'true';

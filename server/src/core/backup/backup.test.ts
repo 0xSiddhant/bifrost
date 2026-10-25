@@ -49,7 +49,7 @@ function makeRepo(): { targets: BackupTargets } {
   db.close();
 
   return {
-    targets: { base, storageRoot, dbFile, envFile, backupDir: path.join(base, 'backups') },
+    targets: { base, storageRoot, dbFile, envFile, outDir: path.join(base, 'backups') },
   };
 }
 
@@ -109,7 +109,7 @@ describe('createBackup', () => {
     const third = createBackup(targets, { now: new Date('2026-07-21T12:00:00Z'), keep: 2 });
 
     expect(third.pruned).toEqual([first.file]);
-    const remaining = listBackups(targets.backupDir);
+    const remaining = listBackups(targets.outDir);
     expect(remaining).toHaveLength(2);
     expect(remaining.some((name) => first.file.endsWith(name))).toBe(false);
   });
@@ -162,9 +162,7 @@ describe('restoreBackup', () => {
     const dest = tmpDir('bkp-missing');
     expect(() =>
       restoreBackup({ archive: path.join(dest, 'nope.zip'), ...restoreRoots(dest) }),
-    ).toThrow(
-      /not found/,
-    );
+    ).toThrow(/not found/);
   });
 });
 
@@ -303,7 +301,7 @@ describe('resolveBackupArchive', () => {
     expect(resolved.pickedLatest).toBe(false);
   });
 
-  it('picks the newest zip from a flat BACKUP_DIR, with its .meta.json', () => {
+  it('picks the newest zip from a flat folder of zips, with its .meta.json', () => {
     const dir = tmpDir('bkp-flat');
     fs.writeFileSync(path.join(dir, 'bifrost-backup-2026-09-01T03-00-00-000Z.zip'), 'zip');
     fs.writeFileSync(path.join(dir, 'bifrost-backup-2026-09-15T03-00-00-000Z.zip'), 'zip');

@@ -32,8 +32,8 @@ export interface BackupTargets {
   dbFile: string;
   /** Absolute path to .env (only archived when includeEnv is set). */
   envFile: string;
-  /** Directory the archive is written to (BACKUP_DIR). */
-  backupDir: string;
+  /** Directory the archive is written to. */
+  outDir: string;
 }
 
 export interface CreateBackupOptions {
@@ -100,7 +100,8 @@ function excludePatterns(storageRel: string, exclude: readonly string[] = []): s
     if (!/^[A-Za-z0-9._-]+$/.test(name) || name === '.' || name === '..') {
       throw new Error(`invalid backup exclude entry: "${name}" (expected a storage/ folder name)`);
     }
-    if (name === 'data') throw new Error('backup exclude cannot contain "data" — it holds the database');
+    if (name === 'data')
+      throw new Error('backup exclude cannot contain "data" — it holds the database');
     return `${storageRel}/${name}/*`;
   });
 }
@@ -109,11 +110,15 @@ function countRows(dbFile: string): Record<string, number> {
   const db = new Database(dbFile, { readonly: true });
   try {
     const names = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+      )
       .all() as { name: string }[];
     const tables: Record<string, number> = {};
     for (const { name } of names) {
-      const row = db.prepare(`SELECT COUNT(*) AS n FROM "${name.replace(/"/g, '""')}"`).get() as { n: number };
+      const row = db.prepare(`SELECT COUNT(*) AS n FROM "${name.replace(/"/g, '""')}"`).get() as {
+        n: number;
+      };
       tables[name] = row.n;
     }
     return tables;
@@ -148,7 +153,9 @@ function capture(cmd: string, args: string[], cwd: string): string {
  */
 function assertSafeArchive(options: RestoreOptions): number {
   const allowed = [rel(options.base, options.storageRoot), LEGACY_THEMES];
-  const names = capture('unzip', ['-Z1', options.archive], options.base).split('\n').filter(Boolean);
+  const names = capture('unzip', ['-Z1', options.archive], options.base)
+    .split('\n')
+    .filter(Boolean);
   // Long listing, same order as -Z1; entry lines are the ones whose 2nd field
   // is the zip version ("3.0"). The first field is the unix mode ("l…" = link).
   const modes = capture('unzip', ['-Z', '-s', options.archive], options.base)
@@ -169,7 +176,10 @@ function assertSafeArchive(options: RestoreOptions): number {
       problem = 'climbs out of the restore folder (..)';
     } else if (modes[i]?.startsWith('l')) {
       problem = 'is a symlink';
-    } else if (name !== '.env' && !allowed.some((root) => name === `${root}/` || name.startsWith(`${root}/`))) {
+    } else if (
+      name !== '.env' &&
+      !allowed.some((root) => name === `${root}/` || name.startsWith(`${root}/`))
+    ) {
       problem = `is outside ${allowed.map((root) => `${root}/`).join(', ')} and .env`;
     }
     if (problem) throw new Error(`refusing to restore: archive entry "${name}" ${problem}`);
@@ -189,19 +199,19 @@ function run(cmd: string, args: string[], cwd: string): void {
   }
 }
 
-export function listBackups(backupDir: string): string[] {
-  if (!fs.existsSync(backupDir)) return [];
+export function listBackups(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
   return fs
-    .readdirSync(backupDir)
+    .readdirSync(dir)
     .filter((name) => ARCHIVE_RE.test(name))
     .sort();
 }
 
-function prune(backupDir: string, keep: number): string[] {
-  const all = listBackups(backupDir);
+function prune(dir: string, keep: number): string[] {
+  const all = listBackups(dir);
   const excess = all.slice(0, Math.max(0, all.length - keep));
-  for (const name of excess) fs.rmSync(path.join(backupDir, name));
-  return excess.map((name) => path.join(backupDir, name));
+  for (const name of excess) fs.rmSync(path.join(dir, name));
+  return excess.map((name) => path.join(dir, name));
 }
 
 export function createBackup(
@@ -209,9 +219,12 @@ export function createBackup(
   options: CreateBackupOptions = {},
 ): CreateBackupResult {
   if (!fs.existsSync(targets.dbFile)) throw new Error(`no database at ${targets.dbFile}`);
-  fs.mkdirSync(targets.backupDir, { recursive: true });
+  fs.mkdirSync(targets.outDir, { recursive: true });
 
-  const file = path.join(targets.backupDir, `${ARCHIVE_PREFIX}${stamp(options.now ?? new Date())}.zip`);
+  const file = path.join(
+    targets.outDir,
+    `${ARCHIVE_PREFIX}${stamp(options.now ?? new Date())}.zip`,
+  );
   if (fs.existsSync(file)) fs.rmSync(file);
 
   const storageRel = rel(targets.base, targets.storageRoot);
@@ -264,7 +277,7 @@ export function createBackup(
     run('zip', ['-q', file, rel(targets.base, targets.envFile)], targets.base);
   }
 
-  const pruned = options.keep && options.keep > 0 ? prune(targets.backupDir, options.keep) : [];
+  const pruned = options.keep && options.keep > 0 ? prune(targets.outDir, options.keep) : [];
   return { file, bytes: fs.statSync(file).size, pruned, dbBytes, tables };
 }
 
@@ -294,7 +307,7 @@ function metaFor(archive: string): string | null {
  * - one backup's folder (`…/bifrost-backup-<stamp>/`, holding its zip) → that
  *   backup, never another;
  * - a folder of backups (the scheduled `…/Bifrost/backups/` with one folder per
- *   backup, or a flat BACKUP_DIR of zips) → the newest, by its timestamped name.
+ *   backup, or a flat folder of zips) → the newest, by its timestamped name.
  *
  * Only complete backups count: a scheduled backup folder is renamed into place
  * only after its zip landed, and `.incoming-*` leftovers never match.

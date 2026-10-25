@@ -1,7 +1,7 @@
 /**
- * `npm run backup [-- --include-env] [-- --meta]` — VACUUM INTO a consistent
- * SQLite copy and zip storage/ (minus tmp/ and BACKUP_EXCLUDE) into
- * BACKUP_DIR, timestamped and rotated to the newest BACKUP_KEEP.
+ * `npm run backup -- --out <dir> [--include-env] [--meta]` — VACUUM INTO a
+ * consistent SQLite copy and zip storage/ (minus tmp/ and BACKUP_EXCLUDE) into
+ * <dir>, timestamped and rotated to the newest BACKUP_KEEP.
  * Online-safe: runs against a live server.
  *
  * `--meta` also writes `<archive>.meta.json` beside the zip — checksum, app
@@ -25,10 +25,12 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 dotenv.config({ path: path.join(ROOT, '.env'), quiet: true });
 
 const config = loadConfig();
-if (!config.backupDir) {
-  console.error('✖ BACKUP_DIR is not set in .env — nowhere to write the backup.');
+const outArg = process.argv[process.argv.indexOf('--out') + 1];
+if (!process.argv.includes('--out') || !outArg || outArg.startsWith('--')) {
+  console.error('✖ --out <dir> is required — the folder the backup is written to.');
   process.exit(1);
 }
+const outDir = path.resolve(outArg);
 
 const includeEnv = process.argv.includes('--include-env');
 const writeMeta = process.argv.includes('--meta');
@@ -50,7 +52,10 @@ function sha256(file: string): string {
 }
 
 function gitCommit(): string | null {
-  const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' });
+  const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
@@ -79,14 +84,16 @@ try {
       storageRoot: config.storage.root,
       dbFile: config.storage.dbFile,
       envFile: path.join(ROOT, '.env'),
-      backupDir: config.backupDir,
+      outDir,
     },
     { includeEnv, keep: config.backupKeep, exclude: config.backupExclude },
   );
   const mb = (result.bytes / 1024 / 1024).toFixed(1);
   console.log(`✔ backup written: ${result.file} (${mb} MB)${includeEnv ? ' [includes .env]' : ''}`);
   if (writeMeta) {
-    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { version: string };
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
+      version: string;
+    };
     const created = fs.statSync(result.file).mtime;
     const meta = {
       schema: 1,
@@ -107,7 +114,9 @@ try {
     console.log(`✔ meta written: ${metaFile}`);
   }
   if (result.pruned.length > 0) {
-    console.log(`  rotated out ${result.pruned.length} older archive(s); keeping ${config.backupKeep}`);
+    console.log(
+      `  rotated out ${result.pruned.length} older archive(s); keeping ${config.backupKeep}`,
+    );
   }
 } catch (error) {
   console.error(`✖ backup failed: ${(error as Error).message}`);
