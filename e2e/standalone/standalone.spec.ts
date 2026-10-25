@@ -1,5 +1,7 @@
+import fs from 'node:fs';
 import type { Page } from '@playwright/test';
 import { downloadBytes } from '../support/files.js';
+import { fromRepoRoot } from '../support/paths.js';
 import { routes } from '../support/journey.js';
 import { makePdf } from '../support/pdf.js';
 import { test, expect } from '../support/standalone-fixtures.js';
@@ -143,9 +145,12 @@ test.describe('standalone shell', () => {
     expect(robots.status()).toBe(200);
     expect(await robots.text()).toContain('User-agent: *');
 
-    // In the app, the tab follows the page.
+    // In the app, the tab follows the page, and the home page heads itself as a tools site.
     await page.goto('/');
     await expect(page).toHaveTitle(/free developer tools/);
+    await expect(page.locator('main.shell-main h1')).toHaveText(
+      'Developer tools, in your browser.',
+    );
     await navigate(page, 'Ollivanders');
     await expect(page).toHaveTitle(/Code editors/);
     await page
@@ -153,6 +158,32 @@ test.describe('standalone shell', () => {
       .first()
       .click();
     await expect(page).toHaveTitle(/JSON editor.*Runestone/);
+  });
+
+  test("a first visit paints its device's theme before any script runs", async ({
+    browser,
+    site,
+  }) => {
+    const bg = (id: string) =>
+      (
+        JSON.parse(
+          fs.readFileSync(fromRepoRoot('client', 'src', 'assets', 'themes', `${id}.json`), 'utf8'),
+        ) as { tokens: Record<string, string> }
+      ).tokens['--bg'];
+    // The first light and first dark theme by name, as the theme engine picks them.
+    for (const [colorScheme, theme] of [
+      ['light', 'daybreak'],
+      ['dark', 'aurora'],
+    ] as const) {
+      const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
+      const page = await context.newPage();
+      await page.goto(`${site.baseUrl}/runestone`);
+      const painted = await page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+      );
+      expect(painted, colorScheme).toBe(bg(theme));
+      await context.close();
+    }
   });
 
   test('themes switch, and survive a reload, from the bundle', async ({ page }) => {

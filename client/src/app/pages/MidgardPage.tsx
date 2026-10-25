@@ -78,10 +78,28 @@ export function MidgardPage() {
     <>
       <section className="hero">
         <span className="eyebrow">᛫ the rainbow bridge ᛫</span>
-        <h1>
-          Your devices, <span className="hero-accent">connected</span>.
-        </h1>
-        <p>Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.</p>
+        {/* The standalone site is a public tools site with no transfer at all,
+            and this heading is what search engines read as its home page. */}
+        {__HUB__ ? (
+          <>
+            <h1>
+              Your devices, <span className="hero-accent">connected</span>.
+            </h1>
+            <p>
+              Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>
+              Developer tools, <span className="hero-accent">in your browser</span>.
+            </h1>
+            <p>
+              JSON, Markdown, YAML and XML editors, a diff checker, quick utilities and a slide
+              presenter — nothing to install, nothing uploaded.
+            </p>
+          </>
+        )}
       </section>
 
       <div className="portals">

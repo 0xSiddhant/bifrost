@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SEO_PAGES } from './src/core/seo';
+import { resolveThemeChoice } from './src/core/theme';
+import { BUNDLED_THEMES } from './src/core/theme/bundled';
 import {
+  firstPaintStyle,
+  firstVisitTheme,
   pageFile,
+  readBundledThemes,
   readSiteUrl,
   renderNotFound,
   renderPage,
@@ -137,5 +142,45 @@ describe('the other files', () => {
     expect(pageFile('/diagon-alley/qr')).toBe('diagon-alley/qr/index.html');
     expect(files.get('index.html')).toContain(`<title>${page('/').title}</title>`);
     expect(seoFiles(SHELL, null).has('sitemap.xml')).toBe(false);
+  });
+});
+
+describe('the first-visit theme', () => {
+  const themes = readBundledThemes();
+
+  it('reads the same themes, in the same order, as the bundle', () => {
+    expect(themes.map((theme) => theme.id)).toEqual(BUNDLED_THEMES.map((theme) => theme.id));
+  });
+
+  it('is the one the theme engine settles on for a first visit, in either colour scheme', () => {
+    for (const prefersLight of [true, false]) {
+      const runtime = resolveThemeChoice({ stored: null, defaultId: null, themes, prefersLight });
+      expect(firstVisitTheme(themes, prefersLight ? 'light' : 'dark')?.id).toBe(runtime);
+    }
+  });
+
+  it('paints from the first frame: dark by default, light where the device prefers it', () => {
+    const style = firstPaintStyle(themes);
+    const dark = firstVisitTheme(themes, 'dark');
+    const light = firstVisitTheme(themes, 'light');
+    expect(style).toMatch(/^<style>html:root\{color-scheme:dark;/);
+    expect(style).toContain(`--bg:${dark?.tokens['--bg']}`);
+    expect(style).toContain(`@media (prefers-color-scheme: light){html:root{color-scheme:light;`);
+    expect(style).toContain(`--bg:${light?.tokens['--bg']}`);
+  });
+
+  it('is in every page and the 404, after the title', () => {
+    const files = seoFiles(SHELL, SITE, themes);
+    for (const [name, html] of files) {
+      if (!name.endsWith('.html')) continue;
+      expect(html, name).toMatch(/<\/title>[\s\S]*<style>html:root\{/);
+    }
+  });
+
+  it('refuses a token value that could break out of the rule', () => {
+    const [first] = themes;
+    if (!first) throw new Error('no themes');
+    const bad = { ...first, tokens: { ...first.tokens, '--bg': 'red}</style><script>' } };
+    expect(() => firstPaintStyle([bad])).toThrow(/unsafe --bg/);
   });
 });

@@ -64,4 +64,36 @@ describe('MidgardPage', () => {
     );
     expect(doors()).toEqual(['/saga']);
   });
+
+  // The standalone home is a public tools site, and its heading is what
+  // search engines read as the page; transfer is not something it does.
+  it('heads the hub with transfer and the standalone site with its tools', () => {
+    // Vitest leaves this file's `__HUB__` a global it sets once, so the
+    // standalone render sets it beside the build, as a real build bakes both.
+    const globals = globalThis as { __BIFROST_BUILD__?: string; __HUB__?: boolean };
+    const heading = () => container.querySelector('h1')?.textContent;
+    const render = () =>
+      act(() =>
+        root.render(
+          <MemoryRouter>
+            <MidgardPage />
+          </MemoryRouter>,
+        ),
+      );
+    mocks.modules = ['saga'];
+    render();
+    expect(heading()).toBe('Your devices, connected.');
+
+    const hub = globals.__HUB__;
+    globals.__BIFROST_BUILD__ = 'standalone';
+    globals.__HUB__ = false;
+    try {
+      render();
+      expect(heading()).toBe('Developer tools, in your browser.');
+      expect(container.textContent).not.toMatch(/Wi-Fi|send and receive/i);
+    } finally {
+      globals.__BIFROST_BUILD__ = 'hub';
+      globals.__HUB__ = hub;
+    }
+  });
 });

@@ -8,11 +8,20 @@
  * (docker/nginx-standalone.conf).
  *
  * The summary sits inside `#root`, so a crawler reads it as the page, and
- * React's first render replaces it. Runs in Node, from `vite.config.ts`, for
- * the standalone build only: the hub is a LAN app and stays unindexed.
+ * React's first render replaces it. Every file also paints the theme a first
+ * visit gets from its first frame (`firstPaintStyle`). Runs in Node, from
+ * `vite.config.ts`, for the standalone build only: the hub is a LAN app and
+ * stays unindexed.
  */
+import { readdirSync, readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
 import { SEO_PAGES, SITE_NAME, type SeoPage } from './src/core/seo';
+import {
+  resolveTheme,
+  type ResolvedTheme,
+  type ThemeFile,
+  type ThemeMode,
+} from './src/core/theme/resolve';
 
 export const SITE_URL_KEY = 'STANDALONE_SITE_URL';
 
@@ -52,6 +61,52 @@ function escapeHtml(text: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** The bundled themes as `core/theme/bundled.ts` has them: resolved, sorted by name. */
+export function readBundledThemes(
+  dir = new URL('./src/assets/themes/', import.meta.url),
+): ResolvedTheme[] {
+  return readdirSync(dir)
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => resolveTheme(JSON.parse(readFileSync(new URL(name, dir), 'utf8')) as ThemeFile))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * The theme a first visit to the standalone site settles on. With no stored
+ * choice and no household default, `resolveThemeChoice` (core/theme) takes
+ * the first theme of the device's colour scheme, so the build can know it.
+ */
+export function firstVisitTheme(
+  themes: readonly ResolvedTheme[],
+  mode: ThemeMode,
+): ResolvedTheme | undefined {
+  return themes.find((theme) => theme.mode === mode) ?? themes[0];
+}
+
+/**
+ * Both first-visit themes' tokens as CSS, picked by `prefers-color-scheme`.
+ * Without it the first frame is the stylesheet's dark defaults until the
+ * theme engine runs, a dark flash on every light-preferring device's first
+ * visit, now with the prerendered summary in it. `html:root` outranks
+ * tokens.css's `:root`; a returning visitor's cached theme is set as an
+ * inline style by index.html's script, which outranks both.
+ */
+export function firstPaintStyle(themes: readonly ResolvedTheme[]): string {
+  const rule = (theme: ResolvedTheme | undefined): string => {
+    if (!theme) return '';
+    const declarations = Object.entries(theme.tokens).map(([key, value]) => {
+      if (/[<{};]/.test(value)) throw new Error(`seo: theme ${theme.id} has an unsafe ${key}`);
+      return `${key}:${value}`;
+    });
+    return `html:root{color-scheme:${theme.mode};${declarations.join(';')}}`;
+  };
+  const light = rule(firstVisitTheme(themes, 'light'));
+  return (
+    `<style>${rule(firstVisitTheme(themes, 'dark'))}` +
+    `${light ? `@media (prefers-color-scheme: light){${light}}` : ''}</style>`
+  );
 }
 
 /** Where a page's file goes in the build: `/` → `index.html`, `/edda` → `edda/index.html`. */
@@ -177,17 +232,24 @@ export function renderSitemap(siteUrl: string): string {
 }
 
 /** Every file this writes, by its path in the build; `index.html` replaces the shell. */
-export function seoFiles(shell: string, siteUrl: string | null): Map<string, string> {
+export function seoFiles(
+  shell: string,
+  siteUrl: string | null,
+  themes: readonly ResolvedTheme[] = [],
+): Map<string, string> {
+  const painted = themes.length
+    ? replaceOnce(shell, /<\/title>/, `</title>\n    ${firstPaintStyle(themes)}`, '</title>')
+    : shell;
   const files = new Map<string, string>();
-  for (const page of SEO_PAGES) files.set(pageFile(page.path), renderPage(shell, page, siteUrl));
-  files.set('404.html', renderNotFound(shell));
+  for (const page of SEO_PAGES) files.set(pageFile(page.path), renderPage(painted, page, siteUrl));
+  files.set('404.html', renderNotFound(painted));
   files.set('robots.txt', renderRobots(siteUrl));
   if (siteUrl) files.set('sitemap.xml', renderSitemap(siteUrl));
   return files;
 }
 
 /** The standalone build's plugin: runs after Vite has written the shell into the bundle. */
-export function seoPlugin(siteUrl: string | null): Plugin {
+export function seoPlugin(siteUrl: string | null, themes = readBundledThemes()): Plugin {
   return {
     name: 'bifrost-standalone-seo',
     apply: 'build',
@@ -197,7 +259,7 @@ export function seoPlugin(siteUrl: string | null): Plugin {
       if (!shell || shell.type !== 'asset') {
         this.error('seo: the build has no index.html to write the pages from');
       }
-      for (const [fileName, source] of seoFiles(String(shell.source), siteUrl)) {
+      for (const [fileName, source] of seoFiles(String(shell.source), siteUrl, themes)) {
         if (fileName === 'index.html') shell.source = source;
         else this.emitFile({ type: 'asset', fileName, source });
       }
