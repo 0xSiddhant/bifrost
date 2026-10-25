@@ -71,6 +71,9 @@ bifrost/
 │               ├── services/  # concrete repo/service implementations
 │               └── schema.ts  # Drizzle tables owned by this module
 ├── client/
+│   ├── buildDefaults.ts       # the .env values a client build bakes in (PLAN-35)
+│   ├── seoBuild.ts            # standalone only: a page per public tool, 404.html, robots.txt,
+│   │                          #   sitemap.xml (the list: src/core/seo.ts)
 │   └── src/
 │       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs

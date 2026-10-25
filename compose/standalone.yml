@@ -23,6 +23,11 @@ services:
       # `up -d --build`; a runtime `environment:` would arrive too late.
       # Defaults are .env.example's.
       args:
+        # The public origin people and search engines reach this site at:
+        # canonical links, link previews and sitemap.xml are built from it.
+        # Set it before a public deploy, here or in the shell that runs
+        # compose (docs/standalone.md).
+        STANDALONE_SITE_URL: ${STANDALONE_SITE_URL:-}
         LOKI_EXECUTION_ENABLED: 'true'
         LOKI_FETCH_ALLOWED: 'true'
         # RUNESTONE_MAX_DOC_KB: '2048'

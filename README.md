@@ -133,6 +133,8 @@ Grafana is at `http://localhost:4648` (admin / bifrost). The `--web docker` setu
 ./bifrost docker up standalone --network <proxy-network>   # find the name with: docker network ls
 ```
 
+For a public site, give the build its address so search engines get canonical links and a sitemap: `STANDALONE_SITE_URL=https://your.site ./bifrost docker up standalone --network <proxy-network>` ([docs/standalone.md](docs/standalone.md#search-engines)).
+
 **The whole hub on a Linux host** (a Raspberry Pi, a home server):
 
 ```bash

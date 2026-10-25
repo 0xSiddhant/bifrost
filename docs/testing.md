@@ -78,7 +78,7 @@ Where Playwright's own browser download is unavailable but a Chromium is install
 
 `e2e/standalone/` runs against `client/dist-standalone/` (build it first: `./bifrost build --standalone`), served by `e2e/support/static-server.ts` with the location rules of the committed `docker/nginx-standalone.conf`; `static-server.test.ts` parses that file and fails if the two disagree. No Bifrost server starts.
 
-On top of the usual guard, every context carries a **no-request guard**: the page may ask its own origin only for files of the build (and navigations). Anything else, an `/api/…` call above all, fails the test at teardown, even though the static server would have answered it with the app shell. The hub stubs never touch the network, so the cold-load journey also reads their call counter (`globalThis.__bifrostStubCalls`) and expects zero.
+On top of the usual guard, every context carries a **no-request guard**: the page may ask its own origin only for files of the build (and navigations). Anything else, an `/api/…` call above all, fails the test at teardown, even though the static server would have answered it (with the 404 page, as nginx does). The hub stubs never touch the network, so the cold-load journey also reads their call counter (`globalThis.__bifrostStubCalls`) and expects zero.
 
 The old `cloud` project is gone: the client's nav comes from its build now, not from asking the server, so the security half of that check is an API test (`e2e/api/cloud-profile.e2e.ts`): a `DEPLOY_PROFILE=cloud` server still refuses every local-only route.
 

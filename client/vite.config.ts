@@ -11,6 +11,7 @@ import {
   type Build,
   type BuildDefaults,
 } from './buildDefaults';
+import { readSiteUrl, seoPlugin } from './seoBuild';
 
 // PLAN-36: in dev, Vite plays the web host. It serves on PORT (the address
 // people open, as in production) and proxies the API paths to the API server
@@ -92,7 +93,13 @@ export default defineConfig(({ mode }) => {
       };
 
   return {
-    plugins: [react(), buildManifestPlugin(build, defaults)],
+    plugins: [
+      react(),
+      buildManifestPlugin(build, defaults),
+      // The public standalone site gets a page per tool for search engines; the
+      // hub is a LAN app and stays as it is.
+      ...(standalone ? [seoPlugin(readSiteUrl(process.env))] : []),
+    ],
     define:
       mode === 'test'
         ? {

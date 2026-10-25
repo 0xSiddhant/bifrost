@@ -40,7 +40,8 @@ test.describe('standalone shell', () => {
     async ({ page, stubCalls }) => {
       for (const path of STANDALONE_PAGES) {
         await page.goto(path);
-        await expect(page.locator('main h1, main h2').first(), path).toBeVisible();
+        // The app's own heading, not the prerendered one it replaces.
+        await expect(page.locator('main.shell-main :is(h1, h2)').first(), path).toBeVisible();
         // Give a stray effect time to fire before counting.
         await page.waitForTimeout(300);
         expect(await stubCalls(page), path).toEqual([]);
@@ -115,6 +116,43 @@ test.describe('standalone shell', () => {
     await expect(sheet(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Back to Midgard' }).click();
     await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('each public page is its own file for search engines; anything else is a 404', async ({
+    page,
+    request,
+  }) => {
+    const titles = new Set<string>();
+    for (const path of STANDALONE_PAGES) {
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(200);
+      const html = await response.text();
+      const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
+      titles.add(title);
+      expect(html, path).toMatch(/<meta name="description" content="[^"]{50,}"/);
+      expect(html, path).toMatch(/<div id="root"><main class="seo-static"><h1>/);
+      expect(html, path).not.toContain('noindex');
+    }
+    expect(titles.size).toBe(STANDALONE_PAGES.length);
+    for (const path of ['/hermes', '/runestone/a-saved-slug', '/api/health', '/no-such-realm']) {
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(404);
+      expect(await response.text(), path).toContain('<meta name="robots" content="noindex" />');
+    }
+    const robots = await request.get('/robots.txt');
+    expect(robots.status()).toBe(200);
+    expect(await robots.text()).toContain('User-agent: *');
+
+    // In the app, the tab follows the page.
+    await page.goto('/');
+    await expect(page).toHaveTitle(/free developer tools/);
+    await navigate(page, 'Ollivanders');
+    await expect(page).toHaveTitle(/Code editors/);
+    await page
+      .getByRole('link', { name: /Runestone/ })
+      .first()
+      .click();
+    await expect(page).toHaveTitle(/JSON editor.*Runestone/);
   });
 
   test('themes switch, and survive a reload, from the bundle', async ({ page }) => {
