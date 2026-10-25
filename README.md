@@ -75,7 +75,7 @@ Each stateful page keeps its own URL; the Diagon Alley utilities open inline at 
 
 ## Quick start
 
-You need **Node.js 20+** and **npm 10+**. macOS is the main host.
+You need **Node.js 22.23.4+** (or 24.22.1+ / 26.12.1+) and **npm 10+**. macOS is the main host.
 
 ```bash
 npm install                  # install dependencies

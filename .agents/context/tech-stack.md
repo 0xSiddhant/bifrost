@@ -2,7 +2,7 @@
 
 | Concern | Choice | Why |
 |---|---|---|
-| Runtime | Node.js ≥ 20, TypeScript strict | Owner's existing Node/mDNS/WebSocket experience; typed contracts for themes/config/API |
+| Runtime | Node.js 22 (≥ 22.23.4), 24 (≥ 24.22.1) or 26 (≥ 26.12.1) per `engines`, TypeScript strict | Owner's existing Node/mDNS/WebSocket experience; typed contracts for themes/config/API |
 | HTTP server | Fastify 5 | Plugin encapsulation maps to feature modules; built-in schema validation; first-class streaming; pino-native |
 | Frontend | React 19 + Vite, vertical-slice `features/` folders, route-level code splitting | Dynamic theming, admin forms, live lists need components; splitting keeps cloud builds free of local-only UI (was React 18 at planning time — see decision log 2026-07-12) |
 | Styling | Plain CSS + CSS custom properties (no Tailwind) | Themes are JSON → CSS variables on `:root`; switchable at runtime with no request, framework-agnostic |

@@ -4,7 +4,7 @@ The architecture reference is maintained in one place to avoid drift:
 
 ➡️ **[`.agents/context/architecture.md`](../.agents/context/architecture.md)**
 
-It covers the single-process model, the three modularization rules (vertical
+It covers the two-process model (web host in front of a loopback API, PLAN-36), the three modularization rules (vertical
 slices, no cross-module imports, deployment-profile manifest), the module
 registry, the shared core kernel, key data flows, restart safety, and the
 storage layout.
