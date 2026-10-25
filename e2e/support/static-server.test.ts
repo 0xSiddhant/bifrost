@@ -47,10 +47,13 @@ function asRule(location: NginxLocation): LocationRule {
   const tryFiles = directive(location.body, 'try_files');
   const fallback = tryFiles?.split(/\s+/).at(-1);
   const defaultType = directive(location.body, 'default_type');
+  const errorPage = directive(location.body, 'error_page')?.split(/\s+/).at(-1);
   return {
     match: location.match,
     path: location.path,
     fallback: fallback === '/index.html' || fallback === '=404' ? fallback : null,
+    ...(tryFiles?.split(/\s+/).includes('$uri/index.html') ? { dirIndex: true } : {}),
+    ...(errorPage ? { errorPage } : {}),
     cacheControl: headers(location.body)['Cache-Control'] ?? '',
     ...(defaultType ? { defaultType } : {}),
   };
@@ -77,6 +80,13 @@ describe('the static server matches docker/nginx-standalone.conf', () => {
     expect(directive(conf, 'server_tokens')).toBe('off');
     expect(directive(conf, 'listen')).toBe('8080');
   });
+
+  it('compresses text on the wire', () => {
+    expect(directive(conf, 'gzip')).toBe('on');
+    for (const type of ['text/css', 'text/javascript', 'application/json', 'image/svg+xml']) {
+      expect(directive(conf, 'gzip_types')).toContain(type);
+    }
+  });
 });
 
 describe('resolve', () => {
@@ -86,6 +96,9 @@ describe('resolve', () => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-static-'));
     fs.mkdirSync(path.join(root, 'assets'));
     fs.writeFileSync(path.join(root, 'index.html'), '<!doctype html>');
+    fs.writeFileSync(path.join(root, '404.html'), '<!doctype html><meta name="robots">');
+    fs.mkdirSync(path.join(root, 'runestone'));
+    fs.writeFileSync(path.join(root, 'runestone', 'index.html'), '<!doctype html><title>R</title>');
     fs.writeFileSync(path.join(root, 'favicon.svg'), '<svg/>');
     fs.writeFileSync(path.join(root, 'assets', 'index-abc123.js'), '');
   });
@@ -104,11 +117,27 @@ describe('resolve', () => {
     expect(resolve(root, '/assets/gone-000000.js')).toMatchObject({ status: 404, file: null });
   });
 
-  it('hands deep links and server paths to the uncached shell', () => {
-    for (const pathname of ['/', '/runestone/abc', '/api/health', '/go/x', '/edda/api/raw/1']) {
+  it('serves a public page from its own folder, with or without the slash', () => {
+    expect(resolve(root, '/').file).toBe(path.join(root, 'index.html'));
+    for (const pathname of ['/runestone', '/runestone/']) {
       const hit = resolve(root, pathname);
       expect(hit.status, pathname).toBe(200);
-      expect(hit.file, pathname).toBe(path.join(root, 'index.html'));
+      expect(hit.file, pathname).toBe(path.join(root, 'runestone', 'index.html'));
+      expect(hit.rule.cacheControl, pathname).toBe('no-cache');
+    }
+  });
+
+  it('answers deep links and server paths with the uncached 404 page, as a 404', () => {
+    for (const pathname of [
+      '/runestone/abc',
+      '/api/health',
+      '/go/x',
+      '/edda/api/raw/1',
+      '/hermes',
+    ]) {
+      const hit = resolve(root, pathname);
+      expect(hit.status, pathname).toBe(404);
+      expect(hit.file, pathname).toBe(path.join(root, '404.html'));
       expect(hit.rule.cacheControl, pathname).toBe('no-cache');
     }
   });
@@ -118,7 +147,7 @@ describe('resolve', () => {
   });
 
   it('never leaves the root', () => {
-    expect(resolve(root, '/../../etc/passwd').file).toBe(path.join(root, 'index.html'));
+    expect(resolve(root, '/../../etc/passwd').file).toBe(path.join(root, '404.html'));
   });
 
   it('picks rules as nginx does: exact first, then the longest prefix', () => {

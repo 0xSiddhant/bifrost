@@ -20,6 +20,10 @@ export interface LocationRule {
   path: string;
   /** What a path with no file becomes: the shell, a 404, or (exact rules) the file itself. */
   fallback: '/index.html' | '=404' | null;
+  /** try_files also tries `$uri/index.html`: a public page's prerendered file. */
+  dirIndex?: boolean;
+  /** `error_page 404 …`: the file a 404 is answered with, keeping the 404 status. */
+  errorPage?: string;
   cacheControl: string;
   /** nginx `default_type`, for an extension the type table does not name. */
   defaultType?: string;
@@ -41,7 +45,14 @@ export const LOCATION_RULES: readonly LocationRule[] = [
     cacheControl: 'no-cache',
     defaultType: 'application/manifest+json',
   },
-  { match: 'prefix', path: '/', fallback: '/index.html', cacheControl: 'no-cache' },
+  {
+    match: 'prefix',
+    path: '/',
+    fallback: '=404',
+    dirIndex: true,
+    errorPage: '/404.html',
+    cacheControl: 'no-cache',
+  },
 ];
 
 /** On every response, as nginx's `add_header … always`. */
@@ -59,6 +70,8 @@ const TYPES: Record<string, string> = {
   '.png': 'image/png',
   '.woff2': 'font/woff2',
   '.wasm': 'application/wasm',
+  '.txt': 'text/plain',
+  '.xml': 'text/xml',
 };
 
 /** nginx's choice: an exact match wins, otherwise the longest prefix. */
@@ -90,14 +103,20 @@ export interface Resolution {
   rule: LocationRule;
 }
 
-/** What the container answers for a path: the file, the shell, or a 404. */
+/** What the container answers for a path: the file, a page's index.html, the shell, or a 404. */
 export function resolve(root: string, pathname: string): Resolution {
   const rule = ruleFor(pathname);
   const file = fileFor(root, pathname);
   if (file) return { status: 200, file, rule };
+  const page = rule.dirIndex ? fileFor(root, path.posix.join(pathname, 'index.html')) : null;
+  if (page) return { status: 200, file: page, rule };
   if (rule.fallback === '/index.html') {
     // nginx's try_files makes an internal redirect, so the shell's own rule applies.
     return { status: 200, file: fileFor(root, '/index.html'), rule: ruleFor('/index.html') };
+  }
+  if (rule.errorPage) {
+    // error_page redirects internally too, and keeps the 404.
+    return { status: 404, file: fileFor(root, rule.errorPage), rule: ruleFor(rule.errorPage) };
   }
   return { status: 404, file: null, rule };
 }

@@ -75,7 +75,7 @@ Each stateful page keeps its own URL; the Diagon Alley utilities open inline at 
 
 ## Quick start
 
-You need **Node.js 20+** and **npm 10+**. macOS is the main host.
+You need **Node.js 22.23.4+** (or 24.22.1+ / 26.12.1+) and **npm 10+**. macOS is the main host.
 
 ```bash
 npm install                  # install dependencies
@@ -130,8 +130,10 @@ Grafana is at `http://localhost:4648` (admin / bifrost). The `--web docker` setu
 **Behind your reverse proxy** on a server (Caddy, Traefik, nginx…):
 
 ```bash
-./bifrost docker up standalone --network <proxy-network>   # find the name with: docker network ls
+STANDALONE_SITE_URL=https://your.site ./bifrost docker up standalone --network <proxy-network>   # find the name with: docker network ls
 ```
+
+`STANDALONE_SITE_URL` is the site's public address: search engines get canonical links and a sitemap from it, and compose refuses to start without it (`STANDALONE_SITE_URL=` builds without them). See [docs/standalone.md](docs/standalone.md#search-engines).
 
 **The whole hub on a Linux host** (a Raspberry Pi, a home server):
 

@@ -55,8 +55,14 @@ export function Dropzone({ onFile }: { onFile: (file: File) => void }) {
           <h2>Present a deck</h2>
           <p>
             Drop a markdown file to present it as slides — split on a <code>---</code> line — or a
-            PDF, one page per slide. Never uploaded, never stored. Or open a saved manuscript from
-            the <a href="/pensieve?type=edda">Pensieve</a>.
+            PDF, one page per slide. Never uploaded, never stored.
+            {/* The Pensieve is the hub's library; the standalone site has none. */}
+            {__HUB__ && (
+              <>
+                {' '}
+                Or open a saved manuscript from the <a href="/pensieve?type=edda">Pensieve</a>.
+              </>
+            )}
           </p>
         </div>
       </div>

@@ -276,7 +276,9 @@ async function registerStandalone(app: FastifyInstance, clientDir: string): Prom
         return reply.code(404).type('text/html').send('<h1>404 Not Found</h1>');
       }
       if (hit.rule.defaultType && !path.extname(hit.file)) reply.type(hit.rule.defaultType);
-      return reply.sendFile(path.relative(clientDir, hit.file), { cacheControl: false });
+      return reply
+        .code(hit.status)
+        .sendFile(path.relative(clientDir, hit.file), { cacheControl: false });
     },
   });
   // nginx's static handler answers 405 to anything but GET and HEAD.

@@ -116,6 +116,8 @@ async function answers(hub: Hub, url: string): Promise<Response> {
 const hubIndex = () => fs.readFileSync(fromRepoRoot('client', 'dist', 'index.html'), 'utf8');
 const standaloneIndex = () =>
   fs.readFileSync(fromRepoRoot('client', 'dist-standalone', 'index.html'), 'utf8');
+const standaloneNotFound = () =>
+  fs.readFileSync(fromRepoRoot('client', 'dist-standalone', '404.html'), 'utf8');
 
 // The run's shape is start.ts's flags, never the environment (owner, 2026-10-09).
 describe('run modes through npm start (PLAN-36)', () => {
@@ -159,9 +161,11 @@ describe('run modes through npm start (PLAN-36)', () => {
       ok: true,
       mode: 'standalone',
     });
-    // A hub path lands on the app (which shows the sheet), not on an API.
-    const api = await answers(hub, `http://127.0.0.1:${hub.port}/api/health`);
-    expect(await api.text()).toBe(standaloneIndex());
+    // A hub path gets the 404 page with a 404, as nginx answers it (never
+    // indexed), and the app in it shows the sheet; no API answers.
+    const api = await fetch(`http://127.0.0.1:${hub.port}/api/health`);
+    expect(api.status).toBe(404);
+    expect(await api.text()).toBe(standaloneNotFound());
     expect(await listening('127.0.0.1', hub.apiPort)).toBe(false);
     expect(hub.output()).toContain('[start] web\n');
     expect(await hub.stop()).toBe(0);

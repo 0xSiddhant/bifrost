@@ -24,6 +24,7 @@ import { NotificationHost } from '../core/notify';
 import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
 import { GuideButton } from '../core/guide/GuideButton';
 import { usePublishedBanner } from './usePublishedBanner';
+import { applyStandaloneSeo } from './standaloneSeo';
 import { runWarmLoad } from './offlineWarmLoad';
 import { createLazyPages } from './lazyPages';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
@@ -107,6 +108,11 @@ export function App() {
   const [pageEpoch, setPageEpoch] = useState(0);
   const pages = useMemo(() => createLazyPages(), [pageEpoch]);
   const retryPages = useCallback(() => setPageEpoch((epoch) => epoch + 1), []);
+
+  // The public standalone site names each page in the tab; the hub stays "Bifrost".
+  useEffect(() => {
+    if (!__HUB__) applyStandaloneSeo(pathname);
+  }, [pathname]);
 
   // Nótt (idle screensaver). The desktop gate is decided once; on a phone/tablet
   // we never fetch config, never arm the idle timer, never load the overlay.
@@ -393,11 +399,13 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
+        {/* The address this site answers on: the hub's mDNS name, or the
+            standalone site's own public host. */}
         <span className="mono caption footer-mark" aria-hidden="true">
-          bifrost.local
+          {__HUB__ ? 'bifrost.local' : window.location.host}
         </span>
         <span className="caption">
-          build: {__BIFROST_BUILD__} · v0.1.0
+          build: {__BIFROST_BUILD__} · v{__BIFROST_CLIENT__.version}
           {/* The standalone site holds no live connection to report on. */}
           {__HUB__ && (
             <>

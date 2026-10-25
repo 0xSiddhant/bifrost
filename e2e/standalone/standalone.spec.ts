@@ -1,5 +1,7 @@
+import fs from 'node:fs';
 import type { Page } from '@playwright/test';
 import { downloadBytes } from '../support/files.js';
+import { fromRepoRoot } from '../support/paths.js';
 import { routes } from '../support/journey.js';
 import { makePdf } from '../support/pdf.js';
 import { test, expect } from '../support/standalone-fixtures.js';
@@ -40,7 +42,8 @@ test.describe('standalone shell', () => {
     async ({ page, stubCalls }) => {
       for (const path of STANDALONE_PAGES) {
         await page.goto(path);
-        await expect(page.locator('main h1, main h2').first(), path).toBeVisible();
+        // The app's own heading, not the prerendered one it replaces.
+        await expect(page.locator('main.shell-main :is(h1, h2)').first(), path).toBeVisible();
         // Give a stray effect time to fire before counting.
         await page.waitForTimeout(300);
         expect(await stubCalls(page), path).toEqual([]);
@@ -57,8 +60,12 @@ test.describe('standalone shell', () => {
       'Diagon Alley',
     ]);
     await expect(page.locator('.shell-footer')).toContainText('build: standalone');
+    // Its own address, not the hub's mDNS name, and the real version.
+    await expect(page.locator('.footer-mark')).toHaveText(new URL(page.url()).host);
+    await expect(page.locator('.shell-footer')).not.toContainText('v0.1.0');
     // The slim Midgard (owner's call): Saga alone, no transfer doors, no Join band.
     await expect(page.getByRole('link', { name: /Saga/ }).first()).toBeVisible();
+    await expect(page.getByText(/saved edda/)).toHaveCount(0);
     for (const door of ['Send files', 'Receive files', 'Hermes', 'Accio']) {
       await expect(page.getByText(door, { exact: true }), door).toHaveCount(0);
     }
@@ -115,6 +122,72 @@ test.describe('standalone shell', () => {
     await expect(sheet(page)).toHaveCount(0);
     await page.getByRole('button', { name: 'Back to Midgard' }).click();
     await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('each public page is its own file for search engines; anything else is a 404', async ({
+    page,
+    request,
+  }) => {
+    const titles = new Set<string>();
+    for (const path of STANDALONE_PAGES) {
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(200);
+      const html = await response.text();
+      const title = /<title>([^<]*)<\/title>/.exec(html)?.[1] ?? '';
+      titles.add(title);
+      expect(html, path).toMatch(/<meta name="description" content="[^"]{50,}"/);
+      expect(html, path).toMatch(/<div id="root"><main class="seo-static"><h1>/);
+      expect(html, path).not.toContain('noindex');
+    }
+    expect(titles.size).toBe(STANDALONE_PAGES.length);
+    for (const path of ['/hermes', '/runestone/a-saved-slug', '/api/health', '/no-such-realm']) {
+      const response = await request.get(path);
+      expect(response.status(), path).toBe(404);
+      expect(await response.text(), path).toContain('<meta name="robots" content="noindex" />');
+    }
+    const robots = await request.get('/robots.txt');
+    expect(robots.status()).toBe(200);
+    expect(await robots.text()).toContain('User-agent: *');
+
+    // In the app, the tab follows the page, and the home page heads itself as a tools site.
+    await page.goto('/');
+    await expect(page).toHaveTitle(/free developer tools/);
+    await expect(page.locator('main.shell-main h1')).toHaveText(
+      'Developer tools, in your browser.',
+    );
+    await navigate(page, 'Ollivanders');
+    await expect(page).toHaveTitle(/Code editors/);
+    await page
+      .getByRole('link', { name: /Runestone/ })
+      .first()
+      .click();
+    await expect(page).toHaveTitle(/JSON editor.*Runestone/);
+  });
+
+  test("a first visit paints its device's theme before any script runs", async ({
+    browser,
+    site,
+  }) => {
+    const bg = (id: string) =>
+      (
+        JSON.parse(
+          fs.readFileSync(fromRepoRoot('client', 'src', 'assets', 'themes', `${id}.json`), 'utf8'),
+        ) as { tokens: Record<string, string> }
+      ).tokens['--bg'];
+    // The first light and first dark theme by name, as the theme engine picks them.
+    for (const [colorScheme, theme] of [
+      ['light', 'daybreak'],
+      ['dark', 'aurora'],
+    ] as const) {
+      const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
+      const page = await context.newPage();
+      await page.goto(`${site.baseUrl}/runestone`);
+      const painted = await page.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
+      );
+      expect(painted, colorScheme).toBe(bg(theme));
+      await context.close();
+    }
   });
 
   test('themes switch, and survive a reload, from the bundle', async ({ page }) => {
