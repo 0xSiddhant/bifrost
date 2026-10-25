@@ -66,6 +66,15 @@ describe('./bifrost task table', () => {
         expect(steps.flatMap(problems)).toEqual([]);
       });
     }
+    for (const [sub] of command.subcommands ?? []) {
+      // Optional `[...]` parts dropped; one that needs a value (`<slug>`) can't be planned bare.
+      const [name, ...args] = sub.replace(/ \[[^\]]*\]/g, '').split(' ');
+      if (args.some((a) => a.includes('<'))) continue;
+      it(`plans the subcommand "./bifrost ${sub}"`, () => {
+        expect(name).toBe(command.name);
+        expect(command.plan(args, ctx).flatMap(problems)).toEqual([]);
+      });
+    }
   }
 
   it('names real things in test all and every docker combination', () => {
@@ -153,6 +162,30 @@ describe('./bifrost task table', () => {
     refused('start', ['--obs', '--otel']);
     refused('start', ['--web', 'cloud']);
     refused('service', ['--web', 'docker']);
+  });
+
+  it('backs up through the agent, or into a folder with --local <dir>', () => {
+    const backup = (args: string[], platform: NodeJS.Platform = 'darwin') =>
+      COMMANDS.find((c) => c.name === 'backup')?.plan(args, { cwd: ROOT, platform });
+    expect(backup([])).toEqual([
+      { kind: 'exec', cmd: 'sh', args: ['scripts/backup-agent.sh', 'run', '--force'] },
+    ]);
+    expect(
+      COMMANDS.find((c) => c.name === 'backup')?.plan(['--local', 'out', '--meta'], {
+        cwd: '/tmp/somewhere',
+        platform: 'linux',
+      }),
+    ).toEqual([
+      {
+        kind: 'exec',
+        cmd: 'tsx',
+        args: ['scripts/backup.ts', '--out', '/tmp/somewhere/out', '--meta'],
+      },
+    ]);
+    expect(() => backup(['--local'])).toThrow(UsageError);
+    expect(() => backup([], 'linux')).toThrow(UsageError);
+    expect(() => backup(['--include-env'])).toThrow(UsageError);
+    expect(() => backup(['agent', 'status', '--local'])).toThrow(UsageError);
   });
 
   it('runs a relative restore path from where the caller stood', () => {
