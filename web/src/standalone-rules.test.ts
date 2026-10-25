@@ -33,10 +33,14 @@ describe('web mode matches docker/nginx-standalone.conf', () => {
     const parsed = locations.map(({ match, path, body }): LocationRule => {
       const fallback = directive(body, 'try_files')?.split(/\s+/).at(-1);
       const defaultType = directive(body, 'default_type');
+      const tryFiles = directive(body, 'try_files')?.split(/\s+/) ?? [];
+      const errorPage = directive(body, 'error_page')?.split(/\s+/).at(-1);
       return {
         match,
         path,
         fallback: fallback === '/index.html' || fallback === '=404' ? fallback : null,
+        ...(tryFiles.includes('$uri/index.html') ? { dirIndex: true } : {}),
+        ...(errorPage ? { errorPage } : {}),
         cacheControl: headers(body)['Cache-Control'] ?? '',
         ...(defaultType ? { defaultType } : {}),
       };
