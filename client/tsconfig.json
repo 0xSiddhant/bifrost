@@ -8,5 +8,5 @@
     "types": ["vite/client"],
     "noEmit": true
   },
-  "include": ["src", "vite.config.ts", "buildDefaults.ts"]
+  "include": ["src", "vite.config.ts", "buildDefaults.ts", "seoBuild.ts", "seoBuild.test.ts"]
 }

@@ -65,7 +65,10 @@ const PORTALS: Portal[] = [
     // Midgard, not Ollivanders: "drop a file, present it on the shared screen"
     // reads far closer to Send/Receive's audience than to Loki's (PLAN-28).
     title: 'Saga',
-    description: 'Present a markdown deck on the big screen — drop a file, or open a saved edda.',
+    // Saving an edda needs the hub, so the standalone site offers the file alone.
+    description: __HUB__
+      ? 'Present a markdown deck on the big screen — drop a file, or open a saved edda.'
+      : 'Present a markdown deck or a PDF on the big screen — drop a file and go.',
     go: 'a deck · every eye',
     module: 'saga',
   },
@@ -78,10 +81,28 @@ export function MidgardPage() {
     <>
       <section className="hero">
         <span className="eyebrow">᛫ the rainbow bridge ᛫</span>
-        <h1>
-          Your devices, <span className="hero-accent">connected</span>.
-        </h1>
-        <p>Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.</p>
+        {/* The standalone site is a public tools site with no transfer at all,
+            and this heading is what search engines read as its home page. */}
+        {__HUB__ ? (
+          <>
+            <h1>
+              Your devices, <span className="hero-accent">connected</span>.
+            </h1>
+            <p>
+              Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>
+              Developer tools, <span className="hero-accent">in your browser</span>.
+            </h1>
+            <p>
+              JSON, Markdown, YAML and XML editors, a diff checker, quick utilities and a slide
+              presenter — nothing to install, nothing uploaded.
+            </p>
+          </>
+        )}
       </section>
 
       <div className="portals">

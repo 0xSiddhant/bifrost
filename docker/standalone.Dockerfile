@@ -47,6 +47,9 @@ ARG HEIMDALL_SHORTCUT_DEFAULT=shift+meta+comma
 ARG HEIMDALL_TAP_COUNT=7
 # The commit Heimdall's About shows (there is no .git in the build context).
 ARG BIFROST_COMMIT=unknown
+# The public origin (https://tools.example.com) for canonical links, link
+# previews and sitemap.xml. Empty builds without them, with a warning.
+ARG STANDALONE_SITE_URL=
 # The build's postbuild step fails it if the bundle can reach a server.
 RUN npm run build:standalone -w client
 
