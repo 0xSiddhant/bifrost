@@ -8,11 +8,16 @@ on:
   pull_request:
     branches: [develop, main]
   push:
-    # develop too: a run there saves the npm and Playwright caches at develop's
+    # develop: a run there saves the npm and Playwright caches at develop's
     # scope, which every PR into develop restores. A cache a PR run saves is
     # visible to that PR alone, so every new PR used to install everything
     # cold. It also checks the squash-merged result.
-    branches: [main, develop]
+    #
+    # Not main: code only reaches main through a PR, which already ran all of
+    # this, and a push there re-tests a tree identical to develop's twice per
+    # release (the merge, then release.yml's chore(release) commit). The cost
+    # is that a release PR, which can read only main's caches, installs cold.
+    branches: [develop]
 
 # A new push makes the PR's running CI moot; a branch push always finishes.
 concurrency:
@@ -84,6 +89,10 @@ jobs:
   e2e-ui:
     name: e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
+    # A shard takes 2–4 minutes; `playwright install-deps` once spent 32 in
+    # Ubuntu's apt mirrors. A stalled mirror now fails the job for a re-run
+    # instead of holding it for GitHub's 6-hour default.
+    timeout-minutes: 20
     strategy:
       # Every shard reports: a failure in one says nothing about the others.
       fail-fast: false
