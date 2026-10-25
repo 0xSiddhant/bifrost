@@ -38,3 +38,6 @@ client/public/pdfjs-wasm/
 
 # PLAN-34: load-test results describe one machine on one day; never committed
 load-results/
+
+# test scratch trees (scripts/backup.test.ts): core/backup needs storage under the repo root
+.scratch-*/
