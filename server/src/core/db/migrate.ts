@@ -9,7 +9,13 @@ import { openDb, runMigrations, checkpointAndClose } from './index.js';
 
 loadDotenv();
 
-const storage = resolveStoragePaths(process.env.STORAGE_ROOT || './storage');
+// No './storage' fallback: STORAGE_ROOT is required, and a missing value here
+// would silently create/migrate a fresh db in the wrong place.
+if (!process.env.STORAGE_ROOT) {
+  process.stderr.write('✖ STORAGE_ROOT is required — set it in .env (e.g. STORAGE_ROOT=./storage)\n');
+  process.exit(1);
+}
+const storage = resolveStoragePaths(process.env.STORAGE_ROOT);
 const handle = openDb(storage.dbFile);
 try {
   runMigrations(handle);

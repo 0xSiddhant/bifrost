@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { applySettingsOverlay, ConfigError, loadConfig } from './index.js';
 
-const VALID_ENV = { HEIMDALL_PIN: '4321' };
+// The minimal env the server boots on: exactly the required (no-default) keys.
+const VALID_ENV = {
+  HEIMDALL_PIN: '4321',
+  DEPLOY_PROFILE: 'local',
+  STORAGE_ROOT: './storage',
+  PORT: '4646',
+};
 
 describe('loadConfig', () => {
   it('applies documented defaults over a minimal env', () => {
@@ -23,7 +29,7 @@ describe('loadConfig', () => {
     expect(config.clientLogs.level).toBe('warn');
     expect(config.clientLogs.maxBatch).toBe(50);
     expect(config.clientLogs.maxBodyBytes).toBe(64 * 1024);
-    expect(config.backupDir).toBeNull();
+    expect(config.backupExclude).toEqual([]);
     expect(config.runestone.maxDocKb).toBe(2048);
   });
 
@@ -41,6 +47,36 @@ describe('loadConfig', () => {
     expect(config.clientLogs.rateLimitPerMin).toBe(5);
   });
 
+  it('defaults list paging to 30 per page, 100 at most (PLAN-31)', () => {
+    const config = loadConfig(VALID_ENV);
+    expect(config.paging).toEqual({ pageSize: 30, maxPageSize: 100 });
+    expect(loadConfig({ ...VALID_ENV, LIST_PAGE_SIZE: '50', LIST_PAGE_MAX: '50' }).paging).toEqual({
+      pageSize: 50,
+      maxPageSize: 50,
+    });
+  });
+
+  it('refuses a page size above the page maximum, naming the key', () => {
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_SIZE: '120' })).toThrow(
+      /LIST_PAGE_SIZE: must not exceed LIST_PAGE_MAX/,
+    );
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '0' })).toThrow(/LIST_PAGE_MAX/);
+    // Above the lowest route ceiling (500) the setting could not be honoured
+    // consistently across the paged endpoints, so it is refused at boot.
+    expect(() => loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '600' })).toThrow(/LIST_PAGE_MAX/);
+    expect(loadConfig({ ...VALID_ENV, LIST_PAGE_MAX: '500' }).paging.maxPageSize).toBe(500);
+  });
+
+  it('defaults the response contract guard to fallback and reads every mode (PLAN-32)', () => {
+    expect(loadConfig(VALID_ENV).http.contractCheck).toBe('fallback');
+    for (const mode of ['off', 'fallback', 'strict'] as const) {
+      expect(loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: mode }).http.contractCheck).toBe(mode);
+    }
+    expect(() => loadConfig({ ...VALID_ENV, API_CONTRACT_CHECK: 'loud' })).toThrow(
+      /API_CONTRACT_CHECK/,
+    );
+  });
+
   it('reads RUNESTONE_MAX_DOC_KB', () => {
     const config = loadConfig({ ...VALID_ENV, RUNESTONE_MAX_DOC_KB: '512' });
     expect(config.runestone.maxDocKb).toBe(512);
@@ -51,6 +87,19 @@ describe('loadConfig', () => {
     expect(() => loadConfig({})).toThrowError(/HEIMDALL_PIN/);
   });
 
+  it.each(['DEPLOY_PROFILE', 'STORAGE_ROOT', 'PORT', 'HEIMDALL_PIN'])(
+    'refuses to load without the required key %s — missing or blank',
+    (key) => {
+      const missing: Record<string, string> = { ...VALID_ENV };
+      delete missing[key];
+      expect(() => loadConfig(missing)).toThrowError(new RegExp(`${key}: required`));
+      // A blank `KEY=` line is "unset", so it must fail the same way.
+      expect(() => loadConfig({ ...VALID_ENV, [key]: '' })).toThrowError(
+        new RegExp(`${key}: required`),
+      );
+    },
+  );
+
   it('lists every invalid key in one error', () => {
     const attempt = () =>
       loadConfig({ ...VALID_ENV, PORT: 'not-a-number', LOG_LEVEL: 'loud', DEPLOY_PROFILE: 'moon' });
@@ -60,10 +109,15 @@ describe('loadConfig', () => {
   });
 
   it('treats empty strings as unset (falls back to defaults)', () => {
-    const config = loadConfig({ ...VALID_ENV, PORT: '', BACKUP_DIR: '', MDNS_NAME: '' });
-    expect(config.port).toBe(4646);
+    const config = loadConfig({ ...VALID_ENV, LOG_LEVEL: '', BACKUP_KEEP: '', MDNS_NAME: '' });
+    expect(config.logLevel).toBe('trace');
     expect(config.mdnsName).toBe('bifrost');
-    expect(config.backupDir).toBeNull();
+    expect(config.backupKeep).toBe(0);
+  });
+
+  it('parses BACKUP_EXCLUDE into trimmed folder names', () => {
+    const config = loadConfig({ ...VALID_ENV, BACKUP_EXCLUDE: ' uploads, downloads ,,' });
+    expect(config.backupExclude).toEqual(['uploads', 'downloads']);
   });
 
   it('parses the extension blocklist into normalized entries', () => {
@@ -117,5 +171,45 @@ describe('applySettingsOverlay', () => {
     expect(applySettingsOverlay(base, [{ key: 'log.level', value: 'debug' }]).logLevel).toBe(
       base.logLevel,
     );
+  });
+});
+
+describe('the API port and run mode (PLAN-36)', () => {
+  it('puts the API on loopback at PORT + 1, in the full hub mode, by default', () => {
+    const config = loadConfig(VALID_ENV);
+    expect(config.port).toBe(4646);
+    expect(config.api).toEqual({ host: '127.0.0.1', port: 4647 });
+    expect(config.runMode).toBe('full');
+    expect(config.webHost).toBe('0.0.0.0');
+  });
+
+  it('takes an explicit API_PORT, API_HOST, BIFROST_RUN and WEB_HOST', () => {
+    const config = loadConfig({
+      ...VALID_ENV,
+      API_PORT: '5000',
+      API_HOST: '::1',
+      BIFROST_RUN: 'api',
+      WEB_HOST: '127.0.0.1',
+    });
+    expect(config.api).toEqual({ host: '::1', port: 5000 });
+    expect(config.runMode).toBe('api');
+    expect(config.webHost).toBe('127.0.0.1');
+  });
+
+  it('refuses an API_PORT equal to PORT', () => {
+    expect(() => loadConfig({ ...VALID_ENV, API_PORT: '4646' })).toThrow(
+      /API_PORT: must differ from PORT/,
+    );
+  });
+
+  it('refuses a default API port past 65535, naming the fix', () => {
+    expect(() => loadConfig({ ...VALID_ENV, PORT: '65535' })).toThrow(
+      /API_PORT: PORT \+ 1 is not a port/,
+    );
+    expect(loadConfig({ ...VALID_ENV, PORT: '65535', API_PORT: '65534' }).api.port).toBe(65534);
+  });
+
+  it('refuses an unknown run mode', () => {
+    expect(() => loadConfig({ ...VALID_ENV, BIFROST_RUN: 'both' })).toThrow(/BIFROST_RUN/);
   });
 });

@@ -1,9 +1,9 @@
 ---
 name: release
-description: Cut a Bifrost release (develop → main). Since PLAN-09, the version bump, changelog, tag, GitHub Release, and back-merge are AUTOMATED by .github/workflows/release.yml on push to main — this skill covers only the preflight and the develop→main merge PR, then confirms the automation ran. Use when the owner says "release", "cut vX.Y.Z", or "merge to main".
+description: Cut a Bifrost release (develop → main). The version bump, changelog, tag, GitHub Release, and back-merge are automated by .github/workflows/release.yml on push to main — this skill covers only the preflight and the develop→main merge PR, then confirms the automation ran. Use when the owner says "release", "cut vX.Y.Z", or "merge to main".
 ---
 
-# Release — develop → main (automated since PLAN-09)
+# Release — develop → main
 
 `.github/workflows/release.yml` runs on every push to `main`: it computes the
 semver bump from conventional commits since the last tag, bumps root + workspace
@@ -19,8 +19,8 @@ release. Full reference: `docs/releasing.md`.
 the CLI install command in README points at the second one, so a release that
 shipped only the tarball leaves that command 404ing.
 
-**So this skill no longer bumps versions, tags, or back-merges by hand** — it
-gets a clean release onto `main` and verifies the workflow did the rest.
+**This skill never bumps versions, tags, or back-merges by hand** — it gets a
+clean release onto `main` and verifies the workflow did the rest.
 
 Hard rules: never push to `main` directly; every change reaches `develop` via
 branch + PR first; every merge is performed by the owner (STOP and wait); the
@@ -41,8 +41,8 @@ destroy the conventional-commit history the workflow reads).
    shipped summary. CI green. **STOP for the owner to merge with a merge commit.**
    Do NOT bump the version or edit the changelog here — the workflow owns that.
 4. **Confirm the automation** (after the merge): the `Release` workflow run
-   succeeds; a new `vX.Y.Z` tag and GitHub Release exist with a `.tar.gz`
-   attached; `CHANGELOG.md` updated; `develop` fast-forwarded to `main` (carries
+   succeeds; a new `vX.Y.Z` tag and GitHub Release exist with both assets
+   attached (`bifrost-vX.Y.Z.tar.gz` and `bifrost-cli-X.Y.Z.tgz`); `CHANGELOG.md` updated; `develop` fast-forwarded to `main` (carries
    the `chore(release):` commit). Report the tag URL, release URL, and
    develop==main confirmation.
 

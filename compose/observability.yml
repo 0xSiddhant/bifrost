@@ -1,0 +1,121 @@
+# Optional Grafana + Loki + Alloy + Prometheus + Tempo stack. DETACHABLE by
+# design — Bifrost never depends on it. Logs are files first (storage/logs/), so
+# this can be down for weeks and Alloy backfills the whole log when it next
+# starts.
+#
+# Works whether Bifrost runs native (PM2/launchd) or in Docker — Alloy just
+# tails storage/logs on the host. Every service is in the `observability`
+# profile (PLAN-39), so the root docker-compose.yml can include this file
+# without starting it:
+#
+#   docker compose --profile observability up -d                       # the hub + this stack
+#   docker compose -f compose/observability.yml --env-file .env --profile observability up -d   # alone
+#   sh scripts/observability.sh                                         # the same, wrapped
+#   open http://localhost:4648   (admin / bifrost — change it)
+#
+# Host ports run on from Bifrost's own (4646 web, 4647 API): 4648 Grafana,
+# 4649 Prometheus, 4650 Tempo's OTLP intake (the API sends traces here),
+# 4651 Loki, 4652 Tempo's query API. Inside the network the services keep
+# their standard ports (grafana:3000, loki:3100, …), so the provisioning and
+# the Alloy config do not change.
+#
+# `name: bifrost` is the project the old root file got from the repo directory,
+# so the existing Grafana/Loki/Prometheus volumes are reused, not recreated.
+#
+# Run from the repo root. A single file needs `--env-file .env`: Compose reads
+# ${VARS} from the .env beside the file it was given (compose/), not the repo
+# root's. The root docker-compose.yml needs no flag.
+name: bifrost
+
+services:
+  loki:
+    profiles: [observability]
+    image: grafana/loki:3.1.1
+    command: -config.file=/etc/loki/config.yml
+    volumes:
+      - ../observability/loki/config.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    ports:
+      - '4651:3100'
+    restart: unless-stopped
+
+  alloy:
+    profiles: [observability]
+    image: grafana/alloy:v1.3.1
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+    volumes:
+      - ../observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../storage/logs:/var/log/bifrost:ro
+      - alloy-data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  # Accelerator, never the record: Prometheus SCRAPES, so anything it missed
+  # while this stack was down never existed as far as it is concerned. The
+  # durable runtime history is the metrics snapshot in storage/logs/, which
+  # Alloy backfills from the files (PLAN-16b).
+  prometheus:
+    profiles: [observability]
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ../observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '4649:9090'
+    # Bifrost runs native on macOS, so the scrape target is the host, not a
+    # sibling container. Docker Desktop resolves host.docker.internal already;
+    # this keeps the same config working on Linux, where it does not.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped
+
+  # Traces. Pushed to, so the least durable of the three signals — see
+  # observability/tempo/tempo.yml. The API sends traces only when its launcher
+  # says so (./bifrost start|service --obs or --otel, or compose/api.otel.yml),
+  # never by default, so a dead endpoint never degrades the log archive with
+  # retry noise (PLAN-16b).
+  tempo:
+    profiles: [observability]
+    image: grafana/tempo:2.6.0
+    command: -config.file=/etc/tempo/tempo.yml
+    volumes:
+      - ../observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      # OTLP/HTTP in, and the query API Grafana uses.
+      - '4650:4318'
+      - '4652:3200'
+    restart: unless-stopped
+
+  grafana:
+    profiles: [observability]
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: bifrost
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '4648:3000'
+    depends_on:
+      - loki
+      - prometheus
+      - tempo
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  alloy-data:
+  grafana-data:
+  prometheus-data:
+  tempo-data:

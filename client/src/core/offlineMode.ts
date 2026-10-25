@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from './api';
+import { API_V1, apiGet, apiSend, hubOnly } from './api';
 
 /**
  * Offline mode (PLAN-22) — the policy half.
@@ -31,14 +31,14 @@ export interface OfflineModeConfig {
  */
 const CONFIG_TIMEOUT_MS = 8_000;
 
-export const fetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
-  apiGet<OfflineModeConfig>('/api/offline-mode/config', { timeoutMs: CONFIG_TIMEOUT_MS });
+const hubFetchOfflineModeConfig = (): Promise<OfflineModeConfig> =>
+  apiGet<OfflineModeConfig>(`${API_V1}/offline-mode/config`, { timeoutMs: CONFIG_TIMEOUT_MS });
 
-export const setOfflineModeTargetEnabled = (
+const hubSetOfflineModeTargetEnabled = (
   id: string,
   enabled: boolean,
 ): Promise<OfflineModeConfig> =>
-  apiSend<OfflineModeConfig>('PATCH', '/api/offline-mode/settings', { id, enabled });
+  apiSend<OfflineModeConfig>('PATCH', `${API_V1}/offline-mode/settings`, { id, enabled });
 
 /** The targets a click should warm: registry order, minus whatever is disabled. */
 export const enabledTargets = (config: OfflineModeConfig): OfflineModeTarget[] =>
@@ -64,3 +64,7 @@ export interface WarmLoadStatus {
 }
 
 export const OFF_STATUS: WarmLoadStatus = { state: 'off', loaded: 0, failed: [] };
+
+// Hub-only: on the standalone site each is a stub that makes no request (PLAN-35).
+export const fetchOfflineModeConfig: typeof hubFetchOfflineModeConfig = __HUB__ ? hubFetchOfflineModeConfig : hubOnly('fetchOfflineModeConfig');
+export const setOfflineModeTargetEnabled: typeof hubSetOfflineModeTargetEnabled = __HUB__ ? hubSetOfflineModeTargetEnabled : hubOnly('setOfflineModeTargetEnabled');

@@ -13,7 +13,7 @@ import { registerClientLogRoutes } from './routes/client-logs.js';
  * anywhere at all, as opposed to existing but being hard to query.
  *
  * It rides the existing pipeline rather than a new one: a batched
- * `POST /api/client-logs` is re-emitted through pino with `source: "client"`,
+ * `POST /api/v1/client-logs` is re-emitted through pino with `source: "client"`,
  * so browser errors land in the same files, ship via the same Alloy, and
  * inherit the same backfill and retention — no Faro, no extra container, no
  * second retention story.

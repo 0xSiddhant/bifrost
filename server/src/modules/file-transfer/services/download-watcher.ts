@@ -1,4 +1,4 @@
-import type { Stats } from 'node:fs';
+import fs, { type Stats } from 'node:fs';
 import path from 'node:path';
 import { watch, type FSWatcher } from 'chokidar';
 import type { DownloadEntry } from '../../../core/bus/events.js';
@@ -19,16 +19,35 @@ import type { DownloadRegistry } from '../ports.js';
  * in here counts path segments — so a file two levels down is simply never
  * seen, which is the intended behaviour rather than a case to reject.
  */
+/**
+ * How long after a new folder appears its contents are read once more. Longer
+ * than `awaitWriteFinish`'s stability window, so a file chokidar *did* see has
+ * been announced by then and the rescan finds nothing to do.
+ */
+export const FOLDER_RESCAN_MS = 3_000;
+
+/** A file modified more recently than this is still being written: chokidar's own watch owns it. */
+const STILL_WRITING_MS = 1_500;
+
+export interface DownloadWatcherOptions {
+  folderRescanMs?: number;
+}
+
 export class DownloadWatcherService implements DownloadRegistry {
   private readonly entries = new Map<string, DownloadEntry>();
   private watcher: FSWatcher | null = null;
   private ready = false;
+  private readonly rescans = new Set<NodeJS.Timeout>();
+  private readonly folderRescanMs: number;
 
   constructor(
     private readonly downloadsDir: string,
     private readonly bus: EventBus,
     private readonly log: Logger,
-  ) {}
+    options: DownloadWatcherOptions = {},
+  ) {
+    this.folderRescanMs = options.folderRescanMs ?? FOLDER_RESCAN_MS;
+  }
 
   start(): Promise<void> {
     this.watcher = watch(this.downloadsDir, {
@@ -62,6 +81,8 @@ export class DownloadWatcherService implements DownloadRegistry {
   }
 
   async stop(): Promise<void> {
+    for (const timer of this.rescans) clearTimeout(timer);
+    this.rescans.clear();
     await this.watcher?.close();
     this.watcher = null;
   }
@@ -108,8 +129,68 @@ export class DownloadWatcherService implements DownloadRegistry {
       type: 'file',
       parent: dirname === '.' ? null : dirname,
     };
+    const previous = this.entries.get(entry.id);
     this.entries.set(entry.id, entry);
-    if (this.ready) this.bus.emit(event, entry);
+    if (!this.ready) return;
+    // Already announced exactly like this (a rescan got there first, then
+    // chokidar's own late event arrived): one file, one announcement.
+    if (previous && previous.size === entry.size && previous.mtime === entry.mtime) return;
+    this.bus.emit(event, entry);
+  }
+
+  /**
+   * Read a first-level folder once more and index any file the watch missed.
+   *
+   * chokidar lists a brand-new directory and *then* starts watching it, so a
+   * file that lands between the two — two uploads into a just-created folder,
+   * milliseconds apart — produces no event at all and would never be listed,
+   * live or on reload, until a restart (found by PLAN-32a's e2e net under
+   * load). A file still being written is left to chokidar: its watch on the
+   * folder is live by now, so the write's own events reach awaitWriteFinish.
+   */
+  async rescanFolder(dir: string): Promise<number> {
+    let dirents: fs.Dirent[];
+    try {
+      dirents = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch (error) {
+      // The folder was removed in the meantime: nothing left to index.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+      this.log.warn({ err: error, folder: this.relative(dir) }, 'downloads folder rescan failed');
+      return 0;
+    }
+    let found = 0;
+    for (const dirent of dirents) {
+      if (!dirent.isFile()) continue;
+      const file = path.join(dir, dirent.name);
+      if (this.isHidden(file)) continue;
+      if (this.entries.has(idFor(this.relative(file).split(path.sep).join('/')))) continue;
+      let stats: Stats;
+      try {
+        stats = await fs.promises.stat(file);
+      } catch {
+        // Gone between the readdir and the stat: there is nothing to index.
+        continue;
+      }
+      if (Date.now() - stats.mtimeMs < STILL_WRITING_MS) continue;
+      this.upsert(file, stats, 'download.added');
+      found += 1;
+    }
+    if (found > 0) {
+      this.log.warn(
+        { folder: this.relative(dir), found },
+        'downloads watcher missed files in a new folder — indexed them on rescan',
+      );
+    }
+    return found;
+  }
+
+  private scheduleRescan(dir: string): void {
+    const timer = setTimeout(() => {
+      this.rescans.delete(timer);
+      void this.rescanFolder(dir);
+    }, this.folderRescanMs);
+    timer.unref();
+    this.rescans.add(timer);
   }
 
   private upsertFolder(dir: string, stats: Stats | undefined): void {
@@ -132,7 +213,9 @@ export class DownloadWatcherService implements DownloadRegistry {
       parent: null,
     };
     this.entries.set(entry.id, entry);
-    if (this.ready) this.bus.emit('download.added', entry);
+    if (!this.ready) return;
+    this.bus.emit('download.added', entry);
+    this.scheduleRescan(dir);
   }
 
   private remove(relative: string): void {

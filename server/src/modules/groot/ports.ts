@@ -25,6 +25,17 @@ export interface GrootRepository {
   findById(id: string): GrootRecord | null;
   findBySlug(slug: string): GrootRecord | null;
   list(filter: GrootListFilter): GrootSummary[];
+  /**
+   * The paged form (PLAN-31): ordered by `(sortKey, id)` **both** in the
+   * filter's direction, so `asc` and `desc` are exact mirrors even across ties
+   * — the Pensieve computes its last page by reading the reversed order.
+   * `list` keeps its `asc(id)` tiebreak for the legacy array response.
+   */
+  listPage(filter: GrootListFilter): GrootSummary[];
+  /** Rows matching `q`/`authorDeviceId`, ignoring sort and paging. */
+  count(filter: Pick<GrootListFilter, 'q' | 'authorDeviceId'>): number;
+  /** Every distinct author over the whole table, unfiltered — the dropdown's options. */
+  listAuthors(): string[];
   /** Removes one document; returns it (for the deleted event) or null. */
   delete(id: string): GrootRecord | null;
   /** Every stored name — feeds the collision-safe default-name generator. */

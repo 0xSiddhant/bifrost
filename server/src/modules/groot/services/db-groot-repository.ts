@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../../../core/db/index.js';
 import { grootDocs } from '../../../core/db/schema.js';
 import type { GrootSummary } from '../../../core/bus/events.js';
@@ -17,6 +17,18 @@ const SUMMARY_COLUMNS = {
 /** `%`/`_` are LIKE wildcards — a search for "100%" must not match everything. */
 function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+/** The filters every read shares — the list, its paged form, and the count. */
+function whereFor(filter: Pick<GrootListFilter, 'q' | 'authorDeviceId'>): SQL | undefined {
+  const conditions: SQL[] = [];
+  if (filter.q) {
+    conditions.push(sql`${grootDocs.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
+  }
+  if (filter.authorDeviceId) {
+    conditions.push(eq(grootDocs.authorDeviceId, filter.authorDeviceId));
+  }
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
 export class DbGrootRepository implements GrootRepository {
@@ -53,14 +65,34 @@ export class DbGrootRepository implements GrootRepository {
   }
 
   list(filter: GrootListFilter): GrootSummary[] {
-    const conditions: SQL[] = [];
-    if (filter.q) {
-      conditions.push(sql`${grootDocs.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
-    }
-    if (filter.authorDeviceId) {
-      conditions.push(eq(grootDocs.authorDeviceId, filter.authorDeviceId));
-    }
+    return this.select(filter, asc(grootDocs.id));
+  }
 
+  listPage(filter: GrootListFilter): GrootSummary[] {
+    const direction = filter.order === 'asc' ? asc : desc;
+    return this.select(filter, direction(grootDocs.id));
+  }
+
+  count(filter: Pick<GrootListFilter, 'q' | 'authorDeviceId'>): number {
+    const row = this.db
+      .select({ n: sql<number>`count(*)` })
+      .from(grootDocs)
+      .where(whereFor(filter))
+      .get();
+    return row?.n ?? 0;
+  }
+
+  listAuthors(): string[] {
+    return this.db
+      .selectDistinct({ id: grootDocs.authorDeviceId })
+      .from(grootDocs)
+      .where(isNotNull(grootDocs.authorDeviceId))
+      .orderBy(asc(grootDocs.authorDeviceId))
+      .all()
+      .flatMap((row) => (row.id ? [row.id] : []));
+  }
+
+  private select(filter: GrootListFilter, tiebreak: SQL): GrootSummary[] {
     const sortColumn = {
       name: sql`lower(${grootDocs.name})`,
       created: grootDocs.createdAt,
@@ -69,10 +101,11 @@ export class DbGrootRepository implements GrootRepository {
     }[filter.sort];
     const direction = filter.order === 'asc' ? asc : desc;
 
-    let query = this.db.select(SUMMARY_COLUMNS).from(grootDocs).$dynamic();
-    if (conditions.length > 0) query = query.where(and(...conditions));
-    return query
-      .orderBy(direction(sortColumn), asc(grootDocs.id))
+    return this.db
+      .select(SUMMARY_COLUMNS)
+      .from(grootDocs)
+      .where(whereFor(filter))
+      .orderBy(direction(sortColumn), tiebreak)
       .limit(filter.limit)
       .offset(filter.offset)
       .all();

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { FeatureModule, ModuleDeps } from '../../core/module.js';
 import type { OfflineModeConfig, OfflineModeTarget } from '../../core/bus/events.js';
 import { AppError } from '../../core/http/index.js';
+import { adminSecurity, errorResponses } from '../../core/http/schemas.js';
 import { readSettings, writeSetting } from '../../core/db/index.js';
 
 /**
@@ -10,13 +11,14 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * that compute locally — so this module owns only the *policy*: which of the
  * warmable pages an admin has left enabled.
  *
- * Same shape as the screensaver module: a public `GET /api/offline-mode/config`
+ * Same shape as the screensaver module: a public `GET /api/v1/offline-mode/config`
  * the client reads to decide what to warm, an admin
- * `PATCH /api/offline-mode/settings`, and an `offlineMode.settingsUpdated`
+ * `PATCH /api/v1/offline-mode/settings`, and an `offlineMode.settingsUpdated`
  * broadcast so open tabs rebind without a reload. The registry itself is
  * code-owned (pages come and go through code changes, not admin typing); only
  * the disabled ids are stored, as one comma-separated `settings` row — the same
- * overlay `themes.disabled` uses, so there is no new table and no migration.
+ * shape the theme switcher's `themes.disabled` row had (removed in PLAN-35), so
+ * there is no new table and no migration.
  *
  * Registered in BOTH profiles: warming client chunks is harmless mechanism, not
  * a LAN-trust concern (matching `toolbox`/`variant`/`screensaver`).
@@ -48,6 +50,28 @@ const TARGETS: readonly OfflineModeTarget[] = [
 
 const TARGET_IDS = TARGETS.map((target) => target.id);
 
+/** `OfflineModeConfig`: the whole code-owned registry, plus the ids disabled. */
+const configSchema = {
+  type: 'object',
+  required: ['targets', 'disabled'],
+  properties: {
+    targets: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'label'],
+        properties: {
+          id: { type: 'string', description: 'The id the client maps to its own import() loader' },
+          label: { type: 'string' },
+        },
+      },
+    },
+    disabled: { type: 'array', items: { type: 'string' } },
+  },
+} as const;
+
+const TAGS = ['offline-mode'];
+
 export const offlineModeModule: FeatureModule = {
   name: 'offline-mode',
   register(app: FastifyInstance, deps: ModuleDeps) {
@@ -72,7 +96,18 @@ export const offlineModeModule: FeatureModule = {
 
     // Public: the client reads this on load (and via SSE) to know which targets
     // its toggle should warm. Read-only, carries no secrets.
-    app.get('/api/offline-mode/config', () => effective());
+    app.get(
+      '/api/v1/offline-mode/config',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'The pages the offline toggle warms, and which an admin disabled',
+          operationId: 'getOfflineModeConfig',
+          response: { 200: configSchema },
+        },
+      },
+      () => effective(),
+    );
 
     const patchSchema = {
       type: 'object',
@@ -85,8 +120,18 @@ export const offlineModeModule: FeatureModule = {
     };
 
     app.patch<{ Body: { id: string; enabled: boolean } }>(
-      '/api/offline-mode/settings',
-      { preHandler: app.requireAdmin, schema: { body: patchSchema } },
+      '/api/v1/offline-mode/settings',
+      {
+        preHandler: app.requireAdmin,
+        schema: {
+          tags: TAGS,
+          summary: 'Enable or disable one warmable page; open tabs rebind live',
+          operationId: 'updateOfflineModeSettings',
+          security: adminSecurity,
+          body: patchSchema,
+          response: { 200: configSchema, ...errorResponses(400, 401, 404, 413, 415) },
+        },
+      },
       (request) => {
         const { id, enabled } = request.body;
         if (!TARGET_IDS.includes(id)) {

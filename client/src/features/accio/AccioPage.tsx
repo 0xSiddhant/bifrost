@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ApiError } from '../../core/api';
 import { deleteLink, saveLink, updateLink, type AccioLink } from '../../core/accio';
 import { copyText } from '../../core/copy';
@@ -8,6 +8,7 @@ import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { cardToneClass } from '../../core/ui/cardTone';
 import { EmptyState } from '../../core/ui/EmptyState';
+import { LoadMore, countLabel } from '../../core/ui/LoadMore';
 import {
   CheckIcon,
   ClipboardIcon,
@@ -17,12 +18,9 @@ import {
   SparklesIcon,
 } from '../../core/ui/icons';
 import {
-  allTags,
   displayTitle,
-  filterLinks,
   hostnameOf,
   parseTagInput,
-  sortLinks,
   tileLetter,
   tileTone,
   type ShelfSort,
@@ -77,7 +75,13 @@ function EditRow({
           autoFocus
         />
       </label>
-      <TagField label="Tags" value={tags} onChange={setTags} known={known} placeholder="comma, separated" />
+      <TagField
+        label="Tags"
+        value={tags}
+        onChange={setTags}
+        known={known}
+        placeholder="comma, separated"
+      />
       {error && (
         <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
           {error}
@@ -100,9 +104,9 @@ function EditRow({
  * Hermes *passes* things between devices and forgets them; Accio *summons* them
  * back later.
  */
-export function AccioPage() {
-  const { links, ready, error } = useShelf();
+const SEARCH_DEBOUNCE_MS = 200;
 
+export function AccioPage() {
   const [url, setUrl] = useState('');
   const [newTags, setNewTags] = useState('');
   const [saving, setSaving] = useState(false);
@@ -111,16 +115,22 @@ export function AccioPage() {
   const [q, setQ] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [sort, setSort] = useState<ShelfSort>('newest');
+  // The server searches now (PLAN-31); debounced so typing is one request.
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(q), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+
+  const shelf = useShelf({ q: search, tag, sort });
+  const { items: links, total, tags, status } = shelf;
+  const ready = status !== 'loading' || links.length > 0;
+  const error = status === 'error';
+  const filtering = Boolean(search.trim() || tag);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const tags = useMemo(() => allTags(links), [links]);
-  const visible = useMemo(
-    () => sortLinks(filterLinks(links, { q, tag }), sort),
-    [links, q, tag, sort],
-  );
 
   const summon = async () => {
     const candidate = url.trim();
@@ -212,7 +222,7 @@ export function AccioPage() {
           </p>
         </Card>
 
-        {links.length > 0 && (
+        {(links.length > 0 || filtering || q) && (
           <div className="shelf-filters">
             <label className="shelf-search">
               <SearchIcon size={15} />
@@ -257,21 +267,22 @@ export function AccioPage() {
                 ))}
               </div>
             )}
-            <span className="shelf-count caption">
-              {visible.length === links.length
-                ? `${links.length} ${links.length === 1 ? 'link' : 'links'}`
-                : `${visible.length} of ${links.length}`}
+            <span className="shelf-count caption" aria-live="polite">
+              {countLabel(links.length, total, 'link')}
             </span>
           </div>
         )}
 
         {error && (
-          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
-            The shelf could not be read. Check the bridge and reload.
-          </p>
+          <div className="load-more__error" role="alert">
+            <span>The shelf could not be read. Check the bridge.</span>
+            <Button variant="ghost" size="sm" onClick={shelf.reload}>
+              Try again
+            </Button>
+          </div>
         )}
 
-        {ready && links.length === 0 && !error && (
+        {ready && links.length === 0 && !error && !filtering && (
           <EmptyState
             icon={<SparklesIcon size={28} />}
             title="Nothing summoned yet"
@@ -279,7 +290,7 @@ export function AccioPage() {
           />
         )}
 
-        {ready && links.length > 0 && visible.length === 0 && (
+        {ready && links.length === 0 && !error && filtering && (
           <EmptyState
             icon={<SearchIcon size={28} />}
             title="Nothing matches"
@@ -287,9 +298,9 @@ export function AccioPage() {
           />
         )}
 
-        {visible.length > 0 && (
-          <div className="shelf-grid">
-            {visible.map((link) => {
+        {links.length > 0 && (
+          <div className="shelf-grid" aria-busy={status === 'loading'}>
+            {links.map((link) => {
               const who = deviceName(link.authorDeviceId);
               const host = hostnameOf(link.url);
               const busy = editingId === link.id || confirmId === link.id;
@@ -393,6 +404,13 @@ export function AccioPage() {
             })}
           </div>
         )}
+
+        <LoadMore
+          hasMore={shelf.hasMore}
+          status={status}
+          onLoadMore={shelf.loadMore}
+          loaded={links.length}
+        />
       </div>
     </>
   );

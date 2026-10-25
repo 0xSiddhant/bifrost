@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCapabilities } from '../../core/useCapabilities';
+import { hasFeature } from '../../core/features';
 import { Portal } from '../../core/ui/Portal';
 import { JoinBifrostCard } from '../../core/ui/JoinBifrostCard';
 import {
@@ -21,7 +21,7 @@ interface Portal {
   title: string;
   description: string;
   go: string;
-  /** Card shows only when this module is loaded (omitted = always). */
+  /** Card shows only when this build ships the feature (omitted = always). */
   module?: string;
 }
 
@@ -32,6 +32,7 @@ const PORTALS: Portal[] = [
     title: 'Send files',
     description: 'Drop files from this device into the hub. They land in a write-only vault on the host.',
     go: 'midgard → asgard',
+    module: 'file-transfer',
   },
   {
     to: '/downloads',
@@ -39,6 +40,7 @@ const PORTALS: Portal[] = [
     title: 'Receive files',
     description: 'Everything shared from the host appears here, live — on every device at once.',
     go: 'asgard → midgard',
+    module: 'file-transfer',
   },
   {
     to: '/hermes',
@@ -46,6 +48,7 @@ const PORTALS: Portal[] = [
     title: 'Hermes',
     description: 'A shared clipboard for the bridge — paste text on one device, read it on every other.',
     go: 'one board · every device',
+    module: 'clipboard',
   },
   {
     to: '/accio',
@@ -62,26 +65,44 @@ const PORTALS: Portal[] = [
     // Midgard, not Ollivanders: "drop a file, present it on the shared screen"
     // reads far closer to Send/Receive's audience than to Loki's (PLAN-28).
     title: 'Saga',
-    description: 'Present a markdown deck on the big screen — drop a file, or open a saved edda.',
+    // Saving an edda needs the hub, so the standalone site offers the file alone.
+    description: __HUB__
+      ? 'Present a markdown deck on the big screen — drop a file, or open a saved edda.'
+      : 'Present a markdown deck or a PDF on the big screen — drop a file and go.',
     go: 'a deck · every eye',
     module: 'saga',
   },
 ];
 
 export function MidgardPage() {
-  const { capabilities } = useCapabilities();
-  const portals = PORTALS.filter(
-    (portal) => !portal.module || !capabilities || capabilities.modules.includes(portal.module),
-  );
+  const portals = PORTALS.filter((portal) => !portal.module || hasFeature(portal.module));
 
   return (
     <>
       <section className="hero">
         <span className="eyebrow">᛫ the rainbow bridge ᛫</span>
-        <h1>
-          Your devices, <span className="hero-accent">connected</span>.
-        </h1>
-        <p>Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.</p>
+        {/* The standalone site is a public tools site with no transfer at all,
+            and this heading is what search engines read as its home page. */}
+        {__HUB__ ? (
+          <>
+            <h1>
+              Your devices, <span className="hero-accent">connected</span>.
+            </h1>
+            <p>
+              Send and receive files across the bridge — no cloud, no accounts, just your Wi-Fi.
+            </p>
+          </>
+        ) : (
+          <>
+            <h1>
+              Developer tools, <span className="hero-accent">in your browser</span>.
+            </h1>
+            <p>
+              JSON, Markdown, YAML and XML editors, a diff checker, quick utilities and a slide
+              presenter — nothing to install, nothing uploaded.
+            </p>
+          </>
+        )}
       </section>
 
       <div className="portals">
@@ -90,12 +111,16 @@ export function MidgardPage() {
         ))}
       </div>
 
-      <div className="rune-divider" aria-hidden="true">
-        ᛒᛁᚠᚱᛟᛋᛏ
-      </div>
-
-      {/* Not a portal — the wide onboarding band stays its own component. */}
-      <JoinBifrostCard />
+      {/* Not a portal — the wide onboarding band stays its own component. It
+          shows the hub's own URL, so the standalone site has none (PLAN-35). */}
+      {__HUB__ && (
+        <>
+          <div className="rune-divider" aria-hidden="true">
+            ᛒᛁᚠᚱᛟᛋᛏ
+          </div>
+          <JoinBifrostCard />
+        </>
+      )}
     </>
   );
 }

@@ -1,25 +1,24 @@
-# Bifrost on a Linux host. See docs/docker-linux.md — this is NOT the macOS run
-# mode (host networking + FSEvents don't work in Docker Desktop's VM).
+# Bifrost in Docker (PLAN-39): every piece has its own image (docker/) and its
+# own compose file (compose/); this file puts the hub's pieces in one project.
+# Each service sets its own run shape in `environment:`; .env never does
+# (owner, 2026-10-09). `./bifrost docker …` runs every combination below.
 #
-#   cp .env.example .env      # set HEIMDALL_PIN etc.
-#   docker compose up -d --build
+#   docker compose up -d --build                         # the hub: API + web host
+#   docker compose -f docker-compose.yml -f compose/api.otel.yml --profile observability up -d --build
+#                                                        # … plus Grafana/Loki/Alloy/Prometheus/Tempo, traces on
+#   docker compose -f compose/api.yml -f compose/api.alone.yml --env-file .env up -d          # the API alone
+#   docker compose -f compose/web.yml -f compose/web.standalone.yml --env-file .env up -d     # the standalone client alone
+#
+# Linux hosts (host networking: bifrost.local, real client addresses, the API on
+# loopback). On a Mac the API runs natively and only the web host may run here,
+# with compose/web.bridge.yml — docs/docker-mac.md. The standalone site for a
+# cloud machine is compose/standalone.yml, not part of this project.
+#
+# Upgrading from the single `bifrost` service (before PLAN-36):
+# `docker compose up -d --build --remove-orphans`.
+name: bifrost
 
-services:
-  bifrost:
-    build: .
-    image: bifrost:latest
-    container_name: bifrost
-    # Host networking so mDNS multicast advertises bifrost.local and clients on
-    # the LAN can reach it. LINUX ONLY — a no-op on Docker Desktop (mac/win).
-    network_mode: host
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: production
-      PORT: 4646
-    volumes:
-      # State that must survive container replacement.
-      - ./storage:/app/storage
-      - ./themes:/app/themes
-    restart: unless-stopped
-    init: true
+include:
+  - compose/api.yml
+  - compose/web.yml
+  - compose/observability.yml

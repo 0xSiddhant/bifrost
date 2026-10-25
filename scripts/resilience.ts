@@ -1,5 +1,5 @@
 /**
- * `npm run test:resilience` — hammer the real built server and prove SQLite
+ * `./bifrost test resilience` — hammer the real built server and prove SQLite
  * survives it. Runs against `server/dist` (build first), on a scratch
  * STORAGE_ROOT, so it never touches real data.
  *
@@ -22,8 +22,11 @@ import Database from 'better-sqlite3';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SERVER_ENTRY = path.join(ROOT, 'server', 'dist', 'app.js');
+// PLAN-36: this tests the API's SQLite durability, so it runs the API alone
+// (BIFROST_RUN=api) on a random API_PORT; no web host is involved.
 const PORT = 20000 + Math.floor(Math.random() * 20000);
-const BASE = `http://127.0.0.1:${PORT}`;
+const API_PORT = PORT + 1;
+const BASE = `http://127.0.0.1:${API_PORT}`;
 const CYCLES = Number(process.env.RESILIENCE_CYCLES ?? 50);
 
 const storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-resilience-'));
@@ -44,6 +47,9 @@ function spawnServer(): { child: ChildProcess; exited: Promise<number | null> } 
       NODE_ENV: 'production',
       STORAGE_ROOT: storageRoot,
       PORT: String(PORT),
+      API_PORT: String(API_PORT),
+      API_HOST: '127.0.0.1',
+      BIFROST_RUN: 'api',
       HEIMDALL_PIN: '4321',
       LOG_LEVEL: 'error',
       DEPLOY_PROFILE: 'local',
@@ -59,7 +65,7 @@ async function waitForHealth(timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
-      const response = await fetch(`${BASE}/api/health`);
+      const response = await fetch(`${BASE}/api/v1/health`);
       if (response.ok) return true;
     } catch {
       /* not up yet */
@@ -85,7 +91,7 @@ async function main(): Promise<void> {
     console.error('✖ build the server first: npm run build');
     process.exit(2);
   }
-  console.log(`resilience: port ${PORT}, storage ${storageRoot}, ${CYCLES} cycles\n`);
+  console.log(`resilience: api port ${API_PORT}, storage ${storageRoot}, ${CYCLES} cycles\n`);
 
   // A. Rapid graceful stop/start.
   let integrityHeld = true;
@@ -107,7 +113,7 @@ async function main(): Promise<void> {
     const server = spawnServer();
     await waitForHealth(15_000);
     const burst = Array.from({ length: 30 }, (_unused, i) =>
-      fetch(`${BASE}/api/clipboard`, {
+      fetch(`${BASE}/api/v1/clipboard`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-bifrost-device': 'resilience' },
         body: JSON.stringify({ text: `entry ${i} ${'x'.repeat(500)}` }),

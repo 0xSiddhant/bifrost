@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '../../core/api';
 import { copyText } from '../../core/copy';
@@ -7,6 +7,7 @@ import { formatTimeAgo } from '../../core/format';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { EmptyState } from '../../core/ui/EmptyState';
+import { LoadMore, countLabel } from '../../core/ui/LoadMore';
 import { QrCard } from '../../core/ui/QrCard';
 import {
   CheckIcon,
@@ -85,8 +86,9 @@ function EditRow({ link, onDone }: { link: Portkey; onDone: () => void }) {
  * redirects to anything on the network; the page is the place to make, edit and
  * watch them (hit counts + last-used update live), each with its own QR.
  */
+const SEARCH_DEBOUNCE_MS = 200;
+
 export function PortkeyPage() {
-  const { links, ready, error } = usePortkeys();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Creative-404 hand-off: `/go/<missing>` bounces here with `?go=<slug>` so the
@@ -102,6 +104,17 @@ export function PortkeyPage() {
   const [suggestion, setSuggestion] = useState<string | null>(null);
 
   const [q, setQ] = useState('');
+  // The server searches now (PLAN-31); debounced so typing is one request.
+  const [search, setSearch] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(q), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [q]);
+  const portkeys = usePortkeys(search);
+  const { items: links, total, status } = portkeys;
+  const ready = status !== 'loading' || links.length > 0;
+  const error = status === 'error';
+  const filtering = search.trim().length > 0;
   const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [confirmSlug, setConfirmSlug] = useState<string | null>(null);
   const [qrSlug, setQrSlug] = useState<string | null>(null);
@@ -128,17 +141,6 @@ export function PortkeyPage() {
   const slugError = slugFormatError(slug);
   const canEnchant = isValidSlugFormat(slug) && url.trim().length > 0 && !saving;
 
-  const visible = useMemo(() => {
-    const query = q.trim().toLowerCase();
-    if (!query) return links;
-    return links.filter(
-      (link) =>
-        link.slug.includes(query) ||
-        link.url.toLowerCase().includes(query) ||
-        (link.note ?? '').toLowerCase().includes(query),
-    );
-  }, [links, q]);
-
   // `override` lets the "Use /go/<suggestion>" button retry with the suggested
   // slug directly, instead of racing a setSlug state update.
   const enchant = async (override?: string) => {
@@ -158,9 +160,10 @@ export function PortkeyPage() {
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setConflictSlug(slugValue);
-        // Offer the nearest free variant from the live list — memorability kept,
-        // no dead-end. A race (another device just took it too) re-suggests on
-        // the next click.
+        // Offer the nearest free variant from the rows loaded so far —
+        // memorability kept, no dead-end. The list is paged now, so a variant
+        // that exists further down can still be offered; the server 409s it
+        // and the next click re-suggests, the same path a race always took.
         setSuggestion(suggestSlug(slugValue, new Set(links.map((link) => link.slug))));
         setCreateError(err.detail ?? `/go/${slugValue} is already enchanted.`);
       } else if (err instanceof ApiError && err.detail) {
@@ -296,7 +299,12 @@ export function PortkeyPage() {
             <p className="caption pk-error" role="alert">
               {createError}
               {suggestion && (
-                <button type="button" className="pk-linkbtn" onClick={useSuggestion} disabled={saving}>
+                <button
+                  type="button"
+                  className="pk-linkbtn"
+                  onClick={useSuggestion}
+                  disabled={saving}
+                >
                   Use /go/{suggestion}
                 </button>
               )}
@@ -314,7 +322,7 @@ export function PortkeyPage() {
           )}
         </Card>
 
-        {links.length > 1 && (
+        {(total > 1 || q) && (
           <label className="pk-search">
             <SearchIcon size={15} />
             <input
@@ -324,21 +332,22 @@ export function PortkeyPage() {
               value={q}
               onChange={(event) => setQ(event.target.value)}
             />
-            <span className="pk-count caption">
-              {visible.length === links.length
-                ? `${links.length} portkeys`
-                : `${visible.length} of ${links.length}`}
+            <span className="pk-count caption" aria-live="polite">
+              {countLabel(links.length, total, 'portkey')}
             </span>
           </label>
         )}
 
         {error && (
-          <p className="caption" role="alert" style={{ color: 'var(--danger)' }}>
-            The portkeys could not be read. Check the bridge and reload.
-          </p>
+          <div className="load-more__error" role="alert">
+            <span>The portkeys could not be read. Check the bridge.</span>
+            <Button variant="ghost" size="sm" onClick={portkeys.reload}>
+              Try again
+            </Button>
+          </div>
         )}
 
-        {ready && links.length === 0 && !error && (
+        {ready && links.length === 0 && !error && !filtering && (
           <EmptyState
             icon={<WandIcon size={28} />}
             title="No portkeys yet"
@@ -346,7 +355,7 @@ export function PortkeyPage() {
           />
         )}
 
-        {ready && links.length > 0 && visible.length === 0 && (
+        {ready && links.length === 0 && !error && filtering && (
           <EmptyState
             icon={<SearchIcon size={28} />}
             title="Nothing matches"
@@ -354,9 +363,9 @@ export function PortkeyPage() {
           />
         )}
 
-        {visible.length > 0 && (
-          <div className="pk-grid" ref={gridRef}>
-            {visible.map((link) => {
+        {links.length > 0 && (
+          <div className="pk-grid" ref={gridRef} aria-busy={status === 'loading'}>
+            {links.map((link) => {
               const who = deviceName(link.authorDeviceId);
               return (
                 <article className="pk-card" key={link.slug}>
@@ -388,7 +397,9 @@ export function PortkeyPage() {
                   {link.note && <p className="pk-card__note">{link.note}</p>}
 
                   <div className="pk-card__meta caption">
-                    <span>{link.lastUsedAt ? `used ${formatTimeAgo(link.lastUsedAt)}` : 'never used'}</span>
+                    <span>
+                      {link.lastUsedAt ? `used ${formatTimeAgo(link.lastUsedAt)}` : 'never used'}
+                    </span>
                     {who && <span className="pk-card__who">{who}</span>}
                   </div>
 
@@ -400,7 +411,9 @@ export function PortkeyPage() {
                         label={`QR to /go/${link.slug}`}
                         downloadName={`portkey-${link.slug}.png`}
                       />
-                      <span className="caption">Scan on a phone — it lands through the redirect.</span>
+                      <span className="caption">
+                        Scan on a phone — it lands through the redirect.
+                      </span>
                     </div>
                   )}
 
@@ -436,7 +449,11 @@ export function PortkeyPage() {
                       aria-label={copiedSlug === link.slug ? 'Copied' : `Copy ${goUrl(link.slug)}`}
                       onClick={() => void copy(link)}
                     >
-                      {copiedSlug === link.slug ? <CheckIcon size={15} /> : <ClipboardIcon size={15} />}
+                      {copiedSlug === link.slug ? (
+                        <CheckIcon size={15} />
+                      ) : (
+                        <ClipboardIcon size={15} />
+                      )}
                     </Button>
                     <Button
                       variant="ghost"
@@ -466,6 +483,13 @@ export function PortkeyPage() {
             })}
           </div>
         )}
+
+        <LoadMore
+          hasMore={portkeys.hasMore}
+          status={status}
+          onLoadMore={portkeys.loadMore}
+          loaded={links.length}
+        />
       </div>
     </>
   );

@@ -14,7 +14,7 @@ import {
  * `eddas` table (never runestones — markdown ≠ JSON semantics) and CRUD plus
  * `edda.saved`/`edda.deleted` on the bus so open libraries live-update and
  * audit-log records activity. Three share surfaces: editor, public preview
- * page (SPA), and the raw `/edda/api/:slug` data URL.
+ * page (SPA), and the raw `/edda/api/v1/:slug` data URL.
  */
 export const eddaModule: FeatureModule = {
   name: 'edda',
@@ -33,8 +33,7 @@ export const eddaModule: FeatureModule = {
 
     registerEddaRoutes(app, {
       maxDocKb: config.edda.maxDocKb,
-      livePreviewMaxKb: config.edda.livePreviewMaxKb,
-      list: new ListEddasUseCase(repo),
+      list: new ListEddasUseCase(repo, config.paging),
       save: new SaveEddaUseCase({ repo, bus, maxDocBytes }),
       get: new GetEddaUseCase(repo),
       update: new UpdateEddaUseCase({ repo, bus, maxDocBytes }),

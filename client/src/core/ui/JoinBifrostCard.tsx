@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiGet } from '../api';
+import { API_V1, apiGet } from '../api';
 import { Select } from './Field';
 import { QrCard } from './QrCard';
 
@@ -16,7 +16,7 @@ export function JoinBifrostCard() {
 
   useEffect(() => {
     let disposed = false;
-    apiGet<{ urls: string[] }>('/api/qr/server-url')
+    apiGet<{ urls: string[] }>(`${API_V1}/qr/server-url`)
       .then(({ urls }) => {
         if (disposed || urls.length === 0) return;
         setServerUrls(urls);

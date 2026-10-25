@@ -1,54 +1,68 @@
 import { log } from '../log';
-import { mergeItems, sortItems } from './select';
+import { compareItems, mergeHeads, type Offsets, type Stream } from './paging';
 import type { LibraryEntry, LibraryItem, LibraryKind, LibraryQuery } from './types';
 
-export interface LibraryLoad {
-  /** Everything that loaded, merged and sorted as one list. */
-  items: LibraryItem[];
-  /** Kinds whose `list()` rejected. Never a reason to render nothing. */
+export interface LibraryStep {
+  /** The merged page, in `query`'s order. */
+  rows: LibraryItem[];
+  /** Rows taken from each kind — the next boundary is `offsets + consumed`. */
+  consumed: Offsets;
+  /** Each answering kind's total under the query. */
+  totals: Offsets;
+  /** The server's page size (every kind reads the same LIST_PAGE_SIZE). */
+  limit: number | null;
+  /** Union of the answering kinds' unfiltered author facets. */
+  authors: string[];
+  /** Kinds whose request rejected. Never a reason to render nothing. */
   failed: LibraryKind[];
 }
 
 /**
- * Fan out across the enabled kinds and merge what comes back (PLAN-21).
+ * One step of the Pensieve's page walk (PLAN-31): ask every kind for a page
+ * from its own offset, then k-way-merge the heads and keep the first `take`.
  *
- * **`allSettled`, never `all`.** With three independent endpoints, `all` would
- * turn one flaky module into an empty page: the two kinds that answered would
- * be thrown away with the one that did not. A failed kind instead contributes
- * nothing to `items` and its name to `failed`, and the page shows the rest plus
- * a Retry strip naming what is missing.
+ * **`allSettled`, never `all`** (PLAN-21, unchanged). With four independent
+ * endpoints, `all` would turn one flaky module into an empty page. A failed
+ * kind contributes no rows, and its name goes to `failed` so the page can show
+ * the rest plus a Retry strip.
  *
- * The fan-out is client-side on purpose. A server endpoint returning "all
- * documents" would have to read three modules' tables from one place, which
- * rule 2 forbids; the only legal shapes would be a core-owned aggregate table
- * or a bus-fed projection, and both couple storage that is deliberately
- * uncoupled. All three API clients already sit in `core/`, so this costs
- * nothing and the boundary stays intact.
+ * The fan-out is client-side on purpose: a server endpoint returning "all
+ * documents" would have to read four modules' tables from one place, which
+ * rule 2 forbids. What replaced the old whole-collection fetch is not a bigger
+ * fetch but real cross-source pagination — this merge over per-kind offsets,
+ * walked by `LibraryPager` — so the browser never holds more than four pages
+ * of rows at once, however large the library grows.
  *
- * Scale bound, written down rather than discovered later: each list endpoint
- * returns its whole matching set (the client sends no `limit`, so each kind
- * comes back under the server's own 200-row default). That is fine for a
- * household tool holding tens to hundreds of documents. **If a library ever
- * reaches thousands of rows, merge-sorting in the browser is the thing that
- * breaks first**, and the fix is real cross-source pagination — a merge cursor
- * over three sorted streams — not a bigger fetch.
- *
- * Retrying one kind is the same call with one entry: `loadLibrary([entry], q)`.
+ * `take` omitted means "one server page", read back from the envelope — the
+ * client never hardcodes LIST_PAGE_SIZE.
  */
-export async function loadLibrary(
+export async function loadLibraryStep(
   entries: readonly LibraryEntry[],
   query: LibraryQuery,
-): Promise<LibraryLoad> {
-  const settled = await Promise.allSettled(entries.map((entry) => entry.list(query)));
+  offsets: Offsets,
+  take?: number,
+): Promise<LibraryStep> {
+  const settled = await Promise.allSettled(
+    entries.map((entry) =>
+      entry.listPage(query, { offset: offsets[entry.kind] ?? 0, limit: take }),
+    ),
+  );
 
-  const lists: LibraryItem[][] = [];
+  const streams: Stream[] = [];
+  const totals: Offsets = {};
+  const authors = new Set<string>();
   const failed: LibraryKind[] = [];
+  let limit: number | null = null;
 
   settled.forEach((result, index) => {
     const entry = entries[index];
     if (!entry) return;
     if (result.status === 'fulfilled') {
-      lists.push(result.value);
+      const page = result.value;
+      streams.push({ kind: entry.kind, rows: page.items });
+      totals[entry.kind] = page.total;
+      for (const author of page.authors) authors.add(author);
+      limit = limit === null ? page.limit : Math.min(limit, page.limit);
       return;
     }
     failed.push(entry.kind);
@@ -60,5 +74,9 @@ export async function loadLibrary(
     });
   });
 
-  return { items: sortItems(mergeItems(lists), query.sort, query.order), failed };
+  const size = take ?? limit ?? 0;
+  const { rows, consumed } = mergeHeads(streams, size, (a, b) =>
+    compareItems(a, b, query.sort, query.order),
+  );
+  return { rows, consumed, totals, limit, authors: [...authors], failed };
 }

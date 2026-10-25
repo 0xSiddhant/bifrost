@@ -2,9 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const PIN = '4321';
 const BOUNDARY = 'BifrostHeimdallBoundary';
@@ -51,9 +50,7 @@ describe('heimdall auth guard + session', () => {
     // …and one dot-file, which is the OS's, not an upload (criterion 27).
     fs.writeFileSync(path.join(uploads, '.DS_Store'), 'x'.repeat(6144));
 
-    app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot });
   });
 
   afterAll(async () => {
@@ -76,7 +73,7 @@ describe('heimdall auth guard + session', () => {
   it('exposes the entry gesture config publicly (no session)', async () => {
     const res = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ shortcut: 'shift+meta+comma', tapCount: 7 });
+    expect(res.json()).toEqual({ shortcut: 'shift+meta+comma', tapCount: 7, defaultThemeId: null });
   });
 
   it('rejects a wrong PIN and accepts the right one', async () => {
@@ -176,6 +173,38 @@ describe('heimdall auth guard + session', () => {
     expect(access.json()).toMatchObject({ tapCount: 5, shortcut: 'ctrl+alt+h' });
   });
 
+  // PLAN-35: themes are client code, so every device learns the household
+  // default from the public access route, and the server checks only the
+  // id's shape (it has no list of themes to check against any more).
+  it('publishes the household default theme to every device, checking only its pattern', async () => {
+    const set = await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: 'no-such-theme' },
+    });
+    expect(set.statusCode).toBe(200);
+    const access = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
+    expect(access.json()).toMatchObject({ defaultThemeId: 'no-such-theme' });
+
+    const bad = await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: 'Not A Theme!' },
+    });
+    expect(bad.statusCode).toBe(400);
+
+    await app.fastify.inject({
+      method: 'PATCH',
+      url: '/api/heimdall/settings',
+      headers: { cookie },
+      payload: { defaultThemeId: null },
+    });
+    const cleared = await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
+    expect(cleared.json()).toMatchObject({ defaultThemeId: null });
+  });
+
   it('rejects an invalid settings patch', async () => {
     const res = await app.fastify.inject({
       method: 'PATCH',
@@ -206,9 +235,7 @@ describe('heimdall auth guard + session', () => {
 describe('heimdall login rate limit', () => {
   it('locks out after 5 failed attempts', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-rl-');
-    const app = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const app = await createTestApp({ STORAGE_ROOT: storageRoot });
     try {
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const res = await login(app, 'wrong');
@@ -229,9 +256,7 @@ describe('heimdall login rate limit', () => {
 describe('heimdall settings persist across restart', () => {
   it('a persisted shortcut survives a fresh boot', async () => {
     const storageRoot = tmpStorage('bifrost-heimdall-persist-');
-    const first = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const first = await createTestApp({ STORAGE_ROOT: storageRoot });
     const { cookie } = await login(first);
     await first.fastify.inject({
       method: 'PATCH',
@@ -241,9 +266,7 @@ describe('heimdall settings persist across restart', () => {
     });
     await first.shutdown();
 
-    const second = await createApp(loadConfig({ HEIMDALL_PIN: PIN, STORAGE_ROOT: storageRoot }), {
-      logger: pino({ level: 'silent' }),
-    });
+    const second = await createTestApp({ STORAGE_ROOT: storageRoot });
     try {
       const access = await second.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
       expect(access.json()).toMatchObject({ shortcut: 'ctrl+alt+k' });

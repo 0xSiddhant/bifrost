@@ -9,7 +9,7 @@ bifrost(1) -- talk to a Bifrost LAN hub from the terminal
 
 **bifrost** is a command-line client for a Bifrost server already running on your local network. It pushes and pulls files, reads and writes the shared clipboard, fetches saved documents, resolves go-links, reports server and device state, and runs a LAN speed test — all over the same HTTP API the browser app uses. It adds no server-side surface of its own.
 
-The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name resolves through your operating system's own mDNS support, the same way a browser reaches it — dependable on macOS, and dependent on `nss-mdns` on Linux or Bonjour on Windows. When it does not resolve, every command says so and names the fix.
+The CLI talks to `http://bifrost.local:4646` unless you say otherwise. That name resolves through your operating system's own mDNS support, the same way a browser reaches it — dependable on macOS, and dependent on `nss-mdns` on Linux or Bonjour on Windows. When it does not connect, the CLI tries the hub on this same machine (`127.0.0.1:4646`, then `127.0.0.1:4647`) and uses the first that answers, natively run or in Docker alike; when none does, every command says so and names the fix. An address given with `--host` or saved with `config set-host` is never replaced this way.
 
 ## GLOBAL OPTIONS
 

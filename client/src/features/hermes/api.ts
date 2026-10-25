@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from '../../core/api';
+import { API_V1, apiGet, apiSend } from '../../core/api';
 
 export interface ClipboardEntry {
   id: string;
@@ -21,10 +21,10 @@ export interface NewClipboardEntry {
 }
 
 export const listClipboard = (): Promise<ClipboardEntry[]> =>
-  apiGet<ClipboardEntry[]>('/api/clipboard');
+  apiGet<ClipboardEntry[]>(`${API_V1}/clipboard`);
 
 export const addClipboard = (input: NewClipboardEntry): Promise<ClipboardEntry> =>
-  apiSend<ClipboardEntry>('POST', '/api/clipboard', input);
+  apiSend<ClipboardEntry>('POST', `${API_V1}/clipboard`, input);
 
 export const deleteClipboard = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/clipboard/${id}`);
+  apiSend<null>('DELETE', `${API_V1}/clipboard/${id}`);

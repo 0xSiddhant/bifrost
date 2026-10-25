@@ -1,9 +1,10 @@
-import { deleteAtlas, listAtlases } from '../atlas';
-import { deleteEdda, listEddas } from '../edda';
-import { deleteGroot, listGroots } from '../groot';
-import { deleteRunestone, listRunestones } from '../runestone';
+import { deleteAtlas, listAtlasesPage } from '../atlas';
+import { deleteEdda, listEddasPage } from '../edda';
+import { deleteGroot, listGrootsPage } from '../groot';
+import { deleteRunestone, listRunestonesPage } from '../runestone';
 import { BracesIcon, DocFileIcon, GlobeIcon, TreeIcon } from '../ui/icons';
-import type { LibraryEntry, LibraryItem, LibraryKind, LibraryQuery } from './types';
+import type { LibraryEntry, LibraryItem, LibraryKind } from './types';
+import { API_V1 } from '../api';
 
 /**
  * The document-kind registry behind the Pensieve (PLAN-21).
@@ -43,10 +44,14 @@ const runestoneEntry: LibraryEntry = {
   noun: 'stone',
   newRoute: '/runestone',
   newLabel: 'Carve a new one',
-  list: (query: LibraryQuery) => listRunestones(query).then((rows) => tag('runestone', rows)),
+  listPage: (query, request) =>
+    listRunestonesPage(query, request).then((page) => ({
+      ...page,
+      items: tag('runestone', page.items),
+    })),
   remove: (id: string) => deleteRunestone(id),
   editorRoute: (item) => `/runestone/${item.slug}`,
-  apiRoute: (item) => `/runestone/api/${item.slug}`,
+  apiRoute: (item) => `/runestone${API_V1}/${item.slug}`,
   mimeType: 'application/json',
 };
 
@@ -60,10 +65,11 @@ const eddaEntry: LibraryEntry = {
   noun: 'manuscript',
   newRoute: '/edda',
   newLabel: 'Write a new one',
-  list: (query: LibraryQuery) => listEddas(query).then((rows) => tag('edda', rows)),
+  listPage: (query, request) =>
+    listEddasPage(query, request).then((page) => ({ ...page, items: tag('edda', page.items) })),
   remove: (id: string) => deleteEdda(id),
   editorRoute: (item) => `/edda/${item.slug}`,
-  apiRoute: (item) => `/edda/api/${item.slug}`,
+  apiRoute: (item) => `/edda${API_V1}/${item.slug}`,
   mimeType: 'text/markdown',
   readRoute: (item) => `/edda/preview/${item.slug}`,
   presentRoute: (item) => `/saga/${item.slug}`,
@@ -79,10 +85,11 @@ const grootEntry: LibraryEntry = {
   noun: 'document',
   newRoute: '/groot',
   newLabel: 'Grow a new one',
-  list: (query: LibraryQuery) => listGroots(query).then((rows) => tag('groot', rows)),
+  listPage: (query, request) =>
+    listGrootsPage(query, request).then((page) => ({ ...page, items: tag('groot', page.items) })),
   remove: (id: string) => deleteGroot(id),
   editorRoute: (item) => `/groot/${item.slug}`,
-  apiRoute: (item) => `/groot/api/${item.slug}`,
+  apiRoute: (item) => `/groot${API_V1}/${item.slug}`,
   mimeType: 'application/yaml',
 };
 
@@ -99,10 +106,11 @@ const atlasEntry: LibraryEntry = {
   noun: 'chart',
   newRoute: '/atlas',
   newLabel: 'Chart a new one',
-  list: (query: LibraryQuery) => listAtlases(query).then((rows) => tag('atlas', rows)),
+  listPage: (query, request) =>
+    listAtlasesPage(query, request).then((page) => ({ ...page, items: tag('atlas', page.items) })),
   remove: (id: string) => deleteAtlas(id),
   editorRoute: (item) => `/atlas/${item.slug}`,
-  apiRoute: (item) => `/atlas/api/${item.slug}`,
+  apiRoute: (item) => `/atlas${API_V1}/${item.slug}`,
   mimeType: 'application/xml',
 };
 

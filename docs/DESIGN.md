@@ -137,7 +137,7 @@ a page can hold any number of cards. (This is why the same colour can appear onc
 per page — e.g. Send and Runestone are both slot 1 — which is fine across
 different pages.) Every card, Loki included, is an ordinary palette card.
 
-Each theme defines its own 10 hues (`themes/*.json`), so the palette stays
+Each theme defines its own 10 hues (`client/src/assets/themes/*.json`), so the palette stays
 on-brand — a warm house theme gets ten warm shades, not a rainbow. A theme that
 omits the slots inherits the stylesheet default set. Reach for `--accent-soft`
 for generic hover/selected fills; use the card palette when a card wants its own

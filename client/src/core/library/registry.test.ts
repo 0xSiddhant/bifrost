@@ -52,7 +52,7 @@ describe('the shipped registry', () => {
     expect(groot).toBeDefined();
     const row = item('groot', 'deploy-values-abc123');
     expect(groot!.editorRoute(row)).toBe('/groot/deploy-values-abc123');
-    expect(groot!.apiRoute?.(row)).toBe('/groot/api/deploy-values-abc123');
+    expect(groot!.apiRoute?.(row)).toBe('/groot/api/v1/deploy-values-abc123');
     // YAML has no rendered read-only page the way Edda's preview does.
     expect(groot!.readRoute).toBeUndefined();
   });
@@ -66,7 +66,7 @@ describe('the shipped registry', () => {
     expect(atlas).toBeDefined();
     const row = item('atlas', 'bundle-info-abc123');
     expect(atlas!.editorRoute(row)).toBe('/atlas/bundle-info-abc123');
-    expect(atlas!.apiRoute?.(row)).toBe('/atlas/api/bundle-info-abc123');
+    expect(atlas!.apiRoute?.(row)).toBe('/atlas/api/v1/bundle-info-abc123');
     // XML has no rendered read-only page the way Edda's preview does.
     expect(atlas!.readRoute).toBeUndefined();
   });

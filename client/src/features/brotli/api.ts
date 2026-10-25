@@ -1,4 +1,4 @@
-import { ApiError, apiGet, apiSend } from '../../core/api';
+import { API_V1, ApiError, apiGet, apiSend } from '../../core/api';
 import type { BrotliQualityName } from './quality';
 
 /**
@@ -16,18 +16,18 @@ export interface BrotliConfig {
 }
 
 export const fetchBrotliConfig = (): Promise<BrotliConfig> =>
-  apiGet<BrotliConfig>('/api/brotli/config');
+  apiGet<BrotliConfig>(`${API_V1}/brotli/config`);
 
 export const compressContent = (bytes: Uint8Array, quality: BrotliQualityName): Promise<Uint8Array> =>
-  postBytes(`/api/brotli/compress?quality=${quality}`, bytes);
+  postBytes(`${API_V1}/brotli/compress?quality=${quality}`, bytes);
 
 export const decompressContent = (bytes: Uint8Array): Promise<Uint8Array> =>
-  postBytes('/api/brotli/decompress', bytes);
+  postBytes(`${API_V1}/brotli/decompress`, bytes);
 
 /**
  * Puts a result on the Hermes clipboard board.
  *
- * This calls the public `/api/clipboard` endpoint **directly**, exactly as
+ * This calls the public `/api/v1/clipboard` endpoint **directly**, exactly as
  * `core/api`'s generic helper backs many features' calls to shared REST
  * routes. It deliberately does not import `features/hermes/api.ts`: that would
  * be a cross-feature import, which is a build failure under
@@ -35,7 +35,7 @@ export const decompressContent = (bytes: Uint8Array): Promise<Uint8Array> =>
  * needed to agree on one URL.
  */
 export const sendToHermes = (text: string): Promise<unknown> =>
-  apiSend('POST', '/api/clipboard', { text });
+  apiSend('POST', `${API_V1}/clipboard`, { text });
 
 async function postBytes(path: string, bytes: Uint8Array): Promise<Uint8Array> {
   const response = await fetch(path, {

@@ -36,7 +36,10 @@ function spawnServer(): { child: ChildProcess; exited: Promise<number | null> } 
       ...process.env,
       NODE_ENV: 'production',
       STORAGE_ROOT: storageRoot,
-      PORT: String(PORT),
+      // PLAN-36: the API alone on the port this test talks to (no web host).
+      PORT: String(PORT + 1),
+      API_PORT: String(PORT),
+      BIFROST_RUN: 'api',
       HEIMDALL_PIN: '4321',
       LOG_LEVEL: 'error',
       DEPLOY_PROFILE: 'local',

@@ -1,132 +1,106 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { log } from '../log';
-import { loadLibrary } from './load';
+import { doc, memoryEntry } from './__fixtures__/memoryEntry';
+import { loadLibraryStep } from './load';
+import { LibraryPager } from './pager';
 import { availableKinds, entryFor } from './registry';
-import { filterItems, sortItems } from './select';
-import type { LibraryEntry, LibraryItem, LibraryKind, LibraryQuery } from './types';
+import type { LibraryItem, LibraryKind, LibraryQuery } from './types';
 
 const QUERY: LibraryQuery = { sort: 'modified', order: 'desc' };
 
-function row(kind: LibraryKind, id: string, modifiedAt: number): LibraryItem {
-  return {
-    kind,
-    id,
-    name: `${kind}-${id}`,
-    slug: `${kind}-${id}`,
-    authorDeviceId: 'device-a',
-    sizeBytes: 10,
-    createdAt: modifiedAt,
-    modifiedAt,
-  };
-}
-
-/** A registry entry that answers from memory — no server, no fetch. */
-function fakeEntry(kind: LibraryKind, rows: LibraryItem[], overrides: Partial<LibraryEntry> = {}): LibraryEntry {
-  return {
-    kind,
-    label: kind.toUpperCase(),
-    module: kind,
-    tone: 1,
-    icon: null,
-    events: [`${kind}.saved`, `${kind}.deleted`],
-    noun: 'document',
-    newRoute: `/${kind}`,
-    newLabel: 'New',
-    list: () => Promise.resolve(rows),
-    remove: () => Promise.resolve(null),
-    editorRoute: (item) => `/${kind}/${item.slug}`,
-    ...overrides,
-  };
-}
-
 afterEach(() => vi.restoreAllMocks());
 
-describe('loadLibrary', () => {
-  it('merges every kind into one sorted list', async () => {
+describe('loadLibraryStep', () => {
+  it('merges one server page per kind into one sorted page, with per-kind consumption', async () => {
     const entries = [
-      fakeEntry('runestone', [row('runestone', 'a', 10), row('runestone', 'b', 40)]),
-      fakeEntry('edda', [row('edda', 'c', 30)]),
+      memoryEntry('runestone', [doc('runestone', 'a', 10), doc('runestone', 'b', 40)]),
+      memoryEntry('edda', [doc('edda', 'c', 30)]),
     ];
 
-    const { items, failed } = await loadLibrary(entries, QUERY);
+    const step = await loadLibraryStep(entries, QUERY, {});
 
-    expect(items.map((item) => item.id)).toEqual(['b', 'c', 'a']);
-    expect(failed).toEqual([]);
+    expect(step.rows.map((item) => item.id)).toEqual(['b', 'c', 'a']);
+    expect(step.consumed).toEqual({ runestone: 2, edda: 1 });
+    expect(step.totals).toEqual({ runestone: 2, edda: 1 });
+    expect(step.limit).toBe(3);
+    expect(step.failed).toEqual([]);
   });
 
-  it('passes the same query to every kind', async () => {
-    const listA = vi.fn(() => Promise.resolve([]));
-    const listB = vi.fn(() => Promise.resolve([]));
+  it('passes the same query and each kind its own offset', async () => {
+    const listA = vi.fn(memoryEntry('runestone', []).listPage);
+    const listB = vi.fn(memoryEntry('edda', []).listPage);
     const query: LibraryQuery = { q: 'notes', author: 'device-b', sort: 'size', order: 'asc' };
 
-    await loadLibrary(
-      [fakeEntry('runestone', [], { list: listA }), fakeEntry('edda', [], { list: listB })],
+    await loadLibraryStep(
+      [
+        memoryEntry('runestone', [], { listPage: listA }),
+        memoryEntry('edda', [], { listPage: listB }),
+      ],
       query,
+      { runestone: 6, edda: 2 },
+      3,
     );
 
-    expect(listA).toHaveBeenCalledWith(query);
-    expect(listB).toHaveBeenCalledWith(query);
+    expect(listA).toHaveBeenCalledWith(query, { offset: 6, limit: 3 });
+    expect(listB).toHaveBeenCalledWith(query, { offset: 2, limit: 3 });
   });
 
-  // Criterion 6: the page is never blank because one module is down.
+  // PLAN-21 criterion 6, unchanged: the page is never blank because one module is down.
   it('returns the other kinds when one rejects, and never throws', async () => {
     vi.spyOn(log, 'reportError').mockImplementation(() => undefined);
     const entries = [
-      fakeEntry('runestone', [row('runestone', 'a', 10)]),
-      fakeEntry('edda', [], { list: () => Promise.reject(new Error('502')) }),
-      fakeEntry('groot', [row('groot', 'g', 20)]),
+      memoryEntry('runestone', [doc('runestone', 'a', 10)]),
+      memoryEntry('edda', [], { listPage: () => Promise.reject(new Error('502')) }),
+      memoryEntry('groot', [doc('groot', 'g', 20)]),
     ];
 
-    const { items, failed } = await loadLibrary(entries, QUERY);
+    const { rows, failed } = await loadLibraryStep(entries, QUERY, {});
 
-    expect(items.map((item) => item.id)).toEqual(['g', 'a']);
+    expect(rows.map((item) => item.id)).toEqual(['g', 'a']);
     expect(failed).toEqual(['edda']);
   });
 
-  it('reports every failed kind when they all reject', async () => {
-    vi.spyOn(log, 'reportError').mockImplementation(() => undefined);
-    const down = (kind: LibraryKind) =>
-      fakeEntry(kind, [], { list: () => Promise.reject(new Error('offline')) });
-
-    const { items, failed } = await loadLibrary([down('runestone'), down('edda')], QUERY);
-
-    expect(items).toEqual([]);
-    expect(failed).toEqual(['runestone', 'edda']);
-  });
-
-  // rules/coding.md: every new failure path gets a line where it is handled.
+  // rules/coding.md: every failure path gets a line where it is handled.
   it('logs the kind that failed', async () => {
     const reportError = vi.spyOn(log, 'reportError').mockImplementation(() => undefined);
     const boom = new Error('502');
 
-    await loadLibrary([fakeEntry('edda', [], { list: () => Promise.reject(boom) })], QUERY);
-
-    expect(reportError).toHaveBeenCalledWith(
-      'library kind "edda" failed to load',
-      boom,
-      { module: 'pensieve' },
+    await loadLibraryStep(
+      [memoryEntry('edda', [], { listPage: () => Promise.reject(boom) })],
+      QUERY,
+      {},
     );
+
+    expect(reportError).toHaveBeenCalledWith('library kind "edda" failed to load', boom, {
+      module: 'pensieve',
+    });
   });
 
-  it('retries one kind by loading a one-entry registry', async () => {
-    const recovered = fakeEntry('edda', [row('edda', 'c', 30)]);
-
-    const { items, failed } = await loadLibrary([recovered], QUERY);
-
-    expect(items.map((item) => item.id)).toEqual(['c']);
-    expect(failed).toEqual([]);
+  it('unions the author facets of the kinds that answered', async () => {
+    const step = await loadLibraryStep(
+      [
+        memoryEntry('runestone', [doc('runestone', 'a', 1, { authorDeviceId: 'phone' })]),
+        memoryEntry('edda', [doc('edda', 'b', 2, { authorDeviceId: 'mac' })]),
+      ],
+      QUERY,
+      {},
+    );
+    expect(step.authors.sort()).toEqual(['mac', 'phone']);
   });
 });
 
 describe('availableKinds', () => {
-  const registry = [fakeEntry('runestone', []), fakeEntry('edda', []), fakeEntry('groot', [])];
+  const registry = [
+    memoryEntry('runestone', []),
+    memoryEntry('edda', []),
+    memoryEntry('groot', []),
+  ];
 
   it('keeps only the kinds this profile serves', () => {
     const kinds = availableKinds(registry, (module) => module !== 'edda');
     expect(kinds.map((entry) => entry.kind)).toEqual(['runestone', 'groot']);
   });
 
-  // Criterion 7: a missing capability means no chip, no fetch, no subscription.
   it('drops a kind entirely rather than listing it as unavailable', () => {
     expect(availableKinds(registry, () => false)).toEqual([]);
   });
@@ -138,56 +112,50 @@ describe('availableKinds', () => {
 });
 
 /**
- * Criterion 11 — the criterion that proves the plan's actual value. A kind the
- * shell has never heard of is registered and must list, filter, sort and delete
- * through exactly the same code paths, with **no page change**: everything the
- * page does to a row it does through the registry entry.
+ * PLAN-21 criterion 11, kept through PLAN-31: a kind the shell has never heard
+ * of is registered and must page, sort and delete through exactly the same
+ * code paths, with no page change.
  */
-describe('a fourth kind is one registry entry', () => {
+describe('a fifth kind is one registry entry', () => {
   const scroll = (id: string, name: string, modifiedAt: number): LibraryItem => ({
-    ...row('groot' as LibraryKind, id, modifiedAt),
-    kind: 'scroll' as LibraryKind,
+    ...doc('scroll' as LibraryKind, id, modifiedAt),
     name,
   });
 
   const removed: string[] = [];
-  const fourth = fakeEntry('scroll' as LibraryKind, [scroll('s1', 'Ancient scroll', 25), scroll('s2', 'Bright scroll', 45)], {
-    module: 'scroll',
-    remove: (id: string) => {
-      removed.push(id);
-      return Promise.resolve(null);
+  const fifth = memoryEntry(
+    'scroll' as LibraryKind,
+    [scroll('s1', 'Ancient scroll', 25), scroll('s2', 'Bright scroll', 45)],
+    {
+      module: 'scroll',
+      remove: (id: string) => {
+        removed.push(id);
+        return Promise.resolve(null);
+      },
     },
+  );
+  const registry = [memoryEntry('runestone', [doc('runestone', 'a', 35)]), fifth];
+
+  it('pages alongside the kinds that already existed', async () => {
+    const view = await new LibraryPager(registry, QUERY).page(1);
+    expect(view.rows.map((item) => item.id)).toEqual(['s2', 'a', 's1']);
+    expect(view.total).toBe(3);
   });
 
-  const registry = [fakeEntry('runestone', [row('runestone', 'a', 35)]), fourth];
-
-  it('lists alongside the kinds that already existed', async () => {
-    const { items, failed } = await loadLibrary(registry, QUERY);
-    expect(items.map((item) => item.id)).toEqual(['s2', 'a', 's1']);
-    expect(failed).toEqual([]);
-  });
-
-  it('filters and sorts by the same rules', async () => {
-    const { items } = await loadLibrary(registry, QUERY);
-
-    const onlyScrolls = filterItems(items, { kind: 'scroll' as LibraryKind });
-    expect(onlyScrolls.map((item) => item.id)).toEqual(['s2', 's1']);
-
-    expect(filterItems(items, { q: 'ancient' }).map((item) => item.id)).toEqual(['s1']);
-    expect(sortItems(items, 'name', 'asc').map((item) => item.name)).toEqual([
+  it('sorts and filters by the same rules', async () => {
+    const byName = await new LibraryPager(registry, { sort: 'name', order: 'asc' }).page(1);
+    expect(byName.rows.map((item) => item.name)).toEqual([
       'Ancient scroll',
       'Bright scroll',
       'runestone-a',
     ]);
+    const searched = await new LibraryPager(registry, { ...QUERY, q: 'ancient' }).page(1);
+    expect(searched.rows.map((item) => item.id)).toEqual(['s1']);
   });
 
   it('deletes through its own entry', async () => {
-    const { items } = await loadLibrary(registry, QUERY);
-    const target = items.find((item) => item.id === 's1');
-    const entry = entryFor(registry, target?.kind ?? ('scroll' as LibraryKind));
-
-    await entry?.remove(target?.id ?? '');
-
+    const entry = entryFor(registry, 'scroll' as LibraryKind);
+    await entry?.remove('s1');
     expect(removed).toEqual(['s1']);
   });
 

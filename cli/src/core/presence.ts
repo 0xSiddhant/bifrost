@@ -1,4 +1,5 @@
 import type { ApiClient } from './client.js';
+import { API_V1 } from './client.js';
 
 /**
  * Wardens, read-only. The write side (`prune`, `name`) is deliberately out of
@@ -18,7 +19,7 @@ export async function listDevices(client: ApiClient): Promise<PresenceDevice[]> 
   const { devices } = await client.json<{ devices: PresenceDevice[] }>(
     'listing devices',
     'GET',
-    '/api/presence',
+    `${API_V1}/presence`,
   );
   return devices;
 }

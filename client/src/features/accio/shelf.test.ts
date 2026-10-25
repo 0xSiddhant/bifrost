@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { AccioLink } from '../../core/accio';
 import {
-  allTags,
+  compareLinks,
   displayTitle,
-  filterLinks,
   hostnameOf,
+  linkMatches,
   parseTagInput,
-  sortLinks,
   tileLetter,
   tileTone,
+  unionTags,
+  type ShelfFilter,
 } from './shelf';
 
 function link(partial: Partial<AccioLink> & { id: string; url: string }): AccioLink {
@@ -71,65 +72,72 @@ describe('displayTitle', () => {
   });
 });
 
-describe('filterLinks', () => {
+describe('linkMatches (the live-row predicate)', () => {
   const rows = [
-    link({ id: '1', url: 'https://cooking.example/pasta', title: 'Perfect Pasta', tags: ['recipes'] }),
+    link({
+      id: '1',
+      url: 'https://cooking.example/pasta',
+      title: 'Perfect Pasta',
+      tags: ['recipes'],
+    }),
     link({ id: '2', url: 'https://cooking.example/bread', title: 'Sourdough', tags: ['recipes'] }),
     link({ id: '3', url: 'https://work.example/pasta-report', title: 'Q3 Report', tags: ['work'] }),
   ];
+  const ids = (filter: ShelfFilter) =>
+    rows.filter((row) => linkMatches(row, filter)).map((r) => r.id);
 
   it('matches title and url, case-insensitively', () => {
-    expect(filterLinks(rows, { q: 'PASTA', tag: null }).map((r) => r.id)).toEqual(['1', '3']);
-    expect(filterLinks(rows, { q: 'work.example', tag: null }).map((r) => r.id)).toEqual(['3']);
+    expect(ids({ q: 'PASTA', tag: null })).toEqual(['1', '3']);
+    expect(ids({ q: 'work.example', tag: null })).toEqual(['3']);
   });
 
   it('composes search with the tag filter', () => {
-    expect(filterLinks(rows, { q: 'pasta', tag: 'recipes' }).map((r) => r.id)).toEqual(['1']);
-    expect(filterLinks(rows, { q: 'pasta', tag: 'work' }).map((r) => r.id)).toEqual(['3']);
-    expect(filterLinks(rows, { q: 'sourdough', tag: 'work' })).toEqual([]);
+    expect(ids({ q: 'pasta', tag: 'recipes' })).toEqual(['1']);
+    expect(ids({ q: 'pasta', tag: 'work' })).toEqual(['3']);
+    expect(ids({ q: 'sourdough', tag: 'work' })).toEqual([]);
   });
 
   it('an empty filter keeps everything', () => {
-    expect(filterLinks(rows, { q: '   ', tag: null })).toHaveLength(3);
+    expect(ids({ q: '   ', tag: null })).toHaveLength(3);
   });
 
   it('never matches an untitled row on a null title', () => {
-    const untitled = [link({ id: '9', url: 'https://x.dev/a' })];
-    expect(filterLinks(untitled, { q: 'null', tag: null })).toEqual([]);
+    expect(linkMatches(link({ id: '9', url: 'https://x.dev/a' }), { q: 'null', tag: null })).toBe(
+      false,
+    );
   });
 });
 
-describe('sortLinks', () => {
+describe('compareLinks (the server order, for placing a live row)', () => {
   const rows = [
     link({ id: 'b', url: 'https://b.dev', title: 'Beta', createdAt: 2000 }),
     link({ id: 'a', url: 'https://a.dev', title: 'alpha', createdAt: 3000 }),
     link({ id: 'c', url: 'https://c.dev', title: 'Gamma', createdAt: 1000 }),
+    link({ id: 'd', url: 'https://d.dev', title: null, createdAt: 3000 }),
   ];
+  const order = (sort: 'newest' | 'oldest' | 'title') =>
+    [...rows].sort((x, y) => compareLinks(x, y, sort)).map((r) => r.id);
 
-  it('defaults to newest first', () => {
-    expect(sortLinks(rows, 'newest').map((r) => r.id)).toEqual(['a', 'b', 'c']);
-    expect(sortLinks(rows, 'oldest').map((r) => r.id)).toEqual(['c', 'b', 'a']);
+  it('orders newest first, ties by id in the same direction', () => {
+    expect(order('newest')).toEqual(['d', 'a', 'b', 'c']);
+    expect(order('oldest')).toEqual(['c', 'b', 'a', 'd']);
   });
 
-  it('sorts by display title, case-insensitively', () => {
-    expect(sortLinks(rows, 'title').map((r) => r.id)).toEqual(['a', 'b', 'c']);
-  });
-
-  it('does not mutate its input', () => {
-    const before = rows.map((r) => r.id);
-    sortLinks(rows, 'title');
-    expect(rows.map((r) => r.id)).toEqual(before);
+  it('orders titles by ASCII-lowered title, falling back to the url', () => {
+    expect(order('title')).toEqual(['a', 'b', 'c', 'd']);
   });
 });
 
-describe('allTags', () => {
-  it('is the deduped, alphabetical union', () => {
+describe('unionTags', () => {
+  it('unions the server facet with tags live rows introduced, alphabetically', () => {
     expect(
-      allTags([
-        link({ id: '1', url: 'https://a.dev', tags: ['work', 'recipes'] }),
-        link({ id: '2', url: 'https://b.dev', tags: ['recipes'] }),
-        link({ id: '3', url: 'https://c.dev' }),
-      ]),
+      unionTags(
+        ['work'],
+        [
+          link({ id: '1', url: 'https://a.dev', tags: ['work', 'recipes'] }),
+          link({ id: '3', url: 'https://c.dev' }),
+        ],
+      ),
     ).toEqual(['recipes', 'work']);
   });
 });

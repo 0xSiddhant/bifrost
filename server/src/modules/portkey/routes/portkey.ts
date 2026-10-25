@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { errorResponses, noContent } from '../../../core/http/schemas.js';
+import { cursorListPageSchema, pagedQueryProperties } from '../../../core/paging.js';
 import { SLUG_MAX_LENGTH } from '../slug.js';
 import { NOTE_MAX_LENGTH } from '../usecases/manage-portkeys.js';
 import { TARGET_MAX_LENGTH } from '../target.js';
@@ -32,6 +34,7 @@ const listQuerySchema = {
     q: { type: 'string', maxLength: 120 },
     limit: { type: 'integer', minimum: 1, maximum: 1000 },
     offset: { type: 'integer', minimum: 0 },
+    ...pagedQueryProperties,
   },
 } as const;
 
@@ -72,22 +75,68 @@ const goParamsSchema = {
   properties: { slug: { type: 'string', minLength: 1, maxLength: 200 } },
 } as const;
 
+// Response shapes (PLAN-32), in the order the table and usecases build them.
+const portkeySchema = {
+  type: 'object',
+  required: ['slug', 'url', 'note', 'hits', 'authorDeviceId', 'createdAt', 'lastUsedAt'],
+  properties: {
+    slug: { type: 'string', description: 'The memorable word; never changes' },
+    url: { type: 'string', description: 'Normalized absolute http(s) target' },
+    note: { type: ['string', 'null'] },
+    hits: { type: 'integer', description: 'Redirects so far, counted after each hop' },
+    authorDeviceId: { type: ['string', 'null'] },
+    createdAt: { type: 'integer', description: 'Unix epoch milliseconds' },
+    lastUsedAt: { type: ['integer', 'null'], description: 'null if never used' },
+  },
+} as const;
+
+const listResponseSchema = {
+  description: 'Without `paged=true`, the bare array it always was; with it, one keyset page',
+  anyOf: [{ type: 'array', items: portkeySchema }, cursorListPageSchema(portkeySchema)],
+} as const;
+
+const TAGS = ['portkey'];
+
 interface ListQuery {
   q?: string;
   limit?: number;
   offset?: number;
+  paged?: boolean;
+  cursor?: string;
 }
 
 export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
-    '/api/portkey',
-    { schema: { querystring: listQuerySchema } },
-    (request) => deps.list.execute(request.query),
+    '/api/v1/portkey',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'List go-links',
+        description:
+          'Search with `q`. `paged=true` opts into the keyset envelope (PLAN-31), walked with ' +
+          '`cursor`; without it the response is the legacy bare array.',
+        operationId: 'listPortkeys',
+        querystring: listQuerySchema,
+        response: { 200: listResponseSchema, ...errorResponses(400) },
+      },
+    },
+    // `paged=true` opts into the cursor envelope (PLAN-31); without it the
+    // response is the bare array `bifrost portkey ls` still reads.
+    (request) =>
+      request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
   app.post<{ Body: { slug: string; url: string; note?: string } }>(
-    '/api/portkey',
-    { schema: { body: createBodySchema } },
+    '/api/v1/portkey',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Create a go-link: /go/<slug> → url',
+        operationId: 'createPortkey',
+        body: createBodySchema,
+        response: { 201: portkeySchema, ...errorResponses(400, 409, 413, 415, 422) },
+      },
+    },
     async (request, reply) => {
       const portkey = deps.create.execute({
         slug: request.body.slug,
@@ -100,8 +149,17 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   );
 
   app.patch<{ Params: { slug: string }; Body: { url?: string; note?: string } }>(
-    '/api/portkey/:slug',
-    { schema: { params: slugParamsSchema, body: updateBodySchema } },
+    '/api/v1/portkey/:slug',
+    {
+      schema: {
+        tags: TAGS,
+        summary: "Change a go-link's target or note",
+        operationId: 'updatePortkey',
+        params: slugParamsSchema,
+        body: updateBodySchema,
+        response: { 200: portkeySchema, ...errorResponses(400, 404, 413, 415, 422) },
+      },
+    },
     (request) =>
       deps.update.execute({
         slug: request.params.slug,
@@ -111,8 +169,16 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   );
 
   app.delete<{ Params: { slug: string } }>(
-    '/api/portkey/:slug',
-    { schema: { params: slugParamsSchema } },
+    '/api/v1/portkey/:slug',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Delete a go-link',
+        operationId: 'deletePortkey',
+        params: slugParamsSchema,
+        response: { 204: noContent, ...errorResponses(400, 404) },
+      },
+    },
     async (request, reply) => {
       deps.remove.execute(request.params.slug);
       return reply.code(204).send();
@@ -125,7 +191,28 @@ export function registerPortkeyRoutes(app: FastifyInstance, deps: PortkeyRoutesD
   // the stale target in every browser cache brutally.
   app.get<{ Params: { slug: string } }>(
     '/go/:slug',
-    { schema: { params: goParamsSchema } },
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Follow a go-link',
+        description:
+          'A known slug redirects to its target (`cache-control: no-store`, so a changed target ' +
+          'takes effect at once). An unknown one redirects to `/portkey?go=<slug>` to create it.',
+        operationId: 'followPortkey',
+        params: goParamsSchema,
+        response: {
+          302: {
+            description: 'To the target, or to the create form for an unknown slug',
+            type: 'null',
+            headers: {
+              location: { type: 'string' },
+              'cache-control': { type: 'string', description: '`no-store` on a known slug' },
+            },
+          },
+          ...errorResponses(400),
+        },
+      },
+    },
     async (request, reply) => {
       const target = deps.resolve.execute(request.params.slug);
       if (!target) {

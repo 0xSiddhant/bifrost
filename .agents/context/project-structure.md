@@ -3,42 +3,65 @@
 ```
 bifrost/
 ├── CLAUDE.md                  # entry point for AI agents → points to .agents/
+├── bifrost                    # `./bifrost`: the repo's task runner (sh shim → scripts/bifrost/main.ts via tsx);
+│                              #   NOT the `bifrost` LAN client, which is cli/
 ├── README.md
 ├── .agents/                    # plans, context, rules, memory (this folder)
-├── .github/workflows/         # ci.yml (lint/typecheck/test/build + docker build + backup smoke)
+├── .github/workflows/         # ci.yml (lint/typecheck/test/build + e2e + docker build + backup smoke)
 │                              #   release.yml (semver → tag → GitHub Release, on push to main)
 ├── .env / .env.example
-├── package.json               # npm workspaces: server, client, cli
-├── ecosystem.config.cjs       # PM2 process definition (macOS run mode)
-├── Dockerfile / .dockerignore # Linux-target image (CI-built; not the macOS run mode)
-├── docker-compose.yml         # run on a Linux host (host networking)
-├── docker-compose.observability.yml   # optional Grafana + Loki + Alloy stack
+├── load-results/              # gitignored: `npm run test:load` result files (PLAN-34), never committed
+├── package.json               # npm workspaces: server, client, cli, e2e, web
+├── ecosystem.config.cjs       # PM2 apps bifrost-api + bifrost-web (+ bifrost-mdns), picked by start-pm2.sh's
+│                              #   flags (BIFROST_APPS + the launcher keys), never .env (PLAN-36/39, 2026-10-09)
+├── docker/                    # one image per process (PLAN-39): api.Dockerfile (server, native toolchain),
+│                              #   web.Dockerfile (web host + both clients, no apt), standalone.Dockerfile
+│                              #   (nginx-unprivileged), nginx-standalone.conf (the standalone site's rules)
+├── .dockerignore
+├── compose/                   # one compose file per piece: api.yml, web.yml, web.bridge.yml (Mac override),
+│                              #   observability.yml (profiled), standalone.yml (cloud machine)
+├── docker-compose.yml         # includes api + web + observability: `docker compose up` is the hub
 ├── observability/             # loki/ alloy/ prometheus/ tempo/ grafana/ configs,
 │                              #   dashboard JSON + provisioned datasources & alert rules
 ├── docs/
 │   ├── ARCHITECTURE.md        # pointer → .agents/context/architecture.md (no duplication)
 │   ├── DESIGN.md              # design system, tokens, sky/relics
-│   ├── THEME-SPEC.md          # rules + JSON schema for user-made themes
+│   ├── THEME-SPEC.md          # rules + JSON schema for the bundled themes
+│   ├── standalone.md          # the standalone site: what it has, Docker, build args (PLAN-35)
 │   ├── pm2.md · launchd.md    # run as a service on macOS
-│   ├── docker-linux.md        # Docker on a Linux host
+│   ├── docker-linux.md        # Docker on a Linux host: the images, the compose combinations
+│   ├── docker-mac.md          # the web host in Docker beside the native API, and the Mac spike (PLAN-39)
 │   ├── observability.md       # the optional Grafana stack
 │   ├── cloud-profile.md       # internet-deployment checklist
 │   ├── releasing.md           # automated release flow
 │   ├── offline-mode.md        # warm-load for the pure-client pages (PLAN-22)
+│   ├── testing.md             # every kind of test, how to run and replay each (PLAN-32)
 │   └── assets/                # screenshots for README
 ├── server/
 │   ├── drizzle/               # generated migrations
+│   ├── openapi.json           # GENERATED API description (PLAN-32, `npm run api:spec`); committed,
+│   │                          #   and `openapi.test.ts` fails while it is stale
 │   └── src/
 │       ├── app.ts             # composition root: reads DEPLOY_PROFILE manifest, registers modules
+│       ├── openapi-spec.ts    # builds the spec from the app itself (local profile, scratch storage)
+│       ├── api-coverage.test.ts  # every route described: tags/summary/operationId/responses/security
+│       ├── testing/app.ts     # testConfig/createTestApp: the one way a server test builds an app
+│       │                      #   (required keys, temp storage, contract guard `strict`)
 │       ├── bootstrap.ts       # production entry (always starts; PM2/launchd/Docker/npm start use it)
 │       ├── otel.ts            # OpenTelemetry SDK — loaded via `node --import`, BEFORE the app
 │       │                      #   (ESM hoists, so starting it from app code instruments nothing)
 │       ├── core/              # shared kernel — NEVER imports from modules/
-│       │   ├── config/  db/  logger/  bus/  sse/  auth/  mdns/  http/  backup/
+│       │   ├── config/  db/  logger/  bus/  sse/  auth/  http/  backup/
+│       │   ├── net.ts         #   lanIPv4Addresses() (the responder itself moved to web/, PLAN-36)
+│       │   ├── web-host-check.ts  # full mode: error if nothing answers PORT/healthz after 10 s
+│       │   │                  #   http/: schemas.ts (shared response pieces), contract.ts (the
+│       │   │                  #   response contract guard), openapi.ts (swagger + routeCatalog)
 │       │   ├── disk-usage.ts  #   the one recursive storage walk (Heimdall + metrics)
+│       │   ├── paging.ts      #   PLAN-31: page-size clamp, keyset cursor codec, envelopes
+│       │   │                  #   (+ their response schemas, PLAN-32)
 │       │   └── relics/        #   runestone name-bank (relicTitle/uniqueRelicTitle)
 │       └── modules/
-│           └── <feature>/     # health, file-transfer, previews, clipboard, themes,
+│           └── <feature>/     # health, file-transfer, previews, clipboard,
 │               ├── module.ts  #   heimdall, qr-tool, presence, audit-log, runestone,
 │               │              #   variant, edda, groot, atlas, loki, accio, nimbus, portkey,
 │               │              #   screensaver, client-logs, metrics, toolbox,
@@ -48,8 +71,11 @@ bifrost/
 │               ├── services/  # concrete repo/service implementations
 │               └── schema.ts  # Drizzle tables owned by this module
 ├── client/
+│   ├── buildDefaults.ts       # the .env values a client build bakes in (PLAN-35)
+│   ├── seoBuild.ts            # standalone only: a page per public tool, 404.html, robots.txt,
+│   │                          #   sitemap.xml (the list: src/core/seo.ts)
 │   └── src/
-│       ├── app/               # shell, router, capability-gated CATEGORY nav (3 hub tabs);
+│       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       │                      #   + PensievePage (PLAN-21) — a shell ACROSS features, so it lives
 │       │                      #     here rather than in features/; its logic is in core/library/
@@ -57,7 +83,12 @@ bifrost/
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
-│       ├── core/              # api/sse clients, log.ts (batched browser→server logger),
+│       │                      #   + themes/*.json (bundled at build time, PLAN-35)
+│       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
+│       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
+│       │                      #   bifrost.local.* localStorage, rules.ts + rules.cases.json),
+│       │                      #   api/sse clients (hub-only stubs in standalone), log.ts (batched
+│       │                      #   browser→server logger; a no-op sink standalone),
 │       │                      #   notify/ (global notification stack: store + host +
 │       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
 │       │                      #   theme engine, device registry, tokens,
@@ -87,10 +118,13 @@ bifrost/
 │       │                      #     one thing every plist library throws away — and owns the pure
 │       │                      #     edit computations; advisories.ts is three, not padded to Groot's),
 │       │                      #   library/ (PLAN-21 — the document-kind registry + allSettled fan-out
-│       │                      #     + pure merge/sort/filter behind the Pensieve; a 4th kind is one entry —
+│       │                      #     + since PLAN-31 the paging algebra (paging.ts) and the page walk
+│       │                      #     (pager.ts, LibraryPager) behind the Pensieve; a 4th kind is one entry —
 │       │                      #     PLAN-19's groot proved it and PLAN-23's atlas proved it again,
 │       │                      #     one array element and no page change),
 │       │                      #   offlineMode.ts (PLAN-22 — warm-load policy client + status shape),
+│       │                      #   useCursorList.ts + ui/LoadMore.tsx (PLAN-31 — Accio/Portkey infinite
+│       │                      #     scroll), ui/Pager.tsx + useMediaQuery.ts (the Pensieve's pager),
 │       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
 │       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
 │       │                      #     cold route with no bridge off the app-wide crash card),
@@ -138,11 +172,50 @@ bifrost/
 │       ├── commands/          #   thin: parse args, call core/, print. No usecase tier —
 │       │                      #     there is no rule here the server does not already enforce
 │       └── test/              #   liveServer (spawns a REAL server per int suite) + runCli
-├── scripts/                   # setup, backup, restore, resilience (test:resilience),
-│                              #   gen-build-info, gen-man, cli-sync (pack + npm install -g,
-│                              #   skipped under CI) + start-pm2.sh, start-launchd.sh,
-│                              #   observability.sh
-├── themes/                    # built-in (aurora, daybreak, ghibli-dusk, olympus) + user-added theme JSON files
+├── web/                       # FIFTH workspace (PLAN-36): the web host on PORT. Lint-banned from
+│   │                          #   importing server/client/cli/e2e source; reads the shared .env itself
+│   └── src/
+│       ├── bootstrap.ts       #   production entry (PM2/launchd/compose/npm start)
+│       ├── main.ts            #   mode → client dir, listen on WEB_HOST:PORT, mDNS decision, shutdown
+│       ├── host.ts            #   buildWebHost: static + SPA fallback + the proxy (hub), or the
+│       │                      #     nginx-rule static site (standalone); 502 HUB_UNAVAILABLE, /healthz
+│       ├── standalone-rules.ts  # the nginx-standalone.conf rules, parity-tested
+│       ├── config.ts  logger.ts  # its own zod view of .env; app-web.N.log, source: "web"
+│       ├── mdns.ts            #   the Bonjour responder (moved from server/src/core/mdns, PLAN-36)
+│       ├── advertiser.ts      #   an advertiser-only process: `bifrost-mdns` (advertise.ts) and `npm run dev`
+│       │                      #     (mdns-dev.ts), each with its own decision (PLAN-39)
+│       ├── processes.ts       #   the processes a run needs + launchFor/parseRunShape (the launchers' flags)
+│       └── supervise.ts       #   runs a mode's processes as one for `npm start` (scripts/start.ts)
+├── e2e/                       # FOURTH workspace (PLAN-32a): sees only the BUILT system, from
+│   │                          #   outside — lint-banned from importing server/client/cli src
+│   ├── playwright.config.ts   #   UI only: chromium-desktop, chromium-mobile, webkit-mobile, cloud
+│   ├── vitest.config.ts       #   unit tests of the support code (`npm test`)
+│   ├── vitest.e2e.config.ts   #   the installed-CLI suite (`cli/**/*.e2e.ts`)
+│   ├── vitest.api.config.ts   #   the black-box API suite (`api/**/*.e2e.ts`, PLAN-33)
+│   ├── api/                   #   boot, transport, contract, fuzz/, security, modes (PLAN-36); support/ (spec reader,
+│   │                          #   recording fetch client, seeding, SSE, zip); coverage-report.ts
+│   ├── support/               #   server.ts (both production entries, the web host in front; scratch
+│   │                          #   storage, blanked .env),
+│   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
+│   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,
+│   │                          #   pty.ts, sink.ts, pdf.ts, files.ts, guard-fixture.ts,
+│   │                          #   static-server.ts + standalone-fixtures.ts (PLAN-35)
+│   ├── browser/               #   journeys 1–18, cross-surface, bridge-closed, routes.spec.ts, guard.spec.ts
+│   ├── standalone/            #   the standalone site, from a static server with the nginx rules (PLAN-35)
+│   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
+│   ├── perf/                  #   the load harness, `npm run test:load` (PLAN-34): run.ts, options.ts,
+│   │                          #   seed.ts, scenarios.ts (autocannon), metrics.ts (/metrics, web host RSS), report.ts,
+│   │                          #   profiles/{load,stress,spike,soak,fanout}.ts; never in CI
+├── tools/micromatch-shim/     # stands in for micromatch (no `braces`): the 3 functions eslint-plugin-boundaries
+│                              #   uses, copied verbatim; wired by package.json devDependency + override
+├── scripts/                   # bifrost/ (`./bifrost`: commands.ts is the one task table — runs, help, man,
+│                              #   list --json; main.ts executes it; commands.test.ts fails on a named script
+│                              #   or file that does not exist), setup, backup, restore, resilience,
+│                              #   run-shape.sh (start-pm2/launchd's --web/--standalone/--otel flags),
+│                              #   gen-build-info, gen-man, gen-openapi (api:spec), cli-sync (pack + npm install -g,
+│                              #   skipped under CI) + start.ts (`npm start`), start-pm2.sh, start-launchd.sh,
+│                              #   observability.sh, check-standalone.ts (the standalone bundle reaches
+│                              #   no server), standalone-smoke.sh (the image, in CI)
 └── storage/                   # gitignored (.gitkeep committed) — survives restarts
     ├── uploads/   downloads/   tmp/   data/ (app.db)   logs/
 ```

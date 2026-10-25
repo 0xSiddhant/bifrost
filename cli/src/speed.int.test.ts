@@ -30,7 +30,7 @@ afterAll(async () => {
 
 /** Takes the guard as a different device, the way a browser mid-test holds it. */
 async function holdGuard(): Promise<void> {
-  const response = await fetch(`${server.baseUrl}/api/nimbus/down?mb=1`, {
+  const response = await fetch(`${server.baseUrl}/api/v1/nimbus/down?mb=1`, {
     headers: { 'x-bifrost-device': OTHER_DEVICE },
   });
   await response.arrayBuffer();
@@ -39,7 +39,7 @@ async function holdGuard(): Promise<void> {
 }
 
 async function freeGuard(): Promise<void> {
-  await fetch(`${server.baseUrl}/api/nimbus/release`, {
+  await fetch(`${server.baseUrl}/api/v1/nimbus/release`, {
     method: 'POST',
     headers: { 'x-bifrost-device': OTHER_DEVICE },
   });
@@ -57,7 +57,7 @@ describe('speed', () => {
     expect(saved.testMb).toBe(1);
 
     const history = (await (
-      await fetch(`${server.baseUrl}/api/nimbus/results`)
+      await fetch(`${server.baseUrl}/api/v1/nimbus/results`)
     ).json()) as NimbusResult[];
     expect(history).toHaveLength(1);
     expect(history[0]?.id).toBe(saved.id);

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, sql, type SQL } from 'drizzle-orm';
 import type { DbHandle } from '../../../core/db/index.js';
 import { atlasDocs } from '../../../core/db/schema.js';
 import type { AtlasSummary } from '../../../core/bus/events.js';
@@ -17,6 +17,18 @@ const SUMMARY_COLUMNS = {
 /** `%`/`_` are LIKE wildcards — a search for "100%" must not match everything. */
 function likePattern(q: string): string {
   return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+/** The filters every read shares — the list, its paged form, and the count. */
+function whereFor(filter: Pick<AtlasListFilter, 'q' | 'authorDeviceId'>): SQL | undefined {
+  const conditions: SQL[] = [];
+  if (filter.q) {
+    conditions.push(sql`${atlasDocs.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
+  }
+  if (filter.authorDeviceId) {
+    conditions.push(eq(atlasDocs.authorDeviceId, filter.authorDeviceId));
+  }
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
 export class DbAtlasRepository implements AtlasRepository {
@@ -53,14 +65,34 @@ export class DbAtlasRepository implements AtlasRepository {
   }
 
   list(filter: AtlasListFilter): AtlasSummary[] {
-    const conditions: SQL[] = [];
-    if (filter.q) {
-      conditions.push(sql`${atlasDocs.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
-    }
-    if (filter.authorDeviceId) {
-      conditions.push(eq(atlasDocs.authorDeviceId, filter.authorDeviceId));
-    }
+    return this.select(filter, asc(atlasDocs.id));
+  }
 
+  listPage(filter: AtlasListFilter): AtlasSummary[] {
+    const direction = filter.order === 'asc' ? asc : desc;
+    return this.select(filter, direction(atlasDocs.id));
+  }
+
+  count(filter: Pick<AtlasListFilter, 'q' | 'authorDeviceId'>): number {
+    const row = this.db
+      .select({ n: sql<number>`count(*)` })
+      .from(atlasDocs)
+      .where(whereFor(filter))
+      .get();
+    return row?.n ?? 0;
+  }
+
+  listAuthors(): string[] {
+    return this.db
+      .selectDistinct({ id: atlasDocs.authorDeviceId })
+      .from(atlasDocs)
+      .where(isNotNull(atlasDocs.authorDeviceId))
+      .orderBy(asc(atlasDocs.authorDeviceId))
+      .all()
+      .flatMap((row) => (row.id ? [row.id] : []));
+  }
+
+  private select(filter: AtlasListFilter, tiebreak: SQL): AtlasSummary[] {
     const sortColumn = {
       name: sql`lower(${atlasDocs.name})`,
       created: atlasDocs.createdAt,
@@ -69,10 +101,11 @@ export class DbAtlasRepository implements AtlasRepository {
     }[filter.sort];
     const direction = filter.order === 'asc' ? asc : desc;
 
-    let query = this.db.select(SUMMARY_COLUMNS).from(atlasDocs).$dynamic();
-    if (conditions.length > 0) query = query.where(and(...conditions));
-    return query
-      .orderBy(direction(sortColumn), asc(atlasDocs.id))
+    return this.db
+      .select(SUMMARY_COLUMNS)
+      .from(atlasDocs)
+      .where(whereFor(filter))
+      .orderBy(direction(sortColumn), tiebreak)
       .limit(filter.limit)
       .offset(filter.offset)
       .all();

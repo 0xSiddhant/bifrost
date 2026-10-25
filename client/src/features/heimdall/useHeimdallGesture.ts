@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { bifrostEvents } from '../../core/sse';
+import { accessSettings, type AccessConfig } from '../../core/settings';
 import { matchesShortcut } from '../../core/shortcut';
-import { fetchAccess, type AccessConfig } from './api';
 
-const DEFAULT: AccessConfig = { shortcut: 'shift+meta+comma', tapCount: 7 };
+/** The build's `.env` defaults (PLAN-35), until the real values load. */
+const DEFAULT: AccessConfig = { ...__BIFROST_DEFAULTS__.heimdall };
 const TAP_WINDOW_MS = 3000;
 
 /** Entry is tablet/desktop only — gated on viewport width, not UA sniffing. */
@@ -19,8 +19,8 @@ const isWideViewport = (): boolean =>
  * keyboard listener is never attached and `registerTap` is a no-op, so a phone
  * has no entry at all (the wordmark just navigates home). Listeners tear down
  * and re-attach when the viewport crosses the threshold on resize. The current
- * shortcut/tap-count come from /api/heimdall/access and re-sync on
- * `settings.updated`.
+ * shortcut/tap-count come from the access settings (the hub's, or this
+ * browser's own on the standalone site) and re-sync live when they change.
  */
 export function useHeimdallGesture(onOpen: () => void): {
   registerTap: (event?: { preventDefault: () => void }) => void;
@@ -33,7 +33,8 @@ export function useHeimdallGesture(onOpen: () => void): {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAccess()
+    accessSettings
+      .load()
       .then((config) => {
         if (!cancelled) configRef.current = config;
       })
@@ -41,11 +42,8 @@ export function useHeimdallGesture(onOpen: () => void): {
         // Keep the built-in defaults; the gesture still works.
       });
 
-    const offSettings = bifrostEvents.on('settings.updated', (payload) => {
-      if (payload && typeof payload === 'object' && 'shortcut' in payload && 'tapCount' in payload) {
-        const next = payload as AccessConfig;
-        configRef.current = { shortcut: next.shortcut, tapCount: next.tapCount };
-      }
+    const offSettings = accessSettings.subscribe((next) => {
+      configRef.current = next;
     });
 
     const onKey = (event: KeyboardEvent) => {

@@ -2,6 +2,7 @@ import type { Readable } from 'node:stream';
 import { Readable as NodeReadable } from 'node:stream';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from '../../../core/http/index.js';
+import { errorResponses, rawBody } from '../../../core/http/schemas.js';
 import type { Logger } from '../../../core/logger/index.js';
 import {
   BROTLI_QUALITY,
@@ -33,6 +34,10 @@ const qualityQuerySchema = {
   },
 } as const;
 
+const TAGS = ['brotli'];
+
+const bytesResponse = rawBody('application/octet-stream', 'The result, streamed; never cached');
+
 export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDeps): void {
   /**
    * Both routes move raw bytes, so the body is never parsed or buffered — the
@@ -48,17 +53,45 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
   );
 
   /** Limits live in .env, so the page reads them instead of hardcoding a menu. */
-  app.get('/api/brotli/config', () => ({
-    maxInputMb: deps.maxInputMb,
-    maxOutputMb: deps.maxOutputMb,
-    qualities: BROTLI_QUALITY_NAMES,
-    defaultQuality: 'balanced' satisfies BrotliQualityName,
-  }));
+  app.get(
+    '/api/v1/brotli/config',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The input and output caps and the quality presets',
+        operationId: 'getBrotliConfig',
+        response: {
+          200: {
+            type: 'object',
+            required: ['maxInputMb', 'maxOutputMb', 'qualities', 'defaultQuality'],
+            properties: {
+              maxInputMb: { type: 'integer' },
+              maxOutputMb: { type: 'integer' },
+              qualities: { type: 'array', items: { type: 'string', enum: BROTLI_QUALITY_NAMES } },
+              defaultQuality: { type: 'string', enum: BROTLI_QUALITY_NAMES },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      maxInputMb: deps.maxInputMb,
+      maxOutputMb: deps.maxOutputMb,
+      qualities: BROTLI_QUALITY_NAMES,
+      defaultQuality: 'balanced' satisfies BrotliQualityName,
+    }),
+  );
 
   app.post<{ Querystring: { quality?: BrotliQualityName } }>(
-    '/api/brotli/compress',
+    '/api/v1/brotli/compress',
     {
-      schema: { querystring: qualityQuerySchema },
+      schema: {
+        tags: TAGS,
+        summary: 'Brotli-compress the request body (application/octet-stream)',
+        operationId: 'brotliCompress',
+        querystring: qualityQuerySchema,
+        response: { 200: bytesResponse, ...errorResponses(400, 413, 415, 429) },
+      },
       // Compress and decompress each get their own budget: a route-level config
       // gets its own store, so a long decompress session cannot spend the
       // allowance the other route needs.
@@ -87,8 +120,16 @@ export function registerBrotliRoutes(app: FastifyInstance, deps: BrotliRoutesDep
   );
 
   app.post(
-    '/api/brotli/decompress',
-    { config: { rateLimit: { max: deps.rateLimitPerMinute, timeWindow: 60_000 } } },
+    '/api/v1/brotli/decompress',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Decompress a Brotli request body (application/octet-stream)',
+        operationId: 'brotliDecompress',
+        response: { 200: bytesResponse, ...errorResponses(400, 413, 415, 422, 429) },
+      },
+      config: { rateLimit: { max: deps.rateLimitPerMinute, timeWindow: 60_000 } },
+    },
     async (request, reply) => {
       // No pre-check exists on this side, by the nature of the risk: a
       // compressed size says nothing about the size it expands to. The output
@@ -109,15 +150,22 @@ function declaredLength(request: FastifyRequest): number | null {
 }
 
 /**
- * Sends a codec stream, holding the status open until the first byte exists.
+ * Sends a codec stream, holding the status open until the first
+ * `HELD_HEAD_BYTES` exist (or the stream ends first).
  *
  * A stream handed straight to `reply.send()` commits its status the moment
  * piping starts, which is too early to be honest here: whether a blown cap or
  * a failed decode can still become a clean 413/422 depends entirely on whether
- * anything has gone out yet. So the first chunk is awaited first — a failure
- * before it arrives still has a status code available, and a failure after it
- * does not, which is exactly the split this module documents rather than
- * promising one uniform outcome.
+ * anything has gone out yet. So the head is awaited first — a failure inside
+ * it still has a status code available, and a failure after it does not,
+ * which is exactly the split this module documents rather than promising one
+ * uniform outcome.
+ *
+ * The head used to be one byte. PLAN-33's fuzzer found four input bytes that
+ * decode one byte and then fail: a 200 cut off mid-body, for an input that is
+ * plainly invalid. Holding 1 MiB (bounded memory per request) gives every
+ * output up to that size an honest 422; only a larger output that fails late
+ * still ends the connection.
  */
 async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): Promise<unknown> {
   // A client that vanishes mid-request leaves nobody to read this; destroying
@@ -130,7 +178,7 @@ async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): 
 
   let body: Readable;
   try {
-    body = await firstByteHeld(produced);
+    body = await headHeld(produced);
   } catch (error) {
     throw asHttpError(error);
   }
@@ -142,23 +190,39 @@ async function sendBytes(reply: FastifyReply, produced: Readable, log: Logger): 
     log.warn({ err }, 'brotli: stream failed after headers; connection destroyed'),
   );
 
-  return reply
-    .header('content-type', 'application/octet-stream')
-    // Deliberately no content-disposition: the client already holds the bytes
-    // and names the download itself, so the server never invents a filename.
-    .header('cache-control', 'no-store')
-    .send(body);
+  return (
+    reply
+      .header('content-type', 'application/octet-stream')
+      // Deliberately no content-disposition: the client already holds the bytes
+      // and names the download itself, so the server never invents a filename.
+      .header('cache-control', 'no-store')
+      .send(body)
+  );
 }
 
-/** Pulls one chunk, then hands back a stream that replays it and the rest. */
-async function firstByteHeld(produced: Readable): Promise<Readable> {
+/** How much output is held before the status is committed (see `sendBytes`). */
+const HELD_HEAD_BYTES = 1024 * 1024;
+
+/** Pulls up to the head, then hands back a stream that replays it and the rest. */
+async function headHeld(produced: Readable): Promise<Readable> {
   const iterator = produced[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
-  const first = await iterator.next();
+  const head: Buffer[] = [];
+  let held = 0;
+  let done = false;
+  while (held < HELD_HEAD_BYTES) {
+    const next = await iterator.next();
+    if (next.done === true) {
+      done = true;
+      break;
+    }
+    head.push(next.value);
+    held += next.value.length;
+  }
   const rest: AsyncIterable<Buffer> = { [Symbol.asyncIterator]: () => iterator };
 
   async function* replay(): AsyncGenerator<Buffer> {
-    if (first.done !== true) yield first.value;
-    yield* rest;
+    yield* head;
+    if (!done) yield* rest;
   }
   return NodeReadable.from(replay(), { objectMode: false });
 }

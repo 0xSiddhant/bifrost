@@ -2,7 +2,11 @@
 
 Bifrost logs structured pino JSON to `storage/logs/` — rotated `app.N.log` files
 with a `current.log` symlink on the active one, kept to `LOG_RETENTION_FILES`
-rotations. That alone is the source of truth (`npm run logs` pretty-prints it).
+rotations. That alone is the source of truth (`./bifrost logs` pretty-prints it).
+Since PLAN-36 the web host in front of the API writes its own series beside it,
+`app-web.N.log` (no symlink; `current.log` stays the API's), every line tagged
+`source: "web"`: its start and stop, the API going away and coming back, and
+streams a browser abandoned. Requests are logged once, by the API.
 This stack is a Grafana view on top; it is never load-bearing.
 
 Since PLAN-16a it is also **the** log UI: Heimdall's in-app viewer, its filters,
@@ -28,12 +32,19 @@ sh scripts/observability.sh down     # stop  (add -v to wipe stored logs)
 Or drive compose directly:
 
 ```bash
-docker compose -f docker-compose.observability.yml up -d
-open http://localhost:3000        # admin / bifrost  — change the password
+docker compose -f compose/observability.yml --env-file .env --profile observability up -d
+open http://localhost:4648        # admin / bifrost  — change the password
 
-docker compose -f docker-compose.observability.yml down      # stop
-docker compose -f docker-compose.observability.yml down -v    # + wipe stored logs
+docker compose -f compose/observability.yml --env-file .env --profile observability down      # stop
+docker compose -f compose/observability.yml --env-file .env --profile observability down -v   # + wipe stored logs
 ```
+
+Every service is in the `observability` profile (PLAN-39), so the root
+`docker-compose.yml` includes the stack without starting it: when the hub runs
+in Docker on Linux, `docker compose --profile observability up -d` starts the
+hub and the stack as one project. The file moved from
+`docker-compose.observability.yml`; it keeps the project name `bifrost`, so
+the existing volumes (and Grafana's and Loki's history) are reused.
 
 The **Bifrost** dashboard is auto-provisioned (requests/min, errors + warnings,
 uploads, watcher events, errors-by-module, errors-by-source, request throughput,
@@ -76,10 +87,15 @@ Two details that follow from this:
 
 ## Tracing (off by default)
 
-`OTEL_ENABLED=false` ships as the default deliberately: a dead OTLP endpoint
-makes the exporter retry and log connection errors into `storage/logs/` —
-observability tooling degrading the observability record. Turn it on when the
-stack is up.
+Traces are off unless the launcher turns them on, deliberately: a dead OTLP
+endpoint makes the exporter retry and log connection errors into
+`storage/logs/`, observability tooling degrading the observability record.
+`./bifrost start --obs` (or `service … --obs`) starts this stack and turns them
+on together; `--otel` turns them on alone, for a stack that is already up; in
+Docker on Linux, `./bifrost docker up --obs` adds `compose/api.otel.yml`. It is
+never an `.env` setting (owner, 2026-10-09): `OTEL_ENABLED` in `.env` is
+ignored. The endpoint and the rest (`OTEL_EXPORTER_OTLP_ENDPOINT`, …) stay in
+`.env`.
 
 The SDK is loaded with **`node --import ./server/dist/otel.js`** (npm start, PM2
 and Docker all do this). It cannot be initialised from application code: ESM
@@ -117,19 +133,31 @@ spans ────────────────push──────▶ 
     pino's numeric `level` instead, so Alloy fills `logLevel` in from it at
     ingest — one query therefore spans the whole archive, and the old files are
     never rewritten.
-  - `source` separates this process from the browsers. Server module lines carry
+  - `source` separates the processes from the browsers. Server module lines carry
     it explicitly; boot, shutdown, and request lines have no binding, so Alloy
-    defaults those to `server`.
+    defaults those to `server`. The web host's lines all carry `source: "web"`,
+    and `app*.log` already matches its `app-web.N.log` files.
+  - The two series never prune each other: pino-roll's retention counts only
+    files named exactly `<base>.<N>.log`, so `app.` and `app-web.` keep
+    `LOG_RETENTION_FILES` each.
 - **Loki** (`observability/loki/config.yml`) stores on a local filesystem
   volume; `reject_old_samples: false` is what lets it accept the backlog.
 - **Prometheus** (`observability/prometheus/prometheus.yml`) scrapes
   `host.docker.internal:4646` — **not** `localhost`, because Bifrost runs native
-  on macOS while this runs in a container. `node_exporter` is deliberately
+  on macOS while this runs in a container. Since PLAN-36 that is the web host,
+  which forwards `/metrics` to the API, so the target did not change; the API's
+  own port is loopback-only and a container could not reach it anyway. `node_exporter` is deliberately
   absent: in Docker on macOS it would measure the Linux VM rather than the Mac,
   producing numbers that look real and mean nothing. Every process metric comes
   from inside Node instead.
-- **Tempo** (`observability/tempo/tempo.yml`) accepts OTLP/HTTP on 4318 and
-  keeps blocks for 48h — recent investigation only, by design.
+- **Tempo** (`observability/tempo/tempo.yml`) accepts OTLP/HTTP on 4318 inside
+  the network, published on this machine as **4650** (the API's
+  `OTEL_EXPORTER_OTLP_ENDPOINT`), and keeps blocks for 48h — recent
+  investigation only, by design. The API sends traces only: metrics are
+  Prometheus's scrape and logs are files, so the SDK's OTLP metrics and logs
+  exporters stay off.
+- **Ports on this machine** run on from Bifrost's: 4648 Grafana, 4649
+  Prometheus, 4650 traces in, 4651 Loki, 4652 Tempo's query API.
 - **Grafana** provisions the Loki datasource and the dashboard from
   `observability/grafana/`.
 
@@ -140,7 +168,7 @@ browser itself. Bifrost is opened from phones and tablets the owner is not
 sitting at, so a React crash or a failed upload there reaches the archive
 through nothing else: the failure never touches the server.
 
-The client batches those reports to `POST /api/client-logs`, and the
+The client batches those reports to `POST /api/v1/client-logs`, and the
 `client-logs` module re-emits them through the same pino instance — same files,
 same rotation, same Alloy, same backfill. Ten feature names exist on both sides
 (`accio`, `edda`, `file-transfer`, `heimdall`, `loki`, `nimbus`, `previews`,
@@ -149,7 +177,7 @@ halves of a feature and adding `source="client"` narrows it to the browser.
 
 - The client ships **`warn` and above** — every line crosses the network into an
   unauthenticated endpoint. `CLIENT_LOG_LEVEL` lowers the floor; clients pick it
-  up from `GET /api/client-logs/config` without a rebuild, and the server
+  up from `GET /api/v1/client-logs/config` without a rebuild, and the server
   enforces the same floor on the way in.
 - `CLIENT_LOG_RATE_LIMIT_PER_MIN`, `CLIENT_LOG_MAX_BATCH`, and
   `CLIENT_LOG_MAX_BODY_KB` bound that write path so a misbehaving tab cannot
@@ -167,11 +195,14 @@ halves of a feature and adding `source="client"` narrows it to the browser.
   against your real logs in Grafana and re-export the JSON to
   `observability/grafana/dashboards/bifrost.json` to keep it provisioned.
 - Change the Grafana admin password (`GF_SECURITY_ADMIN_PASSWORD`) before
-  exposing port 3000 anywhere but localhost.
-- Two alert rules ship provisioned (`observability/grafana/provisioning/
-  alerting/`): error rate and event-loop lag. Both query **Loki**, not
-  Prometheus, so they keep meaning something over an archive that backfills —
-  a rule against a scraped series would silently evaluate over holes.
+  exposing port 4648 anywhere but localhost.
+- Three alert rules ship provisioned (`observability/grafana/provisioning/
+  alerting/`): error rate, event-loop lag, and **contract mismatch** (PLAN-32:
+  any `contract mismatch` line from the response contract guard's `fallback`
+  mode, which means a route's schema is wrong; that rule goes when fallback
+  mode does). All query **Loki**, not Prometheus, so they keep meaning
+  something over an archive that backfills — a rule against a scraped series
+  would silently evaluate over holes.
 - `/metrics` is unauthenticated on the LAN. Prometheus carries no session, so a
   guard would not secure anything, it would just stop the scrape; the endpoint
   exposes counters and gauges, never content.

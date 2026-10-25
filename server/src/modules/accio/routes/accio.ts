@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { deviceIdOf } from '../../../core/device.js';
+import { errorResponses, noContent } from '../../../core/http/schemas.js';
+import { cursorListPageSchema, pagedQueryProperties } from '../../../core/paging.js';
 import { TAG_MAX_COUNT, TAG_MAX_LENGTH } from '../tags.js';
 import { TITLE_MAX_LENGTH } from '../title.js';
 import { URL_MAX_LENGTH } from '../url.js';
@@ -33,6 +35,7 @@ const listQuerySchema = {
     order: { enum: ['asc', 'desc'] },
     limit: { type: 'integer', minimum: 1, maximum: 500 },
     offset: { type: 'integer', minimum: 0 },
+    ...pagedQueryProperties,
   },
 } as const;
 
@@ -66,6 +69,35 @@ const idParamsSchema = {
   properties: { id: { type: 'string', minLength: 1, maxLength: 16 } },
 } as const;
 
+// Response shapes (PLAN-32), in the order the repository and usecases build them.
+const linkSchema = {
+  type: 'object',
+  required: ['id', 'url', 'title', 'tags', 'authorDeviceId', 'createdAt'],
+  properties: {
+    id: { type: 'string' },
+    url: { type: 'string', description: 'Normalized absolute http(s) URL' },
+    title: {
+      type: ['string', 'null'],
+      description: 'null until one is given or the background lookup finds one',
+    },
+    tags: { type: 'array', items: { type: 'string' }, description: 'Lowercased, deduped' },
+    authorDeviceId: { type: ['string', 'null'] },
+    createdAt: { type: 'integer', description: 'Unix epoch milliseconds' },
+  },
+} as const;
+
+const listResponseSchema = {
+  description: 'Without `paged=true`, the bare array it always was; with it, one keyset page',
+  anyOf: [
+    { type: 'array', items: linkSchema },
+    cursorListPageSchema(linkSchema, {
+      tags: { type: 'array', items: { type: 'string' }, description: 'Every tag on the shelf' },
+    }),
+  ],
+} as const;
+
+const TAGS = ['accio'];
+
 interface ListQuery {
   q?: string;
   tag?: string;
@@ -73,18 +105,43 @@ interface ListQuery {
   order?: string;
   limit?: number;
   offset?: number;
+  paged?: boolean;
+  cursor?: string;
 }
 
 export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps): void {
   app.get<{ Querystring: ListQuery }>(
-    '/api/accio',
-    { schema: { querystring: listQuerySchema } },
-    (request) => deps.list.execute(request.query),
+    '/api/v1/accio',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'List saved links',
+        description:
+          'Search (`q`), filter by `tag` and sort. `paged=true` opts into the keyset envelope ' +
+          '(PLAN-31), walked with `cursor`; without it the response is the legacy bare array.',
+        operationId: 'listLinks',
+        querystring: listQuerySchema,
+        response: { 200: listResponseSchema, ...errorResponses(400) },
+      },
+    },
+    // `paged=true` opts into the cursor envelope (PLAN-31); without it the
+    // response is the bare array it always was.
+    (request) =>
+      request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
   app.post<{ Body: { url: string; title?: string; tags?: string[] } }>(
-    '/api/accio',
-    { schema: { body: saveBodySchema } },
+    '/api/v1/accio',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Save a link',
+        description: 'Without a title, one is looked up in the background and arrives by event.',
+        operationId: 'saveLink',
+        body: saveBodySchema,
+        response: { 201: linkSchema, ...errorResponses(400, 413, 415, 422) },
+      },
+    },
     async (request, reply) => {
       const link = deps.save.execute({
         url: request.body.url,
@@ -99,8 +156,17 @@ export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps)
   );
 
   app.patch<{ Params: { id: string }; Body: { title?: string; tags?: string[] } }>(
-    '/api/accio/:id',
-    { schema: { params: idParamsSchema, body: updateBodySchema } },
+    '/api/v1/accio/:id',
+    {
+      schema: {
+        tags: TAGS,
+        summary: "Change a link's title or tags",
+        operationId: 'updateLink',
+        params: idParamsSchema,
+        body: updateBodySchema,
+        response: { 200: linkSchema, ...errorResponses(400, 404, 413, 415) },
+      },
+    },
     (request) =>
       deps.update.execute({
         id: request.params.id,
@@ -110,8 +176,16 @@ export function registerAccioRoutes(app: FastifyInstance, deps: AccioRoutesDeps)
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/api/accio/:id',
-    { schema: { params: idParamsSchema } },
+    '/api/v1/accio/:id',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'Delete a link',
+        operationId: 'deleteLink',
+        params: idParamsSchema,
+        response: { 204: noContent, ...errorResponses(400, 404) },
+      },
+    },
     async (request, reply) => {
       deps.remove.execute(request.params.id);
       return reply.code(204).send();

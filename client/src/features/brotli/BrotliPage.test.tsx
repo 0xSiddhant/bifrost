@@ -28,17 +28,6 @@ vi.mock('../../core/contentFormat/registry', async (importOriginal) => {
   return { ...actual, detectFormat: detector.detectFormat };
 });
 
-vi.mock('../../core/api', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../core/api')>();
-  return {
-    ...actual,
-    fetchCapabilities: vi.fn(async () => ({
-      profile: 'local',
-      modules: ['brotli', 'runestone', 'edda', 'groot', 'atlas', 'clipboard'],
-    })),
-  };
-});
-
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { toBase64 } from './bytes';
 import { BrotliPage } from './BrotliPage';

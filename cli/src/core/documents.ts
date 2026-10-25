@@ -1,5 +1,6 @@
 import type { ApiClient } from './client.js';
 import { CliError, EXIT } from './output.js';
+import { API_V1 } from './client.js';
 
 /**
  * Slug → document, shared by `open` and `preview`.
@@ -32,7 +33,7 @@ export function isDocumentKind(value: string): value is DocumentKind {
 }
 
 export function rawPath(kind: DocumentKind, slug: string): string {
-  return `/${kind}/api/${encodeURIComponent(slug)}`;
+  return `/${kind}${API_V1}/${encodeURIComponent(slug)}`;
 }
 
 export interface ResolvedDocument {
@@ -113,11 +114,15 @@ export async function resolveDocument(
  * XML. That is the honest closest thing, not a rendered page pretending; the day
  * one of them gains a read route, it is one entry here and nothing else changes.
  */
-export function previewUrl(baseUrl: string, document: ResolvedDocument): string {
+export function previewUrl(
+  baseUrl: string,
+  document: ResolvedDocument,
+  wirePath: (path: string) => string = (path) => path,
+): string {
   const slug = encodeURIComponent(document.slug);
   return document.kind === 'edda'
     ? `${baseUrl}/edda/preview/${slug}`
-    : `${baseUrl}${rawPath(document.kind, document.slug)}`;
+    : `${baseUrl}${wirePath(rawPath(document.kind, document.slug))}`;
 }
 
 /** True when `previewUrl` returned a real rendered page rather than raw bytes. */

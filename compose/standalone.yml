@@ -1,0 +1,65 @@
+# The standalone Bifrost site (PLAN-35): the client alone, as static files
+# behind nginx, with no Bifrost server and nothing it can reach. See
+# docs/standalone.md.
+#
+#   BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml up -d --build
+#
+# It publishes no port: it joins the Docker network your reverse proxy is
+# already on, and the proxy routes the public hostname (and TLS) to
+# bifrost-standalone:8080. No fixed container name, no volume, no host port,
+# so it sits beside the other containers on the machine without colliding.
+
+# Not included by the root docker-compose.yml: it runs on another machine, on a
+# network the hub does not have. `name: bifrost` keeps the project name the old
+# root file got from the repo directory (PLAN-39).
+name: bifrost
+
+services:
+  bifrost-standalone:
+    build:
+      context: ..
+      dockerfile: docker/standalone.Dockerfile
+      # Baked in at build time (Vite inlines them), so a change here needs
+      # `up -d --build`; a runtime `environment:` would arrive too late.
+      # Defaults are .env.example's.
+      args:
+        # The public origin people and search engines reach this site at:
+        # canonical links, link previews and sitemap.xml are built from it
+        # (docs/standalone.md). Unset is an error, so a public deploy cannot
+        # forget it; set it empty to build without them on purpose.
+        STANDALONE_SITE_URL: ${STANDALONE_SITE_URL?set STANDALONE_SITE_URL to the site's public origin, e.g. https://tools.example.com (or empty to build without canonical links and a sitemap)}
+        LOKI_EXECUTION_ENABLED: 'true'
+        LOKI_FETCH_ALLOWED: 'true'
+        # RUNESTONE_MAX_DOC_KB: '2048'
+        # EDDA_MAX_DOC_KB: '2048'
+        # EDDA_LIVE_PREVIEW_MAX_KB: '300'
+        # GROOT_MAX_DOC_KB: '2048'
+        # ATLAS_MAX_DOC_KB: '2048'
+        # LOKI_RUN_TIMEOUT_MS: '5000'
+        # LOKI_CONSOLE_MAX_ENTRIES: '500'
+        # SCREENSAVER_ENABLED: 'true'
+        # SCREENSAVER_IDLE_SECONDS: '60'
+        # HEIMDALL_SHORTCUT_DEFAULT: 'shift+meta+comma'
+        # HEIMDALL_TAP_COUNT: '7'
+        # BIFROST_COMMIT: 'abc1234'
+    image: bifrost-standalone:latest
+    restart: unless-stopped
+    read_only: true
+    # nginx's pid file and request buffers; nothing else is ever written.
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - '8080'
+    # No proxy on this machine? Publish the port instead:
+    # ports:
+    #   - '8080:8080'
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: ${BIFROST_DOCKER_NETWORK:?set BIFROST_DOCKER_NETWORK to your reverse proxy's Docker network}

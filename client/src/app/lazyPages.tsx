@@ -1,5 +1,6 @@
 import { lazy, type ComponentType } from 'react';
 import { withChunkTimeout } from '../core/chunkError';
+import { BridgeClosedPage } from '../core/ui/BridgeClosed';
 
 /**
  * Every route's code-split page, built as a *set* rather than as module-level
@@ -25,41 +26,60 @@ function page<P, M>(load: () => Promise<M>, pick: (module: M) => ComponentType<P
   return lazy(() => withChunkTimeout(load()).then((module) => ({ default: pick(module) })));
 }
 
-// Route-level code splitting: cloud builds never ship local-only pages.
+/**
+ * Route-level code splitting. A hub-only page is `__HUB__ ? page(…) :
+ * BridgeClosedPage`, written out at each entry rather than through a helper:
+ * the `import()` must sit in the branch the standalone build drops, or its
+ * chunk (and every request path in it) is emitted anyway (PLAN-35).
+ */
 export function createLazyPages() {
   return {
-    UploadPage: page(
-      () => import('../features/file-transfer/UploadPage'),
-      (m) => m.UploadPage,
-    ),
-    DownloadsPage: page(
-      () => import('../features/file-transfer/DownloadsPage'),
-      (m) => m.DownloadsPage,
-    ),
-    DownloadFolderPage: page(
-      () => import('../features/file-transfer/DownloadFolderPage'),
-      (m) => m.DownloadFolderPage,
-    ),
-    PreviewModal: page(
-      () => import('../features/previews/PreviewModal'),
-      (m) => m.PreviewModal,
-    ),
-    UploadPreviewModal: page(
-      () => import('../features/previews/UploadPreviewModal'),
-      (m) => m.UploadPreviewModal,
-    ),
-    HermesPage: page(
-      () => import('../features/hermes/HermesPage'),
-      (m) => m.HermesPage,
-    ),
+    UploadPage: __HUB__
+      ? page(
+          () => import('../features/file-transfer/UploadPage'),
+          (m) => m.UploadPage,
+        )
+      : BridgeClosedPage,
+    DownloadsPage: __HUB__
+      ? page(
+          () => import('../features/file-transfer/DownloadsPage'),
+          (m) => m.DownloadsPage,
+        )
+      : BridgeClosedPage,
+    DownloadFolderPage: __HUB__
+      ? page(
+          () => import('../features/file-transfer/DownloadFolderPage'),
+          (m) => m.DownloadFolderPage,
+        )
+      : BridgeClosedPage,
+    PreviewModal: __HUB__
+      ? page(
+          () => import('../features/previews/PreviewModal'),
+          (m) => m.PreviewModal,
+        )
+      : BridgeClosedPage,
+    UploadPreviewModal: __HUB__
+      ? page(
+          () => import('../features/previews/UploadPreviewModal'),
+          (m) => m.UploadPreviewModal,
+        )
+      : BridgeClosedPage,
+    HermesPage: __HUB__
+      ? page(
+          () => import('../features/hermes/HermesPage'),
+          (m) => m.HermesPage,
+        )
+      : BridgeClosedPage,
     HeimdallModal: page(
       () => import('../features/heimdall/HeimdallModal'),
       (m) => m.HeimdallModal,
     ),
-    WardensPage: page(
-      () => import('../features/wardens/WardensPage'),
-      (m) => m.WardensPage,
-    ),
+    WardensPage: __HUB__
+      ? page(
+          () => import('../features/wardens/WardensPage'),
+          (m) => m.WardensPage,
+        )
+      : BridgeClosedPage,
     RunestonePage: page(
       () => import('../features/runestone/RunestonePage'),
       (m) => m.RunestonePage,
@@ -67,10 +87,12 @@ export function createLazyPages() {
     // One library over every document kind (PLAN-21). It is a shell across
     // several features, not a feature, so it lives in app/pages — and stays
     // lazy, as the two per-tool pages it replaces were.
-    PensievePage: page(
-      () => import('./pages/PensievePage'),
-      (m) => m.PensievePage,
-    ),
+    PensievePage: __HUB__
+      ? page(
+          () => import('./pages/PensievePage'),
+          (m) => m.PensievePage,
+        )
+      : BridgeClosedPage,
     VariantPage: page(
       () => import('../features/variant/VariantPage'),
       (m) => m.VariantPage,
@@ -79,10 +101,12 @@ export function createLazyPages() {
       () => import('../features/edda/EddaPage'),
       (m) => m.EddaPage,
     ),
-    EddaPreviewPage: page(
-      () => import('../features/edda/EddaPreviewPage'),
-      (m) => m.EddaPreviewPage,
-    ),
+    EddaPreviewPage: __HUB__
+      ? page(
+          () => import('../features/edda/EddaPreviewPage'),
+          (m) => m.EddaPreviewPage,
+        )
+      : BridgeClosedPage,
     GrootPage: page(
       () => import('../features/groot/GrootPage'),
       (m) => m.GrootPage,
@@ -95,22 +119,30 @@ export function createLazyPages() {
       () => import('../features/loki/LokiPage'),
       (m) => m.LokiPage,
     ),
-    BrotliPage: page(
-      () => import('../features/brotli/BrotliPage'),
-      (m) => m.BrotliPage,
-    ),
-    AccioPage: page(
-      () => import('../features/accio/AccioPage'),
-      (m) => m.AccioPage,
-    ),
-    NimbusPage: page(
-      () => import('../features/nimbus/NimbusPage'),
-      (m) => m.NimbusPage,
-    ),
-    PortkeyPage: page(
-      () => import('../features/portkey/PortkeyPage'),
-      (m) => m.PortkeyPage,
-    ),
+    BrotliPage: __HUB__
+      ? page(
+          () => import('../features/brotli/BrotliPage'),
+          (m) => m.BrotliPage,
+        )
+      : BridgeClosedPage,
+    AccioPage: __HUB__
+      ? page(
+          () => import('../features/accio/AccioPage'),
+          (m) => m.AccioPage,
+        )
+      : BridgeClosedPage,
+    NimbusPage: __HUB__
+      ? page(
+          () => import('../features/nimbus/NimbusPage'),
+          (m) => m.NimbusPage,
+        )
+      : BridgeClosedPage,
+    PortkeyPage: __HUB__
+      ? page(
+          () => import('../features/portkey/PortkeyPage'),
+          (m) => m.PortkeyPage,
+        )
+      : BridgeClosedPage,
     SagaPage: page(
       () => import('../features/saga/SagaPage'),
       (m) => m.SagaPage,

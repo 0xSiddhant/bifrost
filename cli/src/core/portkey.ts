@@ -1,4 +1,5 @@
 import type { ApiClient } from './client.js';
+import { API_V1 } from './client.js';
 
 /** Go-links. Every rule (slug shape, reserved roots, target scheme) is the server's. */
 
@@ -13,7 +14,7 @@ export interface Portkey {
 }
 
 export function listPortkeys(client: ApiClient, q?: string): Promise<Portkey[]> {
-  return client.json<Portkey[]>('listing go-links', 'GET', '/api/portkey', {
+  return client.json<Portkey[]>('listing go-links', 'GET', `${API_V1}/portkey`, {
     query: { q },
   });
 }
@@ -22,7 +23,7 @@ export function createPortkey(
   client: ApiClient,
   input: { slug: string; url: string; note?: string },
 ): Promise<Portkey> {
-  return client.json<Portkey>('creating a go-link', 'POST', '/api/portkey', { body: input });
+  return client.json<Portkey>('creating a go-link', 'POST', `${API_V1}/portkey`, { body: input });
 }
 
 export function updatePortkey(
@@ -33,7 +34,7 @@ export function updatePortkey(
   return client.json<Portkey>(
     'updating a go-link',
     'PATCH',
-    `/api/portkey/${encodeURIComponent(slug)}`,
+    `${API_V1}/portkey/${encodeURIComponent(slug)}`,
     { body: patch },
   );
 }
@@ -42,7 +43,7 @@ export function removePortkey(client: ApiClient, slug: string): Promise<void> {
   return client.voidCall(
     'removing a go-link',
     'DELETE',
-    `/api/portkey/${encodeURIComponent(slug)}`,
+    `${API_V1}/portkey/${encodeURIComponent(slug)}`,
   );
 }
 

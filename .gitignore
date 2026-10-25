@@ -3,6 +3,7 @@ node_modules/
 
 # builds
 dist/
+dist-standalone/
 
 # env & secrets
 .env
@@ -34,3 +35,9 @@ client/public/pdfjs-wasm/
 
 # Claude Code — skills are committed, local settings are not
 .claude/settings.local.json
+
+# PLAN-34: load-test results describe one machine on one day; never committed
+load-results/
+
+# test scratch trees (scripts/backup.test.ts): core/backup needs storage under the repo root
+.scratch-*/

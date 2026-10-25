@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
+import { testConfig } from '../../testing/app.js';
 import { openDb, checkpointAndClose, type DbHandle } from '../../core/db/index.js';
 import { EventBus } from '../../core/bus/index.js';
 import { SseHub } from '../../core/sse/index.js';
@@ -27,7 +27,7 @@ describe('downloads watcher → bus → sse', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-watch-'));
-    const config = loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot });
+    const config = testConfig({ STORAGE_ROOT: storageRoot });
     for (const dir of Object.values(config.storage)) {
       if (!dir.endsWith('.db')) fs.mkdirSync(dir, { recursive: true });
     }
@@ -67,7 +67,7 @@ describe('downloads watcher → bus → sse', () => {
       { timeout: 10_000, interval: 200 },
     );
 
-    const listing = await app.inject({ method: 'GET', url: '/api/downloads' });
+    const listing = await app.inject({ method: 'GET', url: '/api/v1/downloads' });
     expect(listing.json()).toHaveLength(1);
   }, 15_000);
 
@@ -98,7 +98,7 @@ describe('downloads watcher → bus → sse', () => {
       { timeout: 10_000, interval: 200 },
     );
 
-    const listing = await app.inject({ method: 'GET', url: '/api/downloads' });
+    const listing = await app.inject({ method: 'GET', url: '/api/v1/downloads' });
     expect(listing.json()).toEqual([]);
   }, 15_000);
 
@@ -114,7 +114,7 @@ describe('downloads watcher → bus → sse', () => {
 
     const res = await app.inject({
       method: 'POST',
-      url: '/api/files/moved.txt/publish',
+      url: '/api/v1/files/moved.txt/publish',
       headers: { 'x-bifrost-device': 'device-a' },
     });
     expect(res.statusCode).toBe(200);
@@ -142,7 +142,7 @@ describe('downloads watcher → bus → sse', () => {
     fs.writeFileSync(path.join(storageRoot, 'uploads', 'anon.txt'), 'staged');
     broadcast.mockClear();
 
-    await app.inject({ method: 'POST', url: '/api/files/anon.txt/publish' });
+    await app.inject({ method: 'POST', url: '/api/v1/files/anon.txt/publish' });
 
     // Null, not omitted: the client filter must tell "unknown sender" from
     // "me", and show the banner in the first case.

@@ -1,12 +1,12 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import zlib from 'node:zlib';
-import pino from 'pino';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createApp, type RunningApp } from '../../app.js';
-import { loadConfig } from '../../core/config/index.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 const MAX_INPUT_MB = 1;
 const MAX_OUTPUT_MB = 4;
@@ -26,15 +26,13 @@ describe('brotli module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-'));
-    const config = loadConfig({
-      HEIMDALL_PIN: '4321',
+    app = await createTestApp({
       STORAGE_ROOT: storageRoot,
       // Small caps keep the byte assertions fast; the arithmetic is identical
       // at the shipped 256/512 MB.
       BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
       BROTLI_MAX_OUTPUT_MB: String(MAX_OUTPUT_MB),
     });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
     await app.fastify.listen({ port: 0, host: '127.0.0.1' });
     const address = app.fastify.server.address();
     origin = typeof address === 'object' && address ? `http://127.0.0.1:${address.port}` : '';
@@ -120,9 +118,13 @@ describe('brotli module', () => {
     // A streamed body is sent chunked, so there is no content-length for the
     // pre-check to read and the streaming counter is the only guard left.
     const chunked = Readable.toWeb(Readable.from([Buffer.alloc(MAX_INPUT_MB * MB + 1024)]));
-    const response = await post('/api/brotli/compress', chunked as RequestInit['body'], {
-      duplex: 'half',
-    } as RequestInit);
+    const response = await post(
+      '/api/brotli/compress',
+      chunked as RequestInit['body'],
+      {
+        duplex: 'half',
+      } as RequestInit,
+    );
     expect(response.status).toBe(413);
     expect(await errorCode(response)).toBe('PAYLOAD_TOO_LARGE');
   });
@@ -166,17 +168,35 @@ describe('brotli module', () => {
     expect(zlib.brotliDecompressSync(await buffer(after))).toEqual(sample);
   }, 30_000);
 
+  it.each([
+    // The counterexample PLAN-33's fuzzer shrank to: one byte decodes, then EOF.
+    ['four bytes that decode one byte, then end', Buffer.from([0, 0, 16, 0])],
+    [
+      'a small .br cut short',
+      zlib.brotliCompressSync(Buffer.from('the bridge holds; '.repeat(400))).subarray(0, -8),
+    ],
+  ])('answers 422 for %s, instead of a 200 cut off mid-body', async (_label, input) => {
+    // The output fits in the held head (1 MiB), so the decode fails before
+    // any status is committed and the refusal can still be honest.
+    const response = await post('/api/brotli/decompress', input);
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ error: 'INVALID_BROTLI' });
+  });
+
   it('ends the response mid-stream when a valid .br turns out to be truncated', async () => {
-    // Varied bytes, not one repeated byte: a uniform buffer compresses into a
-    // single meta-block the decoder emits nothing from until it is whole, which
-    // would quietly re-test the clean 422 above instead of this path.
-    const varied = Buffer.alloc(2 * MB);
-    let seed = 1;
-    for (let index = 0; index < varied.length; index += 1) {
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-      varied[index] = 32 + (seed % 90);
-    }
-    const compressed = zlib.brotliCompressSync(varied);
+    // Random letters from a four-symbol alphabet: 2 bits each, so 3 MiB
+    // compresses to ~0.75 MB (under the 1 MB input cap) and the decoder emits
+    // output as it goes. A uniform or short-cycle buffer compresses to almost
+    // nothing and fails before emitting much, which would quietly re-test the
+    // clean 422 above. Well past the 1 MiB the route holds before committing a
+    // status, so this failure lands after headers are out.
+    const varied = Buffer.from(
+      crypto.randomBytes(3 * MB).map((byte) => 'acgt'.charCodeAt(byte & 3)),
+    );
+    // Quality 5: a fixture only needs to be valid Brotli, and 11 takes seconds.
+    const compressed = zlib.brotliCompressSync(varied, {
+      params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 },
+    });
     const response = await post('/api/brotli/decompress', compressed.subarray(0, -64));
 
     expect(response.status).toBe(200);
@@ -199,15 +219,11 @@ describe('brotli module on the cloud profile', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-brotli-cloud-'));
-    app = await createApp(
-      loadConfig({
-        HEIMDALL_PIN: '4321',
-        STORAGE_ROOT: storageRoot,
-        DEPLOY_PROFILE: 'cloud',
-        BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
-      }),
-      { logger: pino({ level: 'silent' }) },
-    );
+    app = await createTestApp({
+      STORAGE_ROOT: storageRoot,
+      DEPLOY_PROFILE: 'cloud',
+      BROTLI_MAX_INPUT_MB: String(MAX_INPUT_MB),
+    });
   }, 30_000);
 
   afterAll(async () => {

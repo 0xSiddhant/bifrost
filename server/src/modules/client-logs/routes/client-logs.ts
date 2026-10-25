@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { errorResponses } from '../../../core/http/schemas.js';
 import type { AppConfig, LogLevel } from '../../../core/config/index.js';
 import { LOG_LEVELS } from '../../../core/config/index.js';
 import type { Logger } from '../../../core/logger/index.js';
@@ -60,19 +61,41 @@ const batchSchema = (maxBatch: number) =>
     },
   }) as const;
 
+const TAGS = ['client-logs'];
+
 export function registerClientLogRoutes(app: FastifyInstance, deps: ClientLogRoutesDeps): void {
   const { settings } = deps;
 
   // Public, and read once on boot: the client is a static build that never sees
   // .env, so the floor has to be delivered over the wire. Same shape as
-  // /api/loki/config and /api/screensaver/config.
-  app.get('/api/client-logs/config', () => ({
-    level: settings.level,
-    maxBatch: settings.maxBatch,
-  }));
+  // /api/v1/loki/config and /api/v1/screensaver/config.
+  app.get(
+    '/api/v1/client-logs/config',
+    {
+      schema: {
+        tags: TAGS,
+        summary: 'The level floor below which the browser need not send, and the batch size',
+        operationId: 'getClientLogConfig',
+        response: {
+          200: {
+            type: 'object',
+            required: ['level', 'maxBatch'],
+            properties: {
+              level: { type: 'string', description: 'A pino level name, e.g. warn' },
+              maxBatch: { type: 'integer', description: 'Entries per request' },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      level: settings.level,
+      maxBatch: settings.maxBatch,
+    }),
+  );
 
   app.post<{ Body: { entries: ClientLogEntry[] } }>(
-    '/api/client-logs',
+    '/api/v1/client-logs',
     {
       // Both bounds matter and they bound different things: bodyLimit stops one
       // enormous request (413 before the body is read), the rate limit stops
@@ -80,7 +103,21 @@ export function registerClientLogRoutes(app: FastifyInstance, deps: ClientLogRou
       // files the server's own archive lives in.
       bodyLimit: settings.maxBodyBytes,
       config: { rateLimit: { max: settings.rateLimitPerMin, timeWindow: 60_000 } },
-      schema: { body: batchSchema(settings.maxBatch) },
+      schema: {
+        tags: TAGS,
+        summary: "Write a batch of the browser's log lines into the server's archive",
+        description: 'Entries below the level floor are dropped and counted, not refused.',
+        operationId: 'writeClientLogs',
+        body: batchSchema(settings.maxBatch),
+        response: {
+          202: {
+            type: 'object',
+            required: ['accepted', 'dropped'],
+            properties: { accepted: { type: 'integer' }, dropped: { type: 'integer' } },
+          },
+          ...errorResponses(400, 413, 415, 429),
+        },
+      },
     },
     (request, reply) => {
       const deviceId = deviceIdOf(request);

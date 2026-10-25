@@ -11,6 +11,8 @@ import {
   UpdateEddaUseCase,
 } from './manage-eddas.js';
 
+const PAGING = { pageSize: 30, maxPageSize: 100 };
+
 class MemoryRepo implements EddaRepository {
   rows = new Map<string, EddaRecord>();
   lastFilter: EddaListFilter | null = null;
@@ -41,6 +43,18 @@ class MemoryRepo implements EddaRepository {
     const row = this.findById(id);
     if (row) this.rows.delete(id);
     return row;
+  }
+  listPage(filter: EddaListFilter): EddaSummary[] {
+    return this.list(filter);
+  }
+  count(): number {
+    return this.rows.size;
+  }
+  listAuthors(): string[] {
+    const authors = [...this.rows.values()].flatMap((row) =>
+      row.authorDeviceId ? [row.authorDeviceId] : [],
+    );
+    return [...new Set(authors)];
   }
   listNames(): string[] {
     return [...this.rows.values()].map((row) => row.name);
@@ -158,7 +172,7 @@ describe('GetEddaUseCase', () => {
 describe('ListEddasUseCase', () => {
   it('clamps and defaults filter parameters', () => {
     const { repo } = harness();
-    const list = new ListEddasUseCase(repo);
+    const list = new ListEddasUseCase(repo, PAGING);
     list.execute({ sort: 'bogus', order: 'sideways', limit: 9999, offset: -3 });
     expect(repo.lastFilter).toEqual({
       q: undefined,

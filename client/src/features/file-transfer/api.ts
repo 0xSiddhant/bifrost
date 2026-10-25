@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from '../../core/api';
+import { API_V1, apiGet, apiSend } from '../../core/api';
 import { getDeviceId } from '../../core/deviceId';
 
 export interface UploadConfig {
@@ -13,7 +13,7 @@ export interface UploadOutcome {
 }
 
 export const fetchUploadConfig = (): Promise<UploadConfig> =>
-  apiGet<UploadConfig>('/api/files/config');
+  apiGet<UploadConfig>(`${API_V1}/files/config`);
 
 export class UploadCancelledError extends Error {
   override name = 'UploadCancelledError';
@@ -30,20 +30,20 @@ const seg = (name: string): string => encodeURIComponent(name);
 
 /** Move a staged upload into downloads/, where the whole LAN can see it. */
 export const publishUpload = (name: string): Promise<StagedFileResult> =>
-  apiSend<StagedFileResult>('POST', `/api/files/${seg(name)}/publish`);
+  apiSend<StagedFileResult>('POST', `${API_V1}/files/${seg(name)}/publish`);
 
 /** Rename within uploads/. A name the server would clean up comes back 422. */
 export const renameUpload = (name: string, newName: string): Promise<StagedFileResult> =>
-  apiSend<StagedFileResult>('PATCH', `/api/files/${seg(name)}`, { name: newName });
+  apiSend<StagedFileResult>('PATCH', `${API_V1}/files/${seg(name)}`, { name: newName });
 
 export const deleteUpload = (name: string): Promise<null> =>
-  apiSend<null>('DELETE', `/api/files/${seg(name)}`);
+  apiSend<null>('DELETE', `${API_V1}/files/${seg(name)}`);
 
 export const uploadContentUrl = (name: string, options: { inline?: boolean } = {}): string =>
-  `/api/files/${seg(name)}/content${options.inline ? '?inline=1' : ''}`;
+  `${API_V1}/files/${seg(name)}/content${options.inline ? '?inline=1' : ''}`;
 
 /** A folder id → a zip of its files, streamed (PLAN-24). */
-export const folderArchiveUrl = (id: string): string => `/api/downloads/${id}/archive`;
+export const folderArchiveUrl = (id: string): string => `${API_V1}/downloads/${id}/archive`;
 
 const REJECTION_TEXT: Record<string, string> = {
   'too-large': 'file is larger than the server allows',
@@ -105,7 +105,10 @@ export function uploadFile(
 
     const form = new FormData();
     form.append('files', file, file.name);
-    xhr.open('POST', folder === undefined ? '/api/files' : `/api/files?folder=${seg(folder)}`);
+    xhr.open(
+      'POST',
+      folder === undefined ? `${API_V1}/files` : `${API_V1}/files?folder=${seg(folder)}`,
+    );
     // Attribution: a folder upload banners straight from this request, so the
     // sender's own devices need the header to stay quiet about it.
     xhr.setRequestHeader('x-bifrost-device', getDeviceId());

@@ -15,7 +15,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * How many ping round trips one test takes. The median of them is the reported
  * latency — a mean would be dragged upward by a single Wi-Fi retry spike, which
  * is exactly the sort of thing that happens on the path this tool measures.
- * Advertised through /api/nimbus/config so the page and its methodology note
+ * Advertised through /api/v1/nimbus/config so the page and its methodology note
  * quote the server's number rather than their own copy of it.
  */
 const PING_SAMPLES = 10;

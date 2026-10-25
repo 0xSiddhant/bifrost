@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LiveListSync } from '../../core/liveList';
 import { bifrostEvents, type SseStatus } from '../../core/sse';
 import { listDownloads, type DownloadEntry } from '../../core/api';
 import { notify } from '../../core/notify';
@@ -23,12 +24,17 @@ export function useDownloads(): DownloadsState {
 
   useEffect(() => {
     let disposed = false;
+    // A refresh's answer must not wipe a live row that landed while it was in
+    // flight (mount and every SSE reconnect both refresh) — see core/liveList.
+    const sync = new LiveListSync<DownloadEntry>();
 
     const refresh = () => {
+      const fetchId = sync.begin();
       listDownloads()
         .then((list) => {
           if (disposed) return;
-          setEntries(list);
+          const merged = sync.settle(fetchId, list);
+          if (merged) setEntries(merged);
           // Errors never auto-dismiss, so the one thing that must clear this
           // is the listing working again — and having warned that the list was
           // stale, it owes the reader a word when it stops being stale.
@@ -37,6 +43,7 @@ export function useDownloads(): DownloadsState {
           if (notify.dismissKey(LISTING_ERROR)) notify.ok('Downloads list is back in sync');
         })
         .catch((error: Error) => {
+          sync.abandon(fetchId);
           // The stale list stays on screen — but silently showing a listing
           // that may be minutes out of date is how "the file isn't there"
           // becomes a mystery. One entry, deduped, however often it retries.
@@ -50,11 +57,13 @@ export function useDownloads(): DownloadsState {
 
     const upsert = (payload: unknown) => {
       const entry = payload as DownloadEntry;
-      setEntries((prev) => [entry, ...(prev ?? []).filter((e) => e.id !== entry.id)]);
+      const change = sync.record((list) => [entry, ...list.filter((e) => e.id !== entry.id)]);
+      setEntries((prev) => change(prev ?? []));
     };
     const remove = (payload: unknown) => {
       const entry = payload as DownloadEntry;
-      setEntries((prev) => (prev ?? []).filter((e) => e.id !== entry.id));
+      const change = sync.record((list) => list.filter((e) => e.id !== entry.id));
+      setEntries((prev) => change(prev ?? []));
     };
 
     const unsubscribes = [

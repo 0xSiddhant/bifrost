@@ -13,7 +13,7 @@
 1. `git checkout develop && git pull`
 2. `git checkout -b feat/plan-XX-<slug>`
 3. Implement, committing incrementally (see commit rules).
-4. Run `npm run lint && npm run typecheck && npm test` locally — must pass.
+4. Run the `verify` skill (`.claude/skills/verify/SKILL.md`) locally — must pass.
 5. Push and raise a **PR into `develop`**. Title: `feat(plan-XX): <summary>`. Body: what the plan delivered, any deviations + why, test evidence.
 6. CI must be green. User reviews and merges. Never self-merge.
 7. Update `.agents/memory/progress.md` in the same PR.

@@ -2,10 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import pino from 'pino';
 import type { InjectOptions } from 'fastify';
-import { loadConfig } from '../../core/config/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 describe('edda module', () => {
   let app: RunningApp;
@@ -13,12 +12,7 @@ describe('edda module', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-edda-'));
-    const config = loadConfig({
-      HEIMDALL_PIN: '4321',
-      STORAGE_ROOT: storageRoot,
-      EDDA_MAX_DOC_KB: '1',
-    });
-    app = await createApp(config, { logger: pino({ level: 'silent' }) });
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, EDDA_MAX_DOC_KB: '1' });
   });
 
   afterAll(async () => {
@@ -28,10 +22,11 @@ describe('edda module', () => {
 
   const inject = (opts: InjectOptions) => app.fastify.inject(opts);
 
-  it('exposes the doc-size cap and live-preview threshold', async () => {
+  // PLAN-35: the cap is baked into the client from the same .env key at build
+  // time, so the server no longer answers a config read. It still enforces it.
+  it('no longer serves /api/edda/config', async () => {
     const response = await inject({ method: 'GET', url: '/api/edda/config' });
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ maxDocKb: 1, livePreviewMaxKb: 300 });
+    expect(response.statusCode).toBe(404);
   });
 
   it('full lifecycle: save → list → fetch by slug → rename (301 old slug) → delete', async () => {
@@ -65,7 +60,7 @@ describe('edda module', () => {
 
     const stale = await inject({ method: 'GET', url: `/api/edda/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/api/edda/${renamed.slug}`);
+    expect(stale.headers.location).toBe(`/api/v1/edda/${renamed.slug}`);
 
     const remove = await inject({ method: 'DELETE', url: `/api/edda/${created.id}` });
     expect(remove.statusCode).toBe(204);
@@ -99,10 +94,10 @@ describe('edda module', () => {
     });
     const stale = await inject({ method: 'GET', url: `/edda/api/${created.slug}` });
     expect(stale.statusCode).toBe(301);
-    expect(stale.headers.location).toBe(`/edda/api/${rename.json().slug}`);
+    expect(stale.headers.location).toBe(`/edda/api/v1/${rename.json().slug}`);
     // download flag survives the 301
     const staleDl = await inject({ method: 'GET', url: `/edda/api/${created.slug}?download=1` });
-    expect(staleDl.headers.location).toBe(`/edda/api/${rename.json().slug}?download=1`);
+    expect(staleDl.headers.location).toBe(`/edda/api/v1/${rename.json().slug}?download=1`);
 
     const missing = await inject({ method: 'GET', url: '/edda/api/never-was-zz9zz9' });
     expect(missing.statusCode).toBe(404);

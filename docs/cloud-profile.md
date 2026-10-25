@@ -20,7 +20,7 @@ what flips, and where the seams already are.
 
 Action: decide per module whether it graduates to cloud with real
 authorization, or stays local-only. The nav/pages already follow
-`/api/capabilities`, so the client adapts with no separate build.
+`/api/v1/capabilities`, so the client adapts with no separate build.
 
 ## 2. SQLite → Postgres
 

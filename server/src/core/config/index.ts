@@ -14,9 +14,46 @@ export const DEFAULT_LOG_RETENTION_FILES = 30;
 
 export type DeployProfile = 'local' | 'cloud';
 
-const envSchema = z.object({
-  DEPLOY_PROFILE: z.enum(['local', 'cloud']).default('local'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(4646),
+/**
+ * Which of the two processes this install runs (PLAN-36): `full` is the hub
+ * (web host on PORT + the API behind it), `api` the API alone on loopback,
+ * `web` the web host alone serving the standalone client.
+ */
+export const RUN_MODES = ['full', 'api', 'web'] as const;
+export type RunMode = (typeof RUN_MODES)[number];
+
+/** Zod error for a key that must be set: "missing" reads differently from "wrong". */
+function required(what: string, invalid: string) {
+  return (issue: { input?: unknown }) =>
+    issue.input === undefined ? `required — ${what} (set it in .env)` : invalid;
+}
+
+// REQUIRED keys (no default) are the ones where a silent fallback does real
+// harm rather than just picking a tunable value: DEPLOY_PROFILE decides which
+// modules are exposed (defaulting a cloud host to `local` would publish file
+// transfer and code execution to the internet), STORAGE_ROOT decides where the
+// database lives (a lost value would boot on an empty ./storage — looking like
+// data loss, and backing up the empty db), PORT is the address every device,
+// bookmark, QR code and the CLI already point at (a silent change strands them
+// all), HEIMDALL_PIN guards admin. Every
+// other key has a safe default that .env.example repeats.
+const envFields = z.object({
+  DEPLOY_PROFILE: z.enum(['local', 'cloud'], {
+    error: required('which modules load: local or cloud', 'must be "local" or "cloud"'),
+  }),
+  // Presence is checked on the raw string: z.coerce turns a missing value into
+  // NaN first, which would read as "must be a number" rather than "required".
+  PORT: z
+    .string({ error: required('the port the server listens on, e.g. 4646', 'must be a number') })
+    .transform(Number)
+    .pipe(z.number({ error: 'must be a number' }).int().min(1).max(65535)),
+  // PLAN-36: the API server's own port and bind address. PORT stays the
+  // address people open (now the web host's); the API sits behind it on
+  // loopback, so the web host is the only way in. API_PORT defaults to PORT + 1.
+  API_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  API_HOST: z.string().min(1).default('127.0.0.1'),
+  BIFROST_RUN: z.enum(RUN_MODES, { error: 'must be "full", "api" or "web"' }).default('full'),
+  WEB_HOST: z.string().min(1).default('0.0.0.0'),
   MDNS_NAME: z
     .string()
     .regex(/^[a-z0-9-]+$/, 'must be a valid hostname label (lowercase letters, digits, dashes)')
@@ -37,6 +74,16 @@ const envSchema = z.object({
   // request to a user-pasted address, so neither may be hardcoded.
   ACCIO_TITLE_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   ACCIO_TITLE_MAX_BYTES: z.coerce.number().int().positive().default(131072),
+  // List paging (PLAN-31) — rows per page for every paged list the app reads
+  // (Pensieve pages, Accio/Portkey scroll batches), and the most a client may
+  // ask for. GitHub's REST convention: 30 by default, 100 at most. Only the
+  // opt-in `paged=true` form uses these; the legacy bare-array responses keep
+  // their own defaults so an installed CLI never silently shows fewer rows.
+  // LIST_PAGE_MAX is capped at 500: the document and Accio routes reject a
+  // `limit` above that before the clamp could apply a larger cap, so a higher
+  // value would be honoured by Portkey (1000) and refused everywhere else.
+  LIST_PAGE_SIZE: z.coerce.number().int().min(1).default(30),
+  LIST_PAGE_MAX: z.coerce.number().int().min(1).max(500).default(100),
   // Brotli (PLAN-25) — the two size caps and the per-route rate limit. The
   // OUTPUT cap is the decompression-bomb guard: unlike every other limit here
   // it bounds bytes the server *manufactures*, not bytes a client sent, which
@@ -45,7 +92,7 @@ const envSchema = z.object({
   BROTLI_MAX_OUTPUT_MB: z.coerce.number().int().positive().default(512),
   BROTLI_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(30),
   // Nimbus (PLAN-14) — the largest payload one speed test may move in either
-  // direction. Also the upload cap: past it /api/nimbus/up answers 413.
+  // direction. Also the upload cap: past it /api/v1/nimbus/up answers 413.
   NIMBUS_MAX_TEST_MB: z.coerce.number().int().min(1).max(1024).default(100),
   // Loki (PLAN-12) — Part B execution defaults; the runner reads these.
   LOKI_RUN_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
@@ -65,18 +112,18 @@ const envSchema = z.object({
   SCREENSAVER_MOUSE_REACTIVE: z.enum(['true', 'false']).default('true'),
   SCREENSAVER_SHOW_QUOTES: z.enum(['true', 'false']).default('true'),
   SCREENSAVER_QUOTE_ROTATE_SECONDS: z.coerce.number().int().min(4).max(120).default(14),
-  THEMES_DIR: z.string().min(1).default('./themes'),
-  STORAGE_ROOT: z.string().min(1).default('./storage'),
-  HEIMDALL_PIN: z.string().min(4, 'required, minimum 4 characters (set it in .env)'),
+  STORAGE_ROOT: z.string({
+    error: required('where the database and files live, e.g. ./storage', 'must be a path'),
+  }),
+  HEIMDALL_PIN: z
+    .string({ error: required('the admin PIN, minimum 4 characters', 'must be text') })
+    .min(4, 'required, minimum 4 characters (set it in .env)'),
   HEIMDALL_SHORTCUT_DEFAULT: z.string().min(1).default('shift+meta+comma'),
   HEIMDALL_TAP_COUNT: z.coerce.number().int().min(3).max(20).default(7),
   // Encryption key for the admin session cookie (@fastify/secure-session).
   // Optional: when unset, a random key is generated at boot — sessions then
   // reset on restart. Set it (≥ 32 chars) to keep sessions across restarts.
-  HEIMDALL_SESSION_SECRET: z
-    .string()
-    .min(32, 'must be at least 32 characters when set')
-    .optional(),
+  HEIMDALL_SESSION_SECRET: z.string().min(32, 'must be at least 32 characters when set').optional(),
   // Default `trace`, not `info` (PLAN-16a): with the in-app log viewer gone the
   // file is a pure archive feeding Loki, so level is a *query-time* decision,
   // not a write-time one that silently discards data you can never get back.
@@ -90,7 +137,7 @@ const envSchema = z.object({
   // Floor for browser-side logging (PLAN-16a). Every client line crosses the
   // network into an unauthenticated endpoint, so the economics invert against
   // the server's `trace`: warn+ only, lowered temporarily when chasing a bug.
-  // Shipped to the static bundle via GET /api/client-logs/config.
+  // Shipped to the static bundle via GET /api/v1/client-logs/config.
   CLIENT_LOG_LEVEL: z.enum(LOG_LEVELS).default('warn'),
   // Bounds on that unauthenticated write path: a misbehaving tab must not be
   // able to fill storage/logs/. Batches per minute per IP, entries per batch,
@@ -112,13 +159,42 @@ const envSchema = z.object({
   // observability tooling degrading the observability record. Flip it on only
   // when the stack is up.
   OTEL_ENABLED: z.enum(['true', 'false']).default('false'),
-  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4318'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default('http://localhost:4650'),
   OTEL_EXPORT_TIMEOUT_MS: z.coerce.number().int().positive().default(3000),
   OTEL_SERVICE_NAME: z.string().min(1).default('bifrost'),
-  BACKUP_DIR: z.string().default(''),
-  // Rotation: keep only the newest N archives in BACKUP_DIR. 0 = keep all.
+  // The response contract guard (PLAN-32). `fallback` (the default until one
+  // release shows zero `contract mismatch` warnings) sends the pre-schema
+  // bytes whenever a response schema would have changed them, and logs where;
+  // `strict` (every test and e2e server) turns any such change into a 500;
+  // `off` runs no hooks at all.
+  API_CONTRACT_CHECK: z.enum(['off', 'fallback', 'strict']).default('fallback'),
+  // Rotation: keep only the newest N archives in the backup folder. 0 = keep all.
   BACKUP_KEEP: z.coerce.number().int().min(0).default(0),
+  // storage/ folders left out of every archive (comma list). Empty = back up all
+  // of storage/ except tmp/.
+  BACKUP_EXCLUDE: z.string().default(''),
 });
+
+// Cross-key rules: a default page larger than the cap could never be served,
+// and the API cannot share the web host's port.
+const envSchema = envFields
+  .refine((env) => env.LIST_PAGE_SIZE <= env.LIST_PAGE_MAX, {
+    path: ['LIST_PAGE_SIZE'],
+    message: 'must not exceed LIST_PAGE_MAX',
+  })
+  .refine((env) => apiPortOf(env) !== env.PORT, {
+    path: ['API_PORT'],
+    message: 'must differ from PORT (the web host listens on PORT, the API behind it)',
+  })
+  .refine((env) => apiPortOf(env) <= 65535, {
+    path: ['API_PORT'],
+    message: 'PORT + 1 is not a port; set API_PORT explicitly',
+  });
+
+/** API_PORT, or PORT + 1 when unset — the one place the default is decided. */
+function apiPortOf(env: { PORT: number; API_PORT?: number | undefined }): number {
+  return env.API_PORT ?? env.PORT + 1;
+}
 
 export interface StoragePaths {
   root: string;
@@ -130,9 +206,20 @@ export interface StoragePaths {
   dbFile: string;
 }
 
+export type ContractCheckMode = 'off' | 'fallback' | 'strict';
+
 export interface AppConfig {
   profile: DeployProfile;
+  /** The public port people open; the web host's since PLAN-36. */
   port: number;
+  /** Where this API server listens: loopback behind the web host by default. */
+  api: {
+    host: string;
+    port: number;
+  };
+  runMode: RunMode;
+  /** Where the web host listens (`127.0.0.1` keeps the hub on this machine). */
+  webHost: string;
   mdnsName: string;
   maxUploadSizeMb: number;
   maxFilesPerUpload: number;
@@ -157,6 +244,12 @@ export interface AppConfig {
   atlas: {
     maxDocKb: number;
   };
+  paging: {
+    /** Rows per page when a paged request names no `limit` (LIST_PAGE_SIZE). */
+    pageSize: number;
+    /** The largest `limit` a paged request may ask for (LIST_PAGE_MAX). */
+    maxPageSize: number;
+  };
   accio: {
     /** Per-attempt timeout for the post-save `<title>` lookup. */
     titleTimeoutMs: number;
@@ -164,9 +257,9 @@ export interface AppConfig {
     titleMaxBytes: number;
   };
   brotli: {
-    /** Largest body /api/brotli/compress will accept (413 past it). */
+    /** Largest body /api/v1/brotli/compress will accept (413 past it). */
     maxInputMb: number;
-    /** Largest output /api/brotli/decompress may produce — the bomb guard. */
+    /** Largest output /api/v1/brotli/decompress may produce — the bomb guard. */
     maxOutputMb: number;
     /** Per-IP requests per minute, budgeted per route rather than shared. */
     rateLimitPerMin: number;
@@ -204,7 +297,6 @@ export interface AppConfig {
     quoteRotateSeconds: number;
   };
   themes: {
-    dir: string;
     /**
      * Explicit server default (DB settings overlay, Heimdall-set in PLAN-05).
      * null = not configured — clients then fall through to their
@@ -241,9 +333,14 @@ export interface AppConfig {
     /** Seconds between the (expensive, synchronous) disk walks. */
     diskIntervalSec: number;
   };
-  backupDir: string | null;
+  http: {
+    /** The response contract guard's mode (PLAN-32): see core/http/contract.ts. */
+    contractCheck: ContractCheckMode;
+  };
   /** Rotation: keep only the newest N archives (0 = keep all). */
   backupKeep: number;
+  /** storage/ folder names left out of every archive. */
+  backupExclude: readonly string[];
 }
 
 export class ConfigError extends Error {
@@ -252,7 +349,7 @@ export class ConfigError extends Error {
 
 type Env = Record<string, string | undefined>;
 
-/** Empty strings in .env (e.g. `BACKUP_DIR=`) mean "unset" — fall through to defaults. */
+/** Empty strings in .env (e.g. `MDNS_NAME=`) mean "unset" — fall through to defaults. */
 function stripEmpty(env: Env): Record<string, string> {
   return Object.fromEntries(
     Object.entries(env).filter((entry): entry is [string, string] => Boolean(entry[1])),
@@ -279,6 +376,9 @@ export function resolveStoragePaths(storageRoot: string): StoragePaths {
  * the archive rather than only to a stderr nobody is watching under PM2.
  */
 export function logsDirFromEnv(env: Env = process.env): string {
+  // The './storage' fallback is deliberate even though STORAGE_ROOT is required:
+  // this runs before validation, and a .env missing STORAGE_ROOT still has to
+  // get its fatal "STORAGE_ROOT is required" line written somewhere.
   return resolveStoragePaths(env.STORAGE_ROOT || './storage').logs;
 }
 
@@ -302,7 +402,7 @@ export function otelSettingsFromEnv(env: Env = process.env): OtelSettings {
   const timeout = Number(env.OTEL_EXPORT_TIMEOUT_MS);
   return {
     enabled: env.OTEL_ENABLED === 'true',
-    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
+    endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4650',
     timeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 3000,
     serviceName: env.OTEL_SERVICE_NAME || 'bifrost',
   };
@@ -320,6 +420,9 @@ export function loadConfig(env: Env = process.env): AppConfig {
   const config: AppConfig = {
     profile: raw.DEPLOY_PROFILE,
     port: raw.PORT,
+    api: { host: raw.API_HOST, port: apiPortOf(raw) },
+    runMode: raw.BIFROST_RUN,
+    webHost: raw.WEB_HOST,
     mdnsName: raw.MDNS_NAME,
     maxUploadSizeMb: raw.MAX_UPLOAD_SIZE_MB,
     maxFilesPerUpload: raw.MAX_FILES_PER_UPLOAD,
@@ -344,6 +447,10 @@ export function loadConfig(env: Env = process.env): AppConfig {
     },
     atlas: {
       maxDocKb: raw.ATLAS_MAX_DOC_KB,
+    },
+    paging: {
+      pageSize: raw.LIST_PAGE_SIZE,
+      maxPageSize: raw.LIST_PAGE_MAX,
     },
     accio: {
       titleTimeoutMs: raw.ACCIO_TITLE_TIMEOUT_MS,
@@ -374,7 +481,6 @@ export function loadConfig(env: Env = process.env): AppConfig {
       quoteRotateSeconds: raw.SCREENSAVER_QUOTE_ROTATE_SECONDS,
     },
     themes: {
-      dir: path.isAbsolute(raw.THEMES_DIR) ? raw.THEMES_DIR : fromRepoRoot(raw.THEMES_DIR),
       defaultId: null,
     },
     storage: resolveStoragePaths(raw.STORAGE_ROOT),
@@ -397,8 +503,13 @@ export function loadConfig(env: Env = process.env): AppConfig {
       snapshotIntervalSec: raw.METRICS_SNAPSHOT_INTERVAL_SEC,
       diskIntervalSec: raw.METRICS_DISK_INTERVAL_SEC,
     },
-    backupDir: raw.BACKUP_DIR || null,
+    http: {
+      contractCheck: raw.API_CONTRACT_CHECK,
+    },
     backupKeep: raw.BACKUP_KEEP,
+    backupExclude: raw.BACKUP_EXCLUDE.split(',')
+      .map((name) => name.trim())
+      .filter(Boolean),
   };
   return deepFreeze(config);
 }
@@ -450,10 +561,12 @@ const OVERLAYS: Record<string, (config: AppConfig, value: string) => void> = {
     if (Number.isInteger(n) && n >= 5 && n <= 3600) config.screensaver.idleSeconds = n;
   },
   'screensaver.density': (config, value) => {
-    if (value === 'low' || value === 'medium' || value === 'high') config.screensaver.density = value;
+    if (value === 'low' || value === 'medium' || value === 'high')
+      config.screensaver.density = value;
   },
   'screensaver.motion': (config, value) => {
-    if (value === 'calm' || value === 'normal' || value === 'lively') config.screensaver.motion = value;
+    if (value === 'calm' || value === 'normal' || value === 'lively')
+      config.screensaver.motion = value;
   },
   'screensaver.connectLines': (config, value) => {
     config.screensaver.connectLines = value === 'true';

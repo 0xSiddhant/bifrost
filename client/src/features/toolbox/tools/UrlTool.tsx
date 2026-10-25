@@ -106,7 +106,7 @@ export function UrlTool() {
         label="Take a URL apart"
         spellCheck={false}
         className="field__input mono"
-        placeholder="https://bifrost.local:4646/go/router?a=1&b=two#frag"
+        placeholder="https://bifrost.local:4646/hermes?a=1&b=two#frag"
         value={parseInput}
         onChange={(event) => setParseInput(event.target.value)}
       />

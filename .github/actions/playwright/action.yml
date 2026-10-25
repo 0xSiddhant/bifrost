@@ -1,0 +1,34 @@
+name: Playwright browser
+description: One Playwright browser and its system libraries, the download cached per browser and version. Run after the setup action.
+inputs:
+  browser:
+    description: chromium or webkit
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Playwright version
+      id: version
+      shell: bash
+      run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+    - name: Cache the browser
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browser }}
+
+    # Only this job's browser: Chromium's system libraries are a fraction of
+    # WebKit's (GStreamer and the rest), so a Chromium job no longer pays for both.
+    - name: Install the browser
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: e2e
+      run: npx playwright install --with-deps ${{ inputs.browser }}
+
+    - name: Install its system libraries
+      if: steps.cache.outputs.cache-hit == 'true'
+      shell: bash
+      working-directory: e2e
+      run: npx playwright install-deps ${{ inputs.browser }}

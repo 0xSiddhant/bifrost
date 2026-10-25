@@ -24,7 +24,7 @@ import {
 export const portkeyModule: FeatureModule = {
   name: 'portkey',
   register(app, deps) {
-    const { log, db, bus, sse } = deps;
+    const { config, log, db, bus, sse } = deps;
 
     const repo = new DbPortkeyRepository(db);
     const recordHit = new RecordHitUseCase(repo, bus);
@@ -57,7 +57,7 @@ export const portkeyModule: FeatureModule = {
     });
 
     registerPortkeyRoutes(app, {
-      list: new ListPortkeysUseCase(repo),
+      list: new ListPortkeysUseCase(repo, config.paging),
       create: new CreatePortkeyUseCase(repo, bus),
       update: new UpdatePortkeyUseCase(repo, bus),
       remove: new DeletePortkeyUseCase(repo, bus),

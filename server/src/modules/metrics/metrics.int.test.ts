@@ -4,9 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import pino from 'pino';
-import { loadConfig } from '../../core/config/index.js';
 import { LEVEL_FORMATTER } from '../../core/logger/index.js';
-import { createApp, type RunningApp } from '../../app.js';
+import type { RunningApp } from '../../app.js';
+import { createTestApp } from '../../testing/app.js';
 
 interface Line {
   logLevel: string;
@@ -40,10 +40,7 @@ describe('metrics snapshots', () => {
   async function boot(env: Record<string, string>, level: pino.Level = 'trace') {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-metrics-'));
     const captured = capture(level);
-    app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, ...env }),
-      { logger: captured.logger },
-    );
+    app = await createTestApp({ STORAGE_ROOT: storageRoot, ...env }, { logger: captured.logger });
     return captured;
   }
 
@@ -152,8 +149,8 @@ describe('prometheus exposition', () => {
 
   beforeAll(async () => {
     storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-prom-'));
-    app = await createApp(
-      loadConfig({ HEIMDALL_PIN: '4321', STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' }),
+    app = await createTestApp(
+      { STORAGE_ROOT: storageRoot, METRICS_SNAPSHOT_INTERVAL_SEC: '1' },
       { logger: capture().logger },
     );
   });
@@ -190,7 +187,7 @@ describe('prometheus exposition', () => {
   it('records the request histogram against the route template, not the url', async () => {
     await app.fastify.inject({ method: 'GET', url: '/api/health' });
     const body = (await app.fastify.inject({ method: 'GET', url: '/metrics' })).body;
-    expect(body).toMatch(/bifrost_http_request_duration_seconds_bucket\{[^}]*route="\/api\/health"/);
+    expect(body).toMatch(/bifrost_http_request_duration_seconds_bucket\{[^}]*route="\/api\/v1\/health"/);
     expect(body).toMatch(/bifrost_http_request_duration_seconds_count\{[^}]*method="GET"[^}]*\} [1-9]/);
   });
 
@@ -199,9 +196,9 @@ describe('prometheus exposition', () => {
   // fastify-plugin. This is what proves that actually worked.
   it('observes requests to OTHER modules’ routes too', async () => {
     await app.fastify.inject({ method: 'GET', url: '/api/capabilities' });
-    await app.fastify.inject({ method: 'GET', url: '/api/themes' });
+    await app.fastify.inject({ method: 'GET', url: '/api/heimdall/access' });
     const body = (await app.fastify.inject({ method: 'GET', url: '/metrics' })).body;
-    expect(body).toContain('route="/api/themes"');
+    expect(body).toContain('route="/api/v1/heimdall/access"');
   });
 
   it('buckets unmatched requests under one label instead of minting series', async () => {

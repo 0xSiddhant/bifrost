@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type DragEvent,
 } from 'react';
+import { hubNavigate, showBridgeClosed } from '../../core/bridge';
 import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
@@ -22,10 +23,11 @@ import {
 } from '../../core/json';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
-import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
+import { useDraftCache, showsRestore } from '../../core/draftCache';
+import { takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
-import { ApiError } from '../../core/api';
+import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
@@ -35,10 +37,9 @@ import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchRunestone,
-  fetchRunestoneConfig,
+  RUNESTONE_CONFIG,
   saveRunestone,
   updateRunestone,
-  type RunestoneConfig,
 } from '../../core/runestone';
 import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
@@ -100,26 +101,13 @@ export function RunestonePage() {
   const [view, setView] = useState<'code' | 'tree'>(() =>
     window.innerWidth < 768 ? 'tree' : 'code',
   );
-  const [config, setConfig] = useState<RunestoneConfig | null>(null);
+  // Baked in at build time (PLAN-35): known before the first render.
+  const config = RUNESTONE_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [restorable, setRestorable] = useState<RunestoneDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchRunestoneConfig()
-      .then((cfg) => {
-        if (!cancelled) setConfig(cfg);
-      })
-      .catch(() => {
-        // cap check degrades gracefully; the server still enforces it on save
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Load (or fail to find) the document a slug URL names.
   useEffect(() => {
@@ -160,11 +148,6 @@ export function RunestonePage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // What is on screen right now, for the leave handler below — it has to flush
-  // the current buffer on unmount, not the one that existed when it registered.
-  const bufferRef = useRef({ title, text, isScratch });
-  bufferRef.current = { title, text, isScratch };
-
   // On arriving at the scratch editor, in order of how directly the person
   // asked for it:
   //   1. a hand-off from another tool (Groot's "Open in Runestone") — a
@@ -193,26 +176,21 @@ export function RunestonePage() {
     }
   }, [isScratch]);
 
-  // Leaving flushes the buffer and records that it was still open, closing the
-  // window where clicking away within half a second of typing loses the last
-  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
-  // before this runs, so the guard keeps a saved document from resurrecting it.
-  useEffect(() => {
-    return () => {
-      const left = bufferRef.current;
-      if (!left.isScratch || left.text.trim() === '') return;
-      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
-      markLeftOpen(DRAFT_ID);
-    };
-  }, []);
-
-  // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
-  // nothing. Saved documents live on the server instead.
-  useEffect(() => {
-    if (!isScratch || text.trim() === '') return;
-    const id = window.setTimeout(() => saveDraft({ title, text, savedAt: Date.now() }), 500);
-    return () => window.clearTimeout(id);
-  }, [isScratch, title, text]);
+  // The cache mirrors the scratch buffer, so a refresh mid-edit loses nothing,
+  // and leaving flushes it and marks it left open for the silent return above.
+  // Saving clears the draft deliberately and flips `isScratch` before leaving,
+  // so a saved document cannot resurrect it.
+  const blank = text.trim() === '';
+  useDraftCache({
+    isScratch,
+    title,
+    text,
+    blank,
+    offered: restorable,
+    save: saveDraft,
+    clear: clearDraft,
+    returnId: DRAFT_ID,
+  });
 
   useEffect(() => {
     if (!notice) return;
@@ -237,7 +215,7 @@ export function RunestonePage() {
     }
   }, [view, valid, debouncedText]);
 
-  const maxBytes = config ? config.maxDocKb * 1024 : null;
+  const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
   const debouncedCursor = useDebounced(cursor, 150);
@@ -274,6 +252,15 @@ export function RunestonePage() {
         ok('Saved');
       }
     } catch (error) {
+      if (isHubClosed(error)) {
+        // The sheet already explains; on the standalone site its "Download
+        // instead" is this editor's own export, the local answer to "save".
+        showBridgeClosed({
+          reason: error instanceof HubUnavailableError ? 'standalone' : 'unreachable',
+          download: exportDocument,
+        });
+        return;
+      }
       fail(
         error instanceof ApiError && error.status === 413
           ? 'The server refused it — over the size limit.'
@@ -332,7 +319,7 @@ export function RunestonePage() {
   // is derived from — a snapshot 300ms old is not what the user is looking at.
   const compressWithBrotli = () => {
     putBrotliSeed({ text, sourceLabel: 'Runestone' });
-    void navigate('/brotli');
+    hubNavigate(navigate, '/brotli');
   };
 
   const clearDocument = () => {
@@ -379,7 +366,8 @@ export function RunestonePage() {
     if (target) gotoIssue(target);
   };
 
-  const importText = (name: string, content: string, sizeBytes: number) => {
+  const importText = async (name: string, content: string, sizeBytes: number) => {
+    const maxBytes = config.maxDocKb * 1024;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
@@ -393,7 +381,7 @@ export function RunestonePage() {
   const onPickFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (file) importText(file.name, await file.text(), file.size);
+    if (file) await importText(file.name, await file.text(), file.size);
   };
 
   const onDrop = async (event: DragEvent) => {
@@ -404,7 +392,7 @@ export function RunestonePage() {
       fail('Only .json files can be dropped here.');
       return;
     }
-    importText(file.name, await file.text(), file.size);
+    await importText(file.name, await file.text(), file.size);
   };
 
   const exportDocument = () => {
@@ -439,6 +427,28 @@ export function RunestonePage() {
     navigate('/runestone', { replace: true });
   };
 
+  // A blank buffer without leaving the page. Once a document is saved the
+  // editor is bound to its slug, and reloading /runestone/<slug> correctly
+  // re-opens that same document — so the only way to start another one was to
+  // leave Ollivanders and come back in. This is the same reset the 404 does,
+  // with a generated title instead of a slug-derived one, and it *pushes* the
+  // scratch URL rather than replacing it, so Back returns to the document.
+  const startNew = () => {
+    if (dirty && !window.confirm('Start a new runestone? Unsaved changes to this one are lost.'))
+      return;
+    setPhase('new');
+    setDocId(null);
+    setSnapshot(null);
+    setText('');
+    setTitle(relicTitle());
+    setNotice(null);
+    // The cached draft backs up the buffer being left behind, so keeping it
+    // would have the restore prompt offer back exactly what New discarded.
+    clearDraft();
+    setRestorable(null);
+    if (slug) navigate('/runestone');
+  };
+
   const canTransform = valid && !overCap;
 
   if (phase === 'loading') {
@@ -462,7 +472,7 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -489,10 +499,18 @@ export function RunestonePage() {
           <p>Validate, explore, and shape JSON. The title names your export.</p>
         </div>
         <div className="rune-head-actions">
+          <Button
+            variant="ghost"
+            onClick={startNew}
+            disabled={saving}
+            title="Start a new runestone"
+          >
+            New
+          </Button>
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Carving…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=runestone')}>
+          <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
             Pensieve
           </Button>
         </div>
@@ -502,7 +520,7 @@ export function RunestonePage() {
         className="stack rune-workspace panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
-        {restorable && (
+        {showsRestore(restorable, blank) && (
           <Toast kind="info">
             <span className="rune-restore">
               Restore the draft from your last visit?

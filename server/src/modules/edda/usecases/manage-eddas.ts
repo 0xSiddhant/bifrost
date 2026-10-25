@@ -1,6 +1,7 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import type { EddaSummary } from '../../../core/bus/events.js';
 import { AppError } from '../../../core/http/index.js';
+import { pageLimit, type DocumentListPage, type PagingConfig } from '../../../core/paging.js';
 import { uniqueRelicTitle } from '../../../core/relics/index.js';
 import type { EddaListFilter, EddaRecord, EddaRepository, EddaSort } from '../ports.js';
 import { idFromSlug, isReservedSlug, makeSlug, newEddaId } from '../slug.js';
@@ -152,9 +153,33 @@ export interface ListEddasInput {
 const SORTS: readonly EddaSort[] = ['name', 'created', 'modified', 'size'];
 
 export class ListEddasUseCase {
-  constructor(private readonly repo: EddaRepository) {}
+  constructor(
+    private readonly repo: EddaRepository,
+    private readonly paging: PagingConfig,
+  ) {}
 
+  /** The legacy bare array — its 200/500 defaults are what installed clients rely on. */
   execute(input: ListEddasInput): EddaSummary[] {
+    return this.repo.list(this.filterFor(input, Math.min(Math.max(input.limit ?? 200, 1), 500)));
+  }
+
+  /**
+   * The paged form (PLAN-31): one page plus the total under the same filters
+   * and the unfiltered author facet. Offset-based, because the Pensieve needs
+   * random access to page k of a merge it computes itself.
+   */
+  executePage(input: ListEddasInput): DocumentListPage<EddaSummary> {
+    const filter = this.filterFor(input, pageLimit(input.limit, this.paging));
+    return {
+      items: this.repo.listPage(filter),
+      total: this.repo.count(filter),
+      limit: filter.limit,
+      offset: filter.offset,
+      authors: this.repo.listAuthors(),
+    };
+  }
+
+  private filterFor(input: ListEddasInput, limit: number): EddaListFilter {
     const sort = SORTS.includes(input.sort as EddaSort) ? (input.sort as EddaSort) : 'modified';
     const order =
       input.order === 'asc' || input.order === 'desc'
@@ -162,15 +187,14 @@ export class ListEddasUseCase {
         : sort === 'name'
           ? 'asc'
           : 'desc';
-    const filter: EddaListFilter = {
+    return {
       q: input.q?.trim() || undefined,
       authorDeviceId: input.author || undefined,
       sort,
       order,
-      limit: Math.min(Math.max(input.limit ?? 200, 1), 500),
+      limit,
       offset: Math.max(input.offset ?? 0, 0),
     };
-    return this.repo.list(filter);
   }
 }
 

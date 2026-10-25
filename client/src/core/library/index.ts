@@ -7,6 +7,14 @@ export type {
   LibrarySort,
 } from './types';
 export { LIBRARY_REGISTRY, availableKinds, entryFor } from './registry';
-export { filterItems, mergeItems, sortItems, type LibraryFilter } from './select';
-export { loadLibrary, type LibraryLoad } from './load';
+export {
+  compareItems,
+  mergeHeads,
+  pageWindow,
+  parsePageParam,
+  type Offsets,
+  type PageSlot,
+} from './paging';
+export { loadLibraryStep, type LibraryStep } from './load';
+export { LibraryPager, type LibraryPageView } from './pager';
 export { buildCurlCommand } from './curl';

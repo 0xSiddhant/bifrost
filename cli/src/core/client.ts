@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { deviceId, readConfig } from './config.js';
-import { resolveBaseUrl, unreachable } from './discover.js';
-import { CliError, EXIT } from './output.js';
+import { isConnectFailure, LOCAL_FALLBACKS, resolveBaseUrl, unreachable } from './discover.js';
+import { CliError, EXIT, note } from './output.js';
 
 /**
  * The one place that talks HTTP, and the one place that turns a failure into a
@@ -25,6 +25,35 @@ import { CliError, EXIT } from './output.js';
 /** JSON calls are short; a hung LAN link should not wedge the command forever. */
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/** A fallback probe only asks whether a hub is there, on this machine. */
+const PROBE_TIMEOUT_MS = 2_000;
+
+/** The API version every command speaks (PLAN-37); each path is built from it. */
+export const API_V1 = '/api/v1';
+
+const RAW_V1 = /^\/(runestone|edda|groot|atlas)\/api\/v1\//;
+
+/** True for a path under a version: the ones a server from before PLAN-37 lacks. */
+function isVersioned(path: string): boolean {
+  return path === API_V1 || path.startsWith(`${API_V1}/`) || RAW_V1.test(path);
+}
+
+/**
+ * The path a server from before PLAN-37 answers instead: the same one without
+ * its version. This is the one place the CLI names the unversioned paths
+ * (allowlisted in the client's `no-unversioned-api.test.ts`), because an
+ * installed CLI can be newer than the hub it talks to.
+ */
+export function legacyPath(path: string): string {
+  if (path === API_V1 || path.startsWith(`${API_V1}/`)) return `/api${path.slice(API_V1.length)}`;
+  return path.replace(RAW_V1, '/$1/api/');
+}
+
+export const LEGACY_SERVER_HINT =
+  'the server predates API versioning — consider updating it (using its unversioned paths)';
+
+type ApiVersion = 'v1' | 'legacy';
+
 export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   /** Serialized as a JSON body with the matching content-type. */
@@ -42,13 +71,121 @@ export interface UploadInput {
 }
 
 export class ApiClient {
+  private current: string;
+  private fallbacks: readonly string[];
+  private triedFallbacks: readonly string[] = [];
+  private movedFrom: string | null = null;
+  /** Decided by the first versioned request of the run; null until then. */
+  private version: ApiVersion | null = null;
+  private probing: Promise<void> | null = null;
+
+  /**
+   * `fallbacks` are tried, once, when `baseUrl` cannot be connected to at all
+   * (PLAN-39): the default `bifrost.local` that does not resolve on a machine
+   * running the hub itself. Empty for an address the person chose.
+   */
   constructor(
-    readonly baseUrl: string,
+    baseUrl: string,
     private readonly device: string | null,
-  ) {}
+    fallbacks: readonly string[] = [],
+  ) {
+    this.current = baseUrl;
+    this.fallbacks = fallbacks;
+  }
+
+  /** Where requests go: the address given, or the fallback that answered. */
+  get baseUrl(): string {
+    return this.current;
+  }
+
+  /** The address given, when requests moved to a fallback; otherwise null. */
+  get fellBackFrom(): string | null {
+    return this.movedFrom;
+  }
+
+  /** The API version this run speaks, once its first versioned request decided it. */
+  get apiVersion(): ApiVersion | null {
+    return this.version;
+  }
+
+  /** `path` as the server answers it: unchanged, or unversioned for a pre-PLAN-37 server. */
+  wirePath(path: string): string {
+    return this.version === 'legacy' && isVersioned(path) ? legacyPath(path) : path;
+  }
+
+  private decide(version: ApiVersion): void {
+    if (this.version !== null) return;
+    this.version = version;
+    // One line per run on stderr; `note` is silent under --json.
+    if (version === 'legacy') note(LEGACY_SERVER_HINT);
+  }
+
+  /**
+   * Which paths this server answers (PLAN-37): `GET /api/v1/health` once per
+   * run, before its first versioned request. 404 means a server from before
+   * versions existed, so the rest of the run uses the unversioned paths; any
+   * other answer means v1. The probe is the run's first contact, so it fails
+   * the way that request would have: a refused or unresolved address moves to
+   * a fallback (which decides the version there) or is reported unreachable,
+   * and a timeout is reported, never retried. No address is tried twice.
+   */
+  private ensureVersion(): Promise<void> {
+    if (this.version !== null) return Promise.resolve();
+    // Shared, so the first requests of a run made together (the four-kind
+    // document lookup) wait on one probe instead of sending four.
+    this.probing ??= this.probeVersion().finally(() => {
+      this.probing = null;
+    });
+    return this.probing;
+  }
+
+  private async probeVersion(): Promise<void> {
+    let status: number;
+    try {
+      const response = await fetch(`${this.current}${API_V1}/health`, {
+        headers: this.headers(),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+      await response.arrayBuffer();
+      status = response.status;
+    } catch (error) {
+      if (isConnectFailure(error) && (await this.relocate())) return;
+      throw this.unreachable(error);
+    }
+    this.decide(status === 404 ? 'legacy' : 'v1');
+  }
+
+  /**
+   * Try each fallback once; move to the first hub that answers, versioned or
+   * from before PLAN-37. Spent on the first call either way, so a command
+   * never probes twice.
+   */
+  private async relocate(): Promise<boolean> {
+    const candidates = this.fallbacks;
+    this.fallbacks = [];
+    for (const candidate of candidates) {
+      try {
+        const version = await hubAt(candidate);
+        if (version !== null) {
+          this.movedFrom = this.current;
+          this.current = candidate;
+          this.decide(version);
+          return true;
+        }
+      } catch {
+        // Not there either; the next candidate, or the original error.
+      }
+    }
+    this.triedFallbacks = candidates;
+    return false;
+  }
+
+  private unreachable(error: unknown): CliError {
+    return unreachable(this.current, describeTransportFailure(error), this.triedFallbacks);
+  }
 
   url(path: string, query?: RequestOptions['query']): string {
-    const url = new URL(path, `${this.baseUrl}/`);
+    const url = new URL(this.wirePath(path), `${this.baseUrl}/`);
     for (const [key, value] of Object.entries(query ?? {})) {
       if (value !== undefined) url.searchParams.set(key, String(value));
     }
@@ -124,6 +261,7 @@ export class ApiClient {
     const headers = this.headers(
       options.body === undefined ? {} : { 'content-type': 'application/json' },
     );
+    if (isVersioned(path)) await this.ensureVersion();
     try {
       return await fetch(this.url(path, options.query), {
         method,
@@ -133,7 +271,10 @@ export class ApiClient {
         ...init,
       });
     } catch (error) {
-      throw unreachable(this.baseUrl, describeTransportFailure(error));
+      if (isConnectFailure(error) && (await this.relocate())) {
+        return this.send(method, path, options, init);
+      }
+      throw this.unreachable(error);
     }
   }
 
@@ -157,6 +298,25 @@ export class ApiClient {
     path: string,
     files: readonly UploadInput[],
     options: { query?: RequestOptions['query']; onProgress?: (sent: number, total: number) => void } = {},
+  ): Promise<T> {
+    if (isVersioned(path)) await this.ensureVersion();
+    try {
+      return await this.postFilesTo<T>(what, path, files, options);
+    } catch (error) {
+      // Nothing reached a server, so the whole upload starts again from the
+      // first byte (the envelope reopens every file) at the fallback.
+      if (error instanceof ConnectFailure && (await this.relocate())) {
+        return this.postFilesTo<T>(what, path, files, options);
+      }
+      throw error instanceof ConnectFailure ? this.unreachable(error.cause) : error;
+    }
+  }
+
+  private async postFilesTo<T>(
+    what: string,
+    path: string,
+    files: readonly UploadInput[],
+    options: { query?: RequestOptions['query']; onProgress?: (sent: number, total: number) => void },
   ): Promise<T> {
     const boundary = `----BifrostCli${crypto.randomBytes(12).toString('hex')}`;
     const parts = files.map((file) => ({
@@ -233,7 +393,8 @@ export class ApiClient {
       if (readFailure !== null) {
         throw new CliError(`${what} failed: couldn't read a file to send — ${readFailure.message}`);
       }
-      throw unreachable(this.baseUrl, describeTransportFailure(error));
+      if (isConnectFailure(error)) throw new ConnectFailure(error);
+      throw this.unreachable(error);
     });
 
     if (answer.status < 200 || answer.status >= 300) {
@@ -311,8 +472,33 @@ export function multipartFilename(name: string): string {
   return name.replace(/["\\]|[\u0000-\u001f]/g, '_');
 }
 
-/** Builds the client every command uses: `--host`, then the saved default. */
+/** Marks an upload that never reached a server, so `postFiles` may retry it elsewhere. */
+/**
+ * Whether a hub answers at `baseUrl`, and which paths it speaks: v1, the
+ * unversioned ones of a server from before PLAN-37, or null for no hub.
+ */
+async function hubAt(baseUrl: string): Promise<ApiVersion | null> {
+  const signal = (): AbortSignal => AbortSignal.timeout(PROBE_TIMEOUT_MS);
+  const v1 = await fetch(`${baseUrl}${API_V1}/health`, { signal: signal() });
+  await v1.arrayBuffer();
+  if (v1.ok) return 'v1';
+  if (v1.status !== 404) return null;
+  const old = await fetch(`${baseUrl}${legacyPath(`${API_V1}/health`)}`, { signal: signal() });
+  await old.arrayBuffer();
+  return old.ok ? 'legacy' : null;
+}
+
+class ConnectFailure extends Error {
+  constructor(cause: unknown) {
+    super('connect failure', { cause });
+  }
+}
+
+/**
+ * Builds the client every command uses: `--host`, then the saved default,
+ * then `bifrost.local` with this machine's own addresses behind it (PLAN-39).
+ */
 export function clientFromOptions(options: { host?: string }): ApiClient {
-  const { baseUrl } = resolveBaseUrl(options.host, readConfig().host);
-  return new ApiClient(baseUrl, deviceId());
+  const { baseUrl, source } = resolveBaseUrl(options.host, readConfig().host);
+  return new ApiClient(baseUrl, deviceId(), source === 'default' ? LOCAL_FALLBACKS : []);
 }

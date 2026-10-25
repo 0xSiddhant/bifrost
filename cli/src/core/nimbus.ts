@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import type { ApiClient } from './client.js';
 import { CliError } from './output.js';
+import { API_V1 } from './client.js';
 
 /**
  * The LAN speed test, run the same way the browser page runs it — deliberately,
@@ -76,11 +77,11 @@ export function formatMbps(value: number | null): string {
 }
 
 export function getNimbusConfig(client: ApiClient): Promise<NimbusConfig> {
-  return client.json<NimbusConfig>('reading the speed-test config', 'GET', '/api/nimbus/config');
+  return client.json<NimbusConfig>('reading the speed-test config', 'GET', `${API_V1}/nimbus/config`);
 }
 
 export function saveSpeedResult(client: ApiClient, reading: SpeedReading): Promise<NimbusResult> {
-  return client.json<NimbusResult>('saving the speed test', 'POST', '/api/nimbus/results', {
+  return client.json<NimbusResult>('saving the speed test', 'POST', `${API_V1}/nimbus/results`, {
     body: reading,
   });
 }
@@ -88,7 +89,7 @@ export function saveSpeedResult(client: ApiClient, reading: SpeedReading): Promi
 /** One latency round trip; the server sends no body, so this times the hop itself. */
 async function pingOnce(client: ApiClient): Promise<number> {
   const started = performance.now();
-  await client.voidCall('pinging the bridge', 'GET', '/api/nimbus/ping');
+  await client.voidCall('pinging the bridge', 'GET', `${API_V1}/nimbus/ping`);
   return performance.now() - started;
 }
 
@@ -97,7 +98,7 @@ async function downloadTest(
   mb: number,
   warmup: boolean,
 ): Promise<{ bytes: number; ms: number }> {
-  const response = await client.open('running the download test', '/api/nimbus/down', {
+  const response = await client.open('running the download test', `${API_V1}/nimbus/down`, {
     query: { mb, ...(warmup ? { warmup: '1' } : {}) },
   });
   if (response.body === null) {
@@ -122,7 +123,7 @@ async function uploadTest(
   // The server's own timing, not ours — see the header note.
   return client.postBinary<{ bytes: number; ms: number }>(
     'running the upload test',
-    '/api/nimbus/up',
+    `${API_V1}/nimbus/up`,
     payload,
   );
 }
@@ -134,7 +135,7 @@ async function uploadTest(
  */
 async function release(client: ApiClient): Promise<void> {
   try {
-    await client.voidCall('releasing the speed-test lease', 'POST', '/api/nimbus/release');
+    await client.voidCall('releasing the speed-test lease', 'POST', `${API_V1}/nimbus/release`);
   } catch {
     // Deliberately silent: see above. The lease self-expires either way.
   }

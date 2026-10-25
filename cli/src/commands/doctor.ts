@@ -1,8 +1,13 @@
 import dns from 'node:dns/promises';
 import type { Command } from 'commander';
-import { ApiClient, describeTransportFailure } from '../core/client.js';
+import {
+  API_V1,
+  ApiClient,
+  describeTransportFailure,
+  LEGACY_SERVER_HINT,
+} from '../core/client.js';
 import { configPath, deviceId, readConfig } from '../core/config.js';
-import { resolveBaseUrl, unreachableMessage } from '../core/discover.js';
+import { LOCAL_FALLBACKS, resolveBaseUrl, unreachableMessage } from '../core/discover.js';
 import { checkLatest, cliVersion, compareVersions } from '../core/selfUpdate.js';
 import { attention, bad, dim, EXIT, heading, ok, print } from '../core/output.js';
 import type { Capabilities } from './status.js';
@@ -76,25 +81,44 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
     });
   }
 
-  // 3/4 — the bridge itself.
-  const client = new ApiClient(baseUrl, deviceId());
-  if (!resolved) {
+  // 3/4 — the bridge itself. With the default address, a hub on this machine
+  // is tried too when bifrost.local does not answer (PLAN-39), as every
+  // command does; doctor then says so, and how to skip the detour.
+  const fallbacks = source === 'default' ? LOCAL_FALLBACKS : [];
+  const client = new ApiClient(baseUrl, deviceId(), fallbacks);
+  if (!resolved && fallbacks.length === 0) {
     const skipped = 'skipped — the host did not resolve';
     checks.push({ name: 'server reachable', status: 'fail', detail: skipped });
     checks.push({ name: 'server profile', status: 'fail', detail: skipped });
   } else {
     try {
-      const response = await client.probe('/api/health', { signal: AbortSignal.timeout(5_000) });
+      const response = await client.probe(`${API_V1}/health`, { signal: AbortSignal.timeout(5_000) });
       await response.arrayBuffer();
+      const moved = client.fellBackFrom;
+      const healthUrl = client.url(`${API_V1}/health`);
       checks.push(
-        response.ok
-          ? { name: 'server reachable', status: 'pass', detail: `${baseUrl}/api/health answered 200` }
+        response.ok && moved !== null
+          ? {
+              name: 'server reachable',
+              status: 'warn',
+              detail:
+                `${moved} did not answer; a hub on this machine did, at ${client.baseUrl}. ` +
+                'Every command finds it the same way; save it to skip the detour: ' +
+                `bifrost config set-host ${new URL(client.baseUrl).host}`,
+            }
+          : response.ok
+          ? { name: 'server reachable', status: 'pass', detail: `${healthUrl} answered 200` }
           : {
               name: 'server reachable',
               status: 'fail',
-              detail: `${baseUrl}/api/health answered HTTP ${response.status}`,
+              detail: `${healthUrl} answered HTTP ${response.status}`,
             },
       );
+      // A hub from before PLAN-37 works (the CLI falls back to its unversioned
+      // paths), but --json hides the run's own hint, so doctor says it too.
+      if (client.apiVersion === 'legacy') {
+        checks.push({ name: 'API version', status: 'warn', detail: LEGACY_SERVER_HINT });
+      }
     } catch (error) {
       // Already worded by `client.ts` (it raises `discover.ts`'s own
       // remediation text) — re-wrapping it would print the sentence twice.
@@ -105,7 +129,7 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
       const capabilities = await client.json<Capabilities>(
         'reading server capabilities',
         'GET',
-        '/api/capabilities',
+        `${API_V1}/capabilities`,
       );
       checks.push(
         PROFILES.includes(capabilities.profile)
@@ -153,12 +177,12 @@ export async function runDoctor(options: { host?: string }): Promise<Check[]> {
   // 6 — the runtime this CLI needs.
   const major = Number(process.versions.node.split('.')[0]);
   checks.push(
-    Number.isFinite(major) && major >= 20 && typeof fetch === 'function'
+    Number.isFinite(major) && major >= 22 && typeof fetch === 'function'
       ? { name: 'node runtime', status: 'pass', detail: `node ${process.versions.node}, fetch present` }
       : {
           name: 'node runtime',
           status: 'fail',
-          detail: `node ${process.versions.node} — the CLI needs Node 20+ with a built-in fetch`,
+          detail: `node ${process.versions.node} — the CLI needs Node 22+ with a built-in fetch`,
         },
   );
 

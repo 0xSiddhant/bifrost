@@ -23,8 +23,8 @@ describe('searchSections', () => {
   });
 
   it('matches whole sections by name', () => {
-    const hits = searchSections('themes');
-    expect(hits.some((hit) => hit.sectionId === 'themes' && !hit.controlId)).toBe(true);
+    const hits = searchSections('wardens');
+    expect(hits.some((hit) => hit.sectionId === 'wardens' && !hit.controlId)).toBe(true);
   });
 
   it('finds the QR control via a keyword, not just its label', () => {

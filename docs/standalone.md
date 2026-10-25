@@ -1,0 +1,138 @@
+# The standalone site
+
+Bifrost has two client builds (PLAN-35):
+
+- **The hub** (`npm run build`, `client/dist/`): the whole app, served by the Bifrost server on your LAN.
+- **The standalone site** (`./bifrost build --standalone`, `client/dist-standalone/`): only what works in a browser on its own, with no Bifrost server at all. It is meant for a public machine, so the tools you use daily are one URL away from anywhere.
+
+## What it has, and what it doesn't
+
+| Works in the standalone site | Needs the hub |
+|---|---|
+| Runestone, Edda, Groot, Atlas (edit, format, export, "Download instead" of saving) | Saving to the Pensieve, the Pensieve itself, shared document links |
+| Variant, Loki (transforms, regex, the sandboxed runner in your own browser) | Brotli (compression runs on the server) |
+| Saga (present a dropped `.md` or `.pdf`) | Send, Receive, Hermes, Accio, Nimbus, Portkey, Wardens |
+| Every Diagon Alley toolbox tool | The Join Bifrost QR |
+| Themes, and Heimdall with this browser's own settings | Heimdall's household settings, stats and history |
+
+Anything that needs the hub explains itself instead of failing: a link or button to it shows **"The Bifröst is closed"**, with "Download instead" where there is a local copy to offer. The bundle cannot reach a server: every request path is compiled out of it, and `./bifrost build --standalone` fails if one survives (`scripts/check-standalone.ts`).
+
+Heimdall opens by the same shortcut and taps as on the hub, with **no PIN**: there is no server to check one against, and a PIN checked in the browser would protect nothing. Its sections (theme, the shortcut and taps, Sky Relics, Loki's run policy, the screensaver, About) are stored in this browser's `localStorage` under `bifrost.local.*`, and say so.
+
+## Run it locally
+
+No Docker needed to try it or work on it:
+
+```bash
+./bifrost dev --standalone   # Vite dev server in standalone mode, hot reload: http://localhost:5173
+./bifrost preview            # build dist-standalone/, then serve exactly that: http://localhost:4173
+```
+
+Neither starts a Bifrost server, and none is needed: the standalone build has no proxy and no request path to one, so anything hub-only shows "The Bifröst is closed", exactly as the deployed site does. Running `npm run dev` (the hub) at the same time is fine: since PLAN-36 the hub's dev server holds `PORT` (4646) and these keep Vite's own ports.
+
+To serve it from this Mac to the LAN the way the hub is served, run `./bifrost start --standalone` (or `./bifrost service pm2 --standalone`, or `sh scripts/start-pm2.sh --standalone`; no `.env` change): the web host serves `dist-standalone/` on `PORT` with the container's exact rules, forwards nothing, and answers for `bifrost.local`.
+
+`./bifrost preview` serves the real build output, so it is the one to check before deploying. It falls back to the app for any unknown path, a little more loosely than the container's nginx (which 404s a missing `/assets/` file); the e2e `standalone` project serves the build with the container's exact rules (`e2e/support/static-server.ts`). The baked defaults come from your root `.env`, as they do for every build.
+
+## Run it in Docker
+
+The site is a container: static files behind `nginx-unprivileged`, running as a non-root user on port 8080, read-only, with every capability dropped. Its nginx has no `proxy_pass` anywhere, so not even the web server can reach a backend.
+
+### On this machine, in one command
+
+```bash
+./bifrost docker up standalone              # build, then serve on http://localhost:8080
+./bifrost docker up standalone --port 9000  # another port
+./bifrost docker logs standalone            # follow nginx
+./bifrost docker down standalone            # stop and remove it
+```
+
+The container runs with the same lockdown as below (read-only, every capability dropped, no new privileges) and restarts with Docker. It publishes its port on every interface, so other devices on your network can open `http://<this machine>:8080` too. Build arguments go after `--`: `./bifrost docker up standalone -- --build-arg LOKI_EXECUTION_ENABLED=false`. `--no-build` restarts the image already built.
+
+Without `node_modules`, the same with plain Docker:
+
+```bash
+docker build -f docker/standalone.Dockerfile -t bifrost-standalone:latest .
+docker run -d --name bifrost-standalone --restart unless-stopped \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+  -p 9000:8080 bifrost-standalone:latest       # http://localhost:9000
+```
+
+### Behind your reverse proxy
+
+It is built to sit behind the reverse proxy you already run, beside your other containers:
+
+- **No published port.** It `expose`s 8080 and joins your proxy's Docker network.
+- **Nothing that collides:** no fixed container name, no host port, no volume.
+
+```bash
+# The network your reverse proxy (Caddy, Traefik, nginx-proxy, …) is on:
+docker network ls
+BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml up -d --build
+```
+
+Then point the proxy at `bifrost-standalone:8080` for the public hostname, with TLS at the proxy. For example, with Caddy:
+
+```caddyfile
+tools.example.com {
+    reverse_proxy bifrost-standalone:8080
+}
+```
+
+No proxy on the machine? Uncomment the `ports:` line in `compose/standalone.yml` instead.
+
+### Settings are build arguments
+
+Everything the site starts from is **baked in when the image is built**: the editor size caps, Loki's run policy, the screensaver's defaults, and Heimdall's shortcut and tap count. Vite writes them into the JavaScript, so a runtime `environment:` or `docker run -e` arrives too late and changes nothing.
+
+Set them under `build.args` in `compose/standalone.yml` (the defaults are `.env.example`'s), then rebuild:
+
+```yaml
+args:
+  LOKI_EXECUTION_ENABLED: 'false'   # ship the site with the runner off
+  HEIMDALL_TAP_COUNT: '9'
+```
+
+A visitor can still change their own Loki, screensaver and Heimdall settings in their own browser; the build arguments are where every browser starts.
+
+`BIFROST_COMMIT` sets the commit Heimdall's About shows. The image has no `.git`, so without it About reads `unknown`.
+
+## Search engines
+
+The standalone site is public, so the build writes what search engines and link previews read. Each page that works without a hub gets its own HTML file: the home page, Ollivanders, Diagon Alley, Runestone, Variant, Edda, Groot, Atlas, Loki, Saga, and each Diagon Alley tool. Every file has its own title, description, canonical link, Open Graph and Twitter tags, structured data, and a short visible summary with links to the other pages. The build also writes `robots.txt`, `sitemap.xml` and `404.html`. Hub-only pages such as Hermes, Accio or a saved document's link are not among them: nginx answers them with `404.html` and a 404 status, so they are never indexed, and the app in that page still explains them. The list lives in `client/src/core/seo.ts`.
+
+**Set `STANDALONE_SITE_URL` before a public deploy.** Canonical links, `og:url`, the preview image and the sitemap need the site's absolute address, so the build reads its origin (`https://tools.example.com`, no path) from that build argument. Behind your proxy, `compose/standalone.yml` takes it from the shell:
+
+```bash
+STANDALONE_SITE_URL=https://tools.example.com BIFROST_DOCKER_NETWORK=proxy \
+  docker compose -f compose/standalone.yml up -d --build
+```
+
+or write it into `build.args` there in place of the `${STANDALONE_SITE_URL?…}` line, so every rebuild keeps it. Compose refuses to run with it unset, so a public deploy cannot forget it; `STANDALONE_SITE_URL=` (empty) builds without the four on purpose. On this machine without a proxy: `./bifrost docker up standalone -- --build-arg STANDALONE_SITE_URL=https://tools.example.com`. Outside Docker, `./bifrost build --standalone` reads it from `.env`. Without it the build still succeeds and warns, and the pages ship without those four. A malformed value fails the build.
+
+After the first deploy, add the site to Google Search Console and Bing Webmaster Tools, and submit `https://<your site>/sitemap.xml` in each.
+
+## Update it
+
+```bash
+git pull
+STANDALONE_SITE_URL=https://tools.example.com BIFROST_DOCKER_NETWORK=proxy \
+  docker compose -f compose/standalone.yml up -d --build
+```
+
+Compose stops with a message if `STANDALONE_SITE_URL` is unset, unless it is written into `build.args`.
+
+Hashed assets are cached forever and the app shell never, so a browser picks up the new build on its next load.
+
+## Check it
+
+```bash
+docker compose -f compose/standalone.yml ps     # STATUS should read (healthy)
+scripts/standalone-smoke.sh bifrost-standalone:latest  # what CI runs on every PR
+```
+
+The smoke script runs the image the way the compose file does, then checks the shell, that `/runestone` is its own prerendered page, that a deep link and `/api/health` answer with the 404 page and a 404 (proof that nothing behind it is a backend), `robots.txt`, gzip, a hashed asset's cache headers, and the healthcheck. Through your proxy, open `/runestone` and refresh it: the page should load with its own tab title. Open `/robots.txt` and `/sitemap.xml` too: the sitemap's addresses should start with your public origin.
+
+## Logs
+
+The standalone site sends no logs anywhere: the client's log sink is a no-op in this build. A later plan adds a small log service as another container on the same network (PLAN-99).

@@ -11,6 +11,8 @@ import {
   UpdateAtlasUseCase,
 } from './manage-atlas-docs.js';
 
+const PAGING = { pageSize: 30, maxPageSize: 100 };
+
 class MemoryRepo implements AtlasRepository {
   rows = new Map<string, AtlasRecord>();
   lastFilter: AtlasListFilter | null = null;
@@ -41,6 +43,18 @@ class MemoryRepo implements AtlasRepository {
     const row = this.findById(id);
     if (row) this.rows.delete(id);
     return row;
+  }
+  listPage(filter: AtlasListFilter): AtlasSummary[] {
+    return this.list(filter);
+  }
+  count(): number {
+    return this.rows.size;
+  }
+  listAuthors(): string[] {
+    const authors = [...this.rows.values()].flatMap((row) =>
+      row.authorDeviceId ? [row.authorDeviceId] : [],
+    );
+    return [...new Set(authors)];
   }
   listNames(): string[] {
     return [...this.rows.values()].map((row) => row.name);
@@ -223,7 +237,7 @@ describe('GetAtlasUseCase', () => {
 describe('ListAtlasUseCase', () => {
   it('clamps and defaults filter parameters', () => {
     const { repo } = harness();
-    const list = new ListAtlasUseCase(repo);
+    const list = new ListAtlasUseCase(repo, PAGING);
     list.execute({ sort: 'bogus', order: 'sideways', limit: 9999, offset: -3 });
     expect(repo.lastFilter).toEqual({
       q: undefined,

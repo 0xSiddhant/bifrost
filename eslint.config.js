@@ -8,13 +8,19 @@ export default tseslint.config(
     // `client/public/pdfjs-wasm/` is pdf.js's own vendored decoders, copied out
     // of node_modules by scripts/copy-pdf-wasm.ts — third-party build output
     // that happens to land outside node_modules, so it is ignored for the same
-    // reason node_modules is.
+    // reason node_modules is. `tools/micromatch-shim/` is micromatch's own
+    // CommonJS, copied verbatim to replace it (its README says why), so it is
+    // third-party code kept as written, not ours to restyle.
     ignores: [
       '**/dist/**',
+      '**/dist-standalone/**',
       '**/node_modules/**',
       'server/drizzle/**',
       'storage/**',
       'client/public/pdfjs-wasm/**',
+      'tools/micromatch-shim/**',
+      'e2e/test-results/**',
+      'e2e/playwright-report/**',
     ],
   },
   eslint.configs.recommended,
@@ -116,11 +122,77 @@ export default tseslint.config(
     },
   },
   {
+    // The e2e workspace sees the system only from outside (PLAN-32a): the
+    // built server over HTTP, the built client in a browser, the packed CLI as
+    // an installed binary. Importing product source would test the source, not
+    // what ships — the same isolation modules get from each other.
+    files: ['e2e/**/*.ts'],
+    rules: {
+      // Playwright reads a fixture's dependencies from its first parameter's
+      // destructuring pattern, so a fixture that needs none must write `{}`.
+      'no-empty-pattern': 'off',
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**', '**/web/src/**'],
+              message: 'e2e drives the built system from outside — never import product source.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The web host (PLAN-36) knows the API only as an upstream URL: it serves
+    // files and forwards requests, so importing server (or client) source would
+    // couple two processes that are meant to start, stop and fail separately.
+    files: ['web/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/server/src/**', '**/client/src/**', '**/cli/src/**', '**/e2e/**'],
+              message: 'the web host forwards to the API over HTTP — never import another workspace.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // PLAN-36: bifrost.local is answered by the web host, which owns the
+    // address people open. A responder in the API too would put two on the
+    // network (criterion 11), and would vanish whenever the API restarts.
+    files: ['server/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'bonjour-service', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+            { name: 'multicast-dns', message: 'mDNS lives in the web host (web/src/mdns.ts).' },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // CommonJS config files (PM2's ecosystem.config.cjs) — Node globals.
     files: ['**/*.cjs'],
+    // require() is how CommonJS imports; PM2's config reads .env with it.
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
     languageOptions: {
       sourceType: 'commonjs',
-      globals: { module: 'writable', require: 'readonly', __dirname: 'readonly', process: 'readonly' },
+      globals: {
+        module: 'writable',
+        require: 'readonly',
+        __dirname: 'readonly',
+        process: 'readonly',
+      },
     },
   },
   prettier,

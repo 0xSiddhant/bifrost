@@ -64,7 +64,7 @@ export function registerPreview(program: Command): void {
       }
 
       const document = await resolveDocument(client, target, options.type);
-      const url = previewUrl(client.baseUrl, document);
+      const url = previewUrl(client.baseUrl, document, (path) => client.wirePath(path));
 
       if (!hasRenderedPage(document.kind)) {
         note(

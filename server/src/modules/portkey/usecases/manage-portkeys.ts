@@ -1,5 +1,12 @@
 import type { EventBus } from '../../../core/bus/index.js';
 import { AppError } from '../../../core/http/index.js';
+import {
+  decodeCursor,
+  encodeCursor,
+  pageLimit,
+  type CursorListPage,
+  type PagingConfig,
+} from '../../../core/paging.js';
 import type { Portkey, PortkeyListFilter, PortkeyRepository } from '../ports.js';
 import { validateSlug } from '../slug.js';
 import { normalizeTarget } from '../target.js';
@@ -97,11 +104,25 @@ export interface ListPortkeysInput {
   q?: string;
   limit?: number;
   offset?: number;
+  /** Paged form only: where the previous page ended. */
+  cursor?: string;
 }
 
-export class ListPortkeysUseCase {
-  constructor(private readonly repo: PortkeyRepository) {}
+/** Portkey has one order, so its cursors always carry this sort/order pair. */
+const PAGE_SORT = 'created';
+const PAGE_ORDER = 'desc';
 
+export class ListPortkeysUseCase {
+  constructor(
+    private readonly repo: PortkeyRepository,
+    private readonly paging: PagingConfig,
+  ) {}
+
+  /**
+   * The legacy bare array. Its 500/1000 defaults are deliberately NOT the
+   * page size: `bifrost portkey ls` sends no limit and prints what comes back,
+   * so shrinking this would make an installed CLI silently show 30 links.
+   */
   execute(input: ListPortkeysInput): Portkey[] {
     const filter: PortkeyListFilter = {
       q: input.q?.trim() || undefined,
@@ -109,6 +130,28 @@ export class ListPortkeysUseCase {
       offset: Math.max(input.offset ?? 0, 0),
     };
     return this.repo.list(filter);
+  }
+
+  /** The paged form (PLAN-31): a keyset page on `(createdAt, slug)` plus the total. */
+  executePage(input: ListPortkeysInput): CursorListPage<Portkey> {
+    const q = input.q?.trim() || undefined;
+    const limit = pageLimit(input.limit, this.paging);
+    const after = input.cursor
+      ? decodeCursor(input.cursor, PAGE_SORT, PAGE_ORDER, 'number')
+      : undefined;
+    // One row past the page says whether another exists.
+    const rows = this.repo.listPage({ q, limit: limit + 1, after });
+    const page = rows.slice(0, limit);
+    const last = page.at(-1);
+    return {
+      items: page,
+      total: this.repo.count({ q }),
+      limit,
+      nextCursor:
+        rows.length > limit && last
+          ? encodeCursor(PAGE_SORT, PAGE_ORDER, { key: last.createdAt, id: last.slug })
+          : null,
+    };
   }
 }
 

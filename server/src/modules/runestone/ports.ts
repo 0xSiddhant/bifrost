@@ -25,6 +25,17 @@ export interface RunestoneRepository {
   findById(id: string): RunestoneRecord | null;
   findBySlug(slug: string): RunestoneRecord | null;
   list(filter: RunestoneListFilter): RunestoneSummary[];
+  /**
+   * The paged form (PLAN-31): ordered by `(sortKey, id)` **both** in the
+   * filter's direction, so `asc` and `desc` are exact mirrors even across ties
+   * — the Pensieve computes its last page by reading the reversed order.
+   * `list` keeps its `asc(id)` tiebreak for the legacy array response.
+   */
+  listPage(filter: RunestoneListFilter): RunestoneSummary[];
+  /** Rows matching `q`/`authorDeviceId`, ignoring sort and paging. */
+  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): number;
+  /** Every distinct author over the whole table, unfiltered — the dropdown's options. */
+  listAuthors(): string[];
   /** Removes one document; returns it (for the deleted event) or null. */
   delete(id: string): RunestoneRecord | null;
   /** Every stored name — feeds the collision-safe default-name generator. */

@@ -1,4 +1,5 @@
 import { getDeviceId } from './deviceId';
+import { API_V1 } from './api';
 
 /**
  * Browser-side logging (PLAN-16a).
@@ -28,8 +29,11 @@ export type ClientLogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fa
 const LEVELS: ClientLogLevel[] = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'];
 
 const DEFAULT_LEVEL: ClientLogLevel = 'warn';
-const CONFIG_URL = '/api/client-logs/config';
-const INGEST_URL = '/api/client-logs';
+// Functions, not constants: a top-level template over an imported binding is
+// kept by the bundler even when nothing reads it, which would carry the API
+// prefix into the standalone build (PLAN-37; scripts/check-standalone.ts).
+const configUrl = (): string => `${API_V1}/client-logs/config`;
+const ingestUrl = (): string => `${API_V1}/client-logs`;
 
 /** Debounce window: an error burst (a render loop) becomes one request. */
 const FLUSH_DELAY_MS = 2000;
@@ -48,7 +52,7 @@ export interface ClientLogFields {
   stack?: string;
 }
 
-interface QueuedEntry {
+export interface QueuedEntry {
   level: ClientLogLevel;
   msg: string;
   module?: string;
@@ -56,6 +60,44 @@ interface QueuedEntry {
   stack?: string;
   ts: number;
 }
+
+/**
+ * Where reported lines go (PLAN-35). The hub build posts them to the server;
+ * the standalone site has no server of its own to post to, so its lines go
+ * nowhere. A later log service for that site is one more sink here.
+ */
+export interface LogSink {
+  send: (entries: QueuedEntry[]) => Promise<void>;
+  /** The floor and batch size, when the sink has somewhere to ask. */
+  config: () => Promise<unknown>;
+}
+
+/** The hub's `/api/v1/client-logs`, as since PLAN-16a. */
+export const httpSink: LogSink = {
+  send: async (entries) => {
+    const response = await fetch(ingestUrl(), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-bifrost-device': getDeviceId() },
+      body: JSON.stringify({ entries }),
+      // The page may be unloading when the last batch goes out.
+      keepalive: true,
+    });
+    if (!response.ok) throw new Error(`client-logs responded ${response.status}`);
+  },
+  config: async () => {
+    const response = await fetch(configUrl(), { headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error(`client-logs config responded ${response.status}`);
+    return response.json();
+  },
+};
+
+/** The standalone site's: accepted and dropped, with no request ever made. */
+export const noopSink: LogSink = {
+  send: async () => undefined,
+  config: async () => ({}),
+};
+
+const sink: LogSink = __HUB__ ? httpSink : noopSink;
 
 interface Transport {
   send: (entries: QueuedEntry[]) => Promise<void>;
@@ -66,16 +108,7 @@ interface Transport {
 }
 
 const defaultTransport: Transport = {
-  send: async (entries) => {
-    const response = await fetch(INGEST_URL, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-bifrost-device': getDeviceId() },
-      body: JSON.stringify({ entries }),
-      // The page may be unloading when the last batch goes out.
-      keepalive: true,
-    });
-    if (!response.ok) throw new Error(`client-logs responded ${response.status}`);
-  },
+  send: (entries) => sink.send(entries),
   now: () => Date.now(),
   route: () => window.location.pathname,
   schedule: (fn, ms) => window.setTimeout(fn, ms),
@@ -97,7 +130,7 @@ export class ClientLogger {
    * the default floor stands and logging keeps working, because a broken
    * config request is exactly the kind of moment worth having logs for.
    */
-  async configure(fetchConfig: () => Promise<unknown> = defaultFetchConfig): Promise<void> {
+  async configure(fetchConfig: () => Promise<unknown> = sink.config): Promise<void> {
     try {
       const config = (await fetchConfig()) as { level?: unknown; maxBatch?: unknown };
       if (isLevel(config.level)) this.level = config.level;
@@ -172,12 +205,6 @@ export class ClientLogger {
 
 function isLevel(value: unknown): value is ClientLogLevel {
   return typeof value === 'string' && (LEVELS as string[]).includes(value);
-}
-
-async function defaultFetchConfig(): Promise<unknown> {
-  const response = await fetch(CONFIG_URL, { headers: { accept: 'application/json' } });
-  if (!response.ok) throw new Error(`client-logs config responded ${response.status}`);
-  return response.json();
 }
 
 /** The app-wide logger. Client code logs through this, never bare `console.*`. */

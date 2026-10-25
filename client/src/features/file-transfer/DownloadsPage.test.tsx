@@ -96,7 +96,7 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
     const zip = container.querySelector<HTMLAnchorElement>(
       '[aria-label="Download Trip photos as a zip"]',
     );
-    expect(zip?.getAttribute('href')).toBe('/api/downloads/fold0000000000001/archive');
+    expect(zip?.getAttribute('href')).toBe('/api/v1/downloads/fold0000000000001/archive');
   });
 
   it('sums a folder’s children from the same feed rather than trusting its size', () => {
@@ -119,7 +119,7 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
     expect(container.querySelector('[aria-label="Preview a.jpg"]')).toBeTruthy();
     expect(
       container.querySelector<HTMLAnchorElement>('[aria-label="Download a.jpg"]')?.href,
-    ).toContain('/api/downloads/kid00000000000001/content');
+    ).toContain('/api/v1/downloads/kid00000000000001/content');
   });
 
   it('offers the explicit zip button and a way back on the folder page', () => {
@@ -128,7 +128,7 @@ describe('Receive views over one shared feed (PLAN-24)', () => {
     const zip = [...container.querySelectorAll('a')].find((el) =>
       el.textContent?.includes('Download folder as .zip'),
     );
-    expect(zip?.getAttribute('href')).toBe('/api/downloads/fold0000000000001/archive');
+    expect(zip?.getAttribute('href')).toBe('/api/v1/downloads/fold0000000000001/archive');
     const back = [...container.querySelectorAll('a')].find((el) =>
       el.textContent?.includes('Back to Receive'),
     );

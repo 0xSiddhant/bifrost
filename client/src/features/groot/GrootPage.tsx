@@ -7,6 +7,7 @@ import {
   type CSSProperties,
   type DragEvent,
 } from 'react';
+import { hubNavigate, showBridgeClosed } from '../../core/bridge';
 import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
@@ -21,12 +22,13 @@ import {
   type YamlIssue,
 } from '../../core/yaml';
 import { relicTitle } from '../../core/relicNames';
-import { markLeftOpen, takeLeftOpen } from '../../core/draftReturn';
+import { useDraftCache, showsRestore } from '../../core/draftCache';
+import { takeLeftOpen } from '../../core/draftReturn';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { takeGrootSeed } from '../../core/grootSeed';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
 import { putVariantTextSeed } from '../../core/variantSeed';
-import { ApiError } from '../../core/api';
+import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
@@ -37,10 +39,9 @@ import { Toast } from '../../core/ui/Toast';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchGroot,
-  fetchGrootConfig,
+  GROOT_CONFIG,
   saveGroot,
   updateGroot,
-  type GrootConfig,
 } from '../../core/groot';
 import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
 
@@ -114,26 +115,13 @@ export function GrootPage() {
     window.innerWidth < 768 ? 'tree' : 'code',
   );
   const [docIndex, setDocIndex] = useState(0);
-  const [config, setConfig] = useState<GrootConfig | null>(null);
+  // Baked in at build time (PLAN-35): known before the first render.
+  const config = GROOT_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [restorable, setRestorable] = useState<GrootDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchGrootConfig()
-      .then((cfg) => {
-        if (!cancelled) setConfig(cfg);
-      })
-      .catch(() => {
-        // cap check degrades gracefully; the server still enforces it on save
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Load (or fail to find) the document a slug URL names.
   useEffect(() => {
@@ -174,11 +162,6 @@ export function GrootPage() {
 
   const isScratch = phase === 'new' && docId === null;
 
-  // What is on screen right now, for the leave handler below — it has to flush
-  // the current buffer on unmount, not the one that existed when it registered.
-  const bufferRef = useRef({ title, text, isScratch });
-  bufferRef.current = { title, text, isScratch };
-
   // On arriving at the scratch editor: a buffer left open by a navigation
   // inside this page's lifetime comes straight back, because jumping to
   // Runestone to see the same document as JSON and returning is one task, not
@@ -206,27 +189,22 @@ export function GrootPage() {
     }
   }, [isScratch]);
 
-  // Leaving flushes the buffer and records that it was still open. Flushing
-  // here rather than trusting the debounce below closes the window where
-  // clicking "Runestone" within half a second of typing loses the last
+  // The cache mirrors the scratch buffer, so a refresh mid-edit loses nothing,
+  // and leaving flushes it and marks it left open for the silent return above:
+  // clicking "Runestone" within half a second of typing must not lose the last
   // keystrokes. Saving clears the draft deliberately and flips `isScratch`
-  // before this runs, so the guard keeps a saved document from resurrecting it.
-  useEffect(() => {
-    return () => {
-      const left = bufferRef.current;
-      if (!left.isScratch || left.text.trim() === '') return;
-      saveDraft({ title: left.title, text: left.text, savedAt: Date.now() });
-      markLeftOpen(DRAFT_ID);
-    };
-  }, []);
-
-  // Auto-cache the scratch buffer (debounced) so a refresh mid-edit loses
-  // nothing. Saved documents live on the server instead.
-  useEffect(() => {
-    if (!isScratch || text.trim() === '') return;
-    const id = window.setTimeout(() => saveDraft({ title, text, savedAt: Date.now() }), 500);
-    return () => window.clearTimeout(id);
-  }, [isScratch, title, text]);
+  // before leaving, so a saved document cannot resurrect it.
+  const blank = text.trim() === '';
+  useDraftCache({
+    isScratch,
+    title,
+    text,
+    blank,
+    offered: restorable,
+    save: saveDraft,
+    clear: clearDraft,
+    returnId: DRAFT_ID,
+  });
 
   useEffect(() => {
     if (!notice) return;
@@ -250,7 +228,7 @@ export function GrootPage() {
   const activeIndex = docCount === 0 ? 0 : Math.min(docIndex, docCount - 1);
   const activeDoc = analysis.documents[activeIndex];
 
-  const maxBytes = config ? config.maxDocKb * 1024 : null;
+  const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
   const dirty =
@@ -283,6 +261,15 @@ export function GrootPage() {
         ok('Saved');
       }
     } catch (error) {
+      if (isHubClosed(error)) {
+        // The sheet already explains; on the standalone site its "Download
+        // instead" is this editor's own export, the local answer to "save".
+        showBridgeClosed({
+          reason: error instanceof HubUnavailableError ? 'standalone' : 'unreachable',
+          download: exportDocument,
+        });
+        return;
+      }
       fail(
         error instanceof ApiError && error.status === 413
           ? 'The server refused it — over the size limit.'
@@ -345,7 +332,7 @@ export function GrootPage() {
   // is derived from — a snapshot 300ms old is not what the user is looking at.
   const compressWithBrotli = () => {
     putBrotliSeed({ text, sourceLabel: 'Groot' });
-    void navigate('/brotli');
+    hubNavigate(navigate, '/brotli');
   };
 
   const clearDocument = () => {
@@ -392,7 +379,8 @@ export function GrootPage() {
     if (target) gotoOffset(target.offset);
   };
 
-  const importText = (name: string, content: string, sizeBytes: number) => {
+  const importText = async (name: string, content: string, sizeBytes: number) => {
+    const maxBytes = config.maxDocKb * 1024;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
@@ -406,7 +394,7 @@ export function GrootPage() {
   const onPickFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (file) importText(file.name, await file.text(), file.size);
+    if (file) await importText(file.name, await file.text(), file.size);
   };
 
   const onDrop = async (event: DragEvent) => {
@@ -417,7 +405,7 @@ export function GrootPage() {
       fail('Only .yaml or .yml files can be dropped here.');
       return;
     }
-    importText(file.name, await file.text(), file.size);
+    await importText(file.name, await file.text(), file.size);
   };
 
   const exportDocument = () => {
@@ -452,6 +440,31 @@ export function GrootPage() {
     navigate('/groot', { replace: true });
   };
 
+  // A blank buffer without leaving the page. Once a document is saved the
+  // editor is bound to its slug, and reloading /groot/<slug> correctly re-opens
+  // that same document — so the only way to start another one was to leave
+  // Ollivanders and come back in. This is the same reset the 404 does, with a
+  // generated title instead of a slug-derived one, and it *pushes* the scratch
+  // URL rather than replacing it, so Back returns to the document.
+  const startNew = () => {
+    if (dirty && !window.confirm('Start a new document? Unsaved changes to this one are lost.'))
+      return;
+    setPhase('new');
+    setDocId(null);
+    setSnapshot(null);
+    setText('');
+    setTitle(relicTitle());
+    setNotice(null);
+    // The stream tab is clamped on read, not reset — but a new document starts
+    // at its first document, not on whichever tab the last one ended on.
+    setDocIndex(0);
+    // The cached draft backs up the buffer being left behind, so keeping it
+    // would have the restore prompt offer back exactly what New discarded.
+    clearDraft();
+    setRestorable(null);
+    if (slug) navigate('/groot');
+  };
+
   if (phase === 'loading') {
     return <div className="page-loading caption">Reading the rings…</div>;
   }
@@ -473,7 +486,7 @@ export function GrootPage() {
             </p>
             <div className="row">
               <Button onClick={growFromSlug}>Grow it now</Button>
-              <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
+              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=groot')}>
                 Back to the Pensieve
               </Button>
             </div>
@@ -500,10 +513,13 @@ export function GrootPage() {
           <p>Write, fold and check YAML. Comments survive every format.</p>
         </div>
         <div className="rune-head-actions">
+          <Button variant="ghost" onClick={startNew} disabled={saving} title="Start a new document">
+            New
+          </Button>
           <Button onClick={() => void save()} disabled={!canSave}>
             {saving ? 'Growing…' : docId === null ? 'Save to Pensieve' : dirty ? 'Save' : 'Saved'}
           </Button>
-          <Button variant="ghost" onClick={() => void navigate('/pensieve?type=groot')}>
+          <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=groot')}>
             Pensieve
           </Button>
         </div>
@@ -513,7 +529,7 @@ export function GrootPage() {
         className="stack rune-workspace panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
-        {restorable && (
+        {showsRestore(restorable, blank) && (
           <Toast kind="info">
             <span className="rune-restore">
               Restore the draft from your last visit?

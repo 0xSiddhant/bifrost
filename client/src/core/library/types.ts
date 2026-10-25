@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { DocumentListPage, OffsetRequest } from '../api';
 
 /**
  * The document kinds the Pensieve can list (PLAN-21). `groot` was named here
@@ -31,7 +32,7 @@ export interface LibraryItem {
 export type LibrarySort = 'name' | 'created' | 'modified' | 'size';
 export type LibraryOrder = 'asc' | 'desc';
 
-/** What the page asks for; every kind's `list()` receives the same object. */
+/** What the page asks for; every kind's `listPage()` receives the same object. */
 export interface LibraryQuery {
   q?: string;
   /** Exact deviceId — the UI maps a picked device name back to its id. */
@@ -68,7 +69,12 @@ export interface LibraryEntry {
   /** Where "new one" goes, and what the button says. */
   newRoute: string;
   newLabel: string;
-  list(query: LibraryQuery): Promise<LibraryItem[]>;
+  /**
+   * One page of this kind's own sorted stream (PLAN-31): `limit` rows from
+   * `offset`, plus the kind's total under the query and its author facet.
+   * The Pensieve merges these heads itself — no server sees another kind.
+   */
+  listPage(query: LibraryQuery, request: OffsetRequest): Promise<DocumentListPage<LibraryItem>>;
   remove(id: string): Promise<unknown>;
   /** The editor, opened by the row's name. */
   editorRoute(item: LibraryItem): string;

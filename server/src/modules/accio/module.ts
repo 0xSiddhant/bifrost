@@ -68,7 +68,7 @@ export const accioModule: FeatureModule = {
     });
 
     registerAccioRoutes(app, {
-      list: new ListLinksUseCase(repo),
+      list: new ListLinksUseCase(repo, config.paging),
       save: new SaveLinkUseCase({ repo, bus }),
       update: new UpdateLinkUseCase({ repo, bus }),
       remove: new DeleteLinkUseCase(repo, bus),

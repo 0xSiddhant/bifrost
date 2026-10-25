@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { FeatureModule, ModuleDeps } from '../../core/module.js';
 import type { ScreensaverSettings } from '../../core/bus/events.js';
 import { AppError } from '../../core/http/index.js';
+import { adminSecurity, errorResponses } from '../../core/http/schemas.js';
 import { readSettings, writeSetting } from '../../core/db/index.js';
 
 /**
@@ -11,8 +12,8 @@ import { readSettings, writeSetting } from '../../core/db/index.js';
  * the line/mouse toggles, and the quote rotation.
  *
  * Same shape as the Loki settings module: DB `settings` overlay over the
- * env-seeded defaults, a public `GET /api/screensaver/config` the client reads
- * to arm the idle timer, an admin `PATCH /api/screensaver/settings`, and a
+ * env-seeded defaults, a public `GET /api/v1/screensaver/config` the client reads
+ * to arm the idle timer, an admin `PATCH /api/v1/screensaver/settings`, and a
  * `screensaver.settingsUpdated` broadcast so open clients rebind without a
  * reload. Registered in BOTH profiles; the overlay is additionally gated to
  * desktop pointers client-side.
@@ -35,6 +36,22 @@ const ROTATE_MIN = 4;
 const ROTATE_MAX = 120;
 const DENSITIES = ['low', 'medium', 'high'] as const;
 const MOTIONS = ['calm', 'normal', 'lively'] as const;
+
+/** `ScreensaverSettings`, in the order `effective()` builds it. */
+const settingsProperties = {
+  enabled: { type: 'boolean' },
+  idleSeconds: { type: 'integer', description: 'Idle time before Nótt starts' },
+  density: { type: 'string', enum: DENSITIES },
+  motion: { type: 'string', enum: MOTIONS },
+  connectLines: { type: 'boolean' },
+  mouseReactive: { type: 'boolean' },
+  showQuotes: { type: 'boolean' },
+  quoteRotateSeconds: { type: 'integer' },
+} as const;
+
+const settingsRequired = Object.keys(settingsProperties);
+
+const TAGS = ['screensaver'];
 
 export const screensaverModule: FeatureModule = {
   name: 'screensaver',
@@ -59,7 +76,12 @@ export const screensaverModule: FeatureModule = {
       };
       return {
         enabled: bool(SETTING_KEYS.enabled, config.screensaver.enabled),
-        idleSeconds: int(SETTING_KEYS.idleSeconds, config.screensaver.idleSeconds, IDLE_MIN, IDLE_MAX),
+        idleSeconds: int(
+          SETTING_KEYS.idleSeconds,
+          config.screensaver.idleSeconds,
+          IDLE_MIN,
+          IDLE_MAX,
+        ),
         density: oneOf(SETTING_KEYS.density, DENSITIES, config.screensaver.density),
         motion: oneOf(SETTING_KEYS.motion, MOTIONS, config.screensaver.motion),
         connectLines: bool(SETTING_KEYS.connectLines, config.screensaver.connectLines),
@@ -77,13 +99,36 @@ export const screensaverModule: FeatureModule = {
     // Public: the client reads this on load (and via SSE) to arm/disarm the
     // idle timer and configure the canvas. Read-only, carries no secrets. The
     // caps let the Heimdall control clamp its inputs.
-    app.get('/api/screensaver/config', () => ({
-      ...effective(),
-      idleMin: IDLE_MIN,
-      idleMax: IDLE_MAX,
-      rotateMin: ROTATE_MIN,
-      rotateMax: ROTATE_MAX,
-    }));
+    app.get(
+      '/api/v1/screensaver/config',
+      {
+        schema: {
+          tags: TAGS,
+          summary: 'The idle screensaver settings and the bounds the settings form clamps to',
+          operationId: 'getScreensaverConfig',
+          response: {
+            200: {
+              type: 'object',
+              required: [...settingsRequired, 'idleMin', 'idleMax', 'rotateMin', 'rotateMax'],
+              properties: {
+                ...settingsProperties,
+                idleMin: { type: 'integer' },
+                idleMax: { type: 'integer' },
+                rotateMin: { type: 'integer' },
+                rotateMax: { type: 'integer' },
+              },
+            },
+          },
+        },
+      },
+      () => ({
+        ...effective(),
+        idleMin: IDLE_MIN,
+        idleMax: IDLE_MAX,
+        rotateMin: ROTATE_MIN,
+        rotateMax: ROTATE_MAX,
+      }),
+    );
 
     const guard = { preHandler: app.requireAdmin };
     const patchSchema = {
@@ -102,8 +147,21 @@ export const screensaverModule: FeatureModule = {
     };
 
     app.patch<{ Body: Partial<ScreensaverSettings> }>(
-      '/api/screensaver/settings',
-      { ...guard, schema: { body: patchSchema } },
+      '/api/v1/screensaver/settings',
+      {
+        ...guard,
+        schema: {
+          tags: TAGS,
+          summary: 'Change the screensaver settings; open clients rebind live',
+          operationId: 'updateScreensaverSettings',
+          security: adminSecurity,
+          body: patchSchema,
+          response: {
+            200: { type: 'object', required: settingsRequired, properties: settingsProperties },
+            ...errorResponses(400, 401, 413, 415),
+          },
+        },
+      },
       (request) => {
         const patch = request.body;
         if (Object.keys(patch).length === 0) {

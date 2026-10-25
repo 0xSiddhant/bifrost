@@ -114,3 +114,26 @@ code,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* The standalone site's prerendered summary (client/seoBuild.ts): what a
+   crawler reads as the page, on screen only until React's first render
+   replaces it. */
+.seo-static {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  font-family: var(--font-body);
+}
+
+.seo-static h1 {
+  font-family: var(--font-display);
+  margin: 0 0 var(--space-3);
+}
+
+.seo-static ul {
+  padding-left: var(--space-5);
+}
+
+.seo-static a {
+  color: var(--accent);
+}

@@ -38,6 +38,10 @@ export default {
         'core',
         'client',
         'cli',
+        // the out-of-process test workspace (PLAN-32a)
+        'e2e',
+        // the web host workspace: serves the client, forwards to the API (PLAN-36)
+        'web',
         'ci',
         'docs',
         'ops',

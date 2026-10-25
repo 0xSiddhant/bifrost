@@ -11,21 +11,30 @@ import {
   type AppConfig,
   type DeployProfile,
 } from './core/config/index.js';
-import { loadDotenv } from './core/config/dotenv.js';
+import { ignoredKeysWarning, loadDotenv } from './core/config/dotenv.js';
 import { clientLogger, createLogger, moduleLogger, type Logger } from './core/logger/index.js';
-import { checkpointAndClose, openDb, readSettings, runMigrations, writeSetting } from './core/db/index.js';
+import {
+  checkpointAndClose,
+  openDb,
+  readSettings,
+  runMigrations,
+  writeSetting,
+} from './core/db/index.js';
+import { checkClientBuild } from './core/client-build.js';
 import { EventBus } from './core/bus/index.js';
 import { SseHub } from './core/sse/index.js';
 import { buildHttp } from './core/http/index.js';
+import { DOCS_PREFIX } from './core/http/docs.js';
 import { AuthService, registerAuth } from './core/auth/index.js';
-import { advertiseMdns, lanIPv4Addresses, type MdnsHandle } from './core/mdns/index.js';
+import { lanIPv4Addresses } from './core/net.js';
+import { checkWebHostLater } from './core/web-host-check.js';
 import { fromRepoRoot } from './core/paths.js';
+import { getBuildInfo } from './core/build-info.js';
 import type { FeatureModule } from './core/module.js';
 import { healthModule } from './modules/health/module.js';
 import { fileTransferModule } from './modules/file-transfer/module.js';
 import { previewsModule } from './modules/previews/module.js';
 import { qrToolModule, serverUrls, terminalQr } from './modules/qr-tool/module.js';
-import { themesModule } from './modules/themes/module.js';
 import { heimdallModule } from './modules/heimdall/module.js';
 import { clipboardModule } from './modules/clipboard/module.js';
 import { presenceModule } from './modules/presence/module.js';
@@ -58,7 +67,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
     fileTransferModule,
     previewsModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     clipboardModule,
     presenceModule,
@@ -102,7 +110,6 @@ const MANIFEST: Record<DeployProfile, FeatureModule[]> = {
   cloud: [
     healthModule,
     qrToolModule,
-    themesModule,
     heimdallModule,
     runestoneModule,
     variantModule,
@@ -168,7 +175,15 @@ export async function createApp(
   const bus = new EventBus();
   const sse = new SseHub();
 
-  const fastify = await buildHttp({ logger, clientDistDir: fromRepoRoot('client', 'dist'), bus });
+  // The web host serves client/dist now (PLAN-36), but the caps it baked in
+  // are still this server's to compare against what it enforces.
+  checkClientBuild(fromRepoRoot('client', 'dist'), config, logger);
+  const fastify = await buildHttp({
+    logger,
+    bus,
+    contractCheck: config.http.contractCheck,
+    apiVersion: getBuildInfo().version,
+  });
   await registerAuth(fastify, { sessionSecret: config.heimdall.sessionSecret, auth });
   sse.register(fastify, logger);
 
@@ -186,10 +201,33 @@ export async function createApp(
     logger.info({ module: mod.name }, 'module loaded');
   }
 
-  fastify.get('/api/capabilities', () => ({
-    profile: config.profile,
-    modules: modules.map((mod) => mod.name),
-  }));
+  fastify.get(
+    '/api/v1/capabilities',
+    {
+      schema: {
+        tags: ['core'],
+        summary: 'The deployment profile and the modules it loaded',
+        description:
+          'The client builds its navigation from this: a module absent here has no routes ' +
+          'on this hub.',
+        operationId: 'getCapabilities',
+        response: {
+          200: {
+            type: 'object',
+            required: ['profile', 'modules'],
+            properties: {
+              profile: { type: 'string', enum: ['local', 'cloud'] },
+              modules: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
+      },
+    },
+    () => ({
+      profile: config.profile,
+      modules: modules.map((mod) => mod.name),
+    }),
+  );
 
   let closed = false;
   const shutdown = async (reason = 'unspecified'): Promise<void> => {
@@ -265,7 +303,7 @@ async function flushAndExit(logger: Logger, code: number): Promise<never> {
 }
 
 export async function main(): Promise<void> {
-  loadDotenv();
+  const ignoredEnvKeys = loadDotenv();
 
   let baseConfig: AppConfig;
   try {
@@ -291,6 +329,8 @@ export async function main(): Promise<void> {
   const app = await createApp(baseConfig);
   const { fastify, config } = app;
   const rootLog = fastify.log as Logger;
+  const ignoredWarning = ignoredKeysWarning(ignoredEnvKeys);
+  if (ignoredWarning) rootLog.warn({ keys: ignoredEnvKeys }, ignoredWarning);
 
   // A crash used to leave nothing at all behind — the exact case the archive
   // exists to explain. Deliberately no graceful shutdown: process state is
@@ -306,21 +346,53 @@ export async function main(): Promise<void> {
   process.on('uncaughtException', onFatal('uncaughtException'));
   process.on('unhandledRejection', onFatal('unhandledRejection'));
 
-  await fastify.listen({ port: config.port, host: '0.0.0.0' });
+  // PLAN-36: the API listens behind the web host, on loopback by default. The
+  // web host on PORT is what people open, and it answers for bifrost.local.
+  const { host, port } = config.api;
+  await fastify.listen({ port, host });
+  fastify.log.info(
+    { host, port, runMode: config.runMode },
+    `api listening on http://${host}:${port}`,
+  );
+  // An address this machine can open: a wildcard bind is reached on loopback.
+  const reach = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+  // PLAN-38: the docs are on this server, never on the web host's PORT; and
+  // bifrost.local resolves to the LAN address, which a loopback API ignores.
+  fastify.log.info(`api docs: http://${reach}:${port}${DOCS_PREFIX}`);
 
-  let mdns: MdnsHandle | null = null;
-  if (config.profile === 'local') {
-    mdns = advertiseMdns(config.mdnsName, config.port, fastify.log as Logger);
-    fastify.log.info(`bifrost up: http://${config.mdnsName}.local:${config.port}`);
-  }
-  for (const address of lanIPv4Addresses()) {
-    fastify.log.info(`lan address: http://${address}:${config.port}`);
-  }
-  const [primaryUrl] = serverUrls(config);
-  if (primaryUrl) {
-    // Straight to stdout, not the logger: a multi-line ASCII QR inside a JSON
-    // log line would be unreadable. Android fallback per tech-stack.md.
-    process.stdout.write(`\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`);
+  let cancelWebHostCheck = (): void => {};
+  if (config.runMode === 'api') {
+    fastify.log.info(
+      `api-only mode: no web host and no mDNS name — the CLI reaches it with ` +
+        `\`bifrost --host ${reach}:${port}\``,
+    );
+  } else {
+    if (config.runMode === 'web') {
+      fastify.log.warn(
+        'BIFROST_RUN=web runs the web host alone; this API process was started anyway',
+      );
+    }
+    if (config.profile === 'local') {
+      fastify.log.info(`bifrost up: http://${config.mdnsName}.local:${config.port}`);
+    }
+    for (const address of lanIPv4Addresses()) {
+      fastify.log.info(`lan address: http://${address}:${config.port}`);
+    }
+    const [primaryUrl] = serverUrls(config);
+    if (primaryUrl) {
+      // Straight to stdout, not the logger: a multi-line ASCII QR inside a JSON
+      // log line would be unreadable. Android fallback per tech-stack.md.
+      process.stdout.write(
+        `\nscan to join bifrost (${primaryUrl}):\n${await terminalQr(primaryUrl)}\n`,
+      );
+    }
+    if (config.runMode === 'full') {
+      cancelWebHostCheck = checkWebHostLater({
+        port: config.port,
+        webHost: config.webHost,
+        log: rootLog,
+      });
+    }
   }
 
   let signalled = false;
@@ -329,7 +401,7 @@ export async function main(): Promise<void> {
     signalled = true;
     fastify.log.info({ signal }, 'shutdown: signal received');
     void (async () => {
-      if (mdns) await mdns.stop();
+      cancelWebHostCheck();
       await app.shutdown(`signal ${signal}`);
       process.exit(0);
     })();
