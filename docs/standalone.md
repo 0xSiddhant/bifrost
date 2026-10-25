@@ -99,7 +99,7 @@ A visitor can still change their own Loki, screensaver and Heimdall settings in 
 
 ## Search engines
 
-The standalone site is public, so the build writes what search engines and link previews read. Each page that works without a hub gets its own HTML file: the home page, Ollivanders, Diagon Alley, the six editors, Saga, and each Diagon Alley tool. Every file has its own title, description, canonical link, Open Graph and Twitter tags, structured data, and a short visible summary with links to the other pages. The build also writes `robots.txt`, `sitemap.xml` and `404.html`. Hub-only pages such as Hermes, Accio or a saved document's link are not among them: nginx answers them with `404.html` and a 404 status, so they are never indexed, and the app in that page still explains them. The list lives in `client/src/core/seo.ts`.
+The standalone site is public, so the build writes what search engines and link previews read. Each page that works without a hub gets its own HTML file: the home page, Ollivanders, Diagon Alley, Runestone, Variant, Edda, Groot, Atlas, Loki, Saga, and each Diagon Alley tool. Every file has its own title, description, canonical link, Open Graph and Twitter tags, structured data, and a short visible summary with links to the other pages. The build also writes `robots.txt`, `sitemap.xml` and `404.html`. Hub-only pages such as Hermes, Accio or a saved document's link are not among them: nginx answers them with `404.html` and a 404 status, so they are never indexed, and the app in that page still explains them. The list lives in `client/src/core/seo.ts`.
 
 **Set `STANDALONE_SITE_URL` before a public deploy.** Canonical links, `og:url`, the preview image and the sitemap need the site's absolute address, so the build reads its origin (`https://tools.example.com`, no path) from that build argument. Behind your proxy, `compose/standalone.yml` takes it from the shell:
 
@@ -108,7 +108,7 @@ STANDALONE_SITE_URL=https://tools.example.com BIFROST_DOCKER_NETWORK=proxy \
   docker compose -f compose/standalone.yml up -d --build
 ```
 
-or write it into `build.args` there in place of `${STANDALONE_SITE_URL:-}`, so every rebuild keeps it. On this machine without a proxy: `./bifrost docker up standalone -- --build-arg STANDALONE_SITE_URL=https://tools.example.com`. Outside Docker, `./bifrost build --standalone` reads it from `.env`. Without it the build still succeeds and warns, and the pages ship without those four. A malformed value fails the build.
+or write it into `build.args` there in place of the `${STANDALONE_SITE_URL?…}` line, so every rebuild keeps it. Compose refuses to run with it unset, so a public deploy cannot forget it; `STANDALONE_SITE_URL=` (empty) builds without the four on purpose. On this machine without a proxy: `./bifrost docker up standalone -- --build-arg STANDALONE_SITE_URL=https://tools.example.com`. Outside Docker, `./bifrost build --standalone` reads it from `.env`. Without it the build still succeeds and warns, and the pages ship without those four. A malformed value fails the build.
 
 After the first deploy, add the site to Google Search Console and Bing Webmaster Tools, and submit `https://<your site>/sitemap.xml` in each.
 
@@ -120,7 +120,7 @@ STANDALONE_SITE_URL=https://tools.example.com BIFROST_DOCKER_NETWORK=proxy \
   docker compose -f compose/standalone.yml up -d --build
 ```
 
-Leave `STANDALONE_SITE_URL` out and the rebuilt site loses its canonical links and sitemap, unless it is written into `build.args`.
+Compose stops with a message if `STANDALONE_SITE_URL` is unset, unless it is written into `build.args`.
 
 Hashed assets are cached forever and the app shell never, so a browser picks up the new build on its next load.
 

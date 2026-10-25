@@ -209,8 +209,11 @@ function planDocker(args: string[]): Step[] {
 
   if (verb === 'config') {
     noMore(p.positionals, 1);
+    // The two values a real run must be given (compose refuses them unset); any
+    // will do to check that the files parse, whatever this machine's .env holds.
+    const env = { BIFROST_DOCKER_NETWORK: 'proxy', STANDALONE_SITE_URL: '' };
     return COMPOSE_COMBINATIONS.map((combo) =>
-      exec('docker', ['compose', ...combo, 'config', '-q'], { BIFROST_DOCKER_NETWORK: 'proxy' }),
+      exec('docker', ['compose', ...combo, 'config', '-q'], env),
     );
   }
   if (verb === 'smoke') {
@@ -944,7 +947,7 @@ export const COMMANDS: Command[] = [
       ['docker up standalone', 'the standalone site on http://localhost:8080'],
       ['docker up standalone --port 9000', 'on another port'],
       ['docker down standalone', 'stop it'],
-      ['docker up standalone --network proxy', 'the standalone site behind your proxy'],
+      ['docker up standalone --network proxy', 'behind your proxy; needs STANDALONE_SITE_URL set'],
       ['docker logs', 'follow the hub'],
       ['docker down obs -v', 'stop the stack and wipe its data'],
       ['docker up -- --remove-orphans', 'upgrade from the pre-PLAN-36 single service'],

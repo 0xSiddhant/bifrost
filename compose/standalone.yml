@@ -24,10 +24,10 @@ services:
       # Defaults are .env.example's.
       args:
         # The public origin people and search engines reach this site at:
-        # canonical links, link previews and sitemap.xml are built from it.
-        # Set it before a public deploy, here or in the shell that runs
-        # compose (docs/standalone.md).
-        STANDALONE_SITE_URL: ${STANDALONE_SITE_URL:-}
+        # canonical links, link previews and sitemap.xml are built from it
+        # (docs/standalone.md). Unset is an error, so a public deploy cannot
+        # forget it; set it empty to build without them on purpose.
+        STANDALONE_SITE_URL: ${STANDALONE_SITE_URL?set STANDALONE_SITE_URL to the site's public origin, e.g. https://tools.example.com (or empty to build without canonical links and a sitemap)}
         LOKI_EXECUTION_ENABLED: 'true'
         LOKI_FETCH_ALLOWED: 'true'
         # RUNESTONE_MAX_DOC_KB: '2048'
