@@ -2,7 +2,7 @@
 
 ## Goal
 
-A Lighthouse run on the hub's home page (`bifrost.local:4646`, mobile preset) scored **40** for performance. Measured again without browser extensions, it scores **61–65**: first paint 5.5 s, largest paint 5.9 s, 796 KB transferred. Nearly all of that time is download, for three reasons:
+A Lighthouse run on the hub's home page (`bifrost.local:4646`, mobile preset) scored **40** for performance. Measured again without browser extensions (Lighthouse 13.5.0, median of three runs), it scores **64**: first paint 5.4 s, largest paint 6.0 s, 796 KB transferred. Nearly all of that time is download, for three reasons:
 
 - **The hub sends nothing compressed.** The 328 KB entry chunk (104 KB gzipped, 89 KB with Brotli) arrives as 328 KB.
 - **Every page loads the Guide panel's Markdown stack.** That's marked, all of highlight.js and DOMPurify, about 223 KB raw, though the panel only opens on a click.
@@ -32,13 +32,14 @@ PLAN-39 merged. Single PR.
 
 ## Verified against the codebase, not assumed
 
-- **The report was taken with Chrome extensions running.** `bifrost.local_4646-20261026T012009.json` (Lighthouse 13.4.1, mobile, simulated slow 4G, 4× CPU) includes ~360 KB of injected extension scripts (an ad blocker, a cookie-banner detector), which are most of its 1,380 ms of main-thread blocking and every "unminified JavaScript" item. Two clean headless runs (Lighthouse 12, same preset, against the live hub) gave:
-  - performance 61 and 65;
-  - FCP 5.5 s; LCP 5.9 s;
-  - TBT 220 ms and 40 ms;
-  - 796 KB transferred.
+- **The report was taken with Chrome extensions running.** `bifrost.local_4646-20261026T012009.json` (Lighthouse 13.4.1, mobile, simulated slow 4G, 4× CPU) includes ~360 KB of injected extension scripts (an ad blocker, a cookie-banner detector), which are most of its 1,380 ms of main-thread blocking and every "unminified JavaScript" item. The baseline is clean headless runs instead, taken with this plan's own protocol (see "Measuring"): Lighthouse 13.5.0, mobile preset, **median of three**.
 
-  That clean baseline is what this plan measures against.
+  | Page | Performance (runs) | FCP | LCP | TBT | CLS | Transferred |
+  |---|---|---|---|---|---|---|
+  | Hub `/` (live, `127.0.0.1:4646`) | **64** (65 / 64 / 64) | 5.4 s | 6.0 s | 37 ms | 0 | 796 KB |
+  | Public site `/` (`bifrost.0xsiddhant.com`, behind Cloudflare, built before the v2.0.0 release commit) | **81** (81 / 82 / 76) | 3.4 s | 3.7 s | 52 ms | 0.000 | 379 KB |
+
+  This is what the plan measures against. The standalone build's local `/` and `/runestone` get their before numbers in the PR, with the same protocol and the same Lighthouse version as the after numbers. (Two earlier exploratory runs with Lighthouse 12 gave 61 and 65; they are superseded and aren't used for comparison.)
 - **The public site's report** (`bifrost.0xsiddhant.com-20261026T013523.json`, Lighthouse 13.4.1, mobile, with the same browser extensions running):
   - performance 82, accessibility 100, best practices 81, SEO 100;
   - FCP 3.1 s, LCP 3.9 s, TBT 20 ms, **CLS 0.017**.
@@ -79,7 +80,8 @@ PLAN-39 merged. Single PR.
 - **Contrast.** `color.ts`'s `contrastWarnings` checks only `--text` on `--bg` and `--surface`, at the existing `MIN_TEXT_CONTRAST = 4.5`. Measured with the repo's own `contrastRatio` over resolved themes:
   - **Daybreak's `--accent` on `--bg` is 3.15:1**, and on the standalone site Daybreak is the first theme every light-preferring device gets (on the hub, the household default can decide first);
   - **Tokyo's** is 5.23:1 on `--bg` but 4.15:1 on `--surface`, and 3.92:1 on the active nav item's `--accent-soft` tint, which is the failure the report found;
-  - the other five themes pass.
+  - **on `--surface-2`** it's lower again: **Tokyo 3.07:1, Daybreak 2.88:1** (the other five pass, lowest Ghibli Dusk at 5.82). `--surface-2` is the app's most-used background (47 rules), and accent text sits on it, e.g. `.heimdall-brand` inside `.heimdall-panel` (found by the PR's review);
+  - the other five themes pass against every one of these.
 
   44 CSS rules use the accent as a **text** colour (`color: var(--accent)`: 20 in `app.css`, 14 in `ui.css`, 2 in `base.css`, the rest in feature CSS). A further 22 use it as `background-color` or `border-color`, which need no text contrast and stay on `--accent`.
 - **Two animations can't run on the compositor** (both reports, "non-composited animations": 8 on the hub, 7 on the public site). They run on every page, forever:
@@ -87,7 +89,7 @@ PLAN-39 merged. Single PR.
   - `.bridge-strip`'s `bridge-flow` animates **`background-position`**, so every frame repaints.
 
   Both are in `app/app.css`.
-- **Lighthouse versions differ.** The owner's two reports are Lighthouse 13.4.1. This plan's clean baseline was taken with Lighthouse 12, the version this machine's `npx` resolved, and its scores aren't directly comparable with 13's.
+- **Lighthouse versions.** The owner's two reports are Lighthouse 13.4.1, and the baseline above is 13.5.0, the same major version. The after numbers use 13.5.0 too, or the PR re-takes the before numbers with whatever version it measures with.
 - **Heading order.** `JoinBifrostCard` renders `<h3 class="join-card__title">` directly under the page's `<h1>`.
 - **The CSS is mostly global.** `main.tsx` imports `app.css` (86 KB source) and `ui.css` (48 KB). Most of `app.css` is per-page (Runestone's tree, Variant, Edda's preview, Loki, Groot, the Accio shelf, Heimdall). It ships as one 96 KB file, 17 KB gzipped.
 
@@ -162,7 +164,7 @@ These are the standalone nginx's rules (PLAN-35). Repeat visits then skip ~15 re
 
 ### A bundle budget at build time, not Lighthouse in CI
 
-Lighthouse is noisy on a shared runner: two clean runs a minute apart gave 220 ms and 40 ms of main-thread blocking. PLAN-34 already decided that throughput and timing measurements are on demand, never a CI gate. What can be checked exactly is what makes the numbers bad.
+Lighthouse is noisy on a shared runner: two exploratory clean runs a minute apart gave 220 ms and 40 ms of main-thread blocking, and the three baseline runs on the public site ranged from 76 to 82. PLAN-34 already decided that throughput and timing measurements are on demand, never a CI gate. What can be checked exactly is what makes the numbers bad.
 
 `client/bundleBudget.ts`, a Vite plugin for both builds, walks the entry chunk and its static imports, **transitively** (`chunk.imports`, followed down, which is exactly the set `index.html` modulepreloads), in `generateBundle`. It fails the build when:
 - any of those chunks contains a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or the CodeMirror packages;
@@ -173,9 +175,9 @@ The budget is set **after** the code changes land: the measured total plus 10%, 
 ### `--accent-text`: accent colour you can read
 
 The accent is used both as a fill and as a text colour, and only text needs 4.5:1. Changing `--accent` would recolour buttons, borders and the bridge in every theme. Instead:
-- **A new optional token `--accent-text`.** `resolveTheme` derives it when a theme doesn't author it: the accent, darkened in light themes or lightened in dark themes, in small steps until it reaches 4.5:1 against the hardest of its three backgrounds (`--bg`, `--surface`, and `--accent-soft` composited over `--bg`). If the accent already passes, it's unchanged. Stepping towards white (dark themes) or black (light themes) always reaches 4.5:1 against a background of the opposite lightness, but it may drift far from the accent's hue on an unusual theme. So if the derived value would need more than a fixed number of steps, `resolveTheme` stops and leaves the accent, `themes.test.ts` fails, and that theme authors its own `--accent-text` instead. A theme is never silently given an unreadable or unrecognisable colour.
+- **A new optional token `--accent-text`.** `resolveTheme` derives it when a theme doesn't author it: the accent, darkened in light themes or lightened in dark themes, in small steps until it reaches 4.5:1 against the hardest of **every backdrop accent text actually sits on**: `--bg`, `--surface`, `--surface-2`, and `--accent-soft` composited over each of those three (it is translucent, so its contrast depends on what is under it). That set comes from an inventory, not an assumption: the implementation reads each of the 44 text rules' real background (its own rule or its nearest painted ancestor's) and records it in a comment beside the derivation. Any backdrop the inventory finds outside the set (a veil, a danger tint) joins both the derivation and the test. If the accent already passes, it's unchanged. Stepping towards white (dark themes) or black (light themes) always reaches 4.5:1 against a background of the opposite lightness, but it may drift far from the accent's hue on an unusual theme. So if the derived value would need more than a fixed number of steps, `resolveTheme` stops and leaves the accent, `themes.test.ts` fails, and that theme authors its own `--accent-text` instead. A theme is never silently given an unreadable or unrecognisable colour.
 - **The 44 text uses switch** from `color: var(--accent)` to `color: var(--accent-text)`. The 22 `background-color`/`border-color` uses stay on `--accent`: fills and borders need no text contrast, and changing them would recolour the theme.
-- **`contrastWarnings` checks the new token** against those three backgrounds, so `themes.test.ts` fails any future theme whose derived or authored value falls short.
+- **`contrastWarnings` checks the new token** against that same set, so `themes.test.ts` fails any future theme whose derived or authored value falls short anywhere accent text appears.
 - **THEME-SPEC.md and the theme schema** gain the optional token.
 
 Five themes keep their exact look (their accent already passes). Daybreak's and Tokyo's accent *text* becomes slightly deeper or brighter, while their buttons and fills stay the same. That fits the 2026-07 house-theme bar ("calm, not glaring"), but it is a visible change, so the PR shows before/after screenshots of both, and the owner approves them before merge.
@@ -195,7 +197,7 @@ Both animations stay exactly as they look. Only the property that moves them cha
 
 ### The first-paint fonts are preloaded
 
-The public site's only layout shift (0.017) is two web fonts replacing their fallbacks after the first paint:
+The owner's report of the public site has a 0.017 layout shift, all of it two web fonts replacing their fallbacks after the first paint. The three clean baseline runs measured **0.000**, so the shift depends on how late the fonts arrive (the owner's run also had extensions loading), but it's real when they do:
 - **Space Grotesk 700** (headings);
 - **Inter 400** (body text).
 
@@ -258,7 +260,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `app/pages/MidgardPage.tsx`: `JoinBifrostCard` through `lazy()`, in `Suspense` with a reserved-height placeholder and a local error boundary that renders nothing
 - [ ] `core/ui/JoinBifrostCard.tsx`: `<h3>` → `<h2>`, same class
 - [ ] `app/app.css`: `relic-float` on `translate`, and `bridge-flow` as a sliding `::before` with `transform`; verify first that Chrome composites an animated `translate` (otherwise the rotation moves to an inner element)
-- [ ] `core/theme/resolve.ts`: derive `--accent-text`; `core/theme/color.ts`: `contrastWarnings` checks it against `--bg`, `--surface` and `--accent-soft` over `--bg`; `core/theme/schema.ts` + `docs/THEME-SPEC.md`: the optional token
+- [ ] `core/theme/resolve.ts`: derive `--accent-text`; `core/theme/color.ts`: `contrastWarnings` checks it against the backdrop set (`--bg`, `--surface`, `--surface-2`, and `--accent-soft` over each), from an inventory of the 44 text rules' real backgrounds, which is recorded in a comment and extended if it finds more; `core/theme/schema.ts` + `docs/THEME-SPEC.md`: the optional token
 - [ ] The 44 text rules (`color: var(--accent)`) → `var(--accent-text)`; the 22 `background-color`/`border-color` uses stay on `--accent`
 
 **Measure, then set the budget**
@@ -276,10 +278,10 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 4. **Lighthouse,** clean profile, mobile, median of three, hub `/`: first contentful paint ≤ 3.0 s. Performance ≥ 85 is a target, not a guarantee: if it's missed, the PR names the metric that holds it back and why.
 5. **Guide.** It opens on every page that has one, online and on an already-open tab after the hub becomes unreachable (offline mode on).
 6. **Join card.** It renders on the hub's home page; if its chunk can't load, the rest of the home page still renders.
-7. **Contrast.** Every theme's `--accent-text` reaches 4.5:1 against `--bg`, `--surface` and `--accent-soft` over `--bg`, enforced by `themes.test.ts`. Lighthouse reports no colour-contrast failure on the home page in Tokyo or Daybreak.
+7. **Contrast.** Every theme's `--accent-text` reaches 4.5:1 against every backdrop in the inventoried set (at least `--bg`, `--surface`, `--surface-2`, and `--accent-soft` over each), enforced by `themes.test.ts`. Lighthouse reports no colour-contrast failure on the home page in Tokyo or Daybreak.
 8. **Heading order.** Lighthouse reports no heading-order failure on the hub's home page.
 9. **Animations.** Lighthouse lists no non-composited animation on the hub's `/` or the standalone `/`, and the relics and the bridge strip look and move as before (screenshots in the PR).
-10. **Fonts.** Every HTML file both builds ship (the hub's `index.html`, each prerendered page and `404.html`) preloads exactly Space Grotesk 700 and Inter 400, and the build fails if either font is missing. The PR reports the standalone `/`'s layout shift. The target is none attributed to a web font, but it isn't a guarantee: the prerendered summary paints after the CSS alone, so on a slow enough link a font can still arrive after it.
+10. **Fonts.** Every HTML file both builds ship (the hub's `index.html`, each prerendered page and `404.html`) preloads exactly Space Grotesk 700 and Inter 400, and the build fails if either font is missing. The PR reports the standalone `/`'s layout shift, which must stay at 0 (the baseline's median). The preload's job is the case the clean runs didn't hit: fonts arriving after the first paint, as in the owner's report.
 11. **Public site.** On `bifrost.0xsiddhant.com`, assets reach the browser gzipped at level 9 (the entry ~104 KB, from 123 KB), through the host nginx and Cloudflare. The PR records its before and after Lighthouse numbers with the Cloudflare settings they were taken under.
 12. **Budget.** The build fails, naming the package and the chunk, when a forbidden package is added to the first load or the first load grows past the budget.
 13. **Nothing else changes.** No behaviour change: `npm test` and the full `npm run test:e2e` pass unchanged.
@@ -290,7 +292,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `precompress`: eligible files get `.br` and `.gz` that decompress to the original; small, incompressible, `.map` and binary files get none
 - [ ] `bundleBudget`: a fake bundle with `highlight.js` in a modulepreloaded chunk fails, naming both; the same module in a lazy chunk passes; over budget fails with the figures
 - [ ] `resolveTheme`: a light and a dark theme whose accent fails get an `--accent-text` that passes and stays the same hue; one that passes keeps its accent
-- [ ] `themes.test.ts`: every bundled theme passes the extended `contrastWarnings`; a fixture failing on `--accent-soft` alone is flagged; a fixture whose accent cannot be stepped within the limit fails and names the token to author
+- [ ] `themes.test.ts`: every bundled theme passes the extended `contrastWarnings`; a fixture failing on `--accent-soft` alone is flagged, and one failing on `--surface-2` alone (Tokyo's case, the Heimdall brand) is flagged; a fixture whose accent cannot be stepped within the limit fails and names the token to author
 - [ ] `GuideButton.test.tsx`: the panel appears after a click (awaiting the lazy load); Escape and a route change still close it
 - [ ] `MidgardPage.test.tsx`: the Join card appears; a rejected card import leaves the rest of the page rendered
 - [ ] `fontPreload`: a bundle with both fonts gets exactly two preload links with `crossorigin`; a missing font fails the build, naming it
