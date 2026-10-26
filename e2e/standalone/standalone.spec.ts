@@ -186,8 +186,26 @@ test.describe('standalone shell', () => {
         getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
       );
       expect(painted, colorScheme).toBe(bg(theme));
+      // Without JavaScript, the prerendered summary is the page.
+      await expect(page.locator('.seo-static h1'), colorScheme).toBeVisible();
       await context.close();
     }
+  });
+
+  test('a visitor whose browser runs JavaScript never sees the crawler summary', async ({
+    browser,
+    site,
+  }) => {
+    // Hold the app's script back, so the page stays at the moment before
+    // React's first render: the summary is in the HTML, and must not show.
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.route(/\/assets\/index-[^/]+\.js$/, (route) => route.abort());
+    await page.goto(`${site.baseUrl}/runestone`);
+    await expect(page.locator('html')).toHaveClass(/\bjs\b/);
+    await expect(page.locator('.seo-static')).toHaveCount(1);
+    await expect(page.locator('.seo-static')).toBeHidden();
+    await context.close();
   });
 
   test('themes switch, and survive a reload, from the bundle', async ({ page }) => {

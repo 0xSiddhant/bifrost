@@ -20,6 +20,10 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="application-name" content="Bifrost" />
     <script>
+      // Scripts run, so the app will paint: the standalone site's prerendered
+      // summary (client/seoBuild.ts) is for crawlers without JavaScript, and
+      // base.css hides it here rather than flashing it before the app.
+      document.documentElement.classList.add('js');
       // FOUC guard: replay the last applied theme's tokens before first paint.
       // The theme engine reconciles against the server after hydration.
       try {
