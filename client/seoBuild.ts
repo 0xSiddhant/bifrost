@@ -1,14 +1,16 @@
 /**
  * The standalone site's search-engine files, written at build time: a real
  * HTML file per public page (its own title, description, canonical link,
- * preview tags, structured data and a short visible summary with links),
+ * preview tags, structured data and a short summary with links),
  * plus `404.html`, `robots.txt` and `sitemap.xml`. The site stays static
  * files and nothing else; nginx serves `<path>/index.html` for each page and
  * `404.html`, with a 404 status, for everything that is not one
  * (docker/nginx-standalone.conf).
  *
- * The summary sits inside `#root`, so a crawler reads it as the page, and
- * React's first render replaces it. Every file also paints the theme a first
+ * The summary sits inside `#root`, so a crawler reads it as the page. It is
+ * shown only without JavaScript: index.html's inline script marks a page whose
+ * scripts run, and base.css hides the summary there, so a visitor never sees
+ * it before React's first render replaces it. Every file also paints the theme a first
  * visit gets from its first frame (`firstPaintStyle`). Runs in Node, from
  * `vite.config.ts`, for the standalone build only: the hub is a LAN app and
  * stays unindexed.
