@@ -76,6 +76,7 @@ PLAN-39 merged. Single PR.
   `index.html` modulepreloads `common`, `markdown` and `purify` on every page.
 - **Why the Markdown stack is on every page.** `App.tsx` imports `GuideButton`, which imports `GuidePanel`. That imports `renderMarkdown` from `core/markdown` (`render.ts`: `dompurify`, `highlight.js/lib/common`) and `core/ui/MarkdownPreview`. `GuideButton` already renders `GuidePanel` only when `open` is true, so a lazy import changes no behaviour. The guide *texts* are already one `import()` per guide (`core/guide/registry.ts`).
 - **Why `qrcode` is in the entry.** `App.tsx` imports `MidgardPage` eagerly, which imports `JoinBifrostCard` → `QrCard` → `qrcode` (`QRCode.create`, drawn in an effect). The other three `QrCard` users (Heimdall sections, Portkey, the toolbox's `QrTool`) are already in lazy chunks. In the standalone build the card sits under `__HUB__ &&` and is dropped.
+- **Where a failed load would land.** `GuideButton` renders in the header (`App.tsx`, line 281), **outside** `RouteBoundary` (which wraps only `main`, from line 301). The only boundary above it is the root `ErrorBoundary` in `main.tsx`, which replaces the whole app. `React.lazy` also caches a rejection for the life of the payload (`app/lazyPages.tsx`'s note, PLAN-22), so a failed lazy import stays failed until something builds a new one.
 - **Offline mode warms pages, not the panel.** `app/offlineWarmLoad.ts` lists the page loaders (toolbox, runestone, groot, atlas, edda, variant, loki, saga, screensaver). Today the Guide panel is safe offline only because it is in the entry chunk.
 - **Contrast.** `color.ts`'s `contrastWarnings` checks only `--text` on `--bg` and `--surface`, at the existing `MIN_TEXT_CONTRAST = 4.5`. Measured with the repo's own `contrastRatio` over resolved themes:
   - **Daybreak's `--accent` on `--bg` is 3.15:1**, and on the standalone site Daybreak is the first theme every light-preferring device gets (on the hub, the household default can decide first);
@@ -151,6 +152,11 @@ These are the standalone nginx's rules (PLAN-35). Repeat visits then skip ~15 re
 ### The Guide panel loads when the bulb is clicked
 
 `GuideButton` imports `GuidePanel` with `lazy()`, using the project's own `withChunkTimeout`, and renders it in a `Suspense` whose fallback is nothing. The bulb itself, `guideForRoute` and the Escape handling stay in the entry. On the first click the panel arrives a moment later, over the LAN.
+
+⚠️ **A failed load must not take down the app** (found in the PR's review). `Suspense` handles only the wait. If the panel's chunk fails or times out (`withChunkTimeout`), for example on a first click while the hub is unreachable and the tab was never warmed, the rejection is thrown during render. In the header, that reaches the root `ErrorBoundary` and replaces the whole app. So the lazy panel sits inside a **local error boundary** in `GuideButton`, which on failure:
+- closes the panel, so the bulb and the rest of the shell stay as they were;
+- shows `notify.error`: "The guide couldn't load. Check the connection and try again." It has a `dedupeKey`, so repeated clicks don't stack toasts. When `isChunkLoadError` says the chunk is gone because the hub was redeployed, it says to reload instead;
+- builds a **fresh `lazy()`** for the next click, the same way `createLazyPages` does, because React caches the rejected one. The next click is then a real second attempt.
 
 ⚠️ **Offline mode.** `offlineWarmLoad.ts` gains the panel's loader. Otherwise, on a tab already open when the hub disappears, the bulb would open nothing on a page it worked on before. The plan also checks whether the six guide texts are in the warm list. They are separate `import()`s today, so they may already be a gap; if they are, it adds them, so the bulb works offline after this plan whether or not it did before.
 
@@ -255,7 +261,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `docker/nginx-standalone.conf`: `gzip_static on;`; the e2e and web-host rule mirrors re-checked (server-level directive, no location change); `scripts/standalone-smoke.sh`'s existing gzip assertion keeps passing (it cannot tell `gzip_static` from on-the-fly gzip; the headers are identical, so a hand check of nginx's access to the `.gz` file confirms it once)
 
 **Client**
-- [ ] `core/guide/GuideButton.tsx`: `GuidePanel` through `lazy()` + `withChunkTimeout`, inside `Suspense` with no fallback
+- [ ] `core/guide/GuideButton.tsx`: `GuidePanel` through `lazy()` + `withChunkTimeout`, inside `Suspense` with no fallback and a local error boundary (close the panel, `notify.error` with a `dedupeKey` and the reload wording for `isChunkLoadError`, a fresh `lazy()` for the next click)
 - [ ] `app/offlineWarmLoad.ts`: the Guide panel's loader; check the guide texts, and add them if they are not warmed
 - [ ] `app/pages/MidgardPage.tsx`: `JoinBifrostCard` through `lazy()`, in `Suspense` with a reserved-height placeholder and a local error boundary that renders nothing
 - [ ] `core/ui/JoinBifrostCard.tsx`: `<h3>` → `<h2>`, same class
@@ -276,7 +282,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 2. **Caching.** On the hub, `/assets/*` is `public, max-age=31536000, immutable`, the HTML and other files are `no-cache`, and a missing `/assets/` file is a 404, never the app shell.
 3. **Lean first load.** The first load of the hub's `/` contains no module from `highlight.js`, `marked`, `dompurify` or `qrcode`, and transfers at most 300 KB (from 796 KB).
 4. **Lighthouse,** clean profile, mobile, median of three, hub `/`: first contentful paint ≤ 3.0 s. Performance ≥ 85 is a target, not a guarantee: if it's missed, the PR names the metric that holds it back and why.
-5. **Guide.** It opens on every page that has one, online and on an already-open tab after the hub becomes unreachable (offline mode on).
+5. **Guide.** It opens on every page that has one, online and on an already-open tab after the hub becomes unreachable (offline mode on). If its chunk can't load, the app stays up: the panel closes, a notification says why, and the next click tries again.
 6. **Join card.** It renders on the hub's home page; if its chunk can't load, the rest of the home page still renders.
 7. **Contrast.** Every theme's `--accent-text` reaches 4.5:1 against every backdrop in the inventoried set (at least `--bg`, `--surface`, `--surface-2`, and `--accent-soft` over each), enforced by `themes.test.ts`. Lighthouse reports no colour-contrast failure on the home page in Tokyo or Daybreak.
 8. **Heading order.** Lighthouse reports no heading-order failure on the hub's home page.
@@ -293,7 +299,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `bundleBudget`: a fake bundle with `highlight.js` in a modulepreloaded chunk fails, naming both; the same module in a lazy chunk passes; over budget fails with the figures
 - [ ] `resolveTheme`: a light and a dark theme whose accent fails get an `--accent-text` that passes and stays the same hue; one that passes keeps its accent
 - [ ] `themes.test.ts`: every bundled theme passes the extended `contrastWarnings`; a fixture failing on `--accent-soft` alone is flagged, and one failing on `--surface-2` alone (Tokyo's case, the Heimdall brand) is flagged; a fixture whose accent cannot be stepped within the limit fails and names the token to author
-- [ ] `GuideButton.test.tsx`: the panel appears after a click (awaiting the lazy load); Escape and a route change still close it
+- [ ] `GuideButton.test.tsx`: the panel appears after a click (awaiting the lazy load); Escape and a route change still close it; a rejected import leaves the shell rendered, closes the panel and notifies once, and a second click with a now-working import opens it
 - [ ] `MidgardPage.test.tsx`: the Join card appears; a rejected card import leaves the rest of the page rendered
 - [ ] `fontPreload`: a bundle with both fonts gets exactly two preload links with `crossorigin`; a missing font fails the build, naming it
 - [ ] Offline warm-load: the registry includes the Guide panel (and the guide texts, if added)
