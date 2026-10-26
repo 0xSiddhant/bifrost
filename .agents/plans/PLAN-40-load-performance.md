@@ -77,7 +77,7 @@ PLAN-39 merged. Single PR.
 - **Why the Markdown stack is on every page.** `App.tsx` imports `GuideButton`, which imports `GuidePanel`. That imports `renderMarkdown` from `core/markdown` (`render.ts`: `dompurify`, `highlight.js/lib/common`) and `core/ui/MarkdownPreview`. `GuideButton` already renders `GuidePanel` only when `open` is true, so a lazy import changes no behaviour. The guide *texts* are already one `import()` per guide (`core/guide/registry.ts`).
 - **Why `qrcode` is in the entry.** `App.tsx` imports `MidgardPage` eagerly, which imports `JoinBifrostCard` → `QrCard` → `qrcode` (`QRCode.create`, drawn in an effect). The other three `QrCard` users (Heimdall sections, Portkey, the toolbox's `QrTool`) are already in lazy chunks. In the standalone build the card sits under `__HUB__ &&` and is dropped.
 - **Where a failed load would land.** `GuideButton` renders in the header (`App.tsx`, line 281), **outside** `RouteBoundary` (which wraps only `main`, from line 301). The only boundary above it is the root `ErrorBoundary` in `main.tsx`, which replaces the whole app. `React.lazy` also caches a rejection for the life of the payload (`app/lazyPages.tsx`'s note, PLAN-22), so a failed lazy import stays failed until something builds a new one.
-- **Offline mode warms pages, not the panel.** `app/offlineWarmLoad.ts` lists the page loaders (toolbox, runestone, groot, atlas, edda, variant, loki, saga, screensaver). Today the Guide panel is safe offline only because it is in the entry chunk.
+- **Offline mode warms pages, not the panel.** `app/offlineWarmLoad.ts` lists the page loaders (toolbox, runestone, groot, atlas, edda, variant, loki, saga, screensaver). Today the Guide panel is safe offline only because it is in the entry chunk. ⚠️ A loader in that file only runs when the server names it: arming offline mode (`armOffline`, `App.tsx:175`) passes `runWarmLoad` the IDs of the policy targets the server enables (`enabledTargets(offlineConfig)`), and those come from `TARGETS` in `server/src/modules/offline-mode/module.ts`, which has no Guide entry. A loader nothing asks for never runs (found in the PR's review).
 - **Contrast.** `color.ts`'s `contrastWarnings` checks only `--text` on `--bg` and `--surface`, at the existing `MIN_TEXT_CONTRAST = 4.5`. Measured with the repo's own `contrastRatio` over resolved themes:
   - **Daybreak's `--accent` on `--bg` is 3.15:1**, and on the standalone site Daybreak is the first theme every light-preferring device gets (on the hub, the household default can decide first);
   - **Tokyo's** is 5.23:1 on `--bg` but 4.15:1 on `--surface`, and 3.92:1 on the active nav item's `--accent-soft` tint, which is the failure the report found;
@@ -158,7 +158,12 @@ These are the standalone nginx's rules (PLAN-35). Repeat visits then skip ~15 re
 - shows `notify.error`: "The guide couldn't load. Check the connection and try again." It has a `dedupeKey`, so repeated clicks don't stack toasts. When `isChunkLoadError` says the chunk is gone because the hub was redeployed, it says to reload instead;
 - builds a **fresh `lazy()`** for the next click, the same way `createLazyPages` does, because React caches the rejected one. The next click is then a real second attempt.
 
-⚠️ **Offline mode.** `offlineWarmLoad.ts` gains the panel's loader. Otherwise, on a tab already open when the hub disappears, the bulb would open nothing on a page it worked on before. The plan also checks whether the six guide texts are in the warm list. They are separate `import()`s today, so they may already be a gap; if they are, it adds them, so the bulb works offline after this plan whether or not it did before.
+⚠️ **Offline mode.** On a tab already open when the hub disappears, the bulb must still open on a page where it worked before. Adding a loader to `WARM_LOADERS` is not enough on its own, because arming offline mode warms only the IDs the server's policy enables, and the policy has no Guide entry. So:
+- **`offlineWarmLoad.ts` gains `SHELL_WARM_LOADERS`:** the Guide panel and the six guide texts, which are separate `import()`s today and so may already be a gap.
+- **`armOffline` runs them on every arm, alongside the policy's targets.** They are part of the header on every page, not a page an admin decides to warm, so a policy switch for them would be a setting nobody needs. That also keeps this plan client-only.
+- **Their results join the same status**, so the pill's loaded and failed counts stay true. A failure is labelled "Guide" through `targetLabel`'s fallback.
+
+A server `guide` target was considered and not chosen: it would change the API and the spec, and add a Heimdall toggle for something that should always follow the pages it serves.
 
 ### The Join card loads after the home page
 
@@ -242,7 +247,7 @@ The before numbers in this plan were taken that way. The PR records the after nu
 
 ## API contracts
 
-None. No route is added, changed or removed, and `server/openapi.json` is unchanged. The web host changes only the headers and encodings of the static files it already serves.
+None. No route is added, changed or removed, and `server/openapi.json` is unchanged. The web host changes only the headers and encodings of the static files it already serves. The offline-mode policy's target list is unchanged too: the Guide is warmed by the client on every arm, not added as a server target (see "The Guide panel loads when the bulb is clicked").
 
 ## Task checklist
 
@@ -262,7 +267,7 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 
 **Client**
 - [ ] `core/guide/GuideButton.tsx`: `GuidePanel` through `lazy()` + `withChunkTimeout`, inside `Suspense` with no fallback and a local error boundary (close the panel, `notify.error` with a `dedupeKey` and the reload wording for `isChunkLoadError`, a fresh `lazy()` for the next click)
-- [ ] `app/offlineWarmLoad.ts`: the Guide panel's loader; check the guide texts, and add them if they are not warmed
+- [ ] `app/offlineWarmLoad.ts`: `SHELL_WARM_LOADERS` (the Guide panel and the six guide texts); `App.tsx`'s `armOffline` runs them on every arm beside the policy's targets, their results in the same status
 - [ ] `app/pages/MidgardPage.tsx`: `JoinBifrostCard` through `lazy()`, in `Suspense` with a reserved-height placeholder and a local error boundary that renders nothing
 - [ ] `core/ui/JoinBifrostCard.tsx`: `<h3>` → `<h2>`, same class
 - [ ] `app/app.css`: `relic-float` on `translate`, and `bridge-flow` as a sliding `::before` with `transform`; verify first that Chrome composites an animated `translate` (otherwise the rotation moves to an inner element)
@@ -302,7 +307,8 @@ None. No route is added, changed or removed, and `server/openapi.json` is unchan
 - [ ] `GuideButton.test.tsx`: the panel appears after a click (awaiting the lazy load); Escape and a route change still close it; a rejected import leaves the shell rendered, closes the panel and notifies once, and a second click with a now-working import opens it
 - [ ] `MidgardPage.test.tsx`: the Join card appears; a rejected card import leaves the rest of the page rendered
 - [ ] `fontPreload`: a bundle with both fonts gets exactly two preload links with `crossorigin`; a missing font fails the build, naming it
-- [ ] Offline warm-load: the registry includes the Guide panel (and the guide texts, if added)
+- [ ] Offline warm-load: arming with a policy that names no Guide target still loads the Guide panel and the guide texts; a failed shell load shows in the status as "Guide"
+- [ ] End-to-end (offline journey): arm offline mode, stop the hub, then open the Guide on a page that has one: it opens
 
 **Integration (web host)**
 - [ ] `host.test.ts`, hub mode: `br`/`gzip`/identity for an asset, the SPA fallback and `index.html`, each with `Vary`; immutable `/assets/`, `no-cache` HTML; `/assets/gone.js` → 404
