@@ -89,10 +89,20 @@ jobs:
   e2e-ui:
     name: e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
-    # A shard takes 2–4 minutes; `playwright install-deps` once spent 32 in
-    # Ubuntu's apt mirrors. A stalled mirror now fails the job for a re-run
-    # instead of holding it for GitHub's 6-hour default.
-    timeout-minutes: 20
+    # Microsoft's Playwright image already holds every browser and its system
+    # libraries. Installing them on the runner meant `playwright install-deps`,
+    # which fetches WebKit's ~100 packages from Ubuntu's apt mirror on every
+    # run, and a slow mirror held a shard for 17–32 minutes before a single
+    # test ran. The tag must equal e2e's @playwright/test version
+    # (scripts/ci.test.ts). `--user 1001` is the runner's own user, as
+    # Playwright's CI docs give it, so the workspace stays writable; the
+    # larger shared memory is for Chromium, as they also advise.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --user 1001 --ipc=host
+    # A shard takes 3–5 minutes with the image pull. Nothing left in it waits
+    # on a mirror, so anything still running at 15 is stuck, not slow.
+    timeout-minutes: 15
     strategy:
       # Every shard reports: a failure in one says nothing about the others.
       fail-fast: false
@@ -100,19 +110,15 @@ jobs:
         include:
           - name: chromium desktop + standalone
             id: chromium-desktop
-            browser: chromium
             args: --project=chromium-desktop --project=standalone
           - name: chromium mobile
             id: chromium-mobile
-            browser: chromium
             args: --project=chromium-mobile
           - name: webkit 1/2
             id: webkit-1
-            browser: webkit
             args: --project=webkit-mobile --shard=1/2
           - name: webkit 2/2
             id: webkit-2
-            browser: webkit
             args: --project=webkit-mobile --shard=2/2
     steps:
       - uses: actions/checkout@v4
@@ -120,10 +126,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - uses: ./.github/actions/playwright
-        with:
-          browser: ${{ matrix.browser }}
 
       - name: Browser journeys
         run: npm run test:e2e:ui -w e2e -- ${{ matrix.args }}
