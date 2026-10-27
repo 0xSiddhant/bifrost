@@ -2,6 +2,7 @@ import { Button } from '../../../core/ui/Button';
 import { Textarea } from '../../../core/ui/Field';
 import { copyText } from '../../../core/copy';
 import { notify } from '../../../core/notify';
+import { saveBlob } from '../../../core/saveBlob';
 import { SwapIcon } from '../../../core/ui/icons';
 import { runBase64, type Base64Variant } from '../lib/base64';
 import { useToolState } from '../useToolState';
@@ -12,13 +13,27 @@ type Mode = 'encode' | 'decode';
  * Base64 (PLAN-18). Encoding goes through TextEncoder rather than `btoa`
  * directly, so pasting anything outside Latin-1 — an accent, an emoji — is a
  * round trip instead of an InvalidCharacterError. See lib/base64.ts.
+ *
+ * Decoding to bytes that are not text (an image, a PDF, a compressed blob)
+ * offers them as a download, named by their leading bytes. The bytes never
+ * leave this browser.
  */
 export function Base64Tool() {
   const [input, setInput] = useToolState('base64.input', '');
   const [mode, setMode] = useToolState<Mode>('base64.mode', 'encode');
   const [variant, setVariant] = useToolState<Base64Variant>('base64.variant', 'standard');
 
-  const { value, error } = runBase64(input, mode, variant);
+  const { value, error, binary } = runBase64(input, mode, variant);
+
+  const download = () => {
+    if (!binary) return;
+    saveBlob(
+      new Blob([binary.bytes as BlobPart], {
+        type: binary.type ? binary.type.mime : 'application/octet-stream',
+      }),
+      binary.filename,
+    );
+  };
 
   const copy = async () => {
     if (!value) return;
@@ -98,7 +113,17 @@ export function Base64Tool() {
           {error}
         </p>
       )}
-      {!error && mode === 'decode' && input.trim() !== '' && (
+      {binary && (
+        <div className="tool-binary">
+          <p className="tool-binary__note" role="status">
+            {binary.message}
+          </p>
+          <Button size="sm" onClick={download}>
+            Download {binary.filename}
+          </Button>
+        </div>
+      )}
+      {!error && !binary && mode === 'decode' && input.trim() !== '' && (
         <p className="caption">
           Padding and whitespace are fixed up automatically, and both alphabets are accepted.
         </p>
