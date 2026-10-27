@@ -164,18 +164,3 @@ export function exportUnifiedDiff(input: UnifiedDiffExportInput): ExportResult {
     mime: 'text/x-patch',
   };
 }
-
-// ── handing the file to the browser ─────────────────────────────────────────
-
-/** Blob + a temporary download anchor — the one mechanism a client-side save has. */
-export function downloadExport(result: Extract<ExportResult, { ok: true }>): void {
-  const blob = new Blob([result.content], { type: result.mime });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = result.filename;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}

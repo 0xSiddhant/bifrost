@@ -14,6 +14,7 @@ import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
 import { usePanelFont } from '../../core/panelFont';
+import { saveText } from '../../core/saveBlob';
 import { Button } from '../../core/ui/Button';
 import { Toast } from '../../core/ui/Toast';
 import { TreeView } from '../../core/ui/TreeView';
@@ -32,7 +33,7 @@ import {
   type VariantJsonOptions,
   type VariantTextOptions,
 } from './compare';
-import { downloadExport, exportJsonPatch, exportUnifiedDiff } from './export';
+import { exportJsonPatch, exportUnifiedDiff } from './export';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
 import { crossPaneOffset } from './search';
 import { LibraryPicker } from './LibraryPicker';
@@ -514,7 +515,7 @@ export function VariantPage() {
       fail(result.reason);
       return;
     }
-    downloadExport(result);
+    saveText(result.content, result.filename, result.mime);
     ok(`Exported ${result.filename}`);
   };
 

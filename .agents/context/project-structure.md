@@ -128,7 +128,8 @@ bifrost/
 │       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
 │       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
 │       │                      #     cold route with no bridge off the app-wide crash card),
-│       │                      #   saveBlob.ts (a client-side download: a Blob on an `<a download>`),
+│       │                      #   saveBlob.ts (every client-side save: saveBlob for bytes, saveText for
+│       │                      #     text + media type; one `<a download>` mechanism under both),
 │       │                      #   textNormalize, runestone + edda + groot + atlas + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
