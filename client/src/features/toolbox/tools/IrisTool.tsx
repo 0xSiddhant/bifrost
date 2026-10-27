@@ -4,6 +4,7 @@ import { Input } from '../../../core/ui/Field';
 import { copyText } from '../../../core/copy';
 import { notify } from '../../../core/notify';
 import { log } from '../../../core/log';
+import { saveText } from '../../../core/saveBlob';
 import {
   contrastRatio,
   extractPalette,
@@ -105,12 +106,7 @@ export function IrisTool() {
 
   const downloadTheme = (mode: 'dark' | 'light') => {
     const json = paletteToThemeJson(palette, { id: themeId, name: themeName || 'My Theme', mode });
-    const blob = new Blob([json], { type: 'application/json' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${themeId}.json`;
-    link.click();
-    URL.revokeObjectURL(link.href);
+    saveText(json, `${themeId}.json`, 'application/json');
   };
 
   return (

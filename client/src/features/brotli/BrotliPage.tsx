@@ -9,6 +9,7 @@ import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
 import { log } from '../../core/log';
 import { hasFeature } from '../../core/features';
+import { saveBlob } from '../../core/saveBlob';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { Toast } from '../../core/ui/Toast';
@@ -27,7 +28,6 @@ import {
   gzippedName,
   looksLikeText,
   savedPercent,
-  saveBlob,
   toBase64,
 } from './bytes';
 import { DEFAULT_QUALITY, QUALITIES, qualityLabel, qualityLevel, type BrotliQualityName } from './quality';
