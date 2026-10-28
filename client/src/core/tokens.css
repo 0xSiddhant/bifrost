@@ -163,7 +163,7 @@
   --surface: #ffffff;
   --surface-2: #f2ede3;
   --text: #22283a;
-  --text-muted: #6e7385;
+  --text-muted: #656a7a; /* 4.5:1 on --bg and --surface-2 (PLAN-40) */
   --border: #e5dfd0;
   --accent: #0f9d8f;
   --accent-2: #6d5fd0;

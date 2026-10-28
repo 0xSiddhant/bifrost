@@ -193,6 +193,11 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
   const pairs: [string, string][] = [
     ['--text', '--bg'],
     ['--text', '--surface'],
+    // Secondary text sits on every surface, panels included (PLAN-40: Daybreak
+    // and Tokyo fell short on --surface-2, and Daybreak on the page itself).
+    ['--text-muted', '--bg'],
+    ['--text-muted', '--surface'],
+    ['--text-muted', '--surface-2'],
   ];
   for (const [fg, bg] of pairs) {
     const fgValue = tokens[fg];

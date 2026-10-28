@@ -57,7 +57,7 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 ## Contrast (a test, not a warning)
 
-`--text` is checked against `--bg` and `--surface`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
+`--text` is checked against `--bg` and `--surface`, `--text-muted` against `--bg`, `--surface` and `--surface-2`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
 
 ## Starter theme (copy, edit, save into `client/src/assets/themes/`)
 

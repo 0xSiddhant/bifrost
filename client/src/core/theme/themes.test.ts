@@ -241,6 +241,17 @@ describe('--accent-text', () => {
     expect(changed.sort()).toEqual(['daybreak', 'tokyo']);
   });
 
+  it('checks secondary text on every surface, panels included', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: { ...minimalTheme().tokens, '--surface-2': '#4a4a5c' },
+      }) as ThemeFile,
+    ).tokens;
+    expect(contrastWarnings(tokens)).toEqual([
+      expect.stringMatching(/^--text-muted on --surface-2 has contrast/),
+    ]);
+  });
+
   it('flags text that fails on --accent-soft alone', () => {
     // Readable on all three surfaces, unreadable on a heavy accent tint.
     const tokens = resolveTheme(
