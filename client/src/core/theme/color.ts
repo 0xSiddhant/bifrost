@@ -108,6 +108,15 @@ export function contrastRatio(a: string, b: string): number | null {
 export const MIN_TEXT_CONTRAST = 4.5;
 
 /**
+ * Contrast of text as it renders on an opaque backdrop. A translucent colour
+ * is composited over the backdrop first: `contrastRatio` reads only the RGB,
+ * so 10% black over white would measure 21:1 while rendering about 1.2:1.
+ */
+export function textContrast(text: string, backdrop: string): number | null {
+  return contrastRatio(composite(text, backdrop) ?? text, backdrop);
+}
+
+/**
  * The accent tints the CSS mixes from `--accent` itself, besides the theme's
  * own `--accent-soft` (`color-mix(in srgb, var(--accent) N%, transparent)`):
  * 10% behind Portkey's enchant note, 12% behind a chip that is on (Accio,
@@ -203,7 +212,7 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
     const fgValue = tokens[fg];
     const bgValue = tokens[bg];
     if (!fgValue || !bgValue) continue;
-    const ratio = contrastRatio(fgValue, bgValue);
+    const ratio = textContrast(fgValue, bgValue);
     if (ratio !== null && ratio < MIN_TEXT_CONTRAST) {
       warnings.push(
         `${fg} on ${bg} has contrast ${ratio.toFixed(2)}:1 — below the ${MIN_TEXT_CONTRAST}:1 readability floor`,
@@ -217,7 +226,7 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
   const accentText = tokens['--accent-text'];
   if (accentText) {
     for (const backdrop of accentTextBackdrops(tokens)) {
-      const ratio = contrastRatio(accentText, backdrop.color);
+      const ratio = textContrast(accentText, backdrop.color);
       if (ratio !== null && ratio < MIN_TEXT_CONTRAST) {
         warnings.push(
           `--accent-text on ${backdrop.label} has contrast ${ratio.toFixed(2)}:1 — below the ` +

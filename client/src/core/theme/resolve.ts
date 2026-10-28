@@ -1,9 +1,9 @@
 import {
   accentTextBackdrops,
-  contrastRatio,
   MIN_TEXT_CONTRAST,
   mixToward,
   parseColor,
+  textContrast,
   type Rgb,
 } from './color';
 
@@ -70,7 +70,7 @@ export function deriveAccentText(tokens: Record<string, string>, mode: ThemeMode
   const backdrops = accentTextBackdrops(tokens);
   const readable = (color: string) =>
     backdrops.every(({ color: backdrop }) => {
-      const ratio = contrastRatio(color, backdrop);
+      const ratio = textContrast(color, backdrop);
       return ratio === null || ratio >= MIN_TEXT_CONTRAST;
     });
   if (readable(accent)) return accent;

@@ -252,6 +252,53 @@ describe('--accent-text', () => {
     ]);
   });
 
+  it('measures translucent text as it renders, over its backdrop', () => {
+    // 10% black over white renders near white: about 1.2:1, not black's 21:1.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f4f6',
+        '--text': '#111827',
+        '--text-muted': 'rgba(17, 24, 39, 0.3)',
+        '--accent': '#0f766e',
+        '--accent-soft': 'rgba(15, 118, 110, 0.1)',
+        '--accent-text': 'rgba(0, 0, 0, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const warnings = contrastWarnings(resolveTheme(theme).tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\./),
+    );
+    expect(warnings).toContainEqual(expect.stringMatching(/^--text-muted on --bg has contrast/));
+  });
+
+  it('derives from a translucent accent as it renders, not as if it were opaque', () => {
+    // Opaque, this teal reads on white; at 30% it does not, so it is stepped.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#ffffff',
+        '--text': '#111827',
+        '--text-muted': '#4b5563',
+        '--accent': 'rgba(15, 118, 110, 0.3)',
+        '--accent-soft': 'rgba(15, 118, 110, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const resolved = resolveTheme(theme).tokens;
+
+    expect(resolved['--accent-text']).not.toBe('rgba(15, 118, 110, 0.3)');
+    expect(contrastWarnings(resolved)).toEqual([]);
+  });
+
   it('flags text that fails on --accent-soft alone', () => {
     // Readable on all three surfaces, unreadable on a heavy accent tint.
     const tokens = resolveTheme(
