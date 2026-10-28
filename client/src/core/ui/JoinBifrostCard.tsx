@@ -39,7 +39,8 @@ export function JoinBifrostCard() {
       </div>
       <div className="join-card__body">
         <span className="eyebrow eyebrow--violet">onboard a device</span>
-        <h3 className="join-card__title">Join Bifrost</h3>
+        {/* The first section heading under the page's <h1> (PLAN-40). */}
+        <h2 className="join-card__title">Join Bifrost</h2>
         <p className="caption">
           Scan from any phone on this Wi-Fi to open the bridge here. Android tip: pick the IP
           address — no .local lookup needed.
