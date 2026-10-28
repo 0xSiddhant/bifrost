@@ -24,7 +24,7 @@ The JSON Schema lives in `client/src/core/theme/schema.ts` and is enforced by `c
 
 ## Required tokens — the 14 color roles
 
-Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rgba()`, or `transparent`.
+Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`/`rgba()` with commas (each channel a number or a percentage, with an optional alpha), or `transparent`. These are exactly the forms the contrast check reads (`COLOR_PATTERN` in `color.ts`), so the schema accepts nothing else: no `hsl()`, colour names or space-separated `rgb()`.
 
 | Token | Role |
 |---|---|
@@ -57,7 +57,7 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 ## Contrast (a test, not a warning)
 
-`--text` is checked against `--bg` and `--surface`, `--text-muted` against `--bg`, `--surface` and `--surface-2`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read. Translucent text is measured as it renders over each backdrop, `transparent` reads as its backdrop (1:1), and a text colour the check cannot read (`rgb()` in percentages) fails too: write text colours as `#rrggbb` or `rgb()` with whole numbers.
+`--text` is checked against `--bg` and `--surface`, `--text-muted` against `--bg`, `--surface` and `--surface-2`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read. Translucent text is measured as it renders over each backdrop, and `transparent` reads as its backdrop (1:1). `--bg`, `--surface` and `--surface-2` must be opaque, since text is measured on them as solid colours.
 
 ## Starter theme (copy, edit, save into `client/src/assets/themes/`)
 

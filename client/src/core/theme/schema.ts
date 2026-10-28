@@ -7,9 +7,7 @@
  * (resolve.ts) so a minimal theme is ~17 lines.
  */
 
-/** Solid or alpha color: #rgb/#rrggbb/#rrggbbaa, rgb()/rgba(), or `transparent`. */
-const COLOR_PATTERN =
-  '^(#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?|rgba?\\([0-9.,%\\s]+\\)|transparent)$';
+import { COLOR_PATTERN } from './color';
 
 /**
  * Free-form CSS value (gradients, shadows, clamp()...). Guard rails, not a
@@ -21,6 +19,7 @@ const CSS_VALUE_PATTERN = "^(?!.*[@;{}<>])(?!.*[uU][rR][lL]\\s*\\()[-a-zA-Z0-9#%
 /** Self-hosted families only — a LAN with no internet must render identically. */
 const FONT_PATTERN = "^'(Space Grotesk|Inter|JetBrains Mono)'[-a-zA-Z0-9,'\\s]*$";
 
+/** Solid or alpha color, in the grammar the contrast lint reads (`COLOR_PATTERN`). */
 const color = { type: 'string', pattern: COLOR_PATTERN, maxLength: 64 } as const;
 const cssValue = { type: 'string', pattern: CSS_VALUE_PATTERN, maxLength: 600 } as const;
 const font = { type: 'string', pattern: FONT_PATTERN, maxLength: 120 } as const;

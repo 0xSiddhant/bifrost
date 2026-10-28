@@ -12,23 +12,25 @@ export interface Rgb {
   b: number;
 }
 
-export function parseColor(value: string): Rgb | null {
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim());
-  if (hex?.[1]) {
-    let digits = hex[1];
-    if (digits.length === 3) digits = [...digits].map((d) => d + d).join('');
-    return {
-      r: parseInt(digits.slice(0, 2), 16),
-      g: parseInt(digits.slice(2, 4), 16),
-      b: parseInt(digits.slice(4, 6), 16),
-    };
-  }
-  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(value.trim());
-  if (rgb) {
-    return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]) };
-  }
-  return null;
-}
+/** A number, decimals allowed. */
+const NUMBER = String.raw`(\d+(?:\.\d+)?|\.\d+)`;
+const COMMA = String.raw`\s*,\s*`;
+
+/**
+ * The one colour grammar: the schema's colour pattern (`schema.ts`) and
+ * `parseRgba` are both this, so every colour a theme can ship is one the
+ * derived defaults and the contrast lint can read. `#rgb`, `#rrggbb` or
+ * `#rrggbbaa`; `rgb()` or `rgba()` with commas, its three channels all
+ * numbers or all percentages (CSS drops a mix), and an optional alpha as a
+ * number or a percentage; or `transparent`.
+ */
+export const COLOR_PATTERN =
+  String.raw`^(?:#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})` +
+  String.raw`|rgba?\(\s*(?:${NUMBER}${COMMA}${NUMBER}${COMMA}${NUMBER}` +
+  `|${NUMBER}%${COMMA}${NUMBER}%${COMMA}${NUMBER}%)` +
+  String.raw`(?:${COMMA}${NUMBER}(%?))?\s*\)|transparent)$`;
+
+const COLOR = new RegExp(COLOR_PATTERN);
 
 export interface Rgba extends Rgb {
   /** 0..1 */
@@ -37,21 +39,35 @@ export interface Rgba extends Rgb {
 
 /**
  * A colour with its alpha: `rgba()`'s fourth value, `#rrggbbaa`'s last pair,
- * 0 for `transparent` (which the schema accepts), else 1.
+ * 0 for `transparent`, else 1. Null for anything outside `COLOR_PATTERN`.
  */
 export function parseRgba(value: string): Rgba | null {
-  if (value.trim().toLowerCase() === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
-  const rgb = parseColor(value);
-  if (!rgb) return null;
-  const trimmed = value.trim();
-  const hexAlpha = /^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(trimmed)?.[1];
-  if (hexAlpha) return { ...rgb, a: parseInt(hexAlpha, 16) / 255 };
-  const fnAlpha = /^rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)(%?)\s*\)$/i.exec(trimmed);
-  if (fnAlpha?.[1]) {
-    const a = Number(fnAlpha[1]) / (fnAlpha[2] ? 100 : 1);
-    return { ...rgb, a: Math.min(1, Math.max(0, a)) };
+  const match = COLOR.exec(value.trim());
+  if (!match) return null;
+  if (match[0] === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
+  const [, hex, r, g, b, rPercent, gPercent, bPercent, alpha, alphaPercent] = match;
+  if (hex) {
+    const digits = hex.length === 3 ? [...hex].map((d) => d + d).join('') : hex;
+    const pair = (at: number) => parseInt(digits.slice(at, at + 2), 16);
+    return { r: pair(0), g: pair(2), b: pair(4), a: digits.length === 8 ? pair(6) / 255 : 1 };
   }
-  return { ...rgb, a: 1 };
+  // Out-of-range values clamp, as in CSS.
+  const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
+  const channel = (number: string | undefined, percent: string | undefined) =>
+    Math.round(clamp(number === undefined ? Number(percent) * 2.55 : Number(number), 255));
+  return {
+    r: channel(r, rPercent),
+    g: channel(g, gPercent),
+    b: channel(b, bPercent),
+    a: alpha === undefined ? 1 : clamp(Number(alpha) / (alphaPercent ? 100 : 1), 1),
+  };
+}
+
+/** A colour's RGB, alpha dropped. Null for `transparent`, which has none. */
+export function parseColor(value: string): Rgb | null {
+  const rgba = parseRgba(value);
+  if (!rgba || value.trim() === 'transparent') return null;
+  return { r: rgba.r, g: rgba.g, b: rgba.b };
 }
 
 export function toHex({ r, g, b }: Rgb): string {
@@ -136,6 +152,20 @@ export interface Backdrop {
   color: string;
 }
 
+/** The surfaces text sits on, each measured as an opaque colour. */
+const SURFACES = ['--bg', '--surface', '--surface-2'];
+
+/** Every colour token `contrastWarnings` reads. */
+const LINTED_COLORS = [
+  '--text',
+  '--text-muted',
+  '--accent-text',
+  ...SURFACES,
+  '--accent',
+  '--accent-soft',
+  '--screen-veil',
+];
+
 /** The first colour in a CSS value (a gradient's first stop), or null. */
 function firstColor(value: string): string | null {
   return /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i.exec(value)?.[0] ?? null;
@@ -172,9 +202,9 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
     const color = tokens[name];
     return color && parseColor(color) ? { label: name, color } : null;
   };
-  const surfaces = ['--bg', '--surface', '--surface-2']
-    .map(named)
-    .filter((backdrop): backdrop is Backdrop => backdrop !== null);
+  const surfaces = SURFACES.map(named).filter(
+    (backdrop): backdrop is Backdrop => backdrop !== null,
+  );
   const over = (label: string, color: string, under: Backdrop): Backdrop | null => {
     const result = composite(color, under.color);
     return result ? { label: `${label} over ${under.label}`, color: result } : null;
@@ -203,13 +233,20 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
 
 export function contrastWarnings(tokens: Record<string, string>): string[] {
   const warnings: string[] = [];
-  // A text colour the check cannot read would otherwise be skipped silently,
-  // and pass. The schema accepts forms (rgb() in percentages) it does not parse.
-  for (const role of ['--text', '--text-muted', '--accent-text']) {
+  // A colour the check cannot measure would otherwise be skipped, and pass.
+  // The schema accepts only `COLOR_PATTERN`, so this catches tokens that never
+  // met it; a surface must also be opaque, as text is measured on it as solid.
+  for (const role of LINTED_COLORS) {
     const value = tokens[role];
-    if (value && parseRgba(value) === null) {
+    if (value === undefined) continue;
+    const rgba = parseRgba(value);
+    if (rgba === null) {
       warnings.push(
-        `${role} is ${value}, which the contrast check cannot read: write it as #rrggbb or rgb() with whole numbers`,
+        `${role} is ${value}, which is not a colour the contrast check can read: write it as #rrggbb or rgb()`,
+      );
+    } else if (SURFACES.includes(role) && rgba.a < 1) {
+      warnings.push(
+        `${role} is ${value}, which is translucent: the contrast check measures text on it as a solid colour, so make it opaque`,
       );
     }
   }

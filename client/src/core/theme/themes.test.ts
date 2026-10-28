@@ -2,7 +2,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { BUNDLED_THEMES } from './bundled';
-import { accentTextBackdrops, contrastRatio, contrastWarnings, parseColor } from './color';
+import {
+  accentTextBackdrops,
+  contrastRatio,
+  contrastWarnings,
+  parseColor,
+  parseRgba,
+} from './color';
 import { ACCENT_TEXT_MAX_STEPS, ACCENT_TEXT_STEP, resolveTheme, type ThemeFile } from './resolve';
 import { themeSchema } from './schema';
 
@@ -112,6 +118,33 @@ describe('the theme schema', () => {
     theme.tokens['--font-body'] = "'Comic Sans MS', cursive";
     expect(validate(theme)).toBe(false);
   });
+
+  // Codex review: a colour the schema accepted but the lint could not read was
+  // skipped, and passed. Both now use one grammar (`COLOR_PATTERN`).
+  it.each([
+    ['#abc', true],
+    ['#aabbcc', true],
+    ['#aabbcc80', true],
+    ['rgb(40%, 40%, 40%)', true],
+    ['rgba(10.5, 20, 30, 0.5)', true],
+    ['rgba(1, 2, 3, 50%)', true],
+    ['rgba( 1 ,2,3, .5 )', true],
+    ['transparent', true],
+    ['#abcde', false],
+    ['rgb(1, 2)', false],
+    ['rgb(50%, 20, 30)', false],
+    ['rgb(1 2 3)', false],
+    ['rgb(1, 2, 3, 4, 5)', false],
+    ['rgb(1.2.3, 4, 5)', false],
+    ['rgba(,,,)', false],
+    ['hsl(0, 0%, 50%)', false],
+    ['red', false],
+  ])('accepts %s exactly when the contrast check can read it (%s)', (value, readable) => {
+    const theme = minimalTheme();
+    theme.tokens['--text'] = value;
+    expect(validate(theme)).toBe(readable);
+    expect(parseRgba(value) !== null).toBe(readable);
+  });
 });
 
 describe('resolveTheme derived defaults (the server cases, ported)', () => {
@@ -159,6 +192,34 @@ describe('contrast lint', () => {
   it('flags text below 4.5:1', () => {
     const warnings = contrastWarnings({ '--text': '#777777', '--bg': '#666666' });
     expect(warnings[0]).toContain('--text');
+  });
+
+  it('reads rgb() in percentages and decimals, as CSS does', () => {
+    expect(parseRgba('rgb(40%, 40%, 40%)')).toEqual({ r: 102, g: 102, b: 102, a: 1 });
+    expect(parseRgba('rgba(10.4, 20, 30, 50%)')).toEqual({ r: 10, g: 20, b: 30, a: 0.5 });
+    expect(parseRgba('rgb(300, 0, 0)')).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(parseRgba('rgba(150%, 0%, 0%, 2)')).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(parseColor('transparent')).toBeNull();
+  });
+
+  it('measures a backdrop written in percentages instead of skipping it', () => {
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': 'rgb(40%, 40%, 40%)',
+      '--surface': '#000000',
+      '--accent-text': '#7a7a7a',
+    });
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\.34:1/),
+    );
+  });
+
+  it('flags a surface that is translucent, as text is measured on it as solid', () => {
+    const warnings = contrastWarnings({ '--text': '#ffffff', '--surface': 'rgba(0, 0, 0, 0.5)' });
+    expect(warnings).toContainEqual(
+      expect.stringContaining('--surface is rgba(0, 0, 0, 0.5), which is translucent'),
+    );
   });
 });
 
@@ -369,13 +430,16 @@ describe('--accent-text', () => {
     );
   });
 
-  it('flags a text colour the contrast check cannot read, rather than skipping it', () => {
-    // The schema accepts rgb() with percentages; the check reads only #hex and integer rgb().
+  it('flags a colour the contrast check cannot read, rather than skipping it', () => {
+    // The schema rejects these; the lint must not pass them on its own either.
     const theme = minimalTheme();
-    theme.tokens['--text-muted'] = 'rgb(55%, 56%, 64%)';
+    Object.assign(theme.tokens, { '--text-muted': 'rgb(55, 56)', '--surface-2': 'hsl(0, 0%, 9%)' });
 
-    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
-      expect.stringContaining('--text-muted is rgb(55%, 56%, 64%)'),
+    const warnings = contrastWarnings(resolveTheme(theme as ThemeFile).tokens);
+
+    expect(warnings).toContainEqual(expect.stringContaining('--text-muted is rgb(55, 56), which'));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('--surface-2 is hsl(0, 0%, 9%), which'),
     );
   });
 
