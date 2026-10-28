@@ -24,11 +24,13 @@ const COMMA = String.raw`\s*,\s*`;
  * numbers or all percentages (CSS drops a mix), and an optional alpha as a
  * number or a percentage; or `transparent`.
  */
-export const COLOR_PATTERN =
-  String.raw`^(?:#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})` +
+const COLOR_SOURCE =
+  String.raw`#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])` +
   String.raw`|rgba?\(\s*(?:${NUMBER}${COMMA}${NUMBER}${COMMA}${NUMBER}` +
   `|${NUMBER}%${COMMA}${NUMBER}%${COMMA}${NUMBER}%)` +
-  String.raw`(?:${COMMA}${NUMBER}(%?))?\s*\)|transparent)$`;
+  String.raw`(?:${COMMA}${NUMBER}(%?))?\s*\)|transparent`;
+
+export const COLOR_PATTERN = `^(?:${COLOR_SOURCE})$`;
 
 const COLOR = new RegExp(COLOR_PATTERN);
 
@@ -163,12 +165,47 @@ const LINTED_COLORS = [
   ...SURFACES,
   '--accent',
   '--accent-soft',
+  '--header-veil',
   '--screen-veil',
 ];
 
-/** The first colour in a CSS value (a gradient's first stop), or null. */
-function firstColor(value: string): string | null {
-  return /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i.exec(value)?.[0] ?? null;
+/** The gradients accent text sits on, read stop by stop (`gradientColors`). */
+const LINTED_GRADIENTS = ['--sky', '--card-sheen'];
+
+const COLORS_IN_VALUE = new RegExp(COLOR_SOURCE, 'g');
+
+/** Every word a gradient may hold besides its colours. */
+const GRADIENT_WORDS = new Set([
+  'linear-gradient',
+  'radial-gradient',
+  'none',
+  'to',
+  'at',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'center',
+  'circle',
+  'ellipse',
+  'closest-side',
+  'closest-corner',
+  'farthest-side',
+  'farthest-corner',
+  'deg',
+  'turn',
+  'px',
+]);
+
+/**
+ * Every colour in a gradient value (`--sky`, `--card-sheen`), in the colour
+ * grammar. Null when the value holds any other word, such as `white` or
+ * `hsl()`: a colour the check cannot read, which it must not skip.
+ */
+export function gradientColors(value: string): string[] | null {
+  const words = value.replace(COLORS_IN_VALUE, ' ').match(/[a-z][a-z-]*/gi) ?? [];
+  if (!words.every((word) => GRADIENT_WORDS.has(word.toLowerCase()))) return null;
+  return (value.match(COLORS_IN_VALUE) ?? []).filter((color) => color !== 'transparent');
 }
 
 /**
@@ -177,13 +214,15 @@ function firstColor(value: string): string | null {
  * read against its own background or its nearest painted ancestor's:
  *
  * - `--bg`, the page: links (`a`, `.seo-static a`), the `.eyebrow`, Edda's
- *   reading outline, Nimbus's figures, a sky relic, and the header's veil
- *   (`--surface` at 0.78–0.82 over the page, so between the two).
+ *   reading outline, Nimbus's figures, a sky relic. The `--sky` glows lie
+ *   behind all of it, so each of its colours over the page is checked too
+ *   (each alone: where two overlap, both are faint), and so is the header's
+ *   `--header-veil` over the page.
  * - `--surface`, cards and sheets: Portkey's slug and link buttons, the Saga
  *   shortcuts card, Loki's sheet and output, the plist table, the tag
  *   suggestions, the file rows, Edda's outline, the Heimdall modal and its
- *   about links. A card's `--card-sheen` lightens its top in a dark theme, so
- *   its first stop over `--surface` is checked too.
+ *   about links. A card's `--card-sheen` tints its top, so each of its
+ *   colours over `--surface` is checked too.
  * - `--surface-2`, panels, code and chips: `.heimdall-brand` and the local
  *   note on `.heimdall-panel`, highlighted code in `pre` (`.md-preview`,
  *   `.preview-markdown`), the empty-state icon, plist rows on hover.
@@ -222,12 +261,19 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
       }
     }
   }
+  const gradient = (name: string, under: Backdrop | undefined) => {
+    for (const color of gradientColors(tokens[name] ?? '') ?? []) {
+      if (under) layered.push(over(`${name}'s ${color}`, color, under));
+    }
+  };
   const card = surfaces.find((surface) => surface.label === '--surface');
-  const sheen = firstColor(tokens['--card-sheen'] ?? '');
-  if (card && sheen) layered.push(over('--card-sheen', sheen, card));
+  gradient('--card-sheen', card);
   const page = surfaces.find((surface) => surface.label === '--bg');
-  const veil = tokens['--screen-veil'];
-  if (page && veil) layered.push(over('--screen-veil', veil, page));
+  gradient('--sky', page);
+  for (const name of ['--header-veil', '--screen-veil']) {
+    const veil = tokens[name];
+    if (page && veil) layered.push(over(name, veil, page));
+  }
   return [...surfaces, ...layered.filter((backdrop): backdrop is Backdrop => backdrop !== null)];
 }
 
@@ -247,6 +293,14 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
     } else if (SURFACES.includes(role) && rgba.a < 1) {
       warnings.push(
         `${role} is ${value}, which is translucent: the contrast check measures text on it as a solid colour, so make it opaque`,
+      );
+    }
+  }
+  for (const role of LINTED_GRADIENTS) {
+    const value = tokens[role];
+    if (value !== undefined && gradientColors(value) === null) {
+      warnings.push(
+        `${role} is ${value}, which has a colour or word the contrast check cannot read: write its colours as #rrggbb or rgb()`,
       );
     }
   }

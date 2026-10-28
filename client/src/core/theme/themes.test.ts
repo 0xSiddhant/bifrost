@@ -419,6 +419,62 @@ describe('--accent-text', () => {
     expect(veil('daybreak')).toBe('rgba(250, 247, 241, 0.95)');
   });
 
+  // Codex review: a gradient's colours were read from its first stop only,
+  // and a colour outside the grammar (`white`) was skipped.
+  it('checks every colour of the card sheen and the sky, and the header veil', () => {
+    const labels = accentTextBackdrops(resolveTheme(minimalTheme() as ThemeFile).tokens).map(
+      (backdrop) => backdrop.label,
+    );
+
+    expect(labels).toContain("--card-sheen's rgba(236, 236, 245, 0.05) over --surface");
+    expect(labels.filter((label) => label.startsWith("--sky's "))).toHaveLength(3);
+    expect(labels).toContain('--header-veil over --bg');
+  });
+
+  it('flags a gradient colour the contrast check cannot read', () => {
+    const theme = minimalTheme();
+    theme.tokens['--card-sheen'] = 'linear-gradient(180deg, white 0%, transparent 42%)';
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringContaining('--card-sheen is linear-gradient(180deg, white 0%'),
+    );
+  });
+
+  it('derives against the sheen, the sky and the veils a theme gets, authored or not', () => {
+    // On a black page the derived sky's --accent-2 glow (white at 18%) needs a
+    // lighter accent text than any other backdrop; the theme authors no --sky.
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': '#000000',
+      '--surface': '#000000',
+      '--surface-2': '#000000',
+      '--accent': '#777777',
+      '--accent-2': '#ffffff',
+      '--accent-soft': 'rgba(119, 119, 119, 0.12)',
+    });
+
+    const tokens = resolveTheme(theme as ThemeFile).tokens;
+
+    expect(tokens['--accent-text']).not.toBe('#777777');
+    expect(contrastWarnings(tokens)).toEqual([]);
+  });
+
+  it('flags accent text on an authored header veil it cannot be read on', () => {
+    const theme = minimalTheme();
+    theme.tokens['--header-veil'] = 'rgba(236, 236, 245, 0.9)';
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --header-veil over --bg has contrast/),
+    );
+  });
+
+  it('derives the same accent text for every bundled theme as before', () => {
+    const accentText = Object.fromEntries(
+      BUNDLED_THEMES.map((theme) => [theme.id, theme.tokens['--accent-text']]),
+    );
+    expect(accentText).toMatchObject({ daybreak: '#0b7167', tokyo: '#ff70ae' });
+  });
+
   it('flags invisible text: transparent reads as its backdrop', () => {
     const theme = minimalTheme();
     theme.tokens['--accent-text'] = 'transparent';

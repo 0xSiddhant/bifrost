@@ -151,14 +151,13 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',
     '--qr-bg': dark ? '#eef1fa' : '#ffffff',
     '--screen-veil': screenVeil,
-    // Accent-coloured text (PLAN-40), from the colours it actually sits on.
-    '--accent-text': deriveAccentText(
-      { ...t, '--accent': accent, '--screen-veil': screenVeil },
-      theme.mode,
-    ),
   };
 
-  const tokens = { ...derived, ...theme.tokens };
+  const tokens: Record<string, string> = { ...derived, ...theme.tokens };
+  // Accent-coloured text (PLAN-40), from the colours it actually sits on.
+  // Derived last, so it sees every backdrop the lint checks, the derived
+  // sky, sheen and veils included.
+  tokens['--accent-text'] ??= deriveAccentText({ ...tokens, '--accent': accent }, theme.mode);
   return {
     id: theme.id,
     name: theme.name,
