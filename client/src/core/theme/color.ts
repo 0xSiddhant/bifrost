@@ -169,7 +169,7 @@ const LINTED_COLORS = [
   '--screen-veil',
 ];
 
-/** The gradients accent text sits on, read stop by stop (`gradientColors`). */
+/** The gradients accent text sits on, read layer by layer (`gradientStops`). */
 const LINTED_GRADIENTS = ['--sky', '--card-sheen'];
 
 const COLORS_IN_VALUE = new RegExp(COLOR_SOURCE, 'g');
@@ -197,16 +197,39 @@ const GRADIENT_WORDS = new Set([
   'px',
 ]);
 
+/** A CSS value split at its top-level commas: a background's layers. */
+function layers(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '(') depth += 1;
+    else if (value[i] === ')') depth -= 1;
+    else if (value[i] === ',' && depth === 0) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts;
+}
+
 /**
- * Every colour in a gradient value (`--sky`, `--card-sheen`), in the colour
- * grammar. Null when the value holds any other word, such as `white` or
- * `hsl()`: a colour the check cannot read, which it must not skip.
+ * A gradient value's (`--sky`, `--card-sheen`) layers, each as its colour
+ * stops in order, `transparent` included. Null when the value holds any other
+ * word, such as `white` or `hsl()`: a colour the check cannot read, which it
+ * must not skip.
  */
-export function gradientColors(value: string): string[] | null {
+export function gradientStops(value: string): string[][] | null {
   const words = value.replace(COLORS_IN_VALUE, ' ').match(/[a-z][a-z-]*/gi) ?? [];
   if (!words.every((word) => GRADIENT_WORDS.has(word.toLowerCase()))) return null;
-  return (value.match(COLORS_IN_VALUE) ?? []).filter((color) => color !== 'transparent');
+  return layers(value)
+    .map((layer) => layer.match(COLORS_IN_VALUE) ?? [])
+    .filter((stops) => stops.length > 0);
 }
+
+/** Points sampled along each run between two gradient stops, ends included. */
+const GRADIENT_SAMPLES = 8;
 
 /**
  * Every backdrop accent-coloured text sits on (PLAN-40), from an inventory of
@@ -261,9 +284,30 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
       }
     }
   }
+  // A gradient paints every colour between two stops, not only the stops.
+  // CSS interpolates in premultiplied sRGB, which composited over an opaque
+  // base is the straight line between the two stops' composites, so points
+  // along that line are the colours really painted. Text that sits between
+  // two stops in lightness passes both and meets its own lightness midway.
   const gradient = (name: string, under: Backdrop | undefined) => {
-    for (const color of gradientColors(tokens[name] ?? '') ?? []) {
-      if (under) layered.push(over(`${name}'s ${color}`, color, under));
+    if (!under) return;
+    const run = (from: string, to: string) => {
+      const start = composite(from, under.color);
+      const end = parseColor(composite(to, under.color) ?? '');
+      if (!start || !end || (from === 'transparent' && to === 'transparent')) return;
+      const label = from === to ? `${name}'s ${from}` : `${name} from ${from} to ${to}`;
+      for (let k = 0; k <= GRADIENT_SAMPLES; k += 1) {
+        const color = mixToward(start, end, k / GRADIENT_SAMPLES);
+        if (color) layered.push({ label: `${label} over ${under.label}`, color });
+      }
+    };
+    for (const stops of gradientStops(tokens[name] ?? '') ?? []) {
+      // A lone stop is a run from itself to itself.
+      let previous = stops.length === 1 ? stops[0] : undefined;
+      for (const stop of stops) {
+        if (previous !== undefined) run(previous, stop);
+        previous = stop;
+      }
     }
   };
   const card = surfaces.find((surface) => surface.label === '--surface');
@@ -298,7 +342,7 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
   }
   for (const role of LINTED_GRADIENTS) {
     const value = tokens[role];
-    if (value !== undefined && gradientColors(value) === null) {
+    if (value !== undefined && gradientStops(value) === null) {
       warnings.push(
         `${role} is ${value}, which has a colour or word the contrast check cannot read: write its colours as #rrggbb or rgb()`,
       );
@@ -330,11 +374,18 @@ export function contrastWarnings(tokens: Record<string, string>): string[] {
   // short, and the fix is the same: author a readable --accent-text.
   const accentText = tokens['--accent-text'];
   if (accentText) {
+    // A gradient's run gives several points under one label: report its worst.
+    const worst = new Map<string, number>();
     for (const backdrop of accentTextBackdrops(tokens)) {
       const ratio = textContrast(accentText, backdrop.color);
-      if (ratio !== null && ratio < MIN_TEXT_CONTRAST) {
+      if (ratio !== null && ratio < (worst.get(backdrop.label) ?? Infinity)) {
+        worst.set(backdrop.label, ratio);
+      }
+    }
+    for (const [label, ratio] of worst) {
+      if (ratio < MIN_TEXT_CONTRAST) {
         warnings.push(
-          `--accent-text on ${backdrop.label} has contrast ${ratio.toFixed(2)}:1 — below the ` +
+          `--accent-text on ${label} has contrast ${ratio.toFixed(2)}:1 — below the ` +
             `${MIN_TEXT_CONTRAST}:1 readability floor. Author a readable --accent-text in the theme`,
         );
       }

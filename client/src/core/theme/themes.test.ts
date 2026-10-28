@@ -426,9 +426,38 @@ describe('--accent-text', () => {
       (backdrop) => backdrop.label,
     );
 
-    expect(labels).toContain("--card-sheen's rgba(236, 236, 245, 0.05) over --surface");
-    expect(labels.filter((label) => label.startsWith("--sky's "))).toHaveLength(3);
+    expect(labels).toContain(
+      '--card-sheen from rgba(236, 236, 245, 0.05) to transparent over --surface',
+    );
+    expect(new Set(labels.filter((label) => label.startsWith('--sky from ')))).toHaveProperty(
+      'size',
+      3,
+    );
     expect(labels).toContain('--header-veil over --bg');
+  });
+
+  // Codex review: only the stops were checked, while CSS paints every colour
+  // between them.
+  it('checks the colours a gradient paints between its stops, once per run', () => {
+    // #767676 reads 4.6:1 on black and on white, the two stops, but the
+    // gradient passes through its own grey on the way.
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': '#000000',
+      '--surface': '#000000',
+      '--surface-2': '#000000',
+      '--accent-text': '#767676',
+      '--card-sheen': 'linear-gradient(90deg, #000 0%, #fff 100%)',
+    });
+
+    const sheen = contrastWarnings(resolveTheme(theme as ThemeFile).tokens).filter((warning) =>
+      warning.includes('--card-sheen'),
+    );
+
+    expect(sheen).toHaveLength(1);
+    expect(sheen[0]).toMatch(
+      /^--accent-text on --card-sheen from #000 to #fff over --surface has contrast 1\.\d\d:1/,
+    );
   });
 
   it('flags a gradient colour the contrast check cannot read', () => {
