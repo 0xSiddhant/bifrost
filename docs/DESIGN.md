@@ -53,6 +53,8 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
 - **Space**: `--space-1…12` (0.25rem base scale)
 - **Shape/depth**: `--radius-sm/md/lg/full`, `--shadow-1/2`
 - **Motion**: `--dur-1` (150ms) · `--dur-2` (200ms) · `--ease`
+- **Decorative loops animate only `transform`, `translate` or `opacity`** (PLAN-40), so
+  they run on the compositor; a shell journey checks every animation on the home page.
 
 ## The bridge gradient
 

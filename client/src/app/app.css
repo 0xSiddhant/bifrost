@@ -80,28 +80,47 @@
   color: var(--accent-2);
 }
 
+/* The individual `translate` property, not `transform` (PLAN-40): each relic's
+   inline `transform: rotate(…)` would be overwritten by a transform animation,
+   while `translate` composes with it, in screen space as margin-top moved it,
+   and runs on the compositor instead of re-running layout every frame. */
 @keyframes relic-float {
   from {
-    margin-top: -0.75rem;
+    translate: 0 -0.75rem;
   }
   to {
-    margin-top: 0.75rem;
+    translate: 0 0.75rem;
   }
 }
 
+/* The gradient flows on the compositor (PLAN-40): it sits on a layer that
+   slides, instead of a background-position that repaints every frame. The
+   look is the one it always had: the gradient is twice the strip's width and
+   moves one full period, leftwards, every 14s. The layer holds two periods
+   (four strip widths) so sliding it by one, -50%, loops without a seam. */
 .bridge-strip {
+  position: relative;
   height: 3px;
+  overflow: hidden;
+}
+
+.bridge-strip::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 400%;
   background: var(--bridge);
-  background-size: 200% 100%;
+  background-size: 50% 100%;
   animation: bridge-flow 14s linear infinite;
 }
 
 @keyframes bridge-flow {
   from {
-    background-position: 0% 0;
+    transform: translateX(0);
   }
   to {
-    background-position: 200% 0;
+    transform: translateX(-50%);
   }
 }
 
