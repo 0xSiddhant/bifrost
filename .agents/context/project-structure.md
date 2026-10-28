@@ -74,6 +74,10 @@ bifrost/
 │   ├── buildDefaults.ts       # the .env values a client build bakes in (PLAN-35)
 │   ├── seoBuild.ts            # standalone only: a page per public tool, 404.html, robots.txt,
 │   │                          #   sitemap.xml (the list: src/core/seo.ts)
+│   ├── precompress.ts         # both builds (PLAN-40): .br + .gz beside every text file, at closeBundle
+│   ├── bundleBudget.ts        # both builds (PLAN-40): the first load (entry + static imports + CSS)
+│   │                          #   may hold no heavy library and stays under a gzipped budget
+│   ├── fontPreload.ts         # both builds (PLAN-40): preload the two first-paint fonts, by hashed name
 │   └── src/
 │       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
