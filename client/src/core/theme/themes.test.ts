@@ -358,6 +358,27 @@ describe('--accent-text', () => {
     expect(veil('daybreak')).toBe('rgba(250, 247, 241, 0.95)');
   });
 
+  it('flags invisible text: transparent reads as its backdrop', () => {
+    const theme = minimalTheme();
+    theme.tokens['--accent-text'] = 'transparent';
+
+    const warnings = contrastWarnings(resolveTheme(theme as ThemeFile).tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\.00:1/),
+    );
+  });
+
+  it('flags a text colour the contrast check cannot read, rather than skipping it', () => {
+    // The schema accepts rgb() with percentages; the check reads only #hex and integer rgb().
+    const theme = minimalTheme();
+    theme.tokens['--text-muted'] = 'rgb(55%, 56%, 64%)';
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringContaining('--text-muted is rgb(55%, 56%, 64%)'),
+    );
+  });
+
   it('flags text that fails on --accent-soft alone', () => {
     // Readable on all three surfaces, unreadable on a heavy accent tint.
     const tokens = resolveTheme(

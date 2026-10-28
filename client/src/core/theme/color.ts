@@ -35,8 +35,12 @@ export interface Rgba extends Rgb {
   a: number;
 }
 
-/** A colour with its alpha: `rgba()`'s fourth value, `#rrggbbaa`'s last pair, else 1. */
+/**
+ * A colour with its alpha: `rgba()`'s fourth value, `#rrggbbaa`'s last pair,
+ * 0 for `transparent` (which the schema accepts), else 1.
+ */
 export function parseRgba(value: string): Rgba | null {
+  if (value.trim().toLowerCase() === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
   const rgb = parseColor(value);
   if (!rgb) return null;
   const trimmed = value.trim();
@@ -199,6 +203,16 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
 
 export function contrastWarnings(tokens: Record<string, string>): string[] {
   const warnings: string[] = [];
+  // A text colour the check cannot read would otherwise be skipped silently,
+  // and pass. The schema accepts forms (rgb() in percentages) it does not parse.
+  for (const role of ['--text', '--text-muted', '--accent-text']) {
+    const value = tokens[role];
+    if (value && parseRgba(value) === null) {
+      warnings.push(
+        `${role} is ${value}, which the contrast check cannot read: write it as #rrggbb or rgb() with whole numbers`,
+      );
+    }
+  }
   const pairs: [string, string][] = [
     ['--text', '--bg'],
     ['--text', '--surface'],
