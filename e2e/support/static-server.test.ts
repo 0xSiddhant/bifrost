@@ -81,8 +81,9 @@ describe('the static server matches docker/nginx-standalone.conf', () => {
     expect(directive(conf, 'listen')).toBe('8080');
   });
 
-  it('compresses text on the wire', () => {
+  it('compresses text on the wire, from the prebuilt .gz where the build wrote one', () => {
     expect(directive(conf, 'gzip')).toBe('on');
+    expect(directive(conf, 'gzip_static')).toBe('on');
     for (const type of ['text/css', 'text/javascript', 'application/json', 'image/svg+xml']) {
       expect(directive(conf, 'gzip_types')).toContain(type);
     }

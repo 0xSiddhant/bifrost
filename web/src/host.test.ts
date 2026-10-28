@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import { brotliCompressSync, brotliDecompressSync, gunzipSync, gzipSync } from 'node:zlib';
 import Fastify, { type FastifyInstance } from 'fastify';
 import pino from 'pino';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -28,12 +29,32 @@ function writeTree(dir: string, files: Record<string, string>): void {
   }
 }
 
+/** A .br and a .gz beside each named file, as `client/precompress.ts` writes them. */
+function precompress(dir: string, names: string[]): void {
+  for (const name of names) {
+    const file = path.join(dir, name);
+    const source = fs.readFileSync(file);
+    fs.writeFileSync(`${file}.br`, brotliCompressSync(source));
+    fs.writeFileSync(`${file}.gz`, gzipSync(source));
+  }
+}
+
+/** The body as the browser would read it, whichever encoding came back. */
+function decoded(response: { rawPayload: Buffer; headers: Record<string, unknown> }): string {
+  const encoding = response.headers['content-encoding'];
+  if (encoding === 'br') return brotliDecompressSync(response.rawPayload).toString();
+  if (encoding === 'gzip') return gunzipSync(response.rawPayload).toString();
+  return response.rawPayload.toString();
+}
+
 beforeAll(() => {
   clientDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-web-hub-'));
   writeTree(clientDir, {
     'index.html': '<!doctype html><div id="root">hub</div>',
     'assets/app-abc.js': 'hub()',
+    'manifest.webmanifest': '{}',
   });
+  precompress(clientDir, ['index.html', 'assets/app-abc.js']);
   standaloneDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bifrost-web-standalone-'));
   writeTree(standaloneDir, {
     'index.html': '<!doctype html><div id="root">standalone</div>',
@@ -43,6 +64,12 @@ beforeAll(() => {
     'assets/app-def.js': 'standalone()',
     'manifest.webmanifest': '{}',
   });
+  precompress(standaloneDir, [
+    'index.html',
+    '404.html',
+    'runestone/index.html',
+    'assets/app-def.js',
+  ]);
 });
 
 afterAll(() => {
@@ -309,6 +336,58 @@ describe('hub mode', () => {
     expect(post.statusCode).toBe(404);
   });
 
+  // PLAN-40: the build's .br and .gz, picked per request, and nginx's caching.
+  it('sends the best encoding the browser accepts, with Vary, wherever the file comes from', async () => {
+    const web = await hub(await startUpstream());
+    const cases = [
+      { url: '/assets/app-abc.js', body: 'hub()', type: 'javascript' },
+      { url: '/', body: 'hub', type: 'text/html' },
+      // The SPA fallback answers through sendFile.
+      { url: '/runestone/some-slug', body: 'hub', type: 'text/html' },
+    ];
+    for (const { url, body, type } of cases) {
+      for (const [accept, encoding] of [
+        ['br, gzip', 'br'],
+        ['gzip', 'gzip'],
+        ['identity', undefined],
+      ] as const) {
+        const response = await web.inject({ url, headers: { 'accept-encoding': accept } });
+        const label = `${url} (${accept})`;
+        expect(response.statusCode, label).toBe(200);
+        expect(response.headers['content-encoding'], label).toBe(encoding);
+        expect(response.headers.vary, label).toContain('accept-encoding');
+        expect(response.headers['content-type'], label).toContain(type);
+        expect(decoded(response), label).toContain(body);
+      }
+    }
+  });
+
+  it('caches hashed assets forever and revalidates everything else', async () => {
+    const web = await hub(await startUpstream());
+    for (const accept of ['br', 'identity']) {
+      const asset = await web.inject({
+        url: '/assets/app-abc.js',
+        headers: { 'accept-encoding': accept },
+      });
+      expect(asset.headers['cache-control'], accept).toBe('public, max-age=31536000, immutable');
+      for (const url of ['/', '/index.html', '/runestone/some-slug', '/manifest.webmanifest']) {
+        const page = await web.inject({ url, headers: { 'accept-encoding': accept } });
+        expect(page.headers['cache-control'], `${url} (${accept})`).toBe('no-cache');
+      }
+    }
+  });
+
+  it('answers a missing asset with a 404, never the app shell', async () => {
+    const web = await hub(await startUpstream());
+    for (const method of ['GET', 'HEAD'] as const) {
+      const response = await web.inject({ method, url: '/assets/gone-000.js' });
+      expect(response.statusCode, method).toBe(404);
+      expect(response.headers['content-type'], method).not.toContain('text/html');
+      expect(response.headers['cache-control'], method).toBe('no-cache');
+    }
+    expect((await web.inject({ url: '/assets/gone-000.js' })).body).not.toContain('hub');
+  });
+
   it('answers its own health without the API', async () => {
     const web = await hub(await deadPort());
     const response = await web.inject({ url: '/healthz' });
@@ -370,6 +449,26 @@ describe('standalone mode (BIFROST_RUN=web)', () => {
     expect(asset.headers['x-content-type-options']).toBe('nosniff');
     expect(asset.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect((await web.inject({ url: '/assets/gone-000.js' })).statusCode).toBe(404);
+  });
+
+  it('sends the prebuilt encoding through sendFile, keeping the page status', async () => {
+    const web = await standalone();
+    for (const [url, status, body] of [
+      ['/', 200, 'standalone'],
+      ['/runestone', 200, '<title>Runestone</title>'],
+      ['/assets/app-def.js', 200, 'standalone()'],
+      ['/nope', 404, 'noindex'],
+    ] as const) {
+      const response = await web.inject({ url, headers: { 'accept-encoding': 'br, gzip' } });
+      expect(response.statusCode, url).toBe(status);
+      expect(response.headers['content-encoding'], url).toBe('br');
+      expect(response.headers.vary, url).toContain('accept-encoding');
+      expect(decoded(response), url).toContain(body);
+    }
+    const gzip = await web.inject({ url: '/nope', headers: { 'accept-encoding': 'gzip' } });
+    expect(gzip.statusCode).toBe(404);
+    expect(gzip.headers['content-encoding']).toBe('gzip');
+    expect(decoded(gzip)).toContain('noindex');
   });
 
   it('types the web manifest, and refuses anything but GET and HEAD', async () => {

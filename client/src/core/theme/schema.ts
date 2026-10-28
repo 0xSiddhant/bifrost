@@ -7,9 +7,7 @@
  * (resolve.ts) so a minimal theme is ~17 lines.
  */
 
-/** Solid or alpha color: #rgb/#rrggbb/#rrggbbaa, rgb()/rgba(), or `transparent`. */
-const COLOR_PATTERN =
-  '^(#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?([0-9a-fA-F]{2})?|rgba?\\([0-9.,%\\s]+\\)|transparent)$';
+import { COLOR_PATTERN } from './color';
 
 /**
  * Free-form CSS value (gradients, shadows, clamp()...). Guard rails, not a
@@ -21,6 +19,7 @@ const CSS_VALUE_PATTERN = "^(?!.*[@;{}<>])(?!.*[uU][rR][lL]\\s*\\()[-a-zA-Z0-9#%
 /** Self-hosted families only — a LAN with no internet must render identically. */
 const FONT_PATTERN = "^'(Space Grotesk|Inter|JetBrains Mono)'[-a-zA-Z0-9,'\\s]*$";
 
+/** Solid or alpha color, in the grammar the contrast lint reads (`COLOR_PATTERN`). */
 const color = { type: 'string', pattern: COLOR_PATTERN, maxLength: 64 } as const;
 const cssValue = { type: 'string', pattern: CSS_VALUE_PATTERN, maxLength: 600 } as const;
 const font = { type: 'string', pattern: FONT_PATTERN, maxLength: 120 } as const;
@@ -41,6 +40,13 @@ export const REQUIRED_COLOR_ROLES = [
   '--danger-soft',
   '--scrim',
 ] as const;
+
+/**
+ * Optional colour roles derived from the required ones when omitted (PLAN-40).
+ * `--accent-text` is the accent as text can be read in: 4.5:1 on every
+ * backdrop accent-coloured text sits on (`accentTextBackdrops` in color.ts).
+ */
+export const DERIVED_COLOR_ROLES = ['--accent-text'] as const;
 
 export const SYNTAX_TOKENS = [
   '--syn-key',
@@ -153,6 +159,7 @@ const FONT_TOKENS = ['--font-display', '--font-body', '--font-mono'] as const;
 
 export const ALL_TOKEN_KEYS = [
   ...REQUIRED_COLOR_ROLES,
+  ...DERIVED_COLOR_ROLES,
   ...ATMOSPHERE_COLOR_TOKENS,
   ...ATMOSPHERE_CSS_TOKENS,
   ...SYNTAX_TOKENS,
@@ -166,6 +173,7 @@ export const ALL_TOKEN_KEYS = [
 
 const tokenProperties: Record<string, unknown> = {};
 for (const key of REQUIRED_COLOR_ROLES) tokenProperties[key] = color;
+for (const key of DERIVED_COLOR_ROLES) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_COLOR_TOKENS) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_CSS_TOKENS) tokenProperties[key] = cssValue;
 for (const key of SYNTAX_TOKENS) tokenProperties[key] = color;

@@ -8,5 +8,17 @@
     "types": ["vite/client"],
     "noEmit": true
   },
-  "include": ["src", "vite.config.ts", "buildDefaults.ts", "seoBuild.ts", "seoBuild.test.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "buildDefaults.ts",
+    "seoBuild.ts",
+    "seoBuild.test.ts",
+    "precompress.ts",
+    "precompress.test.ts",
+    "bundleBudget.ts",
+    "bundleBudget.test.ts",
+    "fontPreload.ts",
+    "fontPreload.test.ts"
+  ]
 }

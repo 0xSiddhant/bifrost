@@ -79,7 +79,7 @@
 }
 
 .nott__mark svg {
-  color: var(--accent);
+  color: var(--accent-text);
   filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 55%, transparent));
 }
 
@@ -131,7 +131,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .nott__world {

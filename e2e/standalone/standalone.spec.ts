@@ -164,6 +164,29 @@ test.describe('standalone shell', () => {
     await expect(page).toHaveTitle(/JSON editor.*Runestone/);
   });
 
+  // PLAN-40: the two first-paint fonts start with the CSS, from every file.
+  test('every HTML file the build ships preloads exactly the two first-paint fonts', async () => {
+    const dir = fromRepoRoot('client', 'dist-standalone');
+    const pages = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((name) =>
+      name.endsWith('.html'),
+    );
+    expect(pages).toContain('index.html');
+    expect(pages).toContain('404.html');
+    expect(pages.length).toBeGreaterThan(STANDALONE_PAGES.length);
+    for (const name of pages) {
+      const html = fs.readFileSync(`${dir}/${name}`, 'utf8');
+      const preloads = [...html.matchAll(/<link rel="preload"[^>]*>/g)].map(([tag]) => tag);
+      expect(preloads, name).toHaveLength(2);
+      for (const tag of preloads) {
+        expect(tag, name).toMatch(/as="font"/);
+        expect(tag, name).toMatch(/type="font\/woff2"/);
+        expect(tag, name).toMatch(/crossorigin/);
+      }
+      expect(preloads[0], name).toMatch(/\/assets\/space-grotesk-v22-latin-700-[\w-]+\.woff2"/);
+      expect(preloads[1], name).toMatch(/\/assets\/inter-v20-latin-regular-[\w-]+\.woff2"/);
+    }
+  });
+
   test("a first visit paints its device's theme before any script runs", async ({
     browser,
     site,

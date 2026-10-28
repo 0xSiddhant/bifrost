@@ -49,7 +49,7 @@
   font-size: clamp(3.5rem, 18vw, 5.5rem);
   line-height: 1;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   /* Digits must not shuffle the layout as the number changes width. */
   font-variant-numeric: tabular-nums;
 }
@@ -152,7 +152,7 @@
 }
 
 .nimbus-result--live .nimbus-figure__value {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .nimbus-figure__unit {

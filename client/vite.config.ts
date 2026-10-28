@@ -12,6 +12,9 @@ import {
   type BuildDefaults,
 } from './buildDefaults';
 import { readSiteUrl, seoPlugin } from './seoBuild';
+import { bundleBudgetPlugin } from './bundleBudget';
+import { fontPreloadPlugin } from './fontPreload';
+import { precompressPlugin } from './precompress';
 
 // PLAN-36: in dev, Vite plays the web host. It serves on PORT (the address
 // people open, as in production) and proxies the API paths to the API server
@@ -99,6 +102,11 @@ export default defineConfig(({ mode }) => {
       // The public standalone site gets a page per tool for search engines; the
       // hub is a LAN app and stays as it is.
       ...(standalone ? [seoPlugin(readSiteUrl(process.env))] : []),
+      // Both builds (PLAN-40): the first-paint fonts preloaded, the first load
+      // held to its budget, and a .br and .gz written beside every text file.
+      fontPreloadPlugin(),
+      bundleBudgetPlugin(),
+      precompressPlugin(),
     ],
     define:
       mode === 'test'

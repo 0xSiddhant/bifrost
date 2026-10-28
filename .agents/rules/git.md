@@ -25,6 +25,9 @@
 - Subject: imperative, lowercase, no period, ≤ 72 chars.
 - Body explains **why, not what** — the diff already shows what. Reference the plan: `Refs: PLAN-02`.
 - Small, atomic commits. Never mix refactor + feature in one commit.
+- **No `Co-authored-by` trailer in a commit message** unless the owner explicitly asks for one on that commit (owner, 2026-10-28). This holds for commits made by AI agents too.
+- **A PR's merge (squash) message carries `Co-authored-by` lines only when the PR holds commits from more than one author**: one line per author other than the one merging, taken from the PR's commits. A single-author PR's merge message has none.
+- **A PR's merge (squash) message carries `Reviewed-by` lines only when the PR had reviewers**: one line per person or review bot, other than the PR's author, who submitted a review on it (an approval, changes requested, or review comments), written `Reviewed-by: <name> (<GitHub login>)`, e.g. `Reviewed-by: Codex (chatgpt-codex-connector[bot])`. No `@` before the login, so the merge notifies nobody. The lines go at the end of the message, before any `Co-authored-by` lines. A PR nobody else reviewed has none, and an ordinary commit never carries one (owner, 2026-10-28).
 
 Example:
 
