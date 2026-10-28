@@ -440,12 +440,23 @@
   overflow-wrap: anywhere;
 }
 
+/* The card's place while its chunk arrives (PLAN-40), so the footer below
+   does not move when it lands: the card's height with one address, measured
+   at 1280px (269px) and, stacked, at 390px (524px). */
+.join-card--placeholder {
+  min-height: 269px;
+}
+
 @media (max-width: 640px) {
   .join-card {
     grid-template-columns: 1fr;
     justify-items: center;
     text-align: center;
     padding: var(--space-6);
+  }
+
+  .join-card--placeholder {
+    min-height: 524px;
   }
 
   .join-card__body {

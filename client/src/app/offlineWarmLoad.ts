@@ -1,4 +1,6 @@
 import { withChunkTimeout } from '../core/chunkError';
+import { guidePanelChunk } from '../core/guide/GuideButton';
+import { GUIDES } from '../core/guide/registry';
 import { log } from '../core/log';
 
 /**
@@ -32,6 +34,21 @@ export const WARM_LOADERS: WarmLoaders = {
   loki: () => import('../features/loki/LokiPage'),
   saga: () => import('../features/saga/SagaPage'),
   screensaver: () => import('../features/screensaver/Screensaver'),
+};
+
+/**
+ * What the shell itself loads lazily, warmed on every arm beside whatever the
+ * server's policy names (PLAN-40). The Guide panel and its texts belong to the
+ * header on every page that has a guide, not to a page an admin chooses to
+ * warm, so there is no policy switch for them: the server's registry has no
+ * Guide entry, and a loader in `WARM_LOADERS` alone would never be asked for.
+ *
+ * One entry for the panel and all six texts, so the pill counts the Guide
+ * once. The key doubles as its label: `targetLabel` falls back to the id for
+ * anything the server's registry does not name, so a failure reads "Guide".
+ */
+export const SHELL_WARM_LOADERS: WarmLoaders = {
+  Guide: () => Promise.all([guidePanelChunk.load(), ...GUIDES.map((guide) => guide.load())]),
 };
 
 export interface WarmLoadResult {
@@ -79,4 +96,17 @@ export async function runWarmLoad(
     }
   });
   return result;
+}
+
+/**
+ * One arm of the Offline switch: the policy's targets, then the shell's own,
+ * in one status. A shell id never collides with a server one (they are
+ * capitalised labels), so the two maps join as they are.
+ */
+export function runOfflineWarmLoad(
+  policyIds: string[],
+  loaders: WarmLoaders = WARM_LOADERS,
+  shell: WarmLoaders = SHELL_WARM_LOADERS,
+): Promise<WarmLoadResult> {
+  return runWarmLoad([...policyIds, ...Object.keys(shell)], { ...loaders, ...shell });
 }
