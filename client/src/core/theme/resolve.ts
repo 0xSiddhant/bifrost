@@ -100,6 +100,12 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
   const text = t['--text'] ?? '#e9edf5';
   const textMuted = t['--text-muted'] ?? '#8b94a7';
   const surface = t['--surface'] ?? '#131824';
+  const bg = t['--bg'] ?? '#0b0e14';
+  // The screensaver's veil, the stylesheet's defaults made explicit (PLAN-40):
+  // dark themes keep tokens.css's deep veil, a light one gets its own page at
+  // 95% (Daybreak's parchment), as THEME-SPEC promises. Explicit, so accent
+  // text is checked against the veil `.nott__author` really sits on.
+  const screenVeil = t['--screen-veil'] ?? (dark ? 'rgba(6, 8, 14, 0.96)' : alpha(bg, 0.95));
 
   const derived: Record<string, string> = {
     '--bridge': `linear-gradient(90deg, ${accent} 0%, ${accent2} 50%, ${ok} 100%)`,
@@ -144,8 +150,12 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
     '--qr-module-a': dark ? '#0f766e' : '#0c5f54',
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',
     '--qr-bg': dark ? '#eef1fa' : '#ffffff',
-    // Accent-coloured text (PLAN-40), from the authored colours it sits on.
-    '--accent-text': deriveAccentText({ ...t, '--accent': accent }, theme.mode),
+    '--screen-veil': screenVeil,
+    // Accent-coloured text (PLAN-40), from the colours it actually sits on.
+    '--accent-text': deriveAccentText(
+      { ...t, '--accent': accent, '--screen-veil': screenVeil },
+      theme.mode,
+    ),
   };
 
   const tokens = { ...derived, ...theme.tokens };

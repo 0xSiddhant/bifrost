@@ -299,6 +299,65 @@ describe('--accent-text', () => {
     expect(contrastWarnings(resolved)).toEqual([]);
   });
 
+  it('checks accent text on the veil a theme actually gets, authored or not', () => {
+    // A light theme with no --screen-veil of its own: the screensaver's
+    // attribution (.nott__author) still sits on a veil, so the veil it gets
+    // must be among the backdrops, and must be a light one.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#fbfaf7',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f1ec',
+        '--text': '#1f2430',
+        '--text-muted': '#5b6070',
+        '--accent': '#0f6b63',
+        '--accent-soft': 'rgba(15, 107, 99, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const tokens = resolveTheme(theme).tokens;
+    const veil = accentTextBackdrops(tokens).find(
+      (backdrop) => backdrop.label === '--screen-veil over --bg',
+    );
+
+    expect(veil).toBeDefined();
+    expect(tokens['--screen-veil']).toBe('rgba(251, 250, 247, 0.95)');
+    expect(contrastWarnings(tokens)).toEqual([]);
+  });
+
+  it('flags accent text on an authored veil it cannot be read on', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        mode: 'light',
+        tokens: {
+          ...minimalTheme().tokens,
+          '--bg': '#ffffff',
+          '--surface': '#ffffff',
+          '--surface-2': '#f3f4f6',
+          '--text': '#111827',
+          '--text-muted': '#4b5563',
+          '--accent': '#0f6b63',
+          '--accent-soft': 'rgba(15, 107, 99, 0.1)',
+          '--screen-veil': 'rgba(6, 8, 14, 0.96)',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    expect(contrastWarnings(tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --screen-veil over --bg has contrast/),
+    );
+  });
+
+  it("makes the stylesheet's default veils explicit, so no shipped theme changes", () => {
+    const veil = (id: string) =>
+      BUNDLED_THEMES.find((entry) => entry.id === id)?.tokens['--screen-veil'];
+    // tokens.css: :root (Aurora, and every dark theme without one) and Daybreak's block.
+    expect(veil('aurora')).toBe('rgba(6, 8, 14, 0.96)');
+    expect(veil('daybreak')).toBe('rgba(250, 247, 241, 0.95)');
+  });
+
   it('flags text that fails on --accent-soft alone', () => {
     // Readable on all three surfaces, unreadable on a heavy accent tint.
     const tokens = resolveTheme(
