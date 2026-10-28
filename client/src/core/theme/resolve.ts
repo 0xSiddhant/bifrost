@@ -1,4 +1,11 @@
-import { parseColor } from './color';
+import {
+  accentTextBackdrops,
+  contrastRatio,
+  MIN_TEXT_CONTRAST,
+  mixToward,
+  parseColor,
+  type Rgb,
+} from './color';
 
 /**
  * Ported from the server's `modules/themes/resolve.ts` when themes became
@@ -34,6 +41,46 @@ function alpha(color: string, value: number): string {
   const rgb = parseColor(color);
   if (!rgb) return color;
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${value})`;
+}
+
+/** How far one step moves `--accent-text` towards white or black. */
+export const ACCENT_TEXT_STEP = 0.04;
+
+/**
+ * At most this many steps: 48%, just under half way. Past half way the colour
+ * is more white (or black) than accent, the accent's in name only, so the
+ * derivation gives up: `--accent-text` is left as the accent, `themes.test.ts`
+ * fails the theme, and the theme authors its own. Of the bundled themes,
+ * Daybreak needs 7 steps and Tokyo 11; the other five need none.
+ */
+export const ACCENT_TEXT_MAX_STEPS = 12;
+
+const WHITE: Rgb = { r: 255, g: 255, b: 255 };
+const BLACK: Rgb = { r: 0, g: 0, b: 0 };
+
+/**
+ * The accent, as a colour text can be read in (PLAN-40): unchanged when it
+ * already reaches 4.5:1 on every backdrop accent text sits on
+ * (`accentTextBackdrops`), else stepped towards white in a dark theme or black
+ * in a light one, which keeps its hue, until it does. Only text needs this:
+ * fills, borders and the bridge stay on `--accent`, so the theme keeps its look.
+ */
+export function deriveAccentText(tokens: Record<string, string>, mode: ThemeMode): string {
+  const accent = tokens['--accent'] ?? '';
+  const backdrops = accentTextBackdrops(tokens);
+  const readable = (color: string) =>
+    backdrops.every(({ color: backdrop }) => {
+      const ratio = contrastRatio(color, backdrop);
+      return ratio === null || ratio >= MIN_TEXT_CONTRAST;
+    });
+  if (readable(accent)) return accent;
+  const target = mode === 'dark' ? WHITE : BLACK;
+  for (let step = 1; step <= ACCENT_TEXT_MAX_STEPS; step += 1) {
+    const candidate = mixToward(accent, target, step * ACCENT_TEXT_STEP);
+    if (candidate === null) break;
+    if (readable(candidate)) return candidate;
+  }
+  return accent;
 }
 
 /**
@@ -97,6 +144,8 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
     '--qr-module-a': dark ? '#0f766e' : '#0c5f54',
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',
     '--qr-bg': dark ? '#eef1fa' : '#ffffff',
+    // Accent-coloured text (PLAN-40), from the authored colours it sits on.
+    '--accent-text': deriveAccentText({ ...t, '--accent': accent }, theme.mode),
   };
 
   const tokens = { ...derived, ...theme.tokens };

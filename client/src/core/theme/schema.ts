@@ -42,6 +42,13 @@ export const REQUIRED_COLOR_ROLES = [
   '--scrim',
 ] as const;
 
+/**
+ * Optional colour roles derived from the required ones when omitted (PLAN-40).
+ * `--accent-text` is the accent as text can be read in: 4.5:1 on every
+ * backdrop accent-coloured text sits on (`accentTextBackdrops` in color.ts).
+ */
+export const DERIVED_COLOR_ROLES = ['--accent-text'] as const;
+
 export const SYNTAX_TOKENS = [
   '--syn-key',
   '--syn-string',
@@ -153,6 +160,7 @@ const FONT_TOKENS = ['--font-display', '--font-body', '--font-mono'] as const;
 
 export const ALL_TOKEN_KEYS = [
   ...REQUIRED_COLOR_ROLES,
+  ...DERIVED_COLOR_ROLES,
   ...ATMOSPHERE_COLOR_TOKENS,
   ...ATMOSPHERE_CSS_TOKENS,
   ...SYNTAX_TOKENS,
@@ -166,6 +174,7 @@ export const ALL_TOKEN_KEYS = [
 
 const tokenProperties: Record<string, unknown> = {};
 for (const key of REQUIRED_COLOR_ROLES) tokenProperties[key] = color;
+for (const key of DERIVED_COLOR_ROLES) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_COLOR_TOKENS) tokenProperties[key] = color;
 for (const key of ATMOSPHERE_CSS_TOKENS) tokenProperties[key] = cssValue;
 for (const key of SYNTAX_TOKENS) tokenProperties[key] = color;

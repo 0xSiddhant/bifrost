@@ -41,6 +41,7 @@ Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rg
 
 ## Optional groups (derived when omitted)
 
+- **Accent text** — `--accent-text` (PLAN-40): the accent as a colour text can be read in. Links, eyebrows, active nav items, highlighted code keywords and the other 44 places that colour *text* with the accent use it; fills, borders and the bridge stay on `--accent`. Default: your `--accent` when it already reaches 4.5:1 on every backdrop accent text sits on, otherwise the accent stepped towards white (dark themes) or black (light themes) in 4% steps, which keeps its hue, until it does. The backdrops are `--bg`, `--surface`, `--surface-2`, `--accent-soft` over each, the accent's own 10–14% tints over the page and cards, the card sheen and the screensaver veil (`accentTextBackdrops` in `client/src/core/theme/color.ts` lists where each comes from). If the accent needs more than 12 steps (48% of the way), the derivation gives up and the contrast test fails the theme: author a readable `--accent-text` yourself.
 - **Atmosphere** — `--bridge`, `--accent-grad`, `--sky`, `--stars`, `--stars-alpha`, `--glow-teal`, `--glow-violet`, `--glow-amber`, `--glow-soft`, `--tone-teal(-soft)`, `--tone-violet(-soft)`, `--tone-amber(-soft)`, `--header-veil`, `--card-sheen`, `--relic-alpha`, `--relic-muted`, `--shadow-1/2`. Defaults: gradients and glows built from your `--accent`/`--accent-2`/`--ok`; stars on for dark mode, off for light.
 - **Syntax** — `--syn-key/string/number/bool/null/punct` (JSON/code highlighting, Runestone PLAN-07 + Differ PLAN-08). Defaults: accent / ok / accent-2 / warn / muted / muted.
 - **Diff** — `--diff-add/remove/change` plus `--diff-add/remove/change-soft` (compare-pane highlighting, Variant PLAN-08; the `-soft` variants are the line backgrounds, so keep them low-alpha). Defaults: ok / danger / accent, softs at ~0.16 alpha (dark) or ~0.12 (light).
@@ -56,7 +57,7 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 ## Contrast (a test, not a warning)
 
-`--text` is checked against `--bg` and `--surface`. A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
+`--text` is checked against `--bg` and `--surface`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
 
 ## Starter theme (copy, edit, save into `client/src/assets/themes/`)
 

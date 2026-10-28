@@ -44,6 +44,10 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
   `--text-muted` · `--border` · `--accent` · `--accent-2` · `--ok` ·
   `--danger` · `--warn` · softs (`--accent-soft`, `--danger-soft`) ·
   `--scrim` · `--bridge` (the rainbow gradient)
+- **Accent text**: `--accent-text`, the accent as a colour text can be read in
+  (PLAN-40). Colour *text* with it, never with `--accent`; fills, borders and
+  the bridge keep `--accent`. Derived per theme (THEME-SPEC.md), and held to
+  4.5:1 on every backdrop by the theme test.
 - **Atmosphere tones** (eyebrows, code highlights, join band, sky relics):
   `--tone-teal` · `--tone-violet` · `--tone-amber` + `-soft` variants, and matching
   `--glow-teal/violet/amber`. Derived from the theme's accents when omitted.

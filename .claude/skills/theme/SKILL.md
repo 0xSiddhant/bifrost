@@ -89,7 +89,12 @@ The client test is the validator (there is no server-side check any more):
 `npx vitest run src/core/theme` from `client/`. For every bundled file it
 checks the schema (unknown token keys are rejected, `additionalProperties:
 false`), that the `id` equals the file name, and that `--text` clears **4.5:1**
-against `--bg` and `--surface` — a red test, not a warning. A **new** theme also
+against `--bg` and `--surface` — a red test, not a warning. `--accent-text`
+(PLAN-40) must clear it too, on every backdrop accent text sits on; it is
+derived from `--accent` when omitted, and a red test naming it means the accent
+cannot be stepped far enough, so author a readable `--accent-text` yourself
+(`docs/THEME-SPEC.md`, "Accent text"). Colour text with `var(--accent-text)`,
+never `var(--accent)`: a test fails any stylesheet that does. A **new** theme also
 goes into the file list the first test pins, so nothing ships or vanishes by
 accident.
 

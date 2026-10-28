@@ -57,7 +57,7 @@ p {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -141,5 +141,5 @@ code,
 }
 
 .seo-static a {
-  color: var(--accent);
+  color: var(--accent-text);
 }

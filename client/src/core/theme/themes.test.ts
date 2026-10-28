@@ -2,8 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
 import { BUNDLED_THEMES } from './bundled';
-import { contrastRatio, contrastWarnings } from './color';
-import { resolveTheme, type ThemeFile } from './resolve';
+import { accentTextBackdrops, contrastRatio, contrastWarnings, parseColor } from './color';
+import { ACCENT_TEXT_MAX_STEPS, ACCENT_TEXT_STEP, resolveTheme, type ThemeFile } from './resolve';
 import { themeSchema } from './schema';
 
 /**
@@ -159,5 +159,171 @@ describe('contrast lint', () => {
   it('flags text below 4.5:1', () => {
     const warnings = contrastWarnings({ '--text': '#777777', '--bg': '#666666' });
     expect(warnings[0]).toContain('--text');
+  });
+});
+
+// PLAN-40: accent-coloured text gets its own derived token.
+describe('--accent-text', () => {
+  /** The HSL hue of a colour, in degrees. */
+  function hue(value: string): number {
+    const rgb = parseColor(value);
+    if (!rgb) throw new Error(value);
+    const [r, g, b] = [rgb.r / 255, rgb.g / 255, rgb.b / 255];
+    const max = Math.max(r, g, b);
+    const span = max - Math.min(r, g, b);
+    if (span === 0) return 0;
+    const raw =
+      max === r ? ((g - b) / span) % 6 : max === g ? (b - r) / span + 2 : (r - g) / span + 4;
+    return (raw * 60 + 360) % 360;
+  }
+
+  const worst = (tokens: Record<string, string>, color: string) =>
+    Math.min(...accentTextBackdrops(tokens).map((b) => contrastRatio(color, b.color) ?? 21));
+
+  const lightTheme = (accent: string) =>
+    minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f4f6',
+        '--text': '#111827',
+        '--text-muted': '#4b5563',
+        '--border': '#e5e7eb',
+        '--accent': accent,
+        '--accent-soft': `${accent}1a`,
+      },
+    }) as ThemeFile;
+
+  it('derives a readable, same-hue colour for a light theme whose accent fails', () => {
+    const theme = lightTheme('#14b8a6');
+    const accent = '#14b8a6';
+    expect(worst(theme.tokens, accent)).toBeLessThan(4.5);
+
+    const text = resolveTheme(theme).tokens['--accent-text'] ?? '';
+
+    expect(text).not.toBe(accent);
+    expect(worst(resolveTheme(theme).tokens, text)).toBeGreaterThanOrEqual(4.5);
+    expect(Math.abs(hue(text) - hue(accent))).toBeLessThan(1);
+  });
+
+  it('derives a readable, same-hue colour for a dark theme whose accent fails', () => {
+    const accent = '#7c3aed';
+    const theme = minimalTheme({
+      tokens: { ...minimalTheme().tokens, '--accent': accent, '--accent-soft': `${accent}1f` },
+    }) as ThemeFile;
+    expect(worst(theme.tokens, accent)).toBeLessThan(4.5);
+
+    const text = resolveTheme(theme).tokens['--accent-text'] ?? '';
+
+    expect(worst(resolveTheme(theme).tokens, text)).toBeGreaterThanOrEqual(4.5);
+    expect(Math.abs(hue(text) - hue(accent))).toBeLessThan(1);
+    // Lighter in a dark theme, not darker.
+    expect(contrastRatio(text, '#ffffff')).toBeLessThan(contrastRatio(accent, '#ffffff') ?? 0);
+  });
+
+  it('keeps an accent that already reads, exactly', () => {
+    const theme = resolveTheme(minimalTheme() as ThemeFile);
+    expect(theme.tokens['--accent-text']).toBe('#5eead4');
+  });
+
+  it('never overrides an authored value', () => {
+    const theme = minimalTheme();
+    theme.tokens['--accent-text'] = '#a7f3d0';
+    expect(resolveTheme(theme as ThemeFile).tokens['--accent-text']).toBe('#a7f3d0');
+  });
+
+  it('changes only Daybreak and Tokyo among the bundled themes', () => {
+    const changed = BUNDLED_THEMES.filter(
+      (theme) => theme.tokens['--accent-text'] !== theme.tokens['--accent'],
+    ).map((theme) => theme.id);
+    expect(changed.sort()).toEqual(['daybreak', 'tokyo']);
+  });
+
+  it('flags text that fails on --accent-soft alone', () => {
+    // Readable on all three surfaces, unreadable on a heavy accent tint.
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: {
+          ...minimalTheme().tokens,
+          '--accent-soft': 'rgba(94, 234, 212, 0.5)',
+          '--accent-text': '#4fb3a5',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    const warnings = contrastWarnings(tokens);
+
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const warning of warnings)
+      expect(warning).toMatch(/^--accent-text on --accent-soft over /);
+  });
+
+  it('flags text that fails on --surface-2 alone (Tokyo before PLAN-40, the Heimdall brand)', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: {
+          ...minimalTheme().tokens,
+          '--surface-2': '#2c3e57',
+          '--accent': '#ff006e',
+          '--accent-soft': 'rgba(255, 0, 110, 0.12)',
+          '--accent-text': '#ff66a8',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    const warnings = contrastWarnings(tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --surface-2 has contrast/),
+    );
+    for (const warning of warnings) expect(warning).toMatch(/--surface-2 has contrast/);
+  });
+
+  it('gives up past its step limit and names the token to author', () => {
+    // A mid-grey panel: no blue within reach of the limit reads on it.
+    const theme = minimalTheme({
+      tokens: { ...minimalTheme().tokens, '--surface-2': '#8a8a8a', '--accent': '#3b82f6' },
+    }) as ThemeFile;
+
+    const resolved = resolveTheme(theme);
+
+    expect(ACCENT_TEXT_MAX_STEPS * ACCENT_TEXT_STEP).toBeLessThan(0.5);
+    expect(resolved.tokens['--accent-text']).toBe('#3b82f6');
+    expect(contrastWarnings(resolved.tokens)).toContainEqual(
+      expect.stringContaining('Author a readable --accent-text in the theme'),
+    );
+  });
+
+  it("gives the stylesheet's first-paint defaults the derived values", () => {
+    // tokens.css paints before the theme engine runs: Aurora on :root, and
+    // Daybreak under its data-theme. Each must carry what resolveTheme derives.
+    const css = readFileSync(new URL('../tokens.css', import.meta.url), 'utf8');
+    const block = (selector: string) => {
+      const start = css.indexOf(`${selector} {`);
+      return css.slice(start, css.indexOf('\n}', start));
+    };
+    const value = (text: string) => /--accent-text:\s*([^;]+);/.exec(text)?.[1];
+    const theme = (id: string) => BUNDLED_THEMES.find((entry) => entry.id === id)?.tokens;
+    expect(value(block(':root'))).toBe(theme('aurora')?.['--accent-text']);
+    expect(value(block("[data-theme='daybreak']"))).toBe(theme('daybreak')?.['--accent-text']);
+  });
+
+  it('is what every stylesheet colours accent text with, never --accent itself', () => {
+    const root = new URL('../../', import.meta.url);
+    const sheets = (readdirSync(root, { recursive: true }) as string[]).filter((name) =>
+      name.endsWith('.css'),
+    );
+    expect(sheets.length).toBeGreaterThan(5);
+    const offenders = sheets.flatMap((name) =>
+      readFileSync(new URL(name, root), 'utf8')
+        .split('\n')
+        .map((line, index) => ({ line, at: `${name}:${index + 1}` }))
+        // `color:` itself, not border-color, accent-color and the rest.
+        .filter(({ line }) => /(^|[\s;{])color:\s*var\(--accent\)/.test(line))
+        .map(({ at }) => at),
+    );
+    expect(offenders).toEqual([]);
   });
 });
