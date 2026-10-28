@@ -57,6 +57,16 @@ pill.
 Granularity is page-level because Diagon Alley's thirteen tools ship in one
 chunk — a per-tool toggle would fetch the same file.
 
+**The shell's own lazy pieces are warmed on every arm, whatever the policy
+names** (PLAN-40). The Guide panel (the header's bulb) and its six texts are
+separate chunks, so a page warmed for offline use would otherwise open with a
+bulb whose panel cannot arrive. They belong to the header on every page that
+has a guide, not to a page an admin chooses, so there is no server target and
+no Heimdall switch for them: `SHELL_WARM_LOADERS` in `app/offlineWarmLoad.ts`
+runs beside the policy's targets, as one entry, so the pill counts it once and
+names a failure "Guide". With every policy target disabled, the pill reads
+*Ready offline · 1*: the Guide is still warmed.
+
 The registry is code-owned and lives on the server; only the *disabled* ids are
 stored (one comma-separated `settings` row). It has to travel as data because a
 loader cannot be serialised, so the ids are joined to the actual
@@ -144,7 +154,7 @@ setting in the `settings` table and survives restarts.
 |---|---|
 | `server/src/modules/offline-mode/module.ts` | the registry, both routes, the `offlineMode.settingsUpdated` emit and its SSE fan-out |
 | `client/src/core/offlineMode.ts` | config types, the public GET and admin PATCH, and the warm-load status shape |
-| `client/src/app/offlineWarmLoad.ts` | the `id → () => import(...)` map and `runWarmLoad` |
+| `client/src/app/offlineWarmLoad.ts` | the `id → () => import(...)` map, `SHELL_WARM_LOADERS` (the Guide), `runWarmLoad` and `runOfflineWarmLoad` |
 | `client/src/core/ui/OfflineModeToggle.tsx` | the switch and its status pill |
 | `client/src/app/App.tsx` | the route gate, the config fetch and SSE subscription, and the warm status |
 | `client/src/app/lazyPages.tsx` | every route's `lazy` page, rebuildable so a retry is a real second attempt |

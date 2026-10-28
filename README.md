@@ -278,7 +278,7 @@ Operating & deploying:
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 - [`docs/api.md`](docs/api.md) — the API docs (Swagger UI) at `http://127.0.0.1:4647/docs` on the server machine, and how to reach them from another one
 - [`docs/testing.md`](docs/testing.md) — every kind of test, where it lives and how to run it
-- [`docs/performance.md`](docs/performance.md) — the on-demand load harness: profiles, numbers, comparing two builds
+- [`docs/performance.md`](docs/performance.md) — the on-demand load harness (profiles, numbers, comparing two builds) and measuring page load with Lighthouse
 
 ## License
 

@@ -81,6 +81,66 @@ tools.example.com {
 
 No proxy on the machine? Uncomment the `ports:` line in `compose/standalone.yml` instead.
 
+### Behind a host nginx
+
+A VPS whose nginx runs on the host itself (not in Docker) reaches the container on a loopback port instead of a Docker network. Run the container on `127.0.0.1` only, so nothing but the host nginx can reach it:
+
+```bash
+docker build -f docker/standalone.Dockerfile -t bifrost-standalone:latest \
+  --build-arg STANDALONE_SITE_URL=https://tools.example.com .
+docker run -d --name bifrost-standalone --restart unless-stopped \
+  --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+  -p 127.0.0.1:8002:8080 bifrost-standalone:latest
+```
+
+Then a server block for the public hostname, and `certbot --nginx -d tools.example.com` to add HTTPS to it:
+
+```nginx
+server {
+    listen 80;
+    server_name tools.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8002;
+        # HTTP/1.1, or the container sends nothing compressed (below).
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Once certbot has added `listen 443 ssl;`, add `http2 on;` beside it (nginx 1.25.1 or later; older versions write `listen 443 ssl http2;`): the page loads about twenty files at once, and HTTP/2 fetches them over one connection.
+
+**Keep `proxy_http_version 1.1`.** The container's nginx compresses only HTTP/1.1 requests that carry no `Via` header (`gzip_http_version` and `gzip_proxied`, the defaults), and that holds for the prebuilt `.gz` files too. nginx's `proxy_pass` speaks HTTP/1.0 unless told otherwise and adds no `Via`, so the line above is all it needs. A proxy that adds `Via` gets the files uncompressed.
+
+### Compression
+
+The build writes a gzip (level 9) and a Brotli copy beside every text file (PLAN-40), and the container's nginx sends the `.gz` with `gzip_static`, so nothing is compressed per request and the files are as small as gzip gets: the entry chunk (306 KB) arrives as 96 KB, against 109 KB from on-the-fly gzip at nginx's default level 1 (82 KB with Brotli). nginx-unprivileged has no Brotli module, so the `.br` files are there for the hub's web host and for `./bifrost start --standalone`, which serve Brotli to a browser that accepts it. Check what arrives:
+
+```bash
+curl -sS -H 'Accept-Encoding: gzip' -o /dev/null -D - https://tools.example.com/ | grep -i content-encoding
+```
+
+### Behind Cloudflare
+
+With the hostname proxied through Cloudflare (the orange cloud), Cloudflare sits between visitors and your nginx, and changes what a Lighthouse report of the site shows.
+
+**What passes through unchanged:**
+
+- **The caching.** `/assets/` comes back `public, max-age=31536000, immutable` and is served from Cloudflare's cache on a repeat (`cf-cache-status: HIT`); the pages come back `no-cache` and are fetched from your server each time, so a new deploy shows on the next load.
+- **The compression.** Cloudflare passes a gzipped response from the origin straight to visitors, so the level-9 `.gz` files are exactly what visitors download. It re-compresses only an uncompressed response (with Brotli), which is why there is no Brotli at this edge: it would mean giving up compression whenever the site runs without Cloudflare, or a custom nginx build.
+
+**What it adds, each a switch in the Cloudflare dashboard and your call:**
+
+- **Bot Fight Mode / JavaScript Detections** (Security → Bots) injects a script into every page (`/cdn-cgi/challenge-platform/…/jsd/main.js`). It is behind all three deprecation warnings in a Lighthouse report's Best Practices (Shared Storage, `StorageType.persistent`, Protected Audience), a request Cloudflare caches for only four hours, and main-thread time on every load.
+- **Web Analytics** with automatic setup (Analytics & Logs → Web Analytics) adds Cloudflare's RUM beacon (`static.cloudflareinsights.com`): the report's legacy-JavaScript item and a second request on every load.
+
+**Keep Rocket Loader off** (Speed → Optimization). It rewrites the page's `<script>` tags to defer them, and this app's module scripts and modulepreloads are not tested under it.
+
+[docs/performance.md](performance.md#reading-a-report-of-the-public-site) says how to read a report of the site with those scripts in it.
+
 ### Settings are build arguments
 
 Everything the site starts from is **baked in when the image is built**: the editor size caps, Loki's run policy, the screensaver's defaults, and Heimdall's shortcut and tap count. Vite writes them into the JavaScript, so a runtime `environment:` or `docker run -e` arrives too late and changes nothing.
