@@ -6,6 +6,7 @@ vi.mock('../heimdallAccess', () => ({
 }));
 
 const { INSTANT_CLASS, themeEngine } = await import('.');
+const { BUNDLED_THEMES } = await import('./bundled');
 
 /**
  * PLAN-40: the theme a page settles on as it loads must not fade in. A first
@@ -64,5 +65,29 @@ describe('applying a theme', () => {
     expect(instantAtWrite.length).toBeGreaterThan(10);
     expect(instantAtWrite.every(Boolean)).toBe(true);
     await vi.waitFor(() => expect(root.classList.contains(INSTANT_CLASS)).toBe(false));
+  });
+
+  it('replays a cache an older build wrote as this build defines the theme', async () => {
+    // Codex review: a pre-PLAN-40 cache has no --accent-text, so replaying it
+    // as written showed the stylesheet's accent text until the household
+    // default settled, and that request has no timeout.
+    const tokyo = BUNDLED_THEMES.find((theme) => theme.id === 'tokyo')!;
+    const legacyTokens = { ...tokyo.tokens };
+    delete legacyTokens['--accent-text'];
+    localStorage.setItem(
+      'bifrost.theme.cache',
+      JSON.stringify({ id: 'tokyo', mode: 'dark', tokens: legacyTokens }),
+    );
+
+    themeEngine.init();
+
+    // Synchronously, before the household default answers.
+    expect(root.getAttribute('data-theme')).toBe('tokyo');
+    expect(root.style.getPropertyValue('--accent-text')).toBe(tokyo.tokens['--accent-text']);
+    const refreshed = JSON.parse(localStorage.getItem('bifrost.theme.cache')!) as {
+      tokens: Record<string, string>;
+    };
+    expect(refreshed.tokens['--accent-text']).toBe(tokyo.tokens['--accent-text']);
+    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe('daybreak'));
   });
 });

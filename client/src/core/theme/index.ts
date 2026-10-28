@@ -67,7 +67,13 @@ class ThemeEngine {
   init(): void {
     const cached = this.readCache();
     if (cached) {
-      this.apply(cached, { cache: false, fade: false });
+      // The cache is for index.html's replay, before any script has loaded.
+      // Here the bundled themes are at hand, so a cached theme is replayed as
+      // this build defines it, and the cache refreshed: one an older build
+      // wrote lacks newer tokens (PLAN-40's --accent-text), which would show
+      // the stylesheet's defaults until the household default settles.
+      const current = BUNDLED_THEMES.find((theme) => theme.id === cached.id);
+      this.apply(current ?? cached, { cache: current !== undefined, fade: false });
     }
     if (!__HUB__) {
       // No household on the standalone site: the device's own choice decides.
