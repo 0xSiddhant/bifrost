@@ -105,6 +105,15 @@ code,
   background: var(--accent-soft);
 }
 
+/* The theme a page settles on as it loads lands at once (core/theme,
+   PLAN-40); only a visitor's own pick fades. */
+.theme-instant,
+.theme-instant *,
+.theme-instant *::before,
+.theme-instant *::after {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

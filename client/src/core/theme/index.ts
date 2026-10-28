@@ -8,6 +8,8 @@ export type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 const CHOICE_KEY = 'bifrost.theme';
 /** Full token map of the applied theme; the index.html FOUC script replays it. */
 const CACHE_KEY = 'bifrost.theme.cache';
+/** On `<html>` while a theme is applied without fading (`base.css`). */
+export const INSTANT_CLASS = 'theme-instant';
 
 export interface ThemeEngineState {
   themes: ThemeSummary[];
@@ -65,7 +67,7 @@ class ThemeEngine {
   init(): void {
     const cached = this.readCache();
     if (cached) {
-      this.apply(cached, { cache: false });
+      this.apply(cached, { cache: false, fade: false });
     }
     if (!__HUB__) {
       // No household on the standalone site: the device's own choice decides.
@@ -86,7 +88,7 @@ class ThemeEngine {
   /** Explicit visitor pick from the switcher. */
   setTheme(id: string): void {
     writeStorage(CHOICE_KEY, id);
-    this.load(id);
+    this.load(id, { fade: true });
   }
 
   private reconcile(defaultId: string | null): void {
@@ -96,18 +98,26 @@ class ThemeEngine {
       themes: this.themes,
       prefersLight: window.matchMedia('(prefers-color-scheme: light)').matches,
     });
-    if (choice) this.load(choice);
+    if (choice) this.load(choice, { fade: false });
     else this.notify();
   }
 
-  private load(id: string): void {
+  private load(id: string, options: { fade: boolean }): void {
     const theme = BUNDLED_THEMES.find((candidate) => candidate.id === id);
-    if (theme) this.apply(theme, { cache: true });
+    if (theme) this.apply(theme, { cache: true, fade: options.fade });
     else this.notify();
   }
 
-  private apply(theme: ResolvedTheme, options: { cache: boolean }): void {
+  /**
+   * `fade` is for a visitor's own pick, which the page's colour transitions
+   * animate. Settling on the right theme while the page loads is a change
+   * nobody made, so it lands at once (PLAN-40): a first visit would otherwise
+   * fade from the stylesheet's defaults to its theme, and every one of those
+   * fading colours is an animation the compositor cannot run.
+   */
+  private apply(theme: ResolvedTheme, options: { cache: boolean; fade: boolean }): void {
     const root = document.documentElement;
+    if (!options.fade) root.classList.add(INSTANT_CLASS);
     // Clear what the previous theme set: a theme that omits an optional token
     // must fall back to the stylesheet default, not inherit its predecessor's.
     for (const key of this.appliedKeys) root.style.removeProperty(key);
@@ -116,6 +126,12 @@ class ThemeEngine {
     root.style.colorScheme = theme.mode;
     // data-theme keeps CSS attribute hooks and observers (QrCard) working.
     root.setAttribute('data-theme', theme.id);
+    if (!options.fade) {
+      // Style the new colours while transitions are off, then turn them back
+      // on: the values have already changed, so no transition starts.
+      void document.body?.offsetHeight;
+      root.classList.remove(INSTANT_CLASS);
+    }
     this.activeId = theme.id;
     if (options.cache) {
       writeStorage(
