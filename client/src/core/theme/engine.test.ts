@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 
 vi.mock('../heimdallAccess', () => ({
   fetchHeimdallAccess: () => Promise.resolve({ defaultThemeId: null }),
@@ -40,7 +41,7 @@ describe('applying a theme', () => {
 
   it('settles on the first-visit theme at once, then turns transitions back on', async () => {
     themeEngine.init();
-    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe('daybreak'));
+    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe(BUILT_IN_DEFAULT_THEME));
 
     expect(instantAtWrite.length).toBeGreaterThan(10);
     expect(instantAtWrite.every(Boolean)).toBe(true);
@@ -88,6 +89,6 @@ describe('applying a theme', () => {
       tokens: Record<string, string>;
     };
     expect(refreshed.tokens['--accent-text']).toBe(tokyo.tokens['--accent-text']);
-    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe('daybreak'));
+    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe(BUILT_IN_DEFAULT_THEME));
   });
 });

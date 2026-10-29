@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
+import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 import { BUNDLED_THEMES } from './bundled';
 import {
   accentTextBackdrops,
@@ -50,17 +51,22 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the bundled themes', () => {
-  it('are the seven built-ins, all of them bundled', () => {
+  it('are the eight built-ins, all of them bundled', () => {
     expect(files.sort()).toEqual([
       'aurora.json',
       'daybreak.json',
       'ghibli-dusk.json',
       'gryffindor.json',
+      'halloween.json',
       'olympus.json',
       'slytherin.json',
       'tokyo.json',
     ]);
     expect(BUNDLED_THEMES.map((theme) => `${theme.id}.json`).sort()).toEqual(files);
+  });
+
+  it('include the built-in default, so a first visit never silently falls through', () => {
+    expect(BUNDLED_THEMES.map((theme) => theme.id)).toContain(BUILT_IN_DEFAULT_THEME);
   });
 
   it.each(files)('%s matches the theme schema', (file) => {

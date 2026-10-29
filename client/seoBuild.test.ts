@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SEO_PAGES } from './src/core/seo';
 import { resolveThemeChoice } from './src/core/theme';
+import { BUILT_IN_DEFAULT_THEME } from './src/core/theme/builtInDefault';
 import { BUNDLED_THEMES } from './src/core/theme/bundled';
 import {
   firstPaintStyle,
@@ -153,16 +154,35 @@ describe('the first-visit theme', () => {
   });
 
   it('is the one the theme engine settles on for a first visit, in either colour scheme', () => {
-    for (const prefersLight of [true, false]) {
-      const runtime = resolveThemeChoice({ stored: null, defaultId: null, themes, prefersLight });
-      expect(firstVisitTheme(themes, prefersLight ? 'light' : 'dark')?.id).toBe(runtime);
+    for (const builtInId of [BUILT_IN_DEFAULT_THEME, null]) {
+      for (const prefersLight of [true, false]) {
+        const runtime = resolveThemeChoice({
+          stored: null,
+          defaultId: null,
+          builtInId,
+          themes,
+          prefersLight,
+        });
+        expect(firstVisitTheme(themes, prefersLight ? 'light' : 'dark', builtInId)?.id).toBe(
+          runtime,
+        );
+      }
     }
   });
 
-  it('paints from the first frame: dark by default, light where the device prefers it', () => {
+  it('paints the built-in default from the first frame, one rule for both schemes', () => {
     const style = firstPaintStyle(themes);
-    const dark = firstVisitTheme(themes, 'dark');
-    const light = firstVisitTheme(themes, 'light');
+    const theme = themes.find((candidate) => candidate.id === BUILT_IN_DEFAULT_THEME);
+    expect(theme).toBeDefined();
+    expect(style).toMatch(new RegExp(`^<style>html:root\\{color-scheme:${theme?.mode};`));
+    expect(style).toContain(`--bg:${theme?.tokens['--bg']}`);
+    expect(style).not.toContain('@media');
+  });
+
+  it('without a built-in default, paints dark by default and light where the device prefers it', () => {
+    const style = firstPaintStyle(themes, null);
+    const dark = firstVisitTheme(themes, 'dark', null);
+    const light = firstVisitTheme(themes, 'light', null);
     expect(style).toMatch(/^<style>html:root\{color-scheme:dark;/);
     expect(style).toContain(`--bg:${dark?.tokens['--bg']}`);
     expect(style).toContain(`@media (prefers-color-scheme: light){html:root{color-scheme:light;`);
