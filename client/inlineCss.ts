@@ -18,8 +18,16 @@
  *
  * The CSS file itself is then dropped from the build, after the bundle budget
  * has counted it: nothing should load it, and a chunk that did would apply the
- * shell's rules again after the page stylesheets and change their cascade, so
- * a file that names it fails the build.
+ * shell's rules again after the page stylesheets and change their cascade.
+ * Vite would list it, though: a lazy chunk that imports a module living in the
+ * entry chunk (the Markdown stack's, Mermaid's) gets the entry's stylesheet in
+ * its preload list, from the entry's `viteMetadata.importedCss`. With the
+ * stylesheet a `<link>` the preload helper skipped it as already loaded; inline,
+ * it would fetch it, get a 404 and fail the import. So the file leaves every
+ * chunk's `importedCss` before Vite writes those lists (its import analysis
+ * runs after this plugin's `generateBundle`; `resolveDependencies` can't help,
+ * as it is never shown CSS), and the written output is checked: a file that
+ * still names it fails the build.
  */
 import type { Plugin } from 'vite';
 
@@ -81,7 +89,12 @@ export function inlineStylesheets(
 /** The parts of Vite's output this reads. */
 export type InlineBundle = Record<
   string,
-  | { type: 'chunk'; fileName: string; code: string }
+  | {
+      type: 'chunk';
+      fileName: string;
+      code: string;
+      viteMetadata?: { importedCss: Set<string> };
+    }
   | { type: 'asset'; fileName: string; source: string | Uint8Array }
 >;
 
@@ -125,22 +138,30 @@ export function inlineCssPlugin(): Plugin {
       },
     },
     generateBundle(_options, bundle) {
+      const outputs = bundle as unknown as InlineBundle;
+      let bytes = 0;
+      for (const file of inlined) {
+        const output = outputs[file];
+        if (output?.type === 'asset') bytes += String(output.source).length;
+        delete outputs[file];
+        // Out of every preload list Vite is about to write (see the top of the file).
+        for (const chunk of Object.values(outputs)) {
+          if (chunk.type === 'chunk') chunk.viteMetadata?.importedCss.delete(file);
+        }
+      }
+      if (inlined.size > 0) {
+        this.info(`inline css: ${(bytes / 1024).toFixed(1)} KB of shell styles inline in the HTML`);
+      }
+    },
+    writeBundle(_options, bundle) {
       const files = [...inlined];
       const naming = filesNaming(bundle as unknown as InlineBundle, files);
       if (naming.length > 0) {
         this.error(
           `inline css: ${naming.join(', ')} still name ${files.join(', ')}, which is inlined ` +
-            'into the HTML and not emitted. Loading it again would re-apply the shell after the page stylesheets',
+            'into the HTML and not emitted: a lazy import would fetch a missing file, or ' +
+            're-apply the shell after the page stylesheets',
         );
-      }
-      let bytes = 0;
-      for (const file of files) {
-        const output = bundle[file];
-        if (output?.type === 'asset') bytes += String(output.source).length;
-        delete bundle[file];
-      }
-      if (files.length > 0) {
-        this.info(`inline css: ${(bytes / 1024).toFixed(1)} KB of shell styles inline in the HTML`);
       }
     },
   };

@@ -83,10 +83,19 @@ describe('the shell stylesheet, inline (PLAN-41)', () => {
 describe('the inline CSS plugin', () => {
   type Hook = (this: unknown, ...args: unknown[]) => unknown;
 
+  function chunk(fileName: string, code: string, css: string[] = []) {
+    return { type: 'chunk', fileName, code, viteMetadata: { importedCss: new Set(css) } } as const;
+  }
+
   function run(bundleExtra: InlineBundle = {}) {
     const plugin = inlineCssPlugin();
     const css = { type: 'asset', fileName: 'assets/index-c3.css', source: CSS } as const;
-    const bundle: InlineBundle = { 'assets/index-c3.css': css, ...bundleExtra };
+    const bundle: InlineBundle = {
+      'assets/index-c3.css': css,
+      // The entry, whose stylesheet Vite would otherwise hand to every lazy chunk that imports it.
+      'assets/index-a1.js': chunk('assets/index-a1.js', 'run()', ['assets/index-c3.css']),
+      ...bundleExtra,
+    };
     (plugin.configResolved as Hook).call({}, { base: '/' });
     const transform = plugin.transformIndexHtml as { handler: Hook };
     const html = transform.handler.call({}, HTML, { bundle }) as string;
@@ -97,27 +106,37 @@ describe('the inline CSS plugin', () => {
       info: vi.fn(),
     };
     const generate = () => (plugin.generateBundle as Hook).call(ctx, {}, bundle);
-    return { html, bundle, ctx, generate };
+    const write = () => (plugin.writeBundle as Hook).call(ctx, {}, bundle);
+    return { html, bundle, ctx, generate, write };
   }
 
-  it('inlines the stylesheet, then drops the file from the build', () => {
-    const { html, bundle, ctx, generate } = run();
+  it('inlines the stylesheet, then drops the file and every preload of it', () => {
+    const { html, bundle, ctx, generate, write } = run({
+      'assets/Page-e5.js': chunk('assets/Page-e5.js', 'page()', ['assets/Page-e5.css']),
+    });
     expect(html).toContain(`<style>${CSS}</style>`);
     generate();
     expect(bundle['assets/index-c3.css']).toBeUndefined();
+    const importedCss = (file: string) => {
+      const output = bundle[file];
+      return output?.type === 'chunk' ? [...(output.viteMetadata?.importedCss ?? [])] : null;
+    };
+    // Vite builds each lazy import's preload list from these sets, after this hook.
+    expect(importedCss('assets/index-a1.js')).toEqual([]);
+    expect(importedCss('assets/Page-e5.js')).toEqual(['assets/Page-e5.css']);
     expect(ctx.info).toHaveBeenCalledWith(expect.stringMatching(/KB of shell styles inline/));
+    expect(write).not.toThrow();
   });
 
-  it('fails the build when a chunk would still load the dropped file', () => {
-    const { bundle, generate } = run({
-      'assets/Page-e5.js': {
-        type: 'chunk',
-        fileName: 'assets/Page-e5.js',
-        code: 'preload(["assets/index-c3.css"])',
-      },
+  it('fails the build when a written chunk still names the dropped file', () => {
+    const { generate, write } = run({
+      'assets/markdown-e5.js': chunk(
+        'assets/markdown-e5.js',
+        'm.f=["assets/mermaid-f6.js","assets/index-c3.css"]',
+      ),
     });
-    expect(generate).toThrow(/assets\/Page-e5\.js still name assets\/index-c3\.css/);
-    expect(bundle['assets/index-c3.css']).toBeDefined();
+    generate();
+    expect(write).toThrow(/assets\/markdown-e5\.js still name assets\/index-c3\.css/);
   });
 
   it('does nothing on the dev server, which has no bundle', () => {
