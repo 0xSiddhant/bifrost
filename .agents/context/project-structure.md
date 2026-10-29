@@ -86,7 +86,7 @@ bifrost/
 │       │                      #   offlineWarmLoad.ts (PLAN-22 — the id → import() loader map; it
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
-│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
+│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween)
 │       │                      #   + themes/*.json (bundled at build time, PLAN-35)
 │       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
 │       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
