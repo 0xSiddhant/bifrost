@@ -89,7 +89,8 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 1. The visitor's own switcher choice (cached per device).
 2. The household default (hub build only): Heimdall's "Default theme" (`themes.default` in settings, PLAN-05), which every device reads from `GET /api/v1/heimdall/access` (`defaultThemeId`). The standalone site has no household, so it skips this step.
-3. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak out of the box).
+3. The built-in default, `BUILT_IN_DEFAULT_THEME` in `client/src/core/theme/builtInDefault.ts` (Halloween), whatever the device's colour scheme. The build paints it from the first frame too (`client/seoBuild.ts`), so the two cannot disagree. Set it to `null` to hand first visits back to the next step.
+4. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak).
 
 An unknown id at any step (a deleted theme someone still has chosen, say) simply falls through to the next.
 

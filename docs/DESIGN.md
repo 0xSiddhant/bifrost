@@ -17,10 +17,16 @@ declared in `core/fonts.css` with `font-display: swap` and system fallbacks.
 
 ## Themes
 
-Seven themes ship built in; users add more as JSON — see
+Eight themes ship built in; users add more as JSON — see
 [THEME-SPEC.md](THEME-SPEC.md) for the schema and resolver.
 
-- **Aurora** (default, dark) — near-black blue-slate, aurora accents
+- **Halloween** (default, dark) — near-black aubergine base, bone text,
+  pumpkin `--accent`, witch-violet `--accent-2`, potion-green `--ok`. Its sky
+  paints a harvest-moon disc, a violet glow and a low graveyard mist; the
+  bridge runs candy-corn into witchlight; the idle screensaver floats embers
+  and green will-o'-the-wisps. The default for every first visit, whatever
+  the device's colour scheme (`core/theme/builtInDefault.ts`).
+- **Aurora** (dark) — near-black blue-slate, aurora accents
   (teal `--accent`, violet `--accent-2`, green `--ok`) used sparingly.
 - **Daybreak** (light) — warm paper background, same hues desaturated.
 - **Ghibli Dusk** (dark) — Studio-Ghibli twilight: twilight-blue base,
@@ -71,8 +77,8 @@ progress fills, the wordmark, hero accents, and primary-action gradients.
 Every page sits under `.sky`: layered aurora glows (`--sky`), a slow drifting
 aurora ribbon, and a faint starfield (dark theme only, via `--stars-alpha`).
 
-**Relics** are the fun layer: 6–9 random line-art artifacts scattered through
-the sky, re-shuffled on every route change and reload. Four collections live
+**Relics** are the fun layer: 10–14 random line-art artifacts scattered through
+the sky, re-shuffled on every route change and reload. Five collections live
 in `client/src/assets/relics/` (shared primitives in `shared.tsx`, each
 collection registered in `index.ts`):
 
@@ -82,6 +88,7 @@ collection registered in `index.ts`):
 | Wizarding world (`potter.tsx`) | 21 | snitch, hallows, floating candle, platform 9¾… |
 | Olympus (`greek.tsx`) | 20 | trident, lyre, laurel, labyrinth, owl, Ω Δ Ψ… |
 | Ghibli world (`ghibli.tsx`) | 19 | soot sprites, forest spirit, 森 風 火 kanji… |
+| Halloween (`halloween.tsx`) | 35 | jack-o'-lantern, ghost, bat, witch's hat, vampire, cemetery gate, BOO… |
 
 Heimdall → **Sky relics** lets the owner enable/disable collections per
 device (default: all). It's a client-side visual preference (localStorage via

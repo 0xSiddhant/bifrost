@@ -1,4 +1,5 @@
 import { fetchHeimdallAccess } from '../heimdallAccess';
+import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 import { BUNDLED_THEMES } from './bundled';
 import type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 
@@ -18,19 +19,22 @@ export interface ThemeEngineState {
 
 /**
  * PLAN-04 resolution order, pure for testability:
- * visitor choice → the household default (hub only) → prefers-color-scheme
- * match → first available. An unknown id at any step simply falls through.
+ * visitor choice → the household default (hub only) → the built-in default
+ * (`BUILT_IN_DEFAULT_THEME`) → prefers-color-scheme match → first available.
+ * An unknown id at any step simply falls through.
  */
 export function resolveThemeChoice(input: {
   stored: string | null;
   defaultId: string | null;
+  builtInId: string | null;
   themes: Pick<ThemeSummary, 'id' | 'mode'>[];
   prefersLight: boolean;
 }): string | null {
-  const { stored, defaultId, themes, prefersLight } = input;
+  const { stored, defaultId, builtInId, themes, prefersLight } = input;
   const has = (id: string | null) => themes.some((theme) => theme.id === id);
   if (stored && has(stored)) return stored;
   if (defaultId && has(defaultId)) return defaultId;
+  if (builtInId && has(builtInId)) return builtInId;
   const wanted: ThemeMode = prefersLight ? 'light' : 'dark';
   return themes.find((theme) => theme.mode === wanted)?.id ?? themes[0]?.id ?? null;
 }
@@ -80,6 +84,11 @@ class ThemeEngine {
       this.reconcile(null);
       return;
     }
+    // A first visit has no cached theme to replay, and the household default
+    // request has no timeout: settle now on everything but that default (the
+    // built-in one, usually), rather than show the stylesheet's defaults until
+    // it answers. The household default still replaces it when it arrives.
+    if (!cached) this.reconcile(null);
     fetchHeimdallAccess()
       .then((access) => this.reconcile(access.defaultThemeId))
       .catch(() => {
@@ -101,6 +110,7 @@ class ThemeEngine {
     const choice = resolveThemeChoice({
       stored: readStorage(CHOICE_KEY),
       defaultId,
+      builtInId: BUILT_IN_DEFAULT_THEME,
       themes: this.themes,
       prefersLight: window.matchMedia('(prefers-color-scheme: light)').matches,
     });

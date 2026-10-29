@@ -18,6 +18,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
 import { SEO_PAGES, SITE_NAME, type SeoPage } from './src/core/seo';
+import { BUILT_IN_DEFAULT_THEME } from './src/core/theme/builtInDefault';
 import {
   resolveTheme,
   type ResolvedTheme,
@@ -78,13 +79,19 @@ export function readBundledThemes(
 /**
  * The theme a first visit to the standalone site settles on. With no stored
  * choice and no household default, `resolveThemeChoice` (core/theme) takes
- * the first theme of the device's colour scheme, so the build can know it.
+ * the built-in default, else the first theme of the device's colour scheme,
+ * so the build can know it.
  */
 export function firstVisitTheme(
   themes: readonly ResolvedTheme[],
   mode: ThemeMode,
+  builtInId: string | null = BUILT_IN_DEFAULT_THEME,
 ): ResolvedTheme | undefined {
-  return themes.find((theme) => theme.mode === mode) ?? themes[0];
+  return (
+    themes.find((theme) => theme.id === builtInId) ??
+    themes.find((theme) => theme.mode === mode) ??
+    themes[0]
+  );
 }
 
 /**
@@ -93,9 +100,13 @@ export function firstVisitTheme(
  * theme engine runs, a dark flash on every light-preferring device's first
  * visit, now with the prerendered summary in it. `html:root` outranks
  * tokens.css's `:root`; a returning visitor's cached theme is set as an
- * inline style by index.html's script, which outranks both.
+ * inline style by index.html's script, which outranks both. When both schemes
+ * land on the same theme (the built-in default), one rule paints them.
  */
-export function firstPaintStyle(themes: readonly ResolvedTheme[]): string {
+export function firstPaintStyle(
+  themes: readonly ResolvedTheme[],
+  builtInId: string | null = BUILT_IN_DEFAULT_THEME,
+): string {
   const rule = (theme: ResolvedTheme | undefined): string => {
     if (!theme) return '';
     const declarations = Object.entries(theme.tokens).map(([key, value]) => {
@@ -104,9 +115,11 @@ export function firstPaintStyle(themes: readonly ResolvedTheme[]): string {
     });
     return `html:root{color-scheme:${theme.mode};${declarations.join(';')}}`;
   };
-  const light = rule(firstVisitTheme(themes, 'light'));
+  const darkTheme = firstVisitTheme(themes, 'dark', builtInId);
+  const lightTheme = firstVisitTheme(themes, 'light', builtInId);
+  const light = lightTheme?.id === darkTheme?.id ? '' : rule(lightTheme);
   return (
-    `<style>${rule(firstVisitTheme(themes, 'dark'))}` +
+    `<style>${rule(darkTheme)}` +
     `${light ? `@media (prefers-color-scheme: light){${light}}` : ''}</style>`
   );
 }

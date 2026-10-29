@@ -187,7 +187,7 @@ test.describe('standalone shell', () => {
     }
   });
 
-  test("a first visit paints its device's theme before any script runs", async ({
+  test('a first visit paints the built-in default theme before any script runs', async ({
     browser,
     site,
   }) => {
@@ -197,10 +197,11 @@ test.describe('standalone shell', () => {
           fs.readFileSync(fromRepoRoot('client', 'src', 'assets', 'themes', `${id}.json`), 'utf8'),
         ) as { tokens: Record<string, string> }
       ).tokens['--bg'];
-    // The first light and first dark theme by name, as the theme engine picks them.
+    // BUILT_IN_DEFAULT_THEME (client/src/core/theme/builtInDefault.ts) wins over
+    // the device's colour scheme, as the theme engine picks it.
     for (const [colorScheme, theme] of [
-      ['light', 'daybreak'],
-      ['dark', 'aurora'],
+      ['light', 'halloween'],
+      ['dark', 'halloween'],
     ] as const) {
       const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
       const page = await context.newPage();
