@@ -73,7 +73,8 @@ bifrost/
 ├── client/
 │   ├── buildDefaults.ts       # the .env values a client build bakes in (PLAN-35)
 │   ├── seoBuild.ts            # standalone only: a page per public tool, 404.html, robots.txt,
-│   │                          #   sitemap.xml (the list: src/core/seo.ts)
+│   │                          #   sitemap.xml (the list: src/core/seo.ts), and the first-visit theme
+│   │                          #   inlined for the no-JS first paint (core/theme/builtInDefault.ts)
 │   ├── precompress.ts         # both builds (PLAN-40): .br + .gz beside every text file, at closeBundle
 │   ├── bundleBudget.ts        # both builds (PLAN-40): the first load (entry + static imports + CSS)
 │   │                          #   may hold no heavy library and stays under a gzipped budget
@@ -95,11 +96,14 @@ bifrost/
 │       │                      #   browser→server logger; a no-op sink standalone),
 │       │                      #   notify/ (global notification stack: store + host +
 │       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
-│       │                      #   theme engine, device registry, tokens,
+│       │                      #   theme/ (the engine, resolve + schema, color.ts's contrast checks and
+│       │                      #     backdrop inventory (PLAN-40), bundled.ts, builtInDefault.ts — the
+│       │                      #     first-visit default the engine and seoBuild.ts share), device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
 │       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
-│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor (one `mode`
+│       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
+│       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
