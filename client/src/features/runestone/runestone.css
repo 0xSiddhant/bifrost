@@ -1,0 +1,17 @@
+/* Runestone (PLAN-07). Imported by its page, so it loads with that chunk
+   instead of with every page (PLAN-41). Tokens only — no literal colours, per
+   rules/coding.md. */
+
+.rune-status__path {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.rune-status__path:hover {
+  color: var(--accent-text);
+}

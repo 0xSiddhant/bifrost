@@ -4,6 +4,7 @@ import { Button } from '../../core/ui/Button';
 import { renderMarkdown, outline } from '../../core/markdown';
 import { fetchEdda, type EddaDoc } from '../../core/edda';
 import { MarkdownPreview } from '../../core/ui/MarkdownPreview';
+import './edda.css';
 
 type Phase = 'loading' | 'ready' | 'notfound' | 'error';
 

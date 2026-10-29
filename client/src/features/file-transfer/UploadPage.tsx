@@ -21,6 +21,7 @@ import {
 } from './api';
 import { useDownloads } from './useDownloads';
 import { RenameUploadModal } from './RenameUploadModal';
+import './file-transfer.css';
 
 /**
  * Staging states (PLAN-17b) continue where the transfer states stop:

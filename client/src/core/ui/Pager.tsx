@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { pageWindow } from '../library/paging';
 import { useMediaQuery } from '../useMediaQuery';
 import { ChevronLeftIcon, ChevronRightIcon } from './icons';
+import './pager.css';
 
 /**
  * When the pager floats (PLAN-31): iPad-portrait width and up — the owner's

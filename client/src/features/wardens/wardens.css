@@ -1,0 +1,25 @@
+/* Wardens, the device list (PLAN-06). Imported by its page, so it loads with
+   that chunk instead of with every page (PLAN-41). Tokens only — no literal
+   colours, per rules/coding.md. */
+
+@media (max-width: 640px) {
+  .device-row__rename {
+    width: 100%;
+  }
+  .device-row__rename .field__input {
+    max-width: none;
+    flex: 1;
+  }
+}
+
+.device-row__rename {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex: none;
+}
+.device-row__rename .field__input {
+  max-width: 12rem;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}

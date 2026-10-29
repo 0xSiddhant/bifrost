@@ -7,6 +7,7 @@ import { EmptyState } from '../../core/ui/EmptyState';
 import { MonitorIcon } from '../../core/ui/icons';
 import { renameDevice, type PresenceDevice } from './api';
 import { usePresence } from './usePresence';
+import './wardens.css';
 
 function DeviceRow({
   device,

@@ -1,0 +1,42 @@
+/* Groot (PLAN-19). Imported by its page, so it loads with that chunk instead
+   of with every page (PLAN-41). Tokens only — no literal colours, per
+   rules/coding.md. */
+
+/* ── Groot (PLAN-19) — YAML workspace ────────────────────────────────────────
+   Reuses the rune-* editor chrome (the Edda precedent: two editors that do the
+   same job should not drift apart in CSS). These are the parts YAML has and
+   JSON does not — a stream of documents, and a rail of advisories. */
+/* The convert group says what a JSON conversion costs before it is clicked,
+   because after the click the comments are already gone from the output. */
+.groot-convert__note {
+  align-self: center;
+  white-space: nowrap;
+}
+/* Document switcher for a `---` separated stream. */
+.groot-docs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+.groot-docs__tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 2px var(--space-3);
+  cursor: pointer;
+}
+.groot-docs__tab:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.groot-docs__tab.is-active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
