@@ -32,7 +32,7 @@ function seed(): Placement[] {
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const count = Math.min(6 + Math.floor(Math.random() * 4), relics.length); // 6–9
+  const count = Math.min(10 + Math.floor(Math.random() * 5), relics.length); // 10–14
   const placements: Placement[] = [];
   const usedIndexes = new Set<number>();
 
