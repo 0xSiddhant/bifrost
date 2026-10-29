@@ -2,9 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 
-vi.mock('../heimdallAccess', () => ({
-  fetchHeimdallAccess: () => Promise.resolve({ defaultThemeId: null }),
+const { fetchHeimdallAccess } = vi.hoisted(() => ({
+  fetchHeimdallAccess: vi.fn(() => Promise.resolve({ defaultThemeId: null as string | null })),
 }));
+vi.mock('../heimdallAccess', () => ({ fetchHeimdallAccess }));
 
 const { INSTANT_CLASS, themeEngine } = await import('.');
 const { BUNDLED_THEMES } = await import('./bundled');
@@ -46,6 +47,20 @@ describe('applying a theme', () => {
     expect(instantAtWrite.length).toBeGreaterThan(10);
     expect(instantAtWrite.every(Boolean)).toBe(true);
     expect(root.classList.contains(INSTANT_CLASS)).toBe(false);
+  });
+
+  it("paints the built-in default while the hub's household default is still on its way", async () => {
+    // Codex review: a first visit to the hub has no cached theme, so waiting
+    // for the household default showed the stylesheet's Aurora, then switched.
+    let answer: (access: { defaultThemeId: string | null }) => void = () => {};
+    fetchHeimdallAccess.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)));
+    root.removeAttribute('data-theme');
+
+    themeEngine.init();
+
+    expect(root.getAttribute('data-theme')).toBe(BUILT_IN_DEFAULT_THEME);
+    answer({ defaultThemeId: 'tokyo' });
+    await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe('tokyo'));
   });
 
   it("fades a visitor's own pick", () => {

@@ -84,6 +84,11 @@ class ThemeEngine {
       this.reconcile(null);
       return;
     }
+    // A first visit has no cached theme to replay, and the household default
+    // request has no timeout: settle now on everything but that default (the
+    // built-in one, usually), rather than show the stylesheet's defaults until
+    // it answers. The household default still replaces it when it arrives.
+    if (!cached) this.reconcile(null);
     fetchHeimdallAccess()
       .then((access) => this.reconcile(access.defaultThemeId))
       .catch(() => {
