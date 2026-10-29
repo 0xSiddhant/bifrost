@@ -1,6 +1,38 @@
 # Changelog
 
 
+## v2.1.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v2.0.0...v2.1.0)
+
+### 🚀 Enhancements
+
+- **toolbox:** Offer base64 that decodes to binary as a download ([#106](https://github.com/0xSiddhant/bifrost/pull/106))
+- **plan-40:** Load performance — compressed, cached, lean first load ([#108](https://github.com/0xSiddhant/bifrost/pull/108))
+- **themes:** Halloween world — default theme, 35 sky relics, 10–14 relics per page ([#110](https://github.com/0xSiddhant/bifrost/pull/110))
+
+### 🩹 Fixes
+
+- **client:** Show the standalone crawler summary only without javascript ([#105](https://github.com/0xSiddhant/bifrost/pull/105))
+
+### 💅 Refactors
+
+- **client:** Route every client download through one save module ([#107](https://github.com/0xSiddhant/bifrost/pull/107))
+
+### 📖 Documentation
+
+- **docs:** Add plan-40 for load performance ([#103](https://github.com/0xSiddhant/bifrost/pull/103))
+- **docs:** Sync agent context for the next release ([#111](https://github.com/0xSiddhant/bifrost/pull/111))
+
+### 🤖 CI
+
+- **ci:** Stop re-testing main on push, time out stalled browser jobs ([#104](https://github.com/0xSiddhant/bifrost/pull/104))
+
+### ❤️ Contributors
+
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Siddhant Kumar <contactsiddhant2155@gmail.com>
+
 ## v2.0.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v1.4.0...v2.0.0)

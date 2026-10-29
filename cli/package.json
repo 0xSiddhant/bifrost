@@ -1,6 +1,6 @@
 {
   "name": "bifrost-cli",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Command-line client for a Bifrost LAN hub — push, pull, clipboard, documents, go-links, speed test",
   "license": "MIT",

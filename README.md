@@ -185,7 +185,7 @@ Install it from the latest release:
 <!-- CLI_INSTALL_START -->
 
 ```bash
-npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v2.0.0/bifrost-cli-2.0.0.tgz
+npm install -g https://github.com/0xSiddhant/bifrost/releases/download/v2.1.0/bifrost-cli-2.1.0.tgz
 ```
 
 <!-- CLI_INSTALL_END -->
