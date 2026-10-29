@@ -57,7 +57,7 @@ p {
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -105,6 +105,15 @@ code,
   background: var(--accent-soft);
 }
 
+/* The theme a page settles on as it loads lands at once (core/theme,
+   PLAN-40); only a visitor's own pick fades. */
+.theme-instant,
+.theme-instant *,
+.theme-instant *::before,
+.theme-instant *::after {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -116,8 +125,14 @@ code,
 }
 
 /* The standalone site's prerendered summary (client/seoBuild.ts): what a
-   crawler reads as the page, on screen only until React's first render
-   replaces it. */
+   crawler reads as the page. React's first render replaces it, but the CSS
+   arrives before the app's script, so a browser that runs JavaScript would
+   flash it until then; index.html's inline script marks those, and only a
+   page without JavaScript shows it. */
+:root.js .seo-static {
+  display: none;
+}
+
 .seo-static {
   max-width: 62rem;
   margin: 0 auto;
@@ -135,5 +150,5 @@ code,
 }
 
 .seo-static a {
-  color: var(--accent);
+  color: var(--accent-text);
 }

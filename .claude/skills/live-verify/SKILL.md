@@ -18,6 +18,12 @@ Tests passing is not "live-verified". This is the procedure behind the "live-ver
 4. Interaction (clicks, SSE, forms, multi-device): launch Chromium with `--remote-debugging-port` + a scratch `--user-data-dir`, and drive CDP from a throwaway `tsx` script in the scratchpad (`Page.navigate`, `Runtime.evaluate`, `Page.captureScreenshot`). Simulate two devices with two browser targets using different `?deviceId`s / user-data-dirs.
 5. Default matrix unless the change is provably narrower: desktop 1280×900 **and** mobile 390×844; both themes if the change touches styling or tokens (the theme engine caches in localStorage — set it before navigation, or click the top-right switcher via CDP).
 
+## Page load and contrast (optional, for UI or performance changes)
+
+- Run the full `npm run build` first, not only the client build: the hub's pages come from the built web host (`web/dist`), so a client-only build measures the old serving code (PLAN-40 lost a Lighthouse run to exactly this).
+- Run Lighthouse as `docs/performance.md` ("Page load") says: a clean profile, the mobile preset, the median of three, one version for the before and its after.
+- Run axe-core's `color-contrast` (Lighthouse's own rule) in all eight themes, at 1280 and 390–412 px: headless Lighthouse only ever sees the built-in default (`core/theme/builtInDefault.ts`, Halloween since 2026-10-29). Pick a theme by setting `bifrost.theme` in `localStorage` before navigation.
+
 ## CLI changes have no browser (PLAN-27)
 
 A change in `cli/` is live-verified against the **globally installed** `bifrost`

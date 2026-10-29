@@ -6,7 +6,7 @@ import Fastify, { LogController, type FastifyInstance, type FastifyReply } from 
 import fastifyStatic from '@fastify/static';
 import httpProxy from '@fastify/http-proxy';
 import type { Logger } from './logger.js';
-import { resolveStandalone, SECURITY_HEADERS } from './standalone-rules.js';
+import { resolveStandalone, ruleFor, SECURITY_HEADERS } from './standalone-rules.js';
 
 /**
  * The hub's web host (PLAN-36): one small Fastify app in front of the API.
@@ -57,6 +57,13 @@ export const GO_CLOSED_PAGE = `<!doctype html>
 <body><main><h1>The Bifröst is closed</h1>
 <p>This needs your Bifrost hub, and the bridge to it isn't open from here. Try again in a moment.</p></main></body></html>
 `;
+
+/**
+ * The hub's cache headers are the standalone nginx's (PLAN-35), from the same
+ * rules: a hashed asset is cached forever, everything else revalidated.
+ */
+const ASSET_CACHE = ruleFor('/assets/').cacheControl;
+const PAGE_CACHE = ruleFor('/').cacheControl;
 
 function hostForUrl(host: string): string {
   return host.includes(':') ? `[${host}]` : host;
@@ -220,12 +227,33 @@ export async function buildWebHost(options: WebHostOptions): Promise<FastifyInst
   }
 
   if (fs.existsSync(path.join(options.clientDir, 'index.html'))) {
-    await app.register(fastifyStatic, { root: options.clientDir });
+    const assetsDir = path.join(path.resolve(options.clientDir), 'assets') + path.sep;
+    await app.register(fastifyStatic, {
+      root: options.clientDir,
+      // The build writes a .br and a .gz beside every text file (PLAN-40,
+      // client/precompress.ts): the best one the browser accepts is sent,
+      // with Vary, and nothing is compressed per request.
+      preCompressed: true,
+      // A hashed asset's name changes whenever its content does, so it is
+      // cached forever; everything else (the shell, the manifest, the icons)
+      // is revalidated, so a new build shows up on the next load.
+      cacheControl: false,
+      setHeaders: (reply, filePath) => {
+        reply.header('cache-control', filePath.startsWith(assetsDir) ? ASSET_CACHE : PAGE_CACHE);
+      },
+    });
     // SPA fallback: unknown GETs get index.html so client routes deep-link.
     app.setNotFoundHandler((request, reply) => {
-      if (request.method === 'GET' || request.method === 'HEAD')
+      // A missing chunk is a 404, never the shell: HTML under a script's name
+      // fails as a confusing MIME error, where a 404 reaches the app's own
+      // "reload to update" handling (nginx's `try_files $uri =404`).
+      const asset = new URL(request.url, 'http://x').pathname.startsWith('/assets/');
+      if ((request.method === 'GET' || request.method === 'HEAD') && !asset)
         return reply.sendFile('index.html');
-      return reply.code(404).send({ error: 'NOT_FOUND', message: 'route not found' });
+      return reply
+        .code(404)
+        .header('cache-control', PAGE_CACHE)
+        .send({ error: 'NOT_FOUND', message: 'route not found' });
     });
   }
 
@@ -261,7 +289,9 @@ export function relayBody(source: Readable): PassThrough {
 }
 
 async function registerStandalone(app: FastifyInstance, clientDir: string): Promise<void> {
-  await app.register(fastifyStatic, { root: clientDir, serve: false });
+  // The cache headers come from the nginx rules below; the encoding from the
+  // .br and .gz the build wrote (PLAN-40), as nginx's gzip_static does.
+  await app.register(fastifyStatic, { root: clientDir, serve: false, preCompressed: true });
   app.addHook('onSend', async (_request, reply) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) reply.header(name, value);
   });

@@ -15,6 +15,43 @@ test.describe('shell', () => {
     await waitForLive(page);
   });
 
+  // PLAN-40: the sky and the bridge strip run for as long as a tab is open, so
+  // they may animate only what the compositor moves without layout or paint.
+  test('every animation on the home page runs on the compositor', routes('/'), async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.relic').first()).toBeAttached();
+    const animations = await page.evaluate(() =>
+      document
+        .getAnimations()
+        // Named CSS animations: a transition is a moment, not a loop.
+        .filter((animation) => animation instanceof CSSAnimation)
+        .map((animation) => ({
+          name: (animation as CSSAnimation).animationName,
+          properties: [
+            ...new Set(
+              (animation.effect as KeyframeEffect)
+                .getKeyframes()
+                .flatMap((frame) =>
+                  Object.keys(frame).filter(
+                    (key) => !['offset', 'computedOffset', 'easing', 'composite'].includes(key),
+                  ),
+                ),
+            ),
+          ],
+        })),
+    );
+    const names = new Set(animations.map((animation) => animation.name));
+    expect([...names].sort()).toEqual(['aurora-drift', 'bridge-flow', 'relic-float']);
+    for (const { name, properties } of animations) {
+      expect(properties.length, name).toBeGreaterThan(0);
+      for (const property of properties) {
+        expect(['transform', 'translate', 'opacity'], `${name} animates ${property}`).toContain(
+          property,
+        );
+      }
+    }
+  });
+
   test(
     'the nav reaches every hub, each listing its tools',
     routes('/ollivanders', '/diagon-alley'),

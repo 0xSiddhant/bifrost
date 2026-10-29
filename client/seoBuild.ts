@@ -1,14 +1,16 @@
 /**
  * The standalone site's search-engine files, written at build time: a real
  * HTML file per public page (its own title, description, canonical link,
- * preview tags, structured data and a short visible summary with links),
+ * preview tags, structured data and a short summary with links),
  * plus `404.html`, `robots.txt` and `sitemap.xml`. The site stays static
  * files and nothing else; nginx serves `<path>/index.html` for each page and
  * `404.html`, with a 404 status, for everything that is not one
  * (docker/nginx-standalone.conf).
  *
- * The summary sits inside `#root`, so a crawler reads it as the page, and
- * React's first render replaces it. Every file also paints the theme a first
+ * The summary sits inside `#root`, so a crawler reads it as the page. It is
+ * shown only without JavaScript: index.html's inline script marks a page whose
+ * scripts run, and base.css hides the summary there, so a visitor never sees
+ * it before React's first render replaces it. Every file also paints the theme a first
  * visit gets from its first frame (`firstPaintStyle`). Runs in Node, from
  * `vite.config.ts`, for the standalone build only: the hub is a LAN app and
  * stays unindexed.
@@ -16,6 +18,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import type { Plugin } from 'vite';
 import { SEO_PAGES, SITE_NAME, type SeoPage } from './src/core/seo';
+import { BUILT_IN_DEFAULT_THEME } from './src/core/theme/builtInDefault';
 import {
   resolveTheme,
   type ResolvedTheme,
@@ -76,13 +79,19 @@ export function readBundledThemes(
 /**
  * The theme a first visit to the standalone site settles on. With no stored
  * choice and no household default, `resolveThemeChoice` (core/theme) takes
- * the first theme of the device's colour scheme, so the build can know it.
+ * the built-in default, else the first theme of the device's colour scheme,
+ * so the build can know it.
  */
 export function firstVisitTheme(
   themes: readonly ResolvedTheme[],
   mode: ThemeMode,
+  builtInId: string | null = BUILT_IN_DEFAULT_THEME,
 ): ResolvedTheme | undefined {
-  return themes.find((theme) => theme.mode === mode) ?? themes[0];
+  return (
+    themes.find((theme) => theme.id === builtInId) ??
+    themes.find((theme) => theme.mode === mode) ??
+    themes[0]
+  );
 }
 
 /**
@@ -91,9 +100,13 @@ export function firstVisitTheme(
  * theme engine runs, a dark flash on every light-preferring device's first
  * visit, now with the prerendered summary in it. `html:root` outranks
  * tokens.css's `:root`; a returning visitor's cached theme is set as an
- * inline style by index.html's script, which outranks both.
+ * inline style by index.html's script, which outranks both. When both schemes
+ * land on the same theme (the built-in default), one rule paints them.
  */
-export function firstPaintStyle(themes: readonly ResolvedTheme[]): string {
+export function firstPaintStyle(
+  themes: readonly ResolvedTheme[],
+  builtInId: string | null = BUILT_IN_DEFAULT_THEME,
+): string {
   const rule = (theme: ResolvedTheme | undefined): string => {
     if (!theme) return '';
     const declarations = Object.entries(theme.tokens).map(([key, value]) => {
@@ -102,9 +115,11 @@ export function firstPaintStyle(themes: readonly ResolvedTheme[]): string {
     });
     return `html:root{color-scheme:${theme.mode};${declarations.join(';')}}`;
   };
-  const light = rule(firstVisitTheme(themes, 'light'));
+  const darkTheme = firstVisitTheme(themes, 'dark', builtInId);
+  const lightTheme = firstVisitTheme(themes, 'light', builtInId);
+  const light = lightTheme?.id === darkTheme?.id ? '' : rule(lightTheme);
   return (
-    `<style>${rule(firstVisitTheme(themes, 'dark'))}` +
+    `<style>${rule(darkTheme)}` +
     `${light ? `@media (prefers-color-scheme: light){${light}}` : ''}</style>`
   );
 }

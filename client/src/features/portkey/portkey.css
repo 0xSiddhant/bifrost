@@ -95,7 +95,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
   cursor: pointer;
   text-decoration: underline;
@@ -118,7 +118,7 @@
 .pk-enchant-note svg {
   flex: none;
   margin-top: 2px;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 /* Search bar — a slim frosted panel matching the shell header, sticky ≥768px. */
@@ -189,7 +189,7 @@
 .pk-card__slug {
   font-size: var(--text-md);
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
   word-break: break-all;
 }

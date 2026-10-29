@@ -24,7 +24,7 @@ The JSON Schema lives in `client/src/core/theme/schema.ts` and is enforced by `c
 
 ## Required tokens — the 14 color roles
 
-Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rgba()`, or `transparent`.
+Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`/`rgba()` with commas (each channel a number or a percentage, with an optional alpha), or `transparent`. These are exactly the forms the contrast check reads (`COLOR_PATTERN` in `color.ts`), so the schema accepts nothing else: no `hsl()`, colour names or space-separated `rgb()`.
 
 | Token | Role |
 |---|---|
@@ -41,12 +41,13 @@ Every theme must define these. Values: `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rg
 
 ## Optional groups (derived when omitted)
 
+- **Accent text** — `--accent-text` (PLAN-40): the accent as a colour text can be read in. Links, eyebrows, active nav items, highlighted code keywords and the other 44 places that colour *text* with the accent use it; fills, borders and the bridge stay on `--accent`. Default: your `--accent` when it already reaches 4.5:1 on every backdrop accent text sits on, otherwise the accent stepped towards white (dark themes) or black (light themes) in 4% steps, which keeps its hue, until it does. The backdrops are `--bg`, `--surface`, `--surface-2`, `--accent-soft` over each, the accent's own 10–14% tints over the page and cards, every colour the card sheen and the sky paint (their stops and the colours between them), the header veil and the screensaver veil (`accentTextBackdrops` in `client/src/core/theme/color.ts` lists where each comes from). If the accent needs more than 12 steps (48% of the way), the derivation gives up and the contrast test fails the theme: author a readable `--accent-text` yourself.
 - **Atmosphere** — `--bridge`, `--accent-grad`, `--sky`, `--stars`, `--stars-alpha`, `--glow-teal`, `--glow-violet`, `--glow-amber`, `--glow-soft`, `--tone-teal(-soft)`, `--tone-violet(-soft)`, `--tone-amber(-soft)`, `--header-veil`, `--card-sheen`, `--relic-alpha`, `--relic-muted`, `--shadow-1/2`. Defaults: gradients and glows built from your `--accent`/`--accent-2`/`--ok`; stars on for dark mode, off for light.
 - **Syntax** — `--syn-key/string/number/bool/null/punct` (JSON/code highlighting, Runestone PLAN-07 + Differ PLAN-08). Defaults: accent / ok / accent-2 / warn / muted / muted.
 - **Diff** — `--diff-add/remove/change` plus `--diff-add/remove/change-soft` (compare-pane highlighting, Variant PLAN-08; the `-soft` variants are the line backgrounds, so keep them low-alpha). Defaults: ok / danger / accent, softs at ~0.16 alpha (dark) or ~0.12 (light).
 - **QR** — `--qr-module-a/b`, `--qr-bg`. Modules must stay dark-on-light for scanners; defaults are per-mode deep teal→violet on near-white.
 - **Card palette** — `--card-1` … `--card-10`. Ten distinct base hues, one assigned per card across the hub/portal grids (see DESIGN.md). Only the base colour is set here; the corner tint and hover glow are mixed from it in CSS. Defaults: a jewel-tone set (dark) / a deeper saturated set (light). Override any slot to keep a themed hub on-brand — give a two-colour house theme ten *distinguishable* shades of its own palette rather than leaving the default rainbow. Omitted slots inherit the stylesheet default.
-- **Screensaver** — `--screen-veil`, `--screen-particle`, `--screen-particle-2`, `--screen-line`, `--screen-ripple`, `--screen-glow`, `--screen-quote`. The idle particle overlay (Nótt): the deep veil behind everything, the drifting stars + the brighter near-layer "suns" (`-2`), the constellation lines, the click ripple, and the sun-glow. The canvas reads these at draw time. Defaults: a deep veil + soft stars, `--accent-2` suns/glow, `--accent` lines/ripple (dark); a light parchment veil with dark motes (light). `--screen-quote` (the quote text) defaults to `--text`. Omitted slots inherit the stylesheet default — override for a house-specific idle sky, and keep the veil dark/calm (it fills the whole screen). Same calm bar as the rest of the theme.
+- **Screensaver** — `--screen-veil`, `--screen-particle`, `--screen-particle-2`, `--screen-line`, `--screen-ripple`, `--screen-glow`, `--screen-quote`. The idle particle overlay (Nótt): the deep veil behind everything, the drifting stars + the brighter near-layer "suns" (`-2`), the constellation lines, the click ripple, and the sun-glow. The canvas reads these at draw time. Defaults: a deep veil + soft stars, `--accent-2` suns/glow, `--accent` lines/ripple (dark); a light parchment veil with dark motes (light). `--screen-quote` (the quote text) defaults to `--text`. An omitted `--screen-veil` is derived (PLAN-40): the deep veil for a dark theme, the theme's own `--bg` at 95% for a light one, so accent text is checked against the veil it really sits on. Other omitted slots inherit the stylesheet default — override for a house-specific idle sky, and keep the veil dark/calm (it fills the whole screen). Same calm bar as the rest of the theme.
 - **Fonts** — `--font-display/body/mono`. **Self-hosted families only** (`'Space Grotesk'`, `'Inter'`, `'JetBrains Mono'` first in the stack) — the LAN may have no internet, so any other family would silently fall back anyway.
 - **Type/spacing/shape/motion** — `--text-*`, `--space-*`, `--radius-*`, `--dur-*`, `--ease`. Rarely worth overriding; omitted values fall back to the stylesheet.
 
@@ -56,7 +57,7 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 ## Contrast (a test, not a warning)
 
-`--text` is checked against `--bg` and `--surface`. A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read.
+`--text` is checked against `--bg` and `--surface`, `--text-muted` against `--bg`, `--surface` and `--surface-2`, and `--accent-text` against every backdrop accent text sits on (above). A ratio below **4.5:1** (WCAG AA body text) fails the client test, so a theme that ships is one people can read. Translucent text is measured as it renders over each backdrop, and `transparent` reads as its backdrop (1:1). `--bg`, `--surface` and `--surface-2` must be opaque, since text is measured on them as solid colours. The colours inside `--sky` and `--card-sheen` follow the same grammar as every other colour (no colour names or `hsl()`), since accent text is checked against each of them.
 
 ## Starter theme (copy, edit, save into `client/src/assets/themes/`)
 
@@ -88,7 +89,8 @@ Free-form CSS tokens (gradients, shadows) accept most CSS but **reject `url()`, 
 
 1. The visitor's own switcher choice (cached per device).
 2. The household default (hub build only): Heimdall's "Default theme" (`themes.default` in settings, PLAN-05), which every device reads from `GET /api/v1/heimdall/access` (`defaultThemeId`). The standalone site has no household, so it skips this step.
-3. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak out of the box).
+3. The built-in default, `BUILT_IN_DEFAULT_THEME` in `client/src/core/theme/builtInDefault.ts` (Halloween), whatever the device's colour scheme. The build paints it from the first frame too (`client/seoBuild.ts`), so the two cannot disagree. Set it to `null` to hand first visits back to the next step.
+4. The visitor's `prefers-color-scheme`, matched by `mode` (dark → Aurora, light → Daybreak).
 
 An unknown id at any step (a deleted theme someone still has chosen, say) simply falls through to the next.
 

@@ -164,7 +164,30 @@ test.describe('standalone shell', () => {
     await expect(page).toHaveTitle(/JSON editor.*Runestone/);
   });
 
-  test("a first visit paints its device's theme before any script runs", async ({
+  // PLAN-40: the two first-paint fonts start with the CSS, from every file.
+  test('every HTML file the build ships preloads exactly the two first-paint fonts', async () => {
+    const dir = fromRepoRoot('client', 'dist-standalone');
+    const pages = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((name) =>
+      name.endsWith('.html'),
+    );
+    expect(pages).toContain('index.html');
+    expect(pages).toContain('404.html');
+    expect(pages.length).toBeGreaterThan(STANDALONE_PAGES.length);
+    for (const name of pages) {
+      const html = fs.readFileSync(`${dir}/${name}`, 'utf8');
+      const preloads = [...html.matchAll(/<link rel="preload"[^>]*>/g)].map(([tag]) => tag);
+      expect(preloads, name).toHaveLength(2);
+      for (const tag of preloads) {
+        expect(tag, name).toMatch(/as="font"/);
+        expect(tag, name).toMatch(/type="font\/woff2"/);
+        expect(tag, name).toMatch(/crossorigin/);
+      }
+      expect(preloads[0], name).toMatch(/\/assets\/space-grotesk-v22-latin-700-[\w-]+\.woff2"/);
+      expect(preloads[1], name).toMatch(/\/assets\/inter-v20-latin-regular-[\w-]+\.woff2"/);
+    }
+  });
+
+  test('a first visit paints the built-in default theme before any script runs', async ({
     browser,
     site,
   }) => {
@@ -174,10 +197,11 @@ test.describe('standalone shell', () => {
           fs.readFileSync(fromRepoRoot('client', 'src', 'assets', 'themes', `${id}.json`), 'utf8'),
         ) as { tokens: Record<string, string> }
       ).tokens['--bg'];
-    // The first light and first dark theme by name, as the theme engine picks them.
+    // BUILT_IN_DEFAULT_THEME (client/src/core/theme/builtInDefault.ts) wins over
+    // the device's colour scheme, as the theme engine picks it.
     for (const [colorScheme, theme] of [
-      ['light', 'daybreak'],
-      ['dark', 'aurora'],
+      ['light', 'halloween'],
+      ['dark', 'halloween'],
     ] as const) {
       const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
       const page = await context.newPage();
@@ -186,8 +210,26 @@ test.describe('standalone shell', () => {
         getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
       );
       expect(painted, colorScheme).toBe(bg(theme));
+      // Without JavaScript, the prerendered summary is the page.
+      await expect(page.locator('.seo-static h1'), colorScheme).toBeVisible();
       await context.close();
     }
+  });
+
+  test('a visitor whose browser runs JavaScript never sees the crawler summary', async ({
+    browser,
+    site,
+  }) => {
+    // Hold the app's script back, so the page stays at the moment before
+    // React's first render: the summary is in the HTML, and must not show.
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.route(/\/assets\/index-[^/]+\.js$/, (route) => route.abort());
+    await page.goto(`${site.baseUrl}/runestone`);
+    await expect(page.locator('html')).toHaveClass(/\bjs\b/);
+    await expect(page.locator('.seo-static')).toHaveCount(1);
+    await expect(page.locator('.seo-static')).toBeHidden();
+    await context.close();
   });
 
   test('themes switch, and survive a reload, from the bundle', async ({ page }) => {

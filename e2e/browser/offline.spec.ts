@@ -35,6 +35,14 @@ test(
     await expect(page).toHaveURL(/\/runestone$/);
     await expect(page.getByLabel('Document title')).toBeVisible();
 
+    // The Guide panel and its texts are lazy since PLAN-40, and the shell warms
+    // them on every arm, though the server's policy has no Guide entry.
+    await page.getByRole('button', { name: 'JSON guide' }).click();
+    await expect(page.locator('.guide-panel__title')).toHaveText('JSON');
+    await expect(page.locator('.guide-panel .md-preview')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.guide-panel')).toHaveCount(0);
+
     // Not warmed: Brotli is not in the registry, so its chunk cannot arrive.
     await mainNav(page).getByRole('link', { name: 'Ollivanders' }).click();
     await page

@@ -29,6 +29,7 @@ import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
 import { usePanelFont } from '../../core/panelFont';
+import { saveText } from '../../core/saveBlob';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
@@ -395,15 +396,7 @@ export function RunestonePage() {
     await importText(file.name, await file.text(), file.size);
   };
 
-  const exportDocument = () => {
-    const blob = new Blob([text], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = exportFilename(title);
-    anchor.click();
-    URL.revokeObjectURL(url);
-  };
+  const exportDocument = () => saveText(text, exportFilename(title), 'application/json');
 
   const restoreDraft = () => {
     if (!restorable) return;

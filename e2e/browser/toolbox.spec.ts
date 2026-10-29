@@ -1,4 +1,5 @@
 import { test, expect } from '../support/fixtures.js';
+import { downloadBytes } from '../support/files.js';
 import { routes } from '../support/journey.js';
 import type { Locator, Page } from '@playwright/test';
 
@@ -54,6 +55,29 @@ test.describe('toolbox', () => {
     await panel.getByLabel('Text', { exact: true }).fill('héllo 🌉');
     await expect(panel.getByLabel('Base64', { exact: true })).toHaveValue('aMOpbGxvIPCfjIk=');
   });
+
+  test(
+    'Base64 that decodes to binary downloads as a file',
+    routes('/diagon-alley/:toolId'),
+    async ({ page }) => {
+      // A 1×1 PNG, as a data URI carries it.
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      const panel = await openTool(page, 'base64', 'Base64');
+      await panel.getByRole('button', { name: 'decode', exact: true }).click();
+      await panel.getByLabel('Base64', { exact: true }).fill(png.toString('base64'));
+      await expect(panel.getByRole('status')).toContainText('a PNG image');
+
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        panel.getByRole('button', { name: 'Download decoded.png' }).click(),
+      ]);
+      expect(download.suggestedFilename()).toBe('decoded.png');
+      expect((await downloadBytes(download)).equals(png)).toBe(true);
+    },
+  );
 
   test('UUID', routes('/diagon-alley/:toolId'), async ({ page }) => {
     const panel = await openTool(page, 'uuid', 'UUID');

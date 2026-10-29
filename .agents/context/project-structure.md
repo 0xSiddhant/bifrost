@@ -73,7 +73,12 @@ bifrost/
 ├── client/
 │   ├── buildDefaults.ts       # the .env values a client build bakes in (PLAN-35)
 │   ├── seoBuild.ts            # standalone only: a page per public tool, 404.html, robots.txt,
-│   │                          #   sitemap.xml (the list: src/core/seo.ts)
+│   │                          #   sitemap.xml (the list: src/core/seo.ts), and the first-visit theme
+│   │                          #   inlined for the no-JS first paint (core/theme/builtInDefault.ts)
+│   ├── precompress.ts         # both builds (PLAN-40): .br + .gz beside every text file, at closeBundle
+│   ├── bundleBudget.ts        # both builds (PLAN-40): the first load (entry + static imports + CSS)
+│   │                          #   may hold no heavy library and stays under a gzipped budget
+│   ├── fontPreload.ts         # both builds (PLAN-40): preload the two first-paint fonts, by hashed name
 │   └── src/
 │       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
@@ -82,7 +87,7 @@ bifrost/
 │       │                      #   offlineWarmLoad.ts (PLAN-22 — the id → import() loader map; it
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
-│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli)
+│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween)
 │       │                      #   + themes/*.json (bundled at build time, PLAN-35)
 │       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
 │       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
@@ -91,11 +96,14 @@ bifrost/
 │       │                      #   browser→server logger; a no-op sink standalone),
 │       │                      #   notify/ (global notification stack: store + host +
 │       │                      #   imperative `notify` handle + shouldShowForOrigin, PLAN-17a),
-│       │                      #   theme engine, device registry, tokens,
+│       │                      #   theme/ (the engine, resolve + schema, color.ts's contrast checks and
+│       │                      #     backdrop inventory (PLAN-40), bundled.ts, builtInDefault.ts — the
+│       │                      #     first-visit default the engine and seoBuild.ts share), device registry, tokens,
 │       │                      #   ui/ (Card + PortalCard tones teal/violet/amber, hub cards, JoinBifrostCard,
 │       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
-│       │                      #   ErrorBoundary (app-wide crash net), JsonEditor (one `mode`
+│       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
+│       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
@@ -128,6 +136,8 @@ bifrost/
 │       │                      #   chunkError.ts (PLAN-22 — is this a failed dynamic import?
 │       │                      #     read by ui/RouteBoundary, the per-route net that keeps a
 │       │                      #     cold route with no bridge off the app-wide crash card),
+│       │                      #   saveBlob.ts (every client-side save: saveBlob for bytes, saveText for
+│       │                      #     text + media type; one `<a download>` mechanism under both),
 │       │                      #   textNormalize, runestone + edda + groot + atlas + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)

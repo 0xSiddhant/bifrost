@@ -2,8 +2,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter } from 'react-router-dom';
-import { GuideButton } from './GuideButton';
+import { MemoryRouter, useNavigate, type NavigateFunction } from 'react-router-dom';
+import { notifications } from '../notify';
+import { log } from '../log';
+import { GuideButton, guidePanelChunk } from './GuideButton';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -39,6 +41,13 @@ async function settleUntil(done: () => boolean, budgetMs = 5_000): Promise<void>
   throw new Error('the guide panel never finished loading');
 }
 
+/** Hands the test the router's navigate, so a route change can happen mid-test. */
+let navigate: NavigateFunction | null = null;
+function Navigator() {
+  navigate = useNavigate();
+  return null;
+}
+
 describe('GuideButton', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -48,6 +57,7 @@ describe('GuideButton', () => {
       root.render(
         <MemoryRouter initialEntries={[pathname]}>
           <GuideButton />
+          <Navigator />
         </MemoryRouter>,
       ),
     );
@@ -81,6 +91,8 @@ describe('GuideButton', () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    notifications.clear();
+    vi.restoreAllMocks();
   });
 
   it.each(['/runestone', '/edda', '/atlas', '/groot', '/loki', '/brotli'])(
@@ -129,6 +141,18 @@ describe('GuideButton', () => {
     act(() => close?.click());
 
     expect(panel()).toBeNull();
+  });
+
+  it('closes when the route changes to another page', async () => {
+    await openOn('/edda');
+    expect(panel()).not.toBeNull();
+
+    act(() => {
+      void navigate?.('/runestone');
+    });
+
+    expect(panel()).toBeNull();
+    expect(bulb()?.getAttribute('aria-label')).toBe('JSON guide');
   });
 
   it('closes on Escape', async () => {
@@ -232,5 +256,67 @@ describe('GuideButton', () => {
 
     expect(panel()?.textContent).toContain('could not be loaded');
     load.mockRestore();
+  });
+
+  // PLAN-40: the panel is its own chunk, fetched on the first click.
+  describe('when the panel is lazy', () => {
+    const chunkGone = () =>
+      new Error('Failed to fetch dynamically imported module: http://hub/assets/GuidePanel-x.js');
+    const errors = () => notifications.getSnapshot().visible.filter((n) => n.kind === 'error');
+
+    it('fetches the panel only on the first click, then renders it', async () => {
+      const load = vi.spyOn(guidePanelChunk, 'load');
+      mount('/atlas');
+      await tick();
+      expect(load).not.toHaveBeenCalled();
+
+      act(() => bulb()?.click());
+      expect(load).toHaveBeenCalledTimes(1);
+      await settleUntil(() => document.querySelector('.guide-panel__title') !== null);
+
+      expect(document.querySelector('.guide-panel__title')?.textContent).toBe('XML');
+    });
+
+    it('keeps the shell up when the chunk fails, says why once, and tries again on the next click', async () => {
+      const warn = vi.spyOn(log, 'warn').mockImplementation(() => {});
+      // The probe finds nothing answering: the connection is the problem.
+      vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+      const load = vi.spyOn(guidePanelChunk, 'load').mockRejectedValueOnce(chunkGone());
+
+      mount('/groot');
+      act(() => bulb()?.click());
+      await settleUntil(() => errors().length > 0);
+
+      // The bulb is still there, closed; nothing replaced the shell.
+      expect(bulb()).not.toBeNull();
+      expect(bulb()?.getAttribute('aria-expanded')).toBe('false');
+      expect(panel()).toBeNull();
+      expect(errors()).toHaveLength(1);
+      expect(errors()[0]?.count).toBe(1);
+      expect(errors()[0]?.message).toBe(
+        "The guide couldn't load. Check the connection and try again.",
+      );
+      expect(warn).toHaveBeenCalledTimes(1);
+
+      // The import works again: a fresh lazy payload, so a real second attempt.
+      act(() => bulb()?.click());
+      await settleUntil(() => document.querySelector('.guide-panel__title') !== null);
+
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(document.querySelector('.guide-panel__title')?.textContent).toBe('YAML');
+    });
+
+    it('says to reload when the hub answers but the chunk is still gone', async () => {
+      vi.spyOn(log, 'warn').mockImplementation(() => {});
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }));
+      vi.spyOn(guidePanelChunk, 'load').mockRejectedValueOnce(chunkGone());
+
+      mount('/loki');
+      act(() => bulb()?.click());
+      await settleUntil(() => errors().length > 0);
+
+      expect(errors()[0]?.message).toContain('Reload the page');
+      expect(bulb()).not.toBeNull();
+    });
   });
 });

@@ -1,8 +1,9 @@
 /**
  * Colour parsing for the derived defaults, and the WCAG contrast lint. Ported
  * from the server (PLAN-35). The lint used to be a warning Heimdall showed;
- * now that themes are code, `themes.test.ts` fails CI instead. Only
- * `parseColor` is used at runtime, so the lint never reaches the bundle.
+ * now that themes are code, `themes.test.ts` fails CI instead. At runtime
+ * `resolveTheme` uses the parsing, contrast and backdrop helpers to derive
+ * `--accent-text` (PLAN-40); `contrastWarnings` itself stays test-only.
  */
 
 export interface Rgb {
@@ -11,22 +12,95 @@ export interface Rgb {
   b: number;
 }
 
+/** A number, decimals allowed. */
+const NUMBER = String.raw`(\d+(?:\.\d+)?|\.\d+)`;
+const COMMA = String.raw`\s*,\s*`;
+
+/**
+ * The one colour grammar: the schema's colour pattern (`schema.ts`) and
+ * `parseRgba` are both this, so every colour a theme can ship is one the
+ * derived defaults and the contrast lint can read. `#rgb`, `#rrggbb` or
+ * `#rrggbbaa`; `rgb()` or `rgba()` with commas, its three channels all
+ * numbers or all percentages (CSS drops a mix), and an optional alpha as a
+ * number or a percentage; or `transparent`.
+ */
+const COLOR_SOURCE =
+  String.raw`#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])` +
+  String.raw`|rgba?\(\s*(?:${NUMBER}${COMMA}${NUMBER}${COMMA}${NUMBER}` +
+  `|${NUMBER}%${COMMA}${NUMBER}%${COMMA}${NUMBER}%)` +
+  String.raw`(?:${COMMA}${NUMBER}(%?))?\s*\)|transparent`;
+
+export const COLOR_PATTERN = `^(?:${COLOR_SOURCE})$`;
+
+const COLOR = new RegExp(COLOR_PATTERN);
+
+export interface Rgba extends Rgb {
+  /** 0..1 */
+  a: number;
+}
+
+/**
+ * A colour with its alpha: `rgba()`'s fourth value, `#rrggbbaa`'s last pair,
+ * 0 for `transparent`, else 1. Null for anything outside `COLOR_PATTERN`.
+ */
+export function parseRgba(value: string): Rgba | null {
+  const match = COLOR.exec(value.trim());
+  if (!match) return null;
+  if (match[0] === 'transparent') return { r: 0, g: 0, b: 0, a: 0 };
+  const [, hex, r, g, b, rPercent, gPercent, bPercent, alpha, alphaPercent] = match;
+  if (hex) {
+    const digits = hex.length === 3 ? [...hex].map((d) => d + d).join('') : hex;
+    const pair = (at: number) => parseInt(digits.slice(at, at + 2), 16);
+    return { r: pair(0), g: pair(2), b: pair(4), a: digits.length === 8 ? pair(6) / 255 : 1 };
+  }
+  // Out-of-range values clamp, as in CSS.
+  const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
+  const channel = (number: string | undefined, percent: string | undefined) =>
+    Math.round(clamp(number === undefined ? Number(percent) * 2.55 : Number(number), 255));
+  return {
+    r: channel(r, rPercent),
+    g: channel(g, gPercent),
+    b: channel(b, bPercent),
+    a: alpha === undefined ? 1 : clamp(Number(alpha) / (alphaPercent ? 100 : 1), 1),
+  };
+}
+
+/** A colour's RGB, alpha dropped. Null for `transparent`, which has none. */
 export function parseColor(value: string): Rgb | null {
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim());
-  if (hex?.[1]) {
-    let digits = hex[1];
-    if (digits.length === 3) digits = [...digits].map((d) => d + d).join('');
-    return {
-      r: parseInt(digits.slice(0, 2), 16),
-      g: parseInt(digits.slice(2, 4), 16),
-      b: parseInt(digits.slice(4, 6), 16),
-    };
-  }
-  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i.exec(value.trim());
-  if (rgb) {
-    return { r: Number(rgb[1]), g: Number(rgb[2]), b: Number(rgb[3]) };
-  }
-  return null;
+  const rgba = parseRgba(value);
+  if (!rgba || value.trim() === 'transparent') return null;
+  return { r: rgba.r, g: rgba.g, b: rgba.b };
+}
+
+export function toHex({ r, g, b }: Rgb): string {
+  const pair = (channel: number) =>
+    Math.round(Math.min(255, Math.max(0, channel)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${pair(r)}${pair(g)}${pair(b)}`;
+}
+
+/**
+ * `over` painted on the opaque `under`, as a browser composites it: per
+ * channel, in sRGB. Null when either cannot be parsed.
+ */
+export function composite(over: string, under: string): string | null {
+  const top = parseRgba(over);
+  const base = parseColor(under);
+  if (!top || !base) return null;
+  const mix = (a: number, b: number) => top.a * a + (1 - top.a) * b;
+  return toHex({ r: mix(top.r, base.r), g: mix(top.g, base.g), b: mix(top.b, base.b) });
+}
+
+/**
+ * `color` moved `amount` (0..1) of the way to `target`, per channel. Towards
+ * white or black every channel's distance scales alike, so the hue is kept.
+ */
+export function mixToward(color: string, target: Rgb, amount: number): string | null {
+  const rgb = parseColor(color);
+  if (!rgb) return null;
+  const step = (from: number, to: number) => from + (to - from) * amount;
+  return toHex({ r: step(rgb.r, target.r), g: step(rgb.g, target.g), b: step(rgb.b, target.b) });
 }
 
 function channelLuminance(channel: number): number {
@@ -53,23 +127,268 @@ export function contrastRatio(a: string, b: string): number | null {
   return (light + 0.05) / (dark + 0.05);
 }
 
-const MIN_TEXT_CONTRAST = 4.5;
+export const MIN_TEXT_CONTRAST = 4.5;
+
+/**
+ * Contrast of text as it renders on an opaque backdrop. A translucent colour
+ * is composited over the backdrop first: `contrastRatio` reads only the RGB,
+ * so 10% black over white would measure 21:1 while rendering about 1.2:1.
+ */
+export function textContrast(text: string, backdrop: string): number | null {
+  return contrastRatio(composite(text, backdrop) ?? text, backdrop);
+}
+
+/**
+ * The accent tints the CSS mixes from `--accent` itself, besides the theme's
+ * own `--accent-soft` (`color-mix(in srgb, var(--accent) N%, transparent)`):
+ * 10% behind Portkey's enchant note, 12% behind a chip that is on (Accio,
+ * Nimbus), 14% behind the active tag suggestion. Each sits on the page or a
+ * card, never on `--surface-2`.
+ */
+export const ACCENT_TINTS = [0.1, 0.12, 0.14] as const;
+
+export interface Backdrop {
+  /** How the lint names it: `--surface-2`, `--accent-soft over --bg`. */
+  label: string;
+  /** The opaque colour the text actually sits on. */
+  color: string;
+}
+
+/** The surfaces text sits on, each measured as an opaque colour. */
+const SURFACES = ['--bg', '--surface', '--surface-2'];
+
+/** Every colour token `contrastWarnings` reads. */
+const LINTED_COLORS = [
+  '--text',
+  '--text-muted',
+  '--accent-text',
+  ...SURFACES,
+  '--accent',
+  '--accent-soft',
+  '--header-veil',
+  '--screen-veil',
+];
+
+/** The gradients accent text sits on, read layer by layer (`gradientStops`). */
+const LINTED_GRADIENTS = ['--sky', '--card-sheen'];
+
+const COLORS_IN_VALUE = new RegExp(COLOR_SOURCE, 'g');
+
+/** Every word a gradient may hold besides its colours. */
+const GRADIENT_WORDS = new Set([
+  'linear-gradient',
+  'radial-gradient',
+  'none',
+  'to',
+  'at',
+  'top',
+  'bottom',
+  'left',
+  'right',
+  'center',
+  'circle',
+  'ellipse',
+  'closest-side',
+  'closest-corner',
+  'farthest-side',
+  'farthest-corner',
+  'deg',
+  'turn',
+  'px',
+]);
+
+/** A CSS value split at its top-level commas: a background's layers. */
+function layers(value: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (value[i] === '(') depth += 1;
+    else if (value[i] === ')') depth -= 1;
+    else if (value[i] === ',' && depth === 0) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts;
+}
+
+/**
+ * A gradient value's (`--sky`, `--card-sheen`) layers, each as its colour
+ * stops in order, `transparent` included. Null when the value holds any other
+ * word, such as `white` or `hsl()`: a colour the check cannot read, which it
+ * must not skip.
+ */
+export function gradientStops(value: string): string[][] | null {
+  const words = value.replace(COLORS_IN_VALUE, ' ').match(/[a-z][a-z-]*/gi) ?? [];
+  if (!words.every((word) => GRADIENT_WORDS.has(word.toLowerCase()))) return null;
+  return layers(value)
+    .map((layer) => layer.match(COLORS_IN_VALUE) ?? [])
+    .filter((stops) => stops.length > 0);
+}
+
+/** Points sampled along each run between two gradient stops, ends included. */
+const GRADIENT_SAMPLES = 8;
+
+/**
+ * Every backdrop accent-coloured text sits on (PLAN-40), from an inventory of
+ * the 44 rules that colour text with it (`color: var(--accent-text)`), each
+ * read against its own background or its nearest painted ancestor's:
+ *
+ * - `--bg`, the page: links (`a`, `.seo-static a`), the `.eyebrow`, Edda's
+ *   reading outline, Nimbus's figures, a sky relic. The `--sky` glows lie
+ *   behind all of it, so each of its colours over the page is checked too
+ *   (each alone: where two overlap, both are faint), and so is the header's
+ *   `--header-veil` over the page.
+ * - `--surface`, cards and sheets: Portkey's slug and link buttons, the Saga
+ *   shortcuts card, Loki's sheet and output, the plist table, the tag
+ *   suggestions, the file rows, Edda's outline, the Heimdall modal and its
+ *   about links. A card's `--card-sheen` tints its top, so each of its
+ *   colours over `--surface` is checked too.
+ * - `--surface-2`, panels, code and chips: `.heimdall-brand` and the local
+ *   note on `.heimdall-panel`, highlighted code in `pre` (`.md-preview`,
+ *   `.preview-markdown`), the empty-state icon, plist rows on hover.
+ * - `--accent-soft` over each of those: the active nav item, the Heimdall nav,
+ *   Runestone's and Variant's view toggles, the active dropzone, an image
+ *   file's icon, the armed Offline switch, a tone chip outside a card. It is
+ *   translucent, so it is checked over every surface it can land on.
+ * - Found by the inventory, outside that set: the `ACCENT_TINTS` over the
+ *   page and over `--surface`, and the screensaver's `--screen-veil` over the
+ *   page, behind `.nott__author` and its mark.
+ *
+ * Fills, borders and the bridge use `--accent` and need no text contrast.
+ */
+export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] {
+  const named = (name: string): Backdrop | null => {
+    const color = tokens[name];
+    return color && parseColor(color) ? { label: name, color } : null;
+  };
+  const surfaces = SURFACES.map(named).filter(
+    (backdrop): backdrop is Backdrop => backdrop !== null,
+  );
+  const over = (label: string, color: string, under: Backdrop): Backdrop | null => {
+    const result = composite(color, under.color);
+    return result ? { label: `${label} over ${under.label}`, color: result } : null;
+  };
+  const layered: (Backdrop | null)[] = [];
+  const soft = tokens['--accent-soft'];
+  if (soft) for (const surface of surfaces) layered.push(over('--accent-soft', soft, surface));
+  const accent = parseColor(tokens['--accent'] ?? '');
+  const pageAndCards = surfaces.filter((surface) => surface.label !== '--surface-2');
+  if (accent) {
+    for (const share of ACCENT_TINTS) {
+      const tint = `rgba(${accent.r}, ${accent.g}, ${accent.b}, ${share})`;
+      for (const surface of pageAndCards) {
+        layered.push(over(`--accent at ${Math.round(share * 100)}%`, tint, surface));
+      }
+    }
+  }
+  // A gradient paints every colour between two stops, not only the stops.
+  // CSS interpolates in premultiplied sRGB, which composited over an opaque
+  // base is the straight line between the two stops' composites, so points
+  // along that line are the colours really painted. Text that sits between
+  // two stops in lightness passes both and meets its own lightness midway.
+  const gradient = (name: string, under: Backdrop | undefined) => {
+    if (!under) return;
+    const run = (from: string, to: string) => {
+      const start = composite(from, under.color);
+      const end = parseColor(composite(to, under.color) ?? '');
+      if (!start || !end || (from === 'transparent' && to === 'transparent')) return;
+      const label = from === to ? `${name}'s ${from}` : `${name} from ${from} to ${to}`;
+      for (let k = 0; k <= GRADIENT_SAMPLES; k += 1) {
+        const color = mixToward(start, end, k / GRADIENT_SAMPLES);
+        if (color) layered.push({ label: `${label} over ${under.label}`, color });
+      }
+    };
+    for (const stops of gradientStops(tokens[name] ?? '') ?? []) {
+      // A lone stop is a run from itself to itself.
+      let previous = stops.length === 1 ? stops[0] : undefined;
+      for (const stop of stops) {
+        if (previous !== undefined) run(previous, stop);
+        previous = stop;
+      }
+    }
+  };
+  const card = surfaces.find((surface) => surface.label === '--surface');
+  gradient('--card-sheen', card);
+  const page = surfaces.find((surface) => surface.label === '--bg');
+  gradient('--sky', page);
+  for (const name of ['--header-veil', '--screen-veil']) {
+    const veil = tokens[name];
+    if (page && veil) layered.push(over(name, veil, page));
+  }
+  return [...surfaces, ...layered.filter((backdrop): backdrop is Backdrop => backdrop !== null)];
+}
 
 export function contrastWarnings(tokens: Record<string, string>): string[] {
   const warnings: string[] = [];
+  // A colour the check cannot measure would otherwise be skipped, and pass.
+  // The schema accepts only `COLOR_PATTERN`, so this catches tokens that never
+  // met it; a surface must also be opaque, as text is measured on it as solid.
+  for (const role of LINTED_COLORS) {
+    const value = tokens[role];
+    if (value === undefined) continue;
+    const rgba = parseRgba(value);
+    if (rgba === null) {
+      warnings.push(
+        `${role} is ${value}, which is not a colour the contrast check can read: write it as #rrggbb or rgb()`,
+      );
+    } else if (SURFACES.includes(role) && rgba.a < 1) {
+      warnings.push(
+        `${role} is ${value}, which is translucent: the contrast check measures text on it as a solid colour, so make it opaque`,
+      );
+    }
+  }
+  for (const role of LINTED_GRADIENTS) {
+    const value = tokens[role];
+    if (value !== undefined && gradientStops(value) === null) {
+      warnings.push(
+        `${role} is ${value}, which has a colour or word the contrast check cannot read: write its colours as #rrggbb or rgb()`,
+      );
+    }
+  }
   const pairs: [string, string][] = [
     ['--text', '--bg'],
     ['--text', '--surface'],
+    // Secondary text sits on every surface, panels included (PLAN-40: Daybreak
+    // and Tokyo fell short on --surface-2, and Daybreak on the page itself).
+    ['--text-muted', '--bg'],
+    ['--text-muted', '--surface'],
+    ['--text-muted', '--surface-2'],
   ];
   for (const [fg, bg] of pairs) {
     const fgValue = tokens[fg];
     const bgValue = tokens[bg];
     if (!fgValue || !bgValue) continue;
-    const ratio = contrastRatio(fgValue, bgValue);
+    const ratio = textContrast(fgValue, bgValue);
     if (ratio !== null && ratio < MIN_TEXT_CONTRAST) {
       warnings.push(
         `${fg} on ${bg} has contrast ${ratio.toFixed(2)}:1 — below the ${MIN_TEXT_CONTRAST}:1 readability floor`,
       );
+    }
+  }
+  // Accent-coloured text, wherever it sits. `resolveTheme` derives a value
+  // that passes when it can; one that still fails here is a theme whose
+  // accent could not be stepped far enough, or an authored value that falls
+  // short, and the fix is the same: author a readable --accent-text.
+  const accentText = tokens['--accent-text'];
+  if (accentText) {
+    // A gradient's run gives several points under one label: report its worst.
+    const worst = new Map<string, number>();
+    for (const backdrop of accentTextBackdrops(tokens)) {
+      const ratio = textContrast(accentText, backdrop.color);
+      if (ratio !== null && ratio < (worst.get(backdrop.label) ?? Infinity)) {
+        worst.set(backdrop.label, ratio);
+      }
+    }
+    for (const [label, ratio] of worst) {
+      if (ratio < MIN_TEXT_CONTRAST) {
+        warnings.push(
+          `--accent-text on ${label} has contrast ${ratio.toFixed(2)}:1 — below the ` +
+            `${MIN_TEXT_CONTRAST}:1 readability floor. Author a readable --accent-text in the theme`,
+        );
+      }
     }
   }
   return warnings;

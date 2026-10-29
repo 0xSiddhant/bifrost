@@ -25,7 +25,7 @@ import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
 import { GuideButton } from '../core/guide/GuideButton';
 import { usePublishedBanner } from './usePublishedBanner';
 import { applyStandaloneSeo } from './standaloneSeo';
-import { runWarmLoad } from './offlineWarmLoad';
+import { runOfflineWarmLoad } from './offlineWarmLoad';
 import { createLazyPages } from './lazyPages';
 import { useHeimdallGesture } from '../features/heimdall/useHeimdallGesture';
 import { FolderIcon, SparklesIcon, WandIcon, WifiOffIcon } from '../core/ui/icons';
@@ -182,7 +182,7 @@ export function App() {
       if (!offlineConfig) return;
       const targets = enabledTargets(offlineConfig);
       setWarmStatus({ state: 'warming', loaded: 0, failed: [] });
-      void runWarmLoad(targets.map((target) => target.id)).then(({ loaded, failed }) => {
+      void runOfflineWarmLoad(targets.map((target) => target.id)).then(({ loaded, failed }) => {
         setWarmStatus(
           failed.length === 0
             ? { state: 'ready', loaded: loaded.length, failed: [] }

@@ -142,7 +142,7 @@
   place-items: center;
   border-radius: var(--radius-md);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   transition: box-shadow var(--dur-2) var(--ease);
 }
 
@@ -447,7 +447,7 @@ a.portal:hover .portal__go {
 }
 
 .file-row__icon--image {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-soft);
 }
 
@@ -489,7 +489,7 @@ a.portal:hover .portal__go {
 /* A row whose name opens something reads as a link on sight: hover is not an
    affordance on a phone, which is where this app mostly lives. */
 .file-row__link {
-  color: var(--accent);
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -702,7 +702,7 @@ a.portal:hover .portal__go {
   border-radius: var(--radius-full);
   background: var(--surface-2);
   box-shadow: var(--glow-soft);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .empty__title {
@@ -771,7 +771,7 @@ a.portal:hover .portal__go {
 }
 
 .offline-toggle__switch:has(input:checked) {
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
   background: var(--accent-soft);
 }
@@ -971,7 +971,7 @@ a.portal:hover .portal__go {
 /* Since PLAN-20 this surface uses the shared renderer, which also emits links,
    rules, task checkboxes and anchored headings. */
 .preview-markdown a {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .preview-markdown hr {
@@ -1042,7 +1042,7 @@ a.portal:hover .portal__go {
 
 :is(.preview-markdown, .preview-text)
   :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-tag) {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 :is(.preview-markdown, .preview-text) :is(.hljs-string, .hljs-regexp, .hljs-addition) {
@@ -1368,7 +1368,7 @@ a.portal:hover .portal__go {
 }
 
 .plist-keybtn:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-rootname {
@@ -1395,7 +1395,7 @@ a.portal:hover .portal__go {
 }
 
 .plist-typelabel:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-typelabel.is-disabled {
@@ -1441,7 +1441,7 @@ a.portal:hover .portal__go {
 
 .plist-typeselect__input:hover {
   border-color: var(--border);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-typeselect__input:focus-visible {
@@ -1495,7 +1495,7 @@ a.portal:hover .portal__go {
 }
 
 .plist-bool:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-count {
@@ -1513,7 +1513,7 @@ a.portal:hover .portal__go {
   padding: 0;
   border: none;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
   cursor: pointer;
 }
@@ -1556,7 +1556,7 @@ a.portal:hover .portal__go {
 }
 
 .plist-stepper:hover:not(.is-disabled) {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-action {
@@ -1574,7 +1574,7 @@ a.portal:hover .portal__go {
 }
 
 .plist-action:hover {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .plist-grip {

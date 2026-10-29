@@ -83,15 +83,3 @@ export function decompressedName(sourceName: string | null, isText: boolean): st
   }
   return isText ? 'decompressed.txt' : 'decompressed.bin';
 }
-
-/** Hands the browser a file to save, the one mechanism a Blob download has. */
-export function saveBlob(blob: Blob, name: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = name;
-  document.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}

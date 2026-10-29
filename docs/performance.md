@@ -1,4 +1,8 @@
-# Performance: the load harness
+# Performance
+
+Two kinds of measurement: how the **server** holds up under load (the load harness, below) and how fast a **page** loads in a browser ([Page load](#page-load)).
+
+## The load harness
 
 `npm run test:load` measures the **built** server under load (PLAN-34). It starts the production entries on scratch storage and OS-assigned ports, the API (`node --import server/dist/otel.js server/dist/bootstrap.js`) behind the web host (`node web/dist/bootstrap.js`) as production runs them since PLAN-36, seeds the hub through the web host, runs one profile, reads the API's own `/metrics` while it does, samples the web host's RSS with `ps` (it has no `/metrics`), then prints a table and writes `load-results/<profile>-<timestamp>.json`.
 
@@ -13,7 +17,7 @@ npm run test:load -- --profile soak            # 60 minutes: does it leak?
 npm run test:load -- --profile fanout          # 200 SSE listeners, 4 × 1 GB streams, a Brotli round trip
 ```
 
-## Profiles
+### Profiles
 
 | Profile  | Question                              | What it does                                                                                                                                       | Default                                     |
 | -------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -31,7 +35,7 @@ npm run test:load -- --profile fanout          # 200 SSE listeners, 4 × 1 GB st
 
 **Seeding**, before every profile and through the API only: 2,000 documents across the four kinds (1–200 KB, log-uniform), 1,000 Accio links, 500 go-links, 20 download files and 2 folders. Its own throughput is the first line of the report.
 
-## Flags
+### Flags
 
 | Flag                                                      | Default      | Meaning                                                                                         |
 | --------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
@@ -52,7 +56,7 @@ npm run test:load -- --profile fanout          # 200 SSE listeners, 4 × 1 GB st
 
 **Safety.** The harness takes no storage root and no port: it always uses a fresh `mkdtemp` storage and an OS-assigned port, so it cannot be pointed at `storage/` or at the running instance. `--storage-root`, `--port` and `--url` are refused. The stream scenarios check free space first and refuse below 3× the bytes they will write. Nothing leaves the machine: every Accio link is saved with a title (so nothing is fetched) on a loopback discard port.
 
-## Reading a result
+### Reading a result
 
 ```
 scenario                               conns  req/s  p50 ms  p90 ms  p99 ms  max ms    MB/s  bad
@@ -70,7 +74,7 @@ read: health                              20   8109     2.0     3.0     7.0    1
 
 The client and the server share the machine, so at high connection counts the harness itself competes for CPU. The numbers describe the pair, which is fine for comparing two builds on one machine and wrong for quoting as the server's absolute capacity.
 
-## Comparing two builds
+### Comparing two builds
 
 `--baseline` compares a run with an earlier result. `--server-dist` runs the same workload against another build. Together they compare any two commits on one machine:
 
@@ -89,8 +93,47 @@ A build from before PLAN-36 has no web host, so `--server-dist` runs it as the o
 
 Latencies are whole milliseconds, so a ⚠ on a single-digit p50 (1 → 2 ms reads +100%) is one rounding step, not a regression; judge the req/s and the larger latencies. Run the two back to back, on an otherwise idle machine, and compare like with like: the same `--contract` and `--log-level`. A build from before PLAN-32b ignores `API_CONTRACT_CHECK`, so compare it against both `off` (the serializer's own effect) and `fallback` (what production pays today).
 
-## Why it is not in CI
+### Why it is not in CI
 
 Throughput on a home server depends on what else the machine is doing, and on a shared CI runner on its neighbours. A threshold tight enough to catch a real 15% regression flaps on that noise, and a loose one catches nothing; a gate that flaps gets deleted. So the harness fails only on **correctness under load**, which is not noisy, and reports regressions for a person to judge. `--strict` turns them into a failure when you want one.
 
 Results are never committed (`load-results/` is gitignored): they describe one machine on one day, and a committed baseline would be wrong on every other machine. Keep your own baseline file between runs.
+
+## Page load
+
+How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 took its before and after numbers. It is not a CI gate, for the reason above: two clean runs a minute apart differed fivefold in blocking time on the same machine. What CI checks instead is what makes a page slow, exactly: the **bundle budget** (`client/bundleBudget.ts`) fails either build when the first load (the entry chunk and everything it imports statically, which `index.html` modulepreloads, plus their CSS) holds a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or CodeMirror, or when its gzipped size passes the budget written in that file. A change that needs more raises the figure in the same PR. Every build prints the figure: `first load: 120.4 KB gzipped of a 133.0 KB budget`.
+
+### Measuring
+
+- **A clean browser.** Extensions inject scripts that land in the report as if they were Bifrost's (an ad blocker and a cookie-banner detector were most of one report's blocking time and every "unminified JavaScript" item). Use an Incognito window, or the CLI, which starts its own profile:
+
+  ```bash
+  npx lighthouse@13.5.0 http://bifrost.local:4646/ --output=json --output-path=hub-1.json \
+    --chrome-flags="--headless=new"
+  ```
+
+- **The mobile preset**, Lighthouse's default: a mid-range phone on a slow 4G link, with a 4× slower CPU.
+- **The median of three runs**, never one.
+- **One Lighthouse version for a before and its after**, named beside the numbers: scores move between major versions. When a newer version is all you have, take the before numbers again with it.
+- **The pages:** the hub's `/`, and the standalone site's `/` and `/runestone` (served as it is deployed: `./bifrost docker up standalone`, or the web host's `--standalone` mode).
+- **The theme matters.** Headless Chrome prefers a light colour scheme, so a first visit lands on Daybreak. To check contrast in another theme, open the page with that theme picked; Lighthouse's colour-contrast audit is axe-core's `color-contrast` rule, which can be run in any theme from a browser script.
+
+### Reading a report of the public site
+
+A site behind Cloudflare carries Cloudflare's own scripts, and a report counts them as the site's. Read them apart, and write down which Cloudflare features were on when the report was taken (see [docs/standalone.md, Behind Cloudflare](standalone.md#behind-cloudflare)):
+
+- `/cdn-cgi/challenge-platform/…/jsd/main.js` is Bot Fight Mode / JavaScript Detections. All three deprecation warnings (Shared Storage, `StorageType.persistent`, Protected Audience) come from it, and they are the whole Best Practices deduction.
+- `static.cloudflareinsights.com/beacon.min.js` is Web Analytics. It is the legacy-JavaScript item and a second request on every load.
+
+### PLAN-40's numbers
+
+Lighthouse 13.5.0, mobile preset, headless, median of three, on this repository's Linux dev container (the hub through its web host; the standalone build behind nginx with `docker/nginx-standalone.conf`):
+
+| Page | Before | After |
+|---|---|---|
+| Hub `/` | 60 (52 / 62 / 60): FCP 5.5 s, LCP 6.0 s, 793 KB, 29 requests | 93 (93 / 93 / 93): FCP 2.0 s, LCP 2.8 s, 222 KB, 22 requests |
+| Standalone `/` | 85 (85 / 84 / 86): FCP 3.0 s, LCP 3.2 s, 354 KB | 95 (95 / 95 / 95): FCP 2.0 s, LCP 2.6 s, 230 KB |
+| Standalone `/runestone` | 68 (68 / 68 / 67): FCP 4.0 s, LCP 5.4 s, 688 KB | 74 (74 / 74 / 76): FCP 3.0 s, LCP 4.9 s, 524 KB |
+
+Layout shift was 0 in every run, before and after. Accessibility went from 94 (hub) and 95 (standalone) to 100: no contrast or heading-order failure in any of the seven themes on either home page. Runestone's LCP is its editor: CodeMirror is that page's own content, so it is not in the first load and stays where it is.
+

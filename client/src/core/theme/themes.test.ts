@@ -1,9 +1,16 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import { describe, expect, it } from 'vitest';
+import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 import { BUNDLED_THEMES } from './bundled';
-import { contrastRatio, contrastWarnings } from './color';
-import { resolveTheme, type ThemeFile } from './resolve';
+import {
+  accentTextBackdrops,
+  contrastRatio,
+  contrastWarnings,
+  parseColor,
+  parseRgba,
+} from './color';
+import { ACCENT_TEXT_MAX_STEPS, ACCENT_TEXT_STEP, resolveTheme, type ThemeFile } from './resolve';
 import { themeSchema } from './schema';
 
 /**
@@ -44,17 +51,22 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the bundled themes', () => {
-  it('are the seven built-ins, all of them bundled', () => {
+  it('are the eight built-ins, all of them bundled', () => {
     expect(files.sort()).toEqual([
       'aurora.json',
       'daybreak.json',
       'ghibli-dusk.json',
       'gryffindor.json',
+      'halloween.json',
       'olympus.json',
       'slytherin.json',
       'tokyo.json',
     ]);
     expect(BUNDLED_THEMES.map((theme) => `${theme.id}.json`).sort()).toEqual(files);
+  });
+
+  it('include the built-in default, so a first visit never silently falls through', () => {
+    expect(BUNDLED_THEMES.map((theme) => theme.id)).toContain(BUILT_IN_DEFAULT_THEME);
   });
 
   it.each(files)('%s matches the theme schema', (file) => {
@@ -112,6 +124,33 @@ describe('the theme schema', () => {
     theme.tokens['--font-body'] = "'Comic Sans MS', cursive";
     expect(validate(theme)).toBe(false);
   });
+
+  // Codex review: a colour the schema accepted but the lint could not read was
+  // skipped, and passed. Both now use one grammar (`COLOR_PATTERN`).
+  it.each([
+    ['#abc', true],
+    ['#aabbcc', true],
+    ['#aabbcc80', true],
+    ['rgb(40%, 40%, 40%)', true],
+    ['rgba(10.5, 20, 30, 0.5)', true],
+    ['rgba(1, 2, 3, 50%)', true],
+    ['rgba( 1 ,2,3, .5 )', true],
+    ['transparent', true],
+    ['#abcde', false],
+    ['rgb(1, 2)', false],
+    ['rgb(50%, 20, 30)', false],
+    ['rgb(1 2 3)', false],
+    ['rgb(1, 2, 3, 4, 5)', false],
+    ['rgb(1.2.3, 4, 5)', false],
+    ['rgba(,,,)', false],
+    ['hsl(0, 0%, 50%)', false],
+    ['red', false],
+  ])('accepts %s exactly when the contrast check can read it (%s)', (value, readable) => {
+    const theme = minimalTheme();
+    theme.tokens['--text'] = value;
+    expect(validate(theme)).toBe(readable);
+    expect(parseRgba(value) !== null).toBe(readable);
+  });
 });
 
 describe('resolveTheme derived defaults (the server cases, ported)', () => {
@@ -159,5 +198,425 @@ describe('contrast lint', () => {
   it('flags text below 4.5:1', () => {
     const warnings = contrastWarnings({ '--text': '#777777', '--bg': '#666666' });
     expect(warnings[0]).toContain('--text');
+  });
+
+  it('reads rgb() in percentages and decimals, as CSS does', () => {
+    expect(parseRgba('rgb(40%, 40%, 40%)')).toEqual({ r: 102, g: 102, b: 102, a: 1 });
+    expect(parseRgba('rgba(10.4, 20, 30, 50%)')).toEqual({ r: 10, g: 20, b: 30, a: 0.5 });
+    expect(parseRgba('rgb(300, 0, 0)')).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(parseRgba('rgba(150%, 0%, 0%, 2)')).toEqual({ r: 255, g: 0, b: 0, a: 1 });
+    expect(parseColor('transparent')).toBeNull();
+  });
+
+  it('measures a backdrop written in percentages instead of skipping it', () => {
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': 'rgb(40%, 40%, 40%)',
+      '--surface': '#000000',
+      '--accent-text': '#7a7a7a',
+    });
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\.34:1/),
+    );
+  });
+
+  it('flags a surface that is translucent, as text is measured on it as solid', () => {
+    const warnings = contrastWarnings({ '--text': '#ffffff', '--surface': 'rgba(0, 0, 0, 0.5)' });
+    expect(warnings).toContainEqual(
+      expect.stringContaining('--surface is rgba(0, 0, 0, 0.5), which is translucent'),
+    );
+  });
+});
+
+// PLAN-40: accent-coloured text gets its own derived token.
+describe('--accent-text', () => {
+  /** The HSL hue of a colour, in degrees. */
+  function hue(value: string): number {
+    const rgb = parseColor(value);
+    if (!rgb) throw new Error(value);
+    const [r, g, b] = [rgb.r / 255, rgb.g / 255, rgb.b / 255];
+    const max = Math.max(r, g, b);
+    const span = max - Math.min(r, g, b);
+    if (span === 0) return 0;
+    const raw =
+      max === r ? ((g - b) / span) % 6 : max === g ? (b - r) / span + 2 : (r - g) / span + 4;
+    return (raw * 60 + 360) % 360;
+  }
+
+  const worst = (tokens: Record<string, string>, color: string) =>
+    Math.min(...accentTextBackdrops(tokens).map((b) => contrastRatio(color, b.color) ?? 21));
+
+  const lightTheme = (accent: string) =>
+    minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f4f6',
+        '--text': '#111827',
+        '--text-muted': '#4b5563',
+        '--border': '#e5e7eb',
+        '--accent': accent,
+        '--accent-soft': `${accent}1a`,
+      },
+    }) as ThemeFile;
+
+  it('derives a readable, same-hue colour for a light theme whose accent fails', () => {
+    const theme = lightTheme('#14b8a6');
+    const accent = '#14b8a6';
+    expect(worst(theme.tokens, accent)).toBeLessThan(4.5);
+
+    const text = resolveTheme(theme).tokens['--accent-text'] ?? '';
+
+    expect(text).not.toBe(accent);
+    expect(worst(resolveTheme(theme).tokens, text)).toBeGreaterThanOrEqual(4.5);
+    expect(Math.abs(hue(text) - hue(accent))).toBeLessThan(1);
+  });
+
+  it('derives a readable, same-hue colour for a dark theme whose accent fails', () => {
+    const accent = '#7c3aed';
+    const theme = minimalTheme({
+      tokens: { ...minimalTheme().tokens, '--accent': accent, '--accent-soft': `${accent}1f` },
+    }) as ThemeFile;
+    expect(worst(theme.tokens, accent)).toBeLessThan(4.5);
+
+    const text = resolveTheme(theme).tokens['--accent-text'] ?? '';
+
+    expect(worst(resolveTheme(theme).tokens, text)).toBeGreaterThanOrEqual(4.5);
+    expect(Math.abs(hue(text) - hue(accent))).toBeLessThan(1);
+    // Lighter in a dark theme, not darker.
+    expect(contrastRatio(text, '#ffffff')).toBeLessThan(contrastRatio(accent, '#ffffff') ?? 0);
+  });
+
+  it('keeps an accent that already reads, exactly', () => {
+    const theme = resolveTheme(minimalTheme() as ThemeFile);
+    expect(theme.tokens['--accent-text']).toBe('#5eead4');
+  });
+
+  it('never overrides an authored value', () => {
+    const theme = minimalTheme();
+    theme.tokens['--accent-text'] = '#a7f3d0';
+    expect(resolveTheme(theme as ThemeFile).tokens['--accent-text']).toBe('#a7f3d0');
+  });
+
+  it('changes only Daybreak and Tokyo among the bundled themes', () => {
+    const changed = BUNDLED_THEMES.filter(
+      (theme) => theme.tokens['--accent-text'] !== theme.tokens['--accent'],
+    ).map((theme) => theme.id);
+    expect(changed.sort()).toEqual(['daybreak', 'tokyo']);
+  });
+
+  it('checks secondary text on every surface, panels included', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: { ...minimalTheme().tokens, '--surface-2': '#4a4a5c' },
+      }) as ThemeFile,
+    ).tokens;
+    expect(contrastWarnings(tokens)).toEqual([
+      expect.stringMatching(/^--text-muted on --surface-2 has contrast/),
+    ]);
+  });
+
+  it('measures translucent text as it renders, over its backdrop', () => {
+    // 10% black over white renders near white: about 1.2:1, not black's 21:1.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f4f6',
+        '--text': '#111827',
+        '--text-muted': 'rgba(17, 24, 39, 0.3)',
+        '--accent': '#0f766e',
+        '--accent-soft': 'rgba(15, 118, 110, 0.1)',
+        '--accent-text': 'rgba(0, 0, 0, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const warnings = contrastWarnings(resolveTheme(theme).tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\./),
+    );
+    expect(warnings).toContainEqual(expect.stringMatching(/^--text-muted on --bg has contrast/));
+  });
+
+  it('derives from a translucent accent as it renders, not as if it were opaque', () => {
+    // Opaque, this teal reads on white; at 30% it does not, so it is stepped.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#ffffff',
+        '--surface': '#ffffff',
+        '--surface-2': '#ffffff',
+        '--text': '#111827',
+        '--text-muted': '#4b5563',
+        '--accent': 'rgba(15, 118, 110, 0.3)',
+        '--accent-soft': 'rgba(15, 118, 110, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const resolved = resolveTheme(theme).tokens;
+
+    expect(resolved['--accent-text']).not.toBe('rgba(15, 118, 110, 0.3)');
+    expect(contrastWarnings(resolved)).toEqual([]);
+  });
+
+  it('checks accent text on the veil a theme actually gets, authored or not', () => {
+    // A light theme with no --screen-veil of its own: the screensaver's
+    // attribution (.nott__author) still sits on a veil, so the veil it gets
+    // must be among the backdrops, and must be a light one.
+    const theme = minimalTheme({
+      mode: 'light',
+      tokens: {
+        ...minimalTheme().tokens,
+        '--bg': '#fbfaf7',
+        '--surface': '#ffffff',
+        '--surface-2': '#f3f1ec',
+        '--text': '#1f2430',
+        '--text-muted': '#5b6070',
+        '--accent': '#0f6b63',
+        '--accent-soft': 'rgba(15, 107, 99, 0.1)',
+      },
+    }) as ThemeFile;
+
+    const tokens = resolveTheme(theme).tokens;
+    const veil = accentTextBackdrops(tokens).find(
+      (backdrop) => backdrop.label === '--screen-veil over --bg',
+    );
+
+    expect(veil).toBeDefined();
+    expect(tokens['--screen-veil']).toBe('rgba(251, 250, 247, 0.95)');
+    expect(contrastWarnings(tokens)).toEqual([]);
+  });
+
+  it('flags accent text on an authored veil it cannot be read on', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        mode: 'light',
+        tokens: {
+          ...minimalTheme().tokens,
+          '--bg': '#ffffff',
+          '--surface': '#ffffff',
+          '--surface-2': '#f3f4f6',
+          '--text': '#111827',
+          '--text-muted': '#4b5563',
+          '--accent': '#0f6b63',
+          '--accent-soft': 'rgba(15, 107, 99, 0.1)',
+          '--screen-veil': 'rgba(6, 8, 14, 0.96)',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    expect(contrastWarnings(tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --screen-veil over --bg has contrast/),
+    );
+  });
+
+  it("makes the stylesheet's default veils explicit, so no shipped theme changes", () => {
+    const veil = (id: string) =>
+      BUNDLED_THEMES.find((entry) => entry.id === id)?.tokens['--screen-veil'];
+    // tokens.css: :root (Aurora, and every dark theme without one) and Daybreak's block.
+    expect(veil('aurora')).toBe('rgba(6, 8, 14, 0.96)');
+    expect(veil('daybreak')).toBe('rgba(250, 247, 241, 0.95)');
+  });
+
+  // Codex review: a gradient's colours were read from its first stop only,
+  // and a colour outside the grammar (`white`) was skipped.
+  it('checks every colour of the card sheen and the sky, and the header veil', () => {
+    const labels = accentTextBackdrops(resolveTheme(minimalTheme() as ThemeFile).tokens).map(
+      (backdrop) => backdrop.label,
+    );
+
+    expect(labels).toContain(
+      '--card-sheen from rgba(236, 236, 245, 0.05) to transparent over --surface',
+    );
+    expect(new Set(labels.filter((label) => label.startsWith('--sky from ')))).toHaveProperty(
+      'size',
+      3,
+    );
+    expect(labels).toContain('--header-veil over --bg');
+  });
+
+  // Codex review: only the stops were checked, while CSS paints every colour
+  // between them.
+  it('checks the colours a gradient paints between its stops, once per run', () => {
+    // #767676 reads 4.6:1 on black and on white, the two stops, but the
+    // gradient passes through its own grey on the way.
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': '#000000',
+      '--surface': '#000000',
+      '--surface-2': '#000000',
+      '--accent-text': '#767676',
+      '--card-sheen': 'linear-gradient(90deg, #000 0%, #fff 100%)',
+    });
+
+    const sheen = contrastWarnings(resolveTheme(theme as ThemeFile).tokens).filter((warning) =>
+      warning.includes('--card-sheen'),
+    );
+
+    expect(sheen).toHaveLength(1);
+    expect(sheen[0]).toMatch(
+      /^--accent-text on --card-sheen from #000 to #fff over --surface has contrast 1\.\d\d:1/,
+    );
+  });
+
+  it('flags a gradient colour the contrast check cannot read', () => {
+    const theme = minimalTheme();
+    theme.tokens['--card-sheen'] = 'linear-gradient(180deg, white 0%, transparent 42%)';
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringContaining('--card-sheen is linear-gradient(180deg, white 0%'),
+    );
+  });
+
+  it('derives against the sheen, the sky and the veils a theme gets, authored or not', () => {
+    // On a black page the derived sky's --accent-2 glow (white at 18%) needs a
+    // lighter accent text than any other backdrop; the theme authors no --sky.
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, {
+      '--bg': '#000000',
+      '--surface': '#000000',
+      '--surface-2': '#000000',
+      '--accent': '#777777',
+      '--accent-2': '#ffffff',
+      '--accent-soft': 'rgba(119, 119, 119, 0.12)',
+    });
+
+    const tokens = resolveTheme(theme as ThemeFile).tokens;
+
+    expect(tokens['--accent-text']).not.toBe('#777777');
+    expect(contrastWarnings(tokens)).toEqual([]);
+  });
+
+  it('flags accent text on an authored header veil it cannot be read on', () => {
+    const theme = minimalTheme();
+    theme.tokens['--header-veil'] = 'rgba(236, 236, 245, 0.9)';
+
+    expect(contrastWarnings(resolveTheme(theme as ThemeFile).tokens)).toContainEqual(
+      expect.stringMatching(/^--accent-text on --header-veil over --bg has contrast/),
+    );
+  });
+
+  it('derives the same accent text for every bundled theme as before', () => {
+    const accentText = Object.fromEntries(
+      BUNDLED_THEMES.map((theme) => [theme.id, theme.tokens['--accent-text']]),
+    );
+    expect(accentText).toMatchObject({ daybreak: '#0b7167', tokyo: '#ff70ae' });
+  });
+
+  it('flags invisible text: transparent reads as its backdrop', () => {
+    const theme = minimalTheme();
+    theme.tokens['--accent-text'] = 'transparent';
+
+    const warnings = contrastWarnings(resolveTheme(theme as ThemeFile).tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --bg has contrast 1\.00:1/),
+    );
+  });
+
+  it('flags a colour the contrast check cannot read, rather than skipping it', () => {
+    // The schema rejects these; the lint must not pass them on its own either.
+    const theme = minimalTheme();
+    Object.assign(theme.tokens, { '--text-muted': 'rgb(55, 56)', '--surface-2': 'hsl(0, 0%, 9%)' });
+
+    const warnings = contrastWarnings(resolveTheme(theme as ThemeFile).tokens);
+
+    expect(warnings).toContainEqual(expect.stringContaining('--text-muted is rgb(55, 56), which'));
+    expect(warnings).toContainEqual(
+      expect.stringContaining('--surface-2 is hsl(0, 0%, 9%), which'),
+    );
+  });
+
+  it('flags text that fails on --accent-soft alone', () => {
+    // Readable on all three surfaces, unreadable on a heavy accent tint.
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: {
+          ...minimalTheme().tokens,
+          '--accent-soft': 'rgba(94, 234, 212, 0.5)',
+          '--accent-text': '#4fb3a5',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    const warnings = contrastWarnings(tokens);
+
+    expect(warnings.length).toBeGreaterThan(0);
+    for (const warning of warnings)
+      expect(warning).toMatch(/^--accent-text on --accent-soft over /);
+  });
+
+  it('flags text that fails on --surface-2 alone (Tokyo before PLAN-40, the Heimdall brand)', () => {
+    const tokens = resolveTheme(
+      minimalTheme({
+        tokens: {
+          ...minimalTheme().tokens,
+          '--surface-2': '#2c3e57',
+          '--accent': '#ff006e',
+          '--accent-soft': 'rgba(255, 0, 110, 0.12)',
+          '--accent-text': '#ff66a8',
+        },
+      }) as ThemeFile,
+    ).tokens;
+
+    const warnings = contrastWarnings(tokens);
+
+    expect(warnings).toContainEqual(
+      expect.stringMatching(/^--accent-text on --surface-2 has contrast/),
+    );
+    for (const warning of warnings) expect(warning).toMatch(/--surface-2 has contrast/);
+  });
+
+  it('gives up past its step limit and names the token to author', () => {
+    // A mid-grey panel: no blue within reach of the limit reads on it.
+    const theme = minimalTheme({
+      tokens: { ...minimalTheme().tokens, '--surface-2': '#8a8a8a', '--accent': '#3b82f6' },
+    }) as ThemeFile;
+
+    const resolved = resolveTheme(theme);
+
+    expect(ACCENT_TEXT_MAX_STEPS * ACCENT_TEXT_STEP).toBeLessThan(0.5);
+    expect(resolved.tokens['--accent-text']).toBe('#3b82f6');
+    expect(contrastWarnings(resolved.tokens)).toContainEqual(
+      expect.stringContaining('Author a readable --accent-text in the theme'),
+    );
+  });
+
+  it("gives the stylesheet's first-paint defaults the derived values", () => {
+    // tokens.css paints before the theme engine runs: Aurora on :root, and
+    // Daybreak under its data-theme. Each must carry what resolveTheme derives.
+    const css = readFileSync(new URL('../tokens.css', import.meta.url), 'utf8');
+    const block = (selector: string) => {
+      const start = css.indexOf(`${selector} {`);
+      return css.slice(start, css.indexOf('\n}', start));
+    };
+    const value = (text: string) => /--accent-text:\s*([^;]+);/.exec(text)?.[1];
+    const theme = (id: string) => BUNDLED_THEMES.find((entry) => entry.id === id)?.tokens;
+    expect(value(block(':root'))).toBe(theme('aurora')?.['--accent-text']);
+    expect(value(block("[data-theme='daybreak']"))).toBe(theme('daybreak')?.['--accent-text']);
+  });
+
+  it('is what every stylesheet colours accent text with, never --accent itself', () => {
+    const root = new URL('../../', import.meta.url);
+    const sheets = (readdirSync(root, { recursive: true }) as string[]).filter((name) =>
+      name.endsWith('.css'),
+    );
+    expect(sheets.length).toBeGreaterThan(5);
+    const offenders = sheets.flatMap((name) =>
+      readFileSync(new URL(name, root), 'utf8')
+        .split('\n')
+        .map((line, index) => ({ line, at: `${name}:${index + 1}` }))
+        // `color:` itself, not border-color, accent-color and the rest.
+        .filter(({ line }) => /(^|[\s;{])color:\s*var\(--accent\)/.test(line))
+        .map(({ at }) => at),
+    );
+    expect(offenders).toEqual([]);
   });
 });

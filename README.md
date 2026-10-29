@@ -65,7 +65,7 @@ The app is organized into three category tabs, plus a few things that work every
 
 ### Everywhere
 
-- 🎨 Themes (Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin, Tokyo built in), bundled with the client: add one as a JSON file and rebuild
+- 🎨 Themes (Halloween, the default, plus Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin and Tokyo built in), bundled with the client: add one as a JSON file and rebuild
 - 🌌 **Nótt** — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 **Heimdall** — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 **Wardens** — device presence dashboard with character-name aliases; upload history & activity log in Heimdall
@@ -278,7 +278,7 @@ Operating & deploying:
 - [`cli/README.md`](cli/README.md) — the `bifrost` command-line client
 - [`docs/api.md`](docs/api.md) — the API docs (Swagger UI) at `http://127.0.0.1:4647/docs` on the server machine, and how to reach them from another one
 - [`docs/testing.md`](docs/testing.md) — every kind of test, where it lives and how to run it
-- [`docs/performance.md`](docs/performance.md) — the on-demand load harness: profiles, numbers, comparing two builds
+- [`docs/performance.md`](docs/performance.md) — the on-demand load harness (profiles, numbers, comparing two builds) and measuring page load with Lighthouse
 
 ## License
 

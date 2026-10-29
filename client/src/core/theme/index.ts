@@ -1,4 +1,5 @@
 import { fetchHeimdallAccess } from '../heimdallAccess';
+import { BUILT_IN_DEFAULT_THEME } from './builtInDefault';
 import { BUNDLED_THEMES } from './bundled';
 import type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 
@@ -8,6 +9,8 @@ export type { ResolvedTheme, ThemeMode, ThemeSummary } from './resolve';
 const CHOICE_KEY = 'bifrost.theme';
 /** Full token map of the applied theme; the index.html FOUC script replays it. */
 const CACHE_KEY = 'bifrost.theme.cache';
+/** On `<html>` while a theme is applied without fading (`base.css`). */
+export const INSTANT_CLASS = 'theme-instant';
 
 export interface ThemeEngineState {
   themes: ThemeSummary[];
@@ -16,19 +19,22 @@ export interface ThemeEngineState {
 
 /**
  * PLAN-04 resolution order, pure for testability:
- * visitor choice → the household default (hub only) → prefers-color-scheme
- * match → first available. An unknown id at any step simply falls through.
+ * visitor choice → the household default (hub only) → the built-in default
+ * (`BUILT_IN_DEFAULT_THEME`) → prefers-color-scheme match → first available.
+ * An unknown id at any step simply falls through.
  */
 export function resolveThemeChoice(input: {
   stored: string | null;
   defaultId: string | null;
+  builtInId: string | null;
   themes: Pick<ThemeSummary, 'id' | 'mode'>[];
   prefersLight: boolean;
 }): string | null {
-  const { stored, defaultId, themes, prefersLight } = input;
+  const { stored, defaultId, builtInId, themes, prefersLight } = input;
   const has = (id: string | null) => themes.some((theme) => theme.id === id);
   if (stored && has(stored)) return stored;
   if (defaultId && has(defaultId)) return defaultId;
+  if (builtInId && has(builtInId)) return builtInId;
   const wanted: ThemeMode = prefersLight ? 'light' : 'dark';
   return themes.find((theme) => theme.mode === wanted)?.id ?? themes[0]?.id ?? null;
 }
@@ -65,13 +71,24 @@ class ThemeEngine {
   init(): void {
     const cached = this.readCache();
     if (cached) {
-      this.apply(cached, { cache: false });
+      // The cache is for index.html's replay, before any script has loaded.
+      // Here the bundled themes are at hand, so a cached theme is replayed as
+      // this build defines it, and the cache refreshed: one an older build
+      // wrote lacks newer tokens (PLAN-40's --accent-text), which would show
+      // the stylesheet's defaults until the household default settles.
+      const current = BUNDLED_THEMES.find((theme) => theme.id === cached.id);
+      this.apply(current ?? cached, { cache: current !== undefined, fade: false });
     }
     if (!__HUB__) {
       // No household on the standalone site: the device's own choice decides.
       this.reconcile(null);
       return;
     }
+    // A first visit has no cached theme to replay, and the household default
+    // request has no timeout: settle now on everything but that default (the
+    // built-in one, usually), rather than show the stylesheet's defaults until
+    // it answers. The household default still replaces it when it arrives.
+    if (!cached) this.reconcile(null);
     fetchHeimdallAccess()
       .then((access) => this.reconcile(access.defaultThemeId))
       .catch(() => {
@@ -86,28 +103,37 @@ class ThemeEngine {
   /** Explicit visitor pick from the switcher. */
   setTheme(id: string): void {
     writeStorage(CHOICE_KEY, id);
-    this.load(id);
+    this.load(id, { fade: true });
   }
 
   private reconcile(defaultId: string | null): void {
     const choice = resolveThemeChoice({
       stored: readStorage(CHOICE_KEY),
       defaultId,
+      builtInId: BUILT_IN_DEFAULT_THEME,
       themes: this.themes,
       prefersLight: window.matchMedia('(prefers-color-scheme: light)').matches,
     });
-    if (choice) this.load(choice);
+    if (choice) this.load(choice, { fade: false });
     else this.notify();
   }
 
-  private load(id: string): void {
+  private load(id: string, options: { fade: boolean }): void {
     const theme = BUNDLED_THEMES.find((candidate) => candidate.id === id);
-    if (theme) this.apply(theme, { cache: true });
+    if (theme) this.apply(theme, { cache: true, fade: options.fade });
     else this.notify();
   }
 
-  private apply(theme: ResolvedTheme, options: { cache: boolean }): void {
+  /**
+   * `fade` is for a visitor's own pick, which the page's colour transitions
+   * animate. Settling on the right theme while the page loads is a change
+   * nobody made, so it lands at once (PLAN-40): a first visit would otherwise
+   * fade from the stylesheet's defaults to its theme, and every one of those
+   * fading colours is an animation the compositor cannot run.
+   */
+  private apply(theme: ResolvedTheme, options: { cache: boolean; fade: boolean }): void {
     const root = document.documentElement;
+    if (!options.fade) root.classList.add(INSTANT_CLASS);
     // Clear what the previous theme set: a theme that omits an optional token
     // must fall back to the stylesheet default, not inherit its predecessor's.
     for (const key of this.appliedKeys) root.style.removeProperty(key);
@@ -116,6 +142,12 @@ class ThemeEngine {
     root.style.colorScheme = theme.mode;
     // data-theme keeps CSS attribute hooks and observers (QrCard) working.
     root.setAttribute('data-theme', theme.id);
+    if (!options.fade) {
+      // Style the new colours while transitions are off, then turn them back
+      // on: the values have already changed, so no transition starts.
+      void document.body?.offsetHeight;
+      root.classList.remove(INSTANT_CLASS);
+    }
     this.activeId = theme.id;
     if (options.cache) {
       writeStorage(
