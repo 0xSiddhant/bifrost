@@ -59,6 +59,26 @@ describe('SkyRelics', () => {
     expect(relics().length).toBeLessThanOrEqual(14);
   });
 
+  it('fetches nothing during the first render, only once the browser is idle', async () => {
+    vi.resetModules();
+    const fresh = await import('./SkyRelics');
+    const load = vi.spyOn(fresh.relicScatterChunk, 'load');
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <fresh.SkyRelics />
+        </MemoryRouter>,
+      ),
+    );
+
+    // Rendered and committed, and the chunk not yet asked for.
+    expect(load).not.toHaveBeenCalled();
+    expect(relics()).toHaveLength(0);
+
+    await settle(() => relics().length > 0);
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
   it('costs only the relics when their chunk cannot be fetched', async () => {
     vi.resetModules();
     const fresh = await import('./SkyRelics');
