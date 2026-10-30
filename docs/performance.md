@@ -101,7 +101,7 @@ Results are never committed (`load-results/` is gitignored): they describe one m
 
 ## Page load
 
-How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 took its before and after numbers. It is not a CI gate, for the reason above: two clean runs a minute apart differed fivefold in blocking time on the same machine. What CI checks instead is what makes a page slow, exactly: the **bundle budget** (`client/bundleBudget.ts`) fails either build when the first load (the entry chunk and everything it imports statically, which `index.html` modulepreloads, plus their CSS) holds a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or CodeMirror, or when its gzipped size passes the budget written in that file. Since PLAN-41 the first load's CSS has a figure of its own too: it is the shell's stylesheet, inlined into every HTML file, and a page's or panel's own styles belong in a stylesheet that page or panel imports. A change that needs more raises the figure in the same PR. Every build prints both: `first load: 108.6 KB gzipped of a 133.0 KB budget, its CSS 9.1 KB of 10.1 KB`.
+How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 took its before and after numbers. It is not a CI gate, for the reason above: two clean runs a minute apart differed fivefold in blocking time on the same machine. What CI checks instead is what makes a page slow, exactly: the **bundle budget** (`client/bundleBudget.ts`) fails either build when the first load (the entry chunk and everything it imports statically, which `index.html` modulepreloads, plus their CSS) holds a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or CodeMirror, or when its gzipped size passes the budget written in that file. Since PLAN-41 the first load's CSS has a figure of its own too: it is the shell's stylesheet, inlined into every HTML file, and a page's or panel's own styles belong in a stylesheet that page or panel imports. A change that needs more raises the figure in the same PR. Every build prints both: `first load: 108.7 KB gzipped of a 133.0 KB budget, its CSS 9.1 KB of 10.1 KB`.
 
 ### Measuring
 
@@ -147,3 +147,16 @@ Lighthouse 13.5.0, mobile preset, headless, median of three, on this repository'
 
 Layout shift was 0 in every run, before and after. Accessibility went from 94 (hub) and 95 (standalone) to 100: no contrast or heading-order failure in any of the seven themes on either home page. Runestone's LCP is its editor: CodeMirror is that page's own content, so it is not in the first load and stays where it is.
 
+### PLAN-41's numbers
+
+Same method, Lighthouse 13.5.0, both builds served by the web host (the standalone one in its `--standalone` mode). The before is PLAN-40's build, measured again the same day:
+
+| Page | Before | After |
+|---|---|---|
+| Hub `/` | 91 (90 / 92 / 91): FCP 2.2 s, LCP 2.9 s, TBT 190 ms, 226 KB | 95 (95 / 94 / 95): FCP 1.9 s, LCP 2.7 s, TBT 50 ms, 222 KB |
+| Standalone `/` | 94 (86 / 95 / 94): FCP 2.1 s, LCP 2.6 s, TBT 50 ms, 217 KB | 96 (94 / 96 / 97): FCP 1.9 s, LCP 2.4 s, TBT 20 ms, 212 KB |
+| Standalone `/runestone` | 78 (78 / 78 / 79): FCP 2.8 s, LCP 4.4 s, TBT 160 ms, 470 KB | 80 (80 / 80 / 79): FCP 2.8 s, LCP 4.3 s, TBT 120 ms, 466 KB |
+
+The audits the owner's report flagged, on the standalone `/`: unused CSS and render-blocking requests went from failing (14 KiB unused; the stylesheet blocking for 300 ms) to passing; unused JavaScript from 40 to 29 KiB; the longest request chain from 325 to 95 ms (the hub's from 221 to 57 ms, Runestone's from 510 to 61 ms). The first load went from 125.8 to 108.7 KB gzipped (the standalone build's from 126.3 to 108.8), its CSS from 17.2 to 9.1. Layout shift stayed 0 in every run.
+
+The relics are fetched once the browser is idle, not during the first render: started during it, their chunk landed inside Lighthouse's simulated page load and moved the standalone LCP from 2.6 to 2.8 s.
