@@ -45,6 +45,7 @@ import {
   updateGroot,
 } from '../../core/groot';
 import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
+import './groot.css';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .yaml file — one trunk, many branches…';
 

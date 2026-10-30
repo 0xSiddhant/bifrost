@@ -93,4 +93,28 @@ describe('the bundle budget (PLAN-40)', () => {
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/the first load is \d+\.\d KB gzipped, over its 1\.0 KB budget/);
   });
+
+  // PLAN-41: the shell's CSS has a figure of its own, so page styles drifting
+  // back into the global sheets fail even while the total has room.
+  it('fails first-load CSS over its own budget, naming the stylesheet and where page styles go', () => {
+    const heavy = app([]);
+    // Incompressible CSS, as above.
+    const css = Array.from({ length: 2000 }, (_, i) => `.c${(i * 7919) % 65521}{x:${i}}`).join('');
+    heavy['assets/index-a.css'] = { type: 'asset', fileName: 'assets/index-a.css', source: css };
+    const { load, problems } = checkBudget(heavy, Infinity, 1024);
+    expect(load.cssGzipBytes).toBeGreaterThan(1024);
+    expect(load.gzipBytes).toBeGreaterThan(load.cssGzipBytes);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(
+      /the first load's CSS is \d+\.\d KB gzipped, over its 1\.0 KB budget \(assets\/index-a\.css\)/,
+    );
+    expect(problems[0]).toContain('a stylesheet that page or panel imports');
+  });
+
+  it('passes CSS under its budget, and still checks the total', () => {
+    const { load, problems } = checkBudget(app([]), 1, Infinity);
+    expect(load.cssGzipBytes).toBeGreaterThan(0);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^the first load is /);
+  });
 });

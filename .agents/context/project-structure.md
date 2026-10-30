@@ -79,6 +79,8 @@ bifrost/
 │   ├── bundleBudget.ts        # both builds (PLAN-40): the first load (entry + static imports + CSS)
 │   │                          #   may hold no heavy library and stays under a gzipped budget
 │   ├── fontPreload.ts         # both builds (PLAN-40): preload the two first-paint fonts, by hashed name
+│   ├── inlineCss.ts           # both builds (PLAN-41): the shell's stylesheet inline in every HTML file,
+│   │                          #   the file dropped (a page's own styles load with its chunk)
 │   └── src/
 │       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
@@ -87,7 +89,8 @@ bifrost/
 │       │                      #   offlineWarmLoad.ts (PLAN-22 — the id → import() loader map; it
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
-│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween)
+│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween;
+│       │                      #   relics/collections.ts holds the names apart from the drawings, PLAN-41)
 │       │                      #   + themes/*.json (bundled at build time, PLAN-35)
 │       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
 │       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
@@ -103,7 +106,8 @@ bifrost/
 │       │                      #   .tone-surface/.tone-chip shared by Portal + the tool card,
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
 │       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
-│       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card), JsonEditor (one `mode`
+│       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card, the sky's
+│       │                      #   relics: SkyRelics lazily loads RelicScatter, PLAN-41), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
@@ -141,7 +145,10 @@ bifrost/
 │       │                      #   textNormalize, runestone + edda + groot + atlas + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
-│       └── features/          # mirrors server modules; route-level code splitting
+│       └── features/          # mirrors server modules; route-level code splitting; each lazy page imports
+│                              #   its own <name>.css (PLAN-41: app.css/ui.css keep the shell and what pages
+│                              #   share; core/ui/tree-view.css, plist-table.css, pager.css and
+│                              #   core/guide/guide-panel.css sit beside their components)
 │                              #   lore-named where the page is lore-named: hermes→clipboard,
 │                              #   wardens→presence (server ids unchanged; sigil/ was deleted in
 │                              #   PLAN-18 — the QR page became a toolbox tool, module untouched);

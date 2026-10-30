@@ -41,6 +41,7 @@ import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer } from './ResultsDrawer';
 import { hasActiveNormalization } from '../../core/textNormalize';
 import { takeVariantTextSeed } from '../../core/variantSeed';
+import './variant.css';
 
 /**
  * Variant (PLAN-08): two-pane JSON & text comparison. Structural JSON diff by

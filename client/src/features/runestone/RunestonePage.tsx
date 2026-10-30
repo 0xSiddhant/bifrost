@@ -44,6 +44,7 @@ import {
 } from '../../core/runestone';
 import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
+import './runestone.css';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
 

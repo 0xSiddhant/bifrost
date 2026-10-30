@@ -6,6 +6,7 @@ import { Button } from '../../core/ui/Button';
 import { ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon } from '../../core/ui/icons';
 import { fetchPreviewMeta } from './api';
 import { PreviewBody, usePreviewMeta } from './PreviewBody';
+import './previews.css';
 
 interface DownloadsContext {
   entries: DownloadEntry[];

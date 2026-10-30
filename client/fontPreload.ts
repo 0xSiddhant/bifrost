@@ -6,9 +6,11 @@
  * arrived, so a font that lands after the first paint swaps in and shifts the
  * text (the public site's 0.017 layout shift, all of it these two). A
  * `<link rel="preload">` in the head starts them with the CSS instead. Only
- * these two: the other weights and JetBrains Mono are not in the first paint,
- * and preloading them would spend bandwidth the CSS and the entry chunk need
- * more. `font-display: swap` stays, so text never waits on a slow font.
+ * these two: Inter 500 and JetBrains Mono 400 are in React's first render of
+ * the home page too, but they are requested once it has rendered, swap in with
+ * no shift, and preloading them would put 45 KB ahead of the entry chunk the
+ * first render waits for (measured in PLAN-41). The other weights aren't on
+ * the home page. `font-display: swap` stays, so text never waits on a slow font.
  *
  * The file names are hashed, so they exist only in the build: the links are
  * added in `transformIndexHtml` from the bundle's own asset names. The

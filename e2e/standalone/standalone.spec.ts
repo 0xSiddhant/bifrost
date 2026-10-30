@@ -187,6 +187,33 @@ test.describe('standalone shell', () => {
     }
   });
 
+  // PLAN-41: the shell's styles are inline, so no page waits on a stylesheet.
+  test('every HTML file the build ships carries the shell styles inline and links no stylesheet', async () => {
+    const dir = fromRepoRoot('client', 'dist-standalone');
+    const pages = (fs.readdirSync(dir, { recursive: true }) as string[]).filter((name) =>
+      name.endsWith('.html'),
+    );
+    expect(pages).toContain('404.html');
+    const shells = new Set<string>();
+    for (const name of pages) {
+      const html = fs.readFileSync(`${dir}/${name}`, 'utf8');
+      expect(html, name).not.toMatch(/<link[^>]*rel="stylesheet"/);
+      // The first-paint theme style (seoBuild.ts), then the shell's, last in <head>.
+      const styles = [...html.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(([, css]) => css ?? '');
+      expect(styles, name).toHaveLength(2);
+      expect(styles[0], name).toMatch(/^html:root\{/);
+      expect(styles[1], name).toContain('@font-face');
+      expect(styles[1], name).toContain('.shell{');
+      expect(html, name).toMatch(/<\/style>\s*<\/head>/);
+      shells.add(styles[1] ?? '');
+    }
+    // One shell stylesheet, the same everywhere, and no longer a file of its own.
+    expect(shells.size).toBe(1);
+    const sheets = fs.readdirSync(`${dir}/assets`).filter((name) => name.endsWith('.css'));
+    expect(sheets.some((name) => /^index-[\w-]+\.css$/.test(name))).toBe(false);
+    expect(sheets.length).toBeGreaterThan(5);
+  });
+
   test('a first visit paints the built-in default theme before any script runs', async ({
     browser,
     site,

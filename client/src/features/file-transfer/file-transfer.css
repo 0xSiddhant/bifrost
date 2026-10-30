@@ -1,0 +1,69 @@
+/* Send and Receive (PLAN-02, PLAN-17). Imported by their pages, so it loads
+   with that chunk instead of with every page (PLAN-41). Tokens only — no
+   literal colours, per rules/coding.md. */
+
+.badge--ok {
+  color: var(--ok);
+  background: var(--accent-soft);
+}
+.badge--danger {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* The Send page's folder destination: the field, then the sentence that says
+   what choosing one actually does — a row would put the two side by side. */
+.upload-destination {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 32rem;
+}
+/* ── Send: staged file cards (PLAN-17b) ─────────────────────── */
+.staged__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.staged__confirm {
+  margin-top: var(--space-2);
+  color: var(--danger);
+}
+/* The exit is ONE animation: hold the confirmation long enough to read, then
+   swipe out. The card is removed on its animationend, so nothing can remove it
+   while it is still on screen — or leave it behind after it has gone. */
+.staged--leaving {
+  animation: staged-leave 2.4s var(--ease) forwards;
+}
+@keyframes staged-leave {
+  0%,
+  62% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+/* Reduced motion still needs *an* animation, and one that still takes time:
+   `animationend` is what removes the card, and the confirmation has to be
+   readable before it goes. This one travels nowhere — it holds, then vanishes
+   — so it is motion-free by construction, which is why it deliberately opts
+   out of the global `animation-duration: 0.01ms !important` reset in base.css.
+   That reset exists to stop movement, and there is none here to stop; obeying
+   it would make the card blink out the instant the move landed. */
+@media (prefers-reduced-motion: reduce) {
+  .staged--leaving {
+    animation: staged-leave-still 2.4s steps(1, end) forwards !important;
+  }
+
+  @keyframes staged-leave-still {
+    0%,
+    99% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+}

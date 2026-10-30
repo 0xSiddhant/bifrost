@@ -27,6 +27,7 @@ import {
 } from './shelf';
 import { TagField } from './TagField';
 import { useShelf } from './useShelf';
+import './accio.css';
 
 const SORTS: Array<{ value: ShelfSort; label: string }> = [
   { value: 'newest', label: 'Newest' },

@@ -1,119 +1,69 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { RELIC_COLLECTIONS, type Relic } from '../../assets/relics';
-import { getEnabledCollections, onRelicPrefsChange } from '../relicPrefs';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { withChunkTimeout } from '../chunkError';
+import { log } from '../log';
+import { ChunkBoundary } from './ChunkBoundary';
 
 /**
- * Scatters a few random relics through the sky layer — a different handful
- * on every page and every reload, drawn from the collections enabled in
- * Heimdall. Pure atmosphere: faint, behind everything, collision-free,
- * invisible to screen readers and pointers.
+ * The relic drawings' own chunk (PLAN-41): 115 of them, of which a page draws
+ * 10–14, were most of the entry chunk's unused JavaScript. An object, so a
+ * test can make it fail.
  */
+export const relicScatterChunk = {
+  load: () => import('./RelicScatter'),
+};
 
-interface Placement {
-  relic: Relic;
-  leftPx: number;
-  topPx: number;
-  size: number;
-  rotate: number;
-  tone: string;
-  duration: number;
-  delay: number;
+/**
+ * Built once: the relics are decoration, so after a failed fetch the sky
+ * stays empty until the page is reloaded rather than retrying.
+ */
+const RelicScatter = lazy(() =>
+  withChunkTimeout(relicScatterChunk.load()).then((module) => ({
+    default: module.RelicScatter,
+  })),
+);
+
+function relicsFailed(error: Error): void {
+  log.warn(`sky: the relic drawings' chunk could not be loaded: ${error.message}`, {
+    module: 'relics',
+  });
 }
 
-function pool(): Relic[] {
-  return getEnabledCollections().flatMap((name) => [...RELIC_COLLECTIONS[name].relics]);
-}
+/** How long a browser with no idle period gets before the relics load anyway. */
+const IDLE_TIMEOUT_MS = 2_000;
+/** Safari has no `requestIdleCallback`: a short wait past the first paint instead. */
+const IDLE_FALLBACK_MS = 200;
 
-/** Rejection-sample positions so no two relics overlap (circle test + margin). */
-function seed(): Placement[] {
-  const relics = pool();
-  if (relics.length === 0) return [];
-
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const count = Math.min(10 + Math.floor(Math.random() * 5), relics.length); // 10–14
-  const placements: Placement[] = [];
-  const usedIndexes = new Set<number>();
-
-  for (let i = 0; i < count; i++) {
-    let relicIndex = Math.floor(Math.random() * relics.length);
-    while (usedIndexes.has(relicIndex)) relicIndex = Math.floor(Math.random() * relics.length);
-
-    const size = 56 + Math.random() * 84;
-    let leftPx = 0;
-    let topPx = 0;
-    let placed = false;
-
-    for (let attempt = 0; attempt < 40 && !placed; attempt++) {
-      // bias toward the margins so relics rarely sit under running text
-      const edge = Math.random() < 0.7;
-      const leftPct = edge
-        ? Math.random() < 0.5
-          ? Math.random() * 14
-          : 84 + Math.random() * 12
-        : 15 + Math.random() * 70;
-      const topPct = 8 + Math.random() * 80;
-      leftPx = (leftPct / 100) * vw;
-      topPx = (topPct / 100) * vh;
-      placed = placements.every((other) => {
-        const dx = leftPx + size / 2 - (other.leftPx + other.size / 2);
-        const dy = topPx + size / 2 - (other.topPx + other.size / 2);
-        const minGap = (size + other.size) / 2 + 24;
-        return dx * dx + dy * dy > minGap * minGap;
-      });
-    }
-    if (!placed) continue; // sky is crowded here — drop this relic rather than overlap
-
-    usedIndexes.add(relicIndex);
-    const relic = relics[relicIndex];
-    if (!relic) continue;
-    placements.push({
-      relic,
-      leftPx,
-      topPx,
-      size,
-      rotate: -24 + Math.random() * 48,
-      tone: ['muted', 'teal', 'violet'][i % 3] as string,
-      duration: 10 + Math.random() * 9,
-      delay: -Math.random() * 10,
-    });
+/**
+ * Runs `task` once the browser is idle after the first paint, and returns the
+ * cancel. The relic chunk is decoration, so it waits for the work the first
+ * render actually needs: started during that render, its download and its 115
+ * drawings' evaluation would share the moments the page is still painting
+ * (Lighthouse's simulated LCP counted them, PLAN-41).
+ */
+function whenIdle(task: () => void): () => void {
+  if (typeof window.requestIdleCallback === 'function') {
+    const id = window.requestIdleCallback(task, { timeout: IDLE_TIMEOUT_MS });
+    return () => window.cancelIdleCallback(id);
   }
-  return placements;
+  const id = window.setTimeout(task, IDLE_FALLBACK_MS);
+  return () => window.clearTimeout(id);
 }
 
+/**
+ * The sky's relics, drawn once the browser is idle after the first paint and
+ * their chunk has arrived. Nothing waits for them and nothing moves when they
+ * appear: they are absolutely placed inside `.sky`. A missing chunk costs the
+ * relics, never the shell.
+ */
 export function SkyRelics() {
-  const { pathname } = useLocation();
-  const [prefsVersion, setPrefsVersion] = useState(0);
-
-  // Heimdall's relic setting applies immediately, no reload needed
-  useEffect(() => onRelicPrefsChange(() => setPrefsVersion((v) => v + 1)), []);
-
-  // re-seed per route and per prefs change; Math.random() varies every reload
-  const placements = useMemo(seed, [pathname, prefsVersion]);
-
+  const [idle, setIdle] = useState(false);
+  useEffect(() => whenIdle(() => setIdle(true)), []);
+  if (!idle) return null;
   return (
-    <>
-      {placements.map((p, i) => {
-        const RelicArt = p.relic;
-        return (
-          <span
-            key={`${pathname}-${prefsVersion}-${i}`}
-            className={`relic relic--${p.tone}`}
-            style={{
-              left: p.leftPx,
-              top: p.topPx,
-              width: p.size,
-              height: p.size,
-              transform: `rotate(${p.rotate}deg)`,
-              animationDuration: `${p.duration}s`,
-              animationDelay: `${p.delay}s`,
-            }}
-          >
-            <RelicArt width="100%" height="100%" />
-          </span>
-        );
-      })}
-    </>
+    <ChunkBoundary onChunkError={relicsFailed}>
+      <Suspense fallback={null}>
+        <RelicScatter />
+      </Suspense>
+    </ChunkBoundary>
   );
 }

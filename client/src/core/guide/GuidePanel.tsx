@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { MarkdownPreview } from '../ui/MarkdownPreview';
 import { CloseIcon } from '../ui/icons';
 import type { Guide } from './registry';
+import './guide-panel.css';
 
 /**
  * The slide-out reference for the format the current page works with (PLAN-30).

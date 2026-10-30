@@ -14,6 +14,7 @@ import {
 import { readSiteUrl, seoPlugin } from './seoBuild';
 import { bundleBudgetPlugin } from './bundleBudget';
 import { fontPreloadPlugin } from './fontPreload';
+import { inlineCssPlugin } from './inlineCss';
 import { precompressPlugin } from './precompress';
 
 // PLAN-36: in dev, Vite plays the web host. It serves on PORT (the address
@@ -106,6 +107,9 @@ export default defineConfig(({ mode }) => {
       // held to its budget, and a .br and .gz written beside every text file.
       fontPreloadPlugin(),
       bundleBudgetPlugin(),
+      // PLAN-41: the shell's stylesheet inline in the HTML. After the budget,
+      // which counts the stylesheet before this drops the file.
+      inlineCssPlugin(),
       precompressPlugin(),
     ],
     define:
