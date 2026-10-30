@@ -101,7 +101,7 @@ Results are never committed (`load-results/` is gitignored): they describe one m
 
 ## Page load
 
-How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 took its before and after numbers. It is not a CI gate, for the reason above: two clean runs a minute apart differed fivefold in blocking time on the same machine. What CI checks instead is what makes a page slow, exactly: the **bundle budget** (`client/bundleBudget.ts`) fails either build when the first load (the entry chunk and everything it imports statically, which `index.html` modulepreloads, plus their CSS) holds a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or CodeMirror, or when its gzipped size passes the budget written in that file. A change that needs more raises the figure in the same PR. Every build prints the figure: `first load: 120.4 KB gzipped of a 133.0 KB budget`.
+How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 took its before and after numbers. It is not a CI gate, for the reason above: two clean runs a minute apart differed fivefold in blocking time on the same machine. What CI checks instead is what makes a page slow, exactly: the **bundle budget** (`client/bundleBudget.ts`) fails either build when the first load (the entry chunk and everything it imports statically, which `index.html` modulepreloads, plus their CSS) holds a module from `highlight.js`, `marked`, `dompurify`, `qrcode`, `mermaid`, `pdfjs-dist` or CodeMirror, or when its gzipped size passes the budget written in that file. Since PLAN-41 the first load's CSS has a figure of its own too: it is the shell's stylesheet, inlined into every HTML file, and a page's or panel's own styles belong in a stylesheet that page or panel imports. A change that needs more raises the figure in the same PR. Every build prints both: `first load: 108.6 KB gzipped of a 133.0 KB budget, its CSS 9.1 KB of 10.1 KB`.
 
 ### Measuring
 
@@ -116,13 +116,23 @@ How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 
 - **The median of three runs**, never one.
 - **One Lighthouse version for a before and its after**, named beside the numbers: scores move between major versions. When a newer version is all you have, take the before numbers again with it.
 - **The pages:** the hub's `/`, and the standalone site's `/` and `/runestone` (served as it is deployed: `./bifrost docker up standalone`, or the web host's `--standalone` mode).
-- **The theme matters.** Headless Chrome prefers a light colour scheme, so a first visit lands on Daybreak. To check contrast in another theme, open the page with that theme picked; Lighthouse's colour-contrast audit is axe-core's `color-contrast` rule, which can be run in any theme from a browser script.
+- **The theme matters.** A first visit lands on the built-in default theme (Halloween since 2026-10-29), whatever colour scheme headless Chrome prefers. To check contrast in another theme, open the page with that theme picked; Lighthouse's colour-contrast audit is axe-core's `color-contrast` rule, which can be run in any theme from a browser script.
+
+### Reading the audits
+
+The performance score is Lighthouse's five metrics (First Contentful Paint, Speed Index, Largest Contentful Paint, Total Blocking Time, Cumulative Layout Shift) and nothing else. The audits listed under them weigh nothing: a red one says where bytes or time go, not that the score is lower for it. Here is what the ones a report of this app shows mean, read from Lighthouse 13's own source (PLAN-41):
+
+- **Render-blocking requests** fails while any request that blocks rendering, such as a stylesheet `<link>`, finishes before the first paint. Module scripts don't block. Since PLAN-41 there is none: the shell's styles are inline, and each page's own stylesheet arrives with its chunk.
+- **Reduce unused CSS** lists a stylesheet, an inline `<style>` included, when its unused share times its compressed size passes 10 KiB. The shell's styles are about 9 KB gzipped, so they stay under it. A page's own stylesheet listed here holds rules for states the page wasn't in when measured.
+- **Reduce unused JavaScript** lists a script when more than 20 KiB of it (compressed) never ran, counted per function. The entry chunk stays on the list: React DOM and React Router alone leave about 30 KiB unrun on a first render (hydration, other event types, data routers), and only a different framework would change that. Read the figure, not the colour. PLAN-41 took it from about 47 KiB on the public site by loading the sky's relic drawings after the first render.
+- **Network dependency tree** fails when any chain has two requests or more: the HTML, plus anything high-priority it starts that isn't a preload. The entry script alone is such a chain, so this audit fails for this app, as it does for nearly any site that loads a script. Read the longest chain and what is in it instead. Since PLAN-41 every chain is two requests long, and none passes through a stylesheet.
+- **Uses deprecated APIs** is a Best Practices audit, and that category does count it. On the public site it is Cloudflare's bot-detection script, not Bifrost (below).
 
 ### Reading a report of the public site
 
 A site behind Cloudflare carries Cloudflare's own scripts, and a report counts them as the site's. Read them apart, and write down which Cloudflare features were on when the report was taken (see [docs/standalone.md, Behind Cloudflare](standalone.md#behind-cloudflare)):
 
-- `/cdn-cgi/challenge-platform/…/jsd/main.js` is Bot Fight Mode / JavaScript Detections. All three deprecation warnings (Shared Storage, `StorageType.persistent`, Protected Audience) come from it, and they are the whole Best Practices deduction.
+- `/cdn-cgi/challenge-platform/…/jsd/main.js` is Bot Fight Mode / JavaScript Detections. All three deprecation warnings (Shared Storage, `StorageType.persistent`, Protected Audience) come from it, and they are the whole Best Practices deduction. On Cloudflare's Free plan only turning Bot Fight Mode off removes it ([docs/standalone.md](standalone.md#behind-cloudflare)).
 - `static.cloudflareinsights.com/beacon.min.js` is Web Analytics. It is the legacy-JavaScript item and a second request on every load.
 
 ### PLAN-40's numbers
