@@ -152,10 +152,24 @@ describe('navigation cancels (WebKit)', () => {
     page: 'http://127.0.0.1:36455/pensieve?type=runestone',
     detail: 'TypeError: Importing a module script failed.',
   };
+  // A lazy page's stylesheet, cut off by the next `page.goto` (PLAN-41).
+  const cssCancel: Violation = {
+    kind: 'console.error',
+    page: 'http://127.0.0.1:44511/pensieve?type=edda',
+    detail:
+      'Error: Unable to preload CSS for http://127.0.0.1:44511/assets/PensievePage-ClnSFGIP.css',
+  };
 
-  it('recognises only the two WebKit shapes, and only for loopback fetches', () => {
+  it('recognises only the three WebKit shapes, and only for loopback requests', () => {
     expect(isNavigationCancelShaped(fetchCancel)).toBe(true);
     expect(isNavigationCancelShaped(importCancel)).toBe(true);
+    expect(isNavigationCancelShaped(cssCancel)).toBe(true);
+    expect(
+      isNavigationCancelShaped({
+        ...cssCancel,
+        detail: 'Error: Unable to preload CSS for https://cdn.example.com/assets/Page-x.css',
+      }),
+    ).toBe(false);
     expect(
       isNavigationCancelShaped({
         ...fetchCancel,
