@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v2.1.1
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v2.1.0...v2.1.1)
+
+### 🩹 Fixes
+
+- **core:** Npm audit 21 → 0 (glob, minimatch overrides) ([b4bab09](https://github.com/0xSiddhant/bifrost/commit/b4bab09))
+
+### ❤️ Contributors
+
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+
 ## v2.1.0
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v2.0.0...v2.1.0)
