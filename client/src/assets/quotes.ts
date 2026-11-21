@@ -2,10 +2,10 @@
  * Quote bank for the Nótt screensaver. One is chosen at random each time the
  * overlay appears (and on rotation). Quotes are drawn from the worlds Bifrost's
  * lore already borrows from — Harry Potter, the MCU, Naruto, Studio Ghibli,
- * Norse myth, and Greek myth/philosophy. Append freely; keep lines short
+ * Norse myth, Greek myth/philosophy, and Yuletide (winter and Christmas tales). Append freely; keep lines short
  * enough to breathe on a dark full-screen canvas.
  */
-export type QuoteWorld = 'harry-potter' | 'mcu' | 'naruto' | 'ghibli' | 'norse' | 'greek';
+export type QuoteWorld = 'harry-potter' | 'mcu' | 'naruto' | 'ghibli' | 'norse' | 'greek' | 'yule';
 
 export interface Quote {
   text: string;
@@ -21,6 +21,7 @@ export const WORLD_LABELS: Record<QuoteWorld, string> = {
   ghibli: 'Studio Ghibli',
   norse: 'Norse Myth',
   greek: 'Ancient Greece',
+  yule: 'Yuletide',
 };
 
 export const QUOTES: readonly Quote[] = [
@@ -199,6 +200,39 @@ export const QUOTES: readonly Quote[] = [
     text: 'The unexamined life is not worth living.',
     author: 'Socrates',
     world: 'greek',
+  },
+
+  // ── Yuletide (winter and Christmas tales) ─────────────────────
+  // A Christmas Carol (1843), Hávamál 68 (Bellows, 1923), The Snow Queen
+  // (Lang's Pink Fairy Book, 1897), Ode to the West Wind (1819), and two
+  // spoken lines from Frozen (2013). No song lyrics.
+  {
+    text: 'I will honour Christmas in my heart, and try to keep it all the year.',
+    author: 'Ebenezer Scrooge',
+    world: 'yule',
+  },
+  { text: 'God bless Us, Every One!', author: 'Tiny Tim', world: 'yule' },
+  { text: 'Mankind was my business.', author: 'Jacob Marley', world: 'yule' },
+  {
+    text: 'Fire is best among the sons of men, and the sight of the sun.',
+    author: 'The Hávamál',
+    world: 'yule',
+  },
+  {
+    text: 'Those are the white bees swarming.',
+    author: 'Hans Christian Andersen, The Snow Queen',
+    world: 'yule',
+  },
+  {
+    text: 'If Winter comes, can Spring be far behind?',
+    author: 'Percy Bysshe Shelley',
+    world: 'yule',
+  },
+  { text: 'Some people are worth melting for.', author: 'Olaf', world: 'yule' },
+  {
+    text: 'Only an act of true love can thaw a frozen heart.',
+    author: 'Grand Pabbie',
+    world: 'yule',
   },
 ];
 
