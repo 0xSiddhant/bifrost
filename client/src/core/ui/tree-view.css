@@ -1,0 +1,132 @@
+/* The tree view Runestone, Groot and Atlas share (PLAN-07). Imported by
+   TreeView, so it loads with that chunk instead of with every page (PLAN-41).
+   Tokens only — no literal colours, per rules/coding.md. */
+
+.rune-workspace .rune-tree {
+  max-height: var(--rune-editor-h);
+}
+/* tree view — read-only explorer; editing happens in code mode */
+.rune-tree {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  max-height: 60vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+/* Bulk fold controls — sticky so they stay reachable while the tree scrolls;
+   negative margins let the bar span the padded edges of the scroll box. */
+.rune-tree__controls {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.rune-tree__ctl {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.rune-tree__ctl:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.rune-tree__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px 0 2px calc(var(--tree-depth, 0) * var(--space-4));
+  min-width: 0;
+}
+.rune-tree__spacer {
+  width: 14px;
+  flex: none;
+}
+.rune-tree__toggle {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0;
+  width: 14px;
+  flex: none;
+  cursor: pointer;
+  align-self: center;
+  display: inline-flex;
+  transition: transform var(--dur-1) var(--ease);
+}
+.rune-tree__toggle--open {
+  transform: rotate(90deg);
+}
+.rune-tree__key {
+  background: transparent;
+  border: none;
+  color: var(--syn-key);
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+}
+.rune-tree__key:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rune-tree__value {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.rune-tree__value:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rune-tree__value--string {
+  color: var(--syn-string);
+}
+.rune-tree__value--number {
+  color: var(--syn-number);
+}
+.rune-tree__value--boolean {
+  color: var(--syn-bool);
+}
+.rune-tree__value--null {
+  color: var(--syn-null);
+}
+.rune-tree__badge {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+}
+.rune-tree__count {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+/* Alias badge in the tree (`*base`). The tree shows resolved values, so this is
+   the only thing distinguishing an alias from a duplicated branch. */
+.rune-tree__note {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--syn-bool);
+}

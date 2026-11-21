@@ -6,7 +6,8 @@
  * followed down transitively: exactly the set `index.html` modulepreloads,
  * plus the CSS those chunks pull in. The build fails when that set holds a
  * module from one of the heavy libraries below (each belongs to a page or a
- * panel and is loaded lazily), or when its gzipped size passes the budget.
+ * panel and is loaded lazily), when its gzipped size passes the budget, or
+ * when its CSS alone passes the CSS budget (PLAN-41).
  *
  * Lighthouse itself is not a CI gate: on a shared runner two clean runs a
  * minute apart differed fivefold in blocking time, and PLAN-34 already ruled
@@ -44,6 +45,17 @@ export const FORBIDDEN_PACKAGES = [
  */
 export const FIRST_LOAD_BUDGET_BYTES = 133 * 1024;
 
+/**
+ * The first load's CSS, gzipped, may not pass this (PLAN-41). Since each page's
+ * and panel's styles load with that page, the first load's CSS is the shell's
+ * alone, inlined into every HTML file. Set 2026-10-29 to the measured figure
+ * plus 10%: 9.14 KB in both builds (from 17.2 KB) → 10.1 KB. The total above has
+ * about 12 KB of slack, the size of every page's styles together, so only this
+ * figure catches them drifting back into `app.css` or `ui.css` one section at a
+ * time.
+ */
+export const FIRST_LOAD_CSS_BUDGET_BYTES = Math.round(10.1 * 1024);
+
 /** The parts of Vite's output this reads: a chunk or an emitted asset. */
 export type BudgetBundle = Record<
   string,
@@ -64,6 +76,8 @@ export interface FirstLoad {
   chunks: string[];
   css: string[];
   gzipBytes: number;
+  /** The CSS's share of `gzipBytes`. */
+  cssGzipBytes: number;
 }
 
 /** The npm package a module id belongs to, or null for the app's own source. */
@@ -95,19 +109,22 @@ export function firstLoad(bundle: BudgetBundle): FirstLoad {
     for (const sheet of chunk.viteMetadata?.importedCss ?? []) css.add(sheet);
     queue.push(...chunk.imports);
   }
-  const gzipBytes = [...chunks, ...css].reduce((sum, fileName) => {
-    const output = bundle[fileName];
-    if (!output) return sum;
-    const text = output.type === 'chunk' ? output.code : output.source;
-    return sum + gzipSync(text, { level: 9 }).length;
-  }, 0);
-  return { chunks, css: [...css], gzipBytes };
+  const gzipped = (files: Iterable<string>) =>
+    [...files].reduce((sum, fileName) => {
+      const output = bundle[fileName];
+      if (!output) return sum;
+      const text = output.type === 'chunk' ? output.code : output.source;
+      return sum + gzipSync(text, { level: 9 }).length;
+    }, 0);
+  const cssGzipBytes = gzipped(css);
+  return { chunks, css: [...css], gzipBytes: gzipped(chunks) + cssGzipBytes, cssGzipBytes };
 }
 
 /** The first load, and what is wrong with it, one line each (none when within budget). */
 export function checkBudget(
   bundle: BudgetBundle,
   budgetBytes: number = FIRST_LOAD_BUDGET_BYTES,
+  cssBudgetBytes: number = FIRST_LOAD_CSS_BUDGET_BYTES,
 ): { load: FirstLoad; problems: string[] } {
   const load = firstLoad(bundle);
   const problems: string[] = [];
@@ -129,6 +146,14 @@ export function checkBudget(
         'raise FIRST_LOAD_BUDGET_BYTES in client/bundleBudget.ts in the same change',
     );
   }
+  if (load.cssGzipBytes > cssBudgetBytes) {
+    problems.push(
+      `the first load's CSS is ${kb(load.cssGzipBytes)} gzipped, over its ${kb(cssBudgetBytes)} ` +
+        `budget (${load.css.join(', ')}). A page's or panel's own styles go in a stylesheet ` +
+        'that page or panel imports, not in app.css or ui.css. If the shell itself grew, raise ' +
+        'FIRST_LOAD_CSS_BUDGET_BYTES in client/bundleBudget.ts in the same change',
+    );
+  }
   return { load, problems };
 }
 
@@ -136,17 +161,27 @@ function kb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
-export function bundleBudgetPlugin(budgetBytes: number = FIRST_LOAD_BUDGET_BYTES): Plugin {
+export function bundleBudgetPlugin(
+  budgetBytes: number = FIRST_LOAD_BUDGET_BYTES,
+  cssBudgetBytes: number = FIRST_LOAD_CSS_BUDGET_BYTES,
+): Plugin {
   return {
     name: 'bifrost-bundle-budget',
     apply: 'build',
     enforce: 'post',
     generateBundle(_options, bundle) {
-      const { load, problems } = checkBudget(bundle as unknown as BudgetBundle, budgetBytes);
+      const { load, problems } = checkBudget(
+        bundle as unknown as BudgetBundle,
+        budgetBytes,
+        cssBudgetBytes,
+      );
       if (problems.length > 0) {
         this.error(`bundle budget:\n  ${problems.join('\n  ')}`);
       }
-      this.info(`first load: ${kb(load.gzipBytes)} gzipped of a ${kb(budgetBytes)} budget`);
+      this.info(
+        `first load: ${kb(load.gzipBytes)} gzipped of a ${kb(budgetBytes)} budget, ` +
+          `its CSS ${kb(load.cssGzipBytes)} of ${kb(cssBudgetBytes)}`,
+      );
     },
   };
 }

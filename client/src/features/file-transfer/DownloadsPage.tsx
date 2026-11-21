@@ -9,6 +9,7 @@ import { ArchiveFileIcon, DownloadIcon, EyeIcon, FolderIcon } from '../../core/u
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { folderArchiveUrl } from './api';
 import { useDownloads } from './useDownloads';
+import './file-transfer.css';
 
 type SortKey = 'newest' | 'name' | 'size';
 

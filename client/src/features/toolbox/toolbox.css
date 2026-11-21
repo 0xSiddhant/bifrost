@@ -14,9 +14,10 @@
    A container, so the tables below flow into more columns when the *panel*
    gives them room. Keyed on the container rather than the viewport because the
    same output sits in a full-width panel, in a split panel's right column, and
-   in half of the URL parser — three different widths at one viewport size. */
-.tool-output,
-.tool-panel__body {
+   in half of the URL parser — three different widths at one viewport size. The
+   panel body is the other container; ExpandingGrid renders it before this
+   stylesheet loads, so its rule is in ui.css (PLAN-41). */
+.tool-output {
   container-type: inline-size;
 }
 
@@ -353,20 +354,21 @@
   max-width: 44rem;
 }
 
-/* A generated value that deserves to be read at a glance. */
+/* A generated value that deserves to be read at a glance. It is always set in
+   `.mono` (base.css), whose size it takes: a font-size here never applied while
+   this stylesheet came before base.css in the bundle, and would have changed
+   the look once it moved to the tool chunk, after base.css (PLAN-41). */
 .tool-secret {
   display: block;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface-2);
-  font-size: var(--text-lg);
   letter-spacing: 0.04em;
   overflow-wrap: anywhere;
 }
 
 .tool-secret--wrap {
-  font-size: var(--text-md);
   letter-spacing: 0;
 }
 

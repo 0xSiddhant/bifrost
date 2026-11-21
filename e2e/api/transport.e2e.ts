@@ -195,7 +195,12 @@ describe('transport', () => {
     it('serves a built asset with its content type', async () => {
       const index = fs.readFileSync(fromRepoRoot('client/dist/index.html'), 'utf8');
       const script = /<script[^>]+src="(\/assets\/[^"]+\.js)"/.exec(index)?.[1];
-      const style = /<link[^>]+href="(\/assets\/[^"]+\.css)"/.exec(index)?.[1];
+      // The shell's stylesheet is inline in index.html (PLAN-41); a page's own
+      // stylesheet is still a file, fetched with its chunk.
+      const sheet = fs
+        .readdirSync(fromRepoRoot('client/dist/assets'))
+        .find((name) => name.endsWith('.css'));
+      const style = sheet && `/assets/${sheet}`;
       expect(script).toBeDefined();
       expect(style).toBeDefined();
       const js = await suite.client().get(script as string);

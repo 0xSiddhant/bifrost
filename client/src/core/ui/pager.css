@@ -1,0 +1,80 @@
+/* The Pensieve's numbered pager (PLAN-31). Imported by Pager, so it loads with
+   that chunk instead of with every page (PLAN-41). Tokens only — no literal
+   colours, per rules/coding.md. */
+
+/* ── Pager (PLAN-31) ─────────────────────────────────────────────
+   Numbered pages for a list whose rows live on the server. Floating, it is a
+   vertical column fixed bottom-right (iPad-sized and up, see Pager.tsx);
+   inline, it is a row under the list in normal flow. z 30 sits above page
+   content and below the guide drawer (40) and the Heimdall scrim (50). */
+.pager {
+  --pager-control: 2.25rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.pager--inline {
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+.pager--floating {
+  position: fixed;
+  right: max(var(--space-6), env(safe-area-inset-right));
+  bottom: max(var(--space-6), env(safe-area-inset-bottom));
+  z-index: 30;
+  flex-direction: column;
+  padding: var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+/* In a column, "previous" points up and "next" points down. */
+.pager--floating .pager__step svg {
+  transform: rotate(90deg);
+}
+.pager__page,
+.pager__step,
+.pager__gap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--pager-control);
+  height: var(--pager-control);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.pager__page:hover,
+.pager__step:hover:not(.pager__step--off) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.pager__page:focus-visible,
+.pager__step:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pager__page--on {
+  color: var(--bg);
+  background: var(--accent);
+  font-weight: 600;
+}
+.pager__page--on:hover {
+  color: var(--bg);
+  background: var(--accent);
+}
+.pager__step--off {
+  opacity: 0.35;
+}
+.pager__gap {
+  min-width: auto;
+  height: auto;
+  padding: 0 var(--space-1);
+  line-height: 1;
+}

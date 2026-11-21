@@ -1,4 +1,4 @@
-import { ALL_COLLECTIONS, type RelicCollection } from '../assets/relics';
+import { ALL_COLLECTIONS, type RelicCollection } from '../assets/relics/collections';
 
 /**
  * Which relic collections drift through the sky. A visual preference of the

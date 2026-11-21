@@ -112,6 +112,9 @@ export const API_OUTAGE: AllowEntry = {
  * a page error ("Fetch API cannot load … due to access control checks") or a
  * console line ("Importing a module script failed"). For a loopback URL that
  * text cannot be a real CORS failure: every request here is same-origin.
+ * A lazy page's stylesheet (PLAN-41) is cut off the same way: WebKit fires
+ * the `<link>`'s error event, Vite's preload helper rejects the import with
+ * "Unable to preload CSS for <url>", and React logs the boundary's catch.
  *
  * Shape alone is not enough to allow it — the same words would describe a
  * chunk that really failed to load — so `NavigationCancels` allows one only
@@ -120,11 +123,14 @@ export const API_OUTAGE: AllowEntry = {
  */
 const LOOPBACK_FETCH_CANCEL =
   /Fetch API cannot load https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/].* due to access control checks/;
+const LOOPBACK_CSS_CANCEL =
+  /^Error: Unable to preload CSS for https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/]\S*\.css$/;
 
 export function isNavigationCancelShaped(violation: Violation): boolean {
   if (violation.kind !== 'pageerror' && violation.kind !== 'console.error') return false;
   return (
     LOOPBACK_FETCH_CANCEL.test(violation.detail) ||
+    LOOPBACK_CSS_CANCEL.test(violation.detail) ||
     /^TypeError: Importing a module script failed\.$/.test(violation.detail)
   );
 }

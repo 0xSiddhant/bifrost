@@ -19,6 +19,8 @@
     "bundleBudget.ts",
     "bundleBudget.test.ts",
     "fontPreload.ts",
-    "fontPreload.test.ts"
+    "fontPreload.test.ts",
+    "inlineCss.ts",
+    "inlineCss.test.ts"
   ]
 }

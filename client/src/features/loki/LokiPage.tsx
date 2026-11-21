@@ -43,6 +43,7 @@ import { runRegex } from './regex';
 import { loadLokiDraft, saveLokiDraft, type LokiDraft } from './draft';
 import { LokiRunner } from './runner';
 import { OutputDrawer, emptyOutput, type OutputState } from './OutputDrawer';
+import './loki.css';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or transform JavaScript…';
 const REGEX_PLACEHOLDER = 'Text to test the pattern against…';

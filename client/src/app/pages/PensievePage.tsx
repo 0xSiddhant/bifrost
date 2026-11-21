@@ -35,6 +35,7 @@ import {
   type LibraryQuery,
   type LibrarySort,
 } from '../../core/library';
+import './pensieve.css';
 
 /** The device that saved it, by PLAN-06 display rules (alias-first). */
 function authorDisplay(deviceId: string | null): string {

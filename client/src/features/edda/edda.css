@@ -1,0 +1,235 @@
+/* Edda (PLAN-11). Imported by its editor and its public preview page, so it
+   loads with that chunk instead of with every page (PLAN-41). Tokens only — no
+   literal colours, per rules/coding.md. */
+
+/* The export's print-only twin never shows in the app. */
+:is(.md-preview, .preview-markdown) figure.mermaid--print {
+  display: none;
+}
+
+/* ── Edda (PLAN-11): Markdown editor + live preview + library ─────────────── */
+.eyebrow--amber {
+  color: var(--tone-amber);
+}
+.edda-workspace-wrap {
+  --edda-h: 60vh;
+}
+/* Full-width breakout at ≥1024px (Variant/Runestone precedent); the page head
+   comes along so the whole page aligns. Below that it stays in the column. */
+@media (min-width: 1024px) {
+  .edda-head,
+  .edda-workspace-wrap {
+    --edda-w: min(105rem, calc(100vw - 2 * var(--space-8)));
+    width: var(--edda-w);
+    margin-inline: calc((100% - var(--edda-w)) / 2);
+  }
+  .edda-workspace-wrap {
+    --edda-h: max(30rem, calc(100vh - 22rem));
+  }
+}
+.edda-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.edda-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.edda-toolbar__group--end {
+  margin-left: auto;
+  gap: var(--space-1) var(--space-2);
+}
+.edda-tool {
+  min-width: 2.2rem;
+  height: 2rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.edda-tool:hover {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.edda-panetoggle {
+  margin-bottom: var(--space-3);
+}
+.edda-workspace {
+  display: flex;
+  gap: var(--space-3);
+}
+.edda-panes {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0;
+  height: var(--edda-h);
+}
+.edda-workspace--stacked .edda-panes {
+  flex-direction: column;
+  gap: var(--space-3);
+  height: auto;
+}
+.edda-editor {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+}
+.edda-editor .json-editor {
+  flex: 1;
+  min-width: 0;
+}
+/* Split mode: editor width from the draggable ratio, preview takes the rest. */
+.edda-workspace--split .edda-editor {
+  flex: 0 0 calc(var(--edda-ratio, 0.5) * 100% - 0.5 * var(--space-3));
+}
+.edda-workspace--stacked .edda-editor {
+  height: 50vh;
+}
+.edda-divider {
+  flex: 0 0 6px;
+  align-self: stretch;
+  margin: 0 var(--space-1);
+  border-radius: 999px;
+  background: var(--border);
+  cursor: col-resize;
+  touch-action: none;
+}
+.edda-divider:hover {
+  background: var(--accent);
+}
+.edda-preview-wrap {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.edda-workspace--stacked .edda-preview-wrap {
+  height: 50vh;
+}
+.edda-preview-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--surface-2);
+}
+.edda-outline {
+  flex: 0 0 14rem;
+  max-height: var(--edda-h);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.edda-outline__title {
+  margin-bottom: var(--space-2);
+}
+.edda-outline ul,
+.edda-read__outline ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.edda-outline button {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 2px 0;
+}
+.edda-outline button:hover {
+  color: var(--accent-text);
+}
+.edda-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+.edda-status__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+.edda-status__toggle input {
+  accent-color: var(--accent);
+}
+.edda-soon {
+  text-align: center;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+/* Public read-only page (/edda/preview/:slug). */
+.edda-read__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+.edda-read__title {
+  margin: 0;
+}
+.edda-read__body {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+.edda-read__outline {
+  position: sticky;
+  top: var(--space-4);
+  flex: 0 0 14rem;
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+}
+.edda-read__outline a {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.edda-read__outline a:hover {
+  color: var(--accent-text);
+}
+.md-preview--read {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  overflow: visible;
+  max-width: 46rem;
+}
+@media (max-width: 900px) {
+  .edda-read__outline {
+    display: none;
+  }
+}

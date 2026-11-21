@@ -6,6 +6,7 @@ import { CloseIcon, SearchIcon, ShieldIcon } from '../../core/ui/icons';
 import { login, logout } from './api';
 import { ctlId, SECTION_GROUPS, SECTIONS } from './sections';
 import { searchSections } from './search';
+import './heimdall.css';
 
 const [FIRST_SECTION] = SECTIONS;
 

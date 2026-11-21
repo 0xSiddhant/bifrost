@@ -6,6 +6,7 @@ import { CloseIcon } from '../../core/ui/icons';
 import { fetchUploadPreviewMeta } from './api';
 import { PreviewBody, usePreviewMeta } from './PreviewBody';
 import { API_V1 } from '../../core/api';
+import './previews.css';
 
 /**
  * Preview of a file still staged in uploads/ (PLAN-17b), at

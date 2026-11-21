@@ -11,6 +11,7 @@ import { QrTool } from './tools/QrTool';
 import { SecretTool } from './tools/SecretTool';
 import { UrlTool } from './tools/UrlTool';
 import { UuidTool } from './tools/UuidTool';
+import './toolbox.css';
 
 /**
  * The whole tool set in **one** lazy chunk (PLAN-18), loaded when the first

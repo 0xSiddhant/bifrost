@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { formatJsonPath } from '../json';
 import { ChevronRightIcon } from './icons';
+import './tree-view.css';
 
 /**
  * Read-only explorer for a parsed JSON document (PLAN-07): collapsible nodes,

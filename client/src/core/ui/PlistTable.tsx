@@ -15,6 +15,7 @@ import {
   type XmlChange,
 } from '../xml/plist';
 import { DisclosureIcon, GripIcon, MinusIcon, PlusIcon, StepperIcon } from './icons';
+import './plist-table.css';
 
 /**
  * The editable, Xcode-shaped property list table (PLAN-23).

@@ -13,6 +13,7 @@ import { copyText } from '../../core/copy';
 import { addClipboard, deleteClipboard, type ClipboardEntry } from './api';
 import { linkify, opensInNewTab } from './linkify';
 import { useClipboard } from './useClipboard';
+import './hermes.css';
 
 function byteSize(text: string): string {
   return formatBytes(new TextEncoder().encode(text).length);
