@@ -368,10 +368,20 @@ test.describe('standalone features', () => {
 
 test.describe('standalone Heimdall', () => {
   const sectionNav = (page: Page) => page.getByRole('navigation', { name: 'Sections' });
+  /**
+   * The prerendered page has loaded before React mounts the app, and the
+   * shortcut's listener with it, so a key pressed right after `goto` can
+   * reach no listener at all (10 of 15 runs of these tests lost it on a
+   * loaded machine). The app's header is the mount.
+   */
+  const openHeimdall = async (page: Page) => {
+    await expect(page.locator('.shell-header')).toBeVisible();
+    await page.keyboard.press('Shift+Meta+Comma');
+  };
 
   test('opens without a PIN, on device-local sections only', async ({ page, stubCalls }) => {
     await page.goto('/');
-    await page.keyboard.press('Shift+Meta+Comma');
+    await openHeimdall(page);
     const dialog = page.getByRole('dialog', { name: 'Heimdall' });
     await expect(sectionNav(page)).toBeVisible();
     await expect(dialog.getByLabel('PIN')).toHaveCount(0);
@@ -399,7 +409,7 @@ test.describe('standalone Heimdall', () => {
     await expect(other.getByRole('button', { name: 'Run' })).toBeVisible();
 
     await page.goto('/');
-    await page.keyboard.press('Shift+Meta+Comma');
+    await openHeimdall(page);
     const dialog = page.getByRole('dialog', { name: 'Heimdall' });
     await sectionNav(page).getByRole('button', { name: 'Loki', exact: true }).click();
     const execution = dialog.getByLabel('Enable sandboxed execution');
@@ -411,7 +421,7 @@ test.describe('standalone Heimdall', () => {
     await expect(other.getByRole('button', { name: 'Run' })).toBeHidden();
 
     await page.reload();
-    await page.keyboard.press('Shift+Meta+Comma');
+    await openHeimdall(page);
     await sectionNav(page).getByRole('button', { name: 'Loki', exact: true }).click();
     await expect(dialog.getByLabel('Enable sandboxed execution')).not.toBeChecked();
   });
@@ -426,7 +436,7 @@ test.describe('standalone Heimdall', () => {
       localStorage.setItem('bifrost.local.loki', '{not json');
     });
     await page.reload();
-    await page.keyboard.press('Shift+Meta+Comma');
+    await openHeimdall(page);
     const dialog = page.getByRole('dialog', { name: 'Heimdall' });
     await sectionNav(page).getByRole('button', { name: 'Screensaver', exact: true }).click();
     await expect(dialog.getByLabel('Particle density')).toHaveValue('high');
