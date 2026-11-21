@@ -17,15 +17,23 @@ declared in `core/fonts.css` with `font-display: swap` and system fallbacks.
 
 ## Themes
 
-Eight themes ship built in; users add more as JSON — see
+Nine themes ship built in; users add more as JSON — see
 [THEME-SPEC.md](THEME-SPEC.md) for the schema and resolver.
 
-- **Halloween** (default, dark) — near-black aubergine base, bone text,
+- **Yule** (default, light) — winter and Christmas: frost-white base, white
+  cards, glacier-blue `--accent` (frozen water), holly-red `--accent-2`,
+  evergreen `--ok`, ornament-gold `--warn`. Its sky paints a pale aurora, a
+  winter-sun halo and a cold blue wash; the starfield becomes blue frost
+  glints; snow falls behind every page, Christmas lights hang below the
+  header, and Santa's sleigh rides along a snowy footer (the opt-in
+  decorations, THEME-SPEC.md). The default for every first visit, whatever
+  the device's colour scheme (`core/theme/builtInDefault.ts`), since
+  2026-11-21.
+- **Halloween** (dark) — near-black aubergine base, bone text,
   pumpkin `--accent`, witch-violet `--accent-2`, potion-green `--ok`. Its sky
   paints a harvest-moon disc, a violet glow and a low graveyard mist; the
   bridge runs candy-corn into witchlight; the idle screensaver floats embers
-  and green will-o'-the-wisps. The default for every first visit, whatever
-  the device's colour scheme (`core/theme/builtInDefault.ts`).
+  and green will-o'-the-wisps. The default from 2026-10-29 until Yule.
 - **Aurora** (dark) — near-black blue-slate, aurora accents
   (teal `--accent`, violet `--accent-2`, green `--ok`) used sparingly.
 - **Daybreak** (light) — warm paper background, same hues desaturated.
@@ -75,10 +83,11 @@ progress fills, the wordmark, hero accents, and primary-action gradients.
 ## Atmosphere — the sky and its relics
 
 Every page sits under `.sky`: layered aurora glows (`--sky`), a slow drifting
-aurora ribbon, and a faint starfield (dark theme only, via `--stars-alpha`).
+aurora ribbon, and a faint starfield (dark themes by default, via
+`--stars-alpha`; Yule turns it on as blue frost glints).
 
 **Relics** are the fun layer: 10–14 random line-art artifacts scattered through
-the sky, re-shuffled on every route change and reload. Five collections live
+the sky, re-shuffled on every route change and reload. Six collections live
 in `client/src/assets/relics/` (shared primitives in `shared.tsx`, each
 collection registered in `index.ts`):
 
@@ -89,6 +98,7 @@ collection registered in `index.ts`):
 | Olympus (`greek.tsx`) | 20 | trident, lyre, laurel, labyrinth, owl, Ω Δ Ψ… |
 | Ghibli world (`ghibli.tsx`) | 19 | soot sprites, forest spirit, 森 風 火 kanji… |
 | Halloween (`halloween.tsx`) | 35 | jack-o'-lantern, ghost, bat, witch's hat, vampire, cemetery gate, BOO… |
+| Yule (`yule.tsx`) | 40 | baubles, star topper, wreath, holly, candy cane, gingerbread, nutcracker, three snowflakes, snowman, ice palace, JÓL, NOËL… |
 
 Heimdall → **Sky relics** lets the owner enable/disable collections per
 device (default: all). It's a client-side visual preference (localStorage via
@@ -108,9 +118,27 @@ Rules that keep them tasteful:
 - gentle 10–19s vertical drift, frozen by `prefers-reduced-motion`
 - `aria-hidden`, `pointer-events: none` — decoration only, never content
 
+**A theme's opt-in decorations** (the Yule world, THEME-SPEC.md) come with
+the relics' chunk, after the first paint, and are not rendered at all in a
+theme that leaves them off:
+
+- **Snowfall** — three depth layers of flakes in `.sky`, in front of the
+  relics and behind every card; each layer falls one tile and loops, and
+  sways a few pixels. Phones keep two layers. Heimdall → Sky Relics has a
+  per-device Snowfall switch; reduced motion leaves the flakes still.
+- **String lights** — a strand of bulbs in the theme's four role colours,
+  hung below the header in the space every page leaves empty there, so it
+  scrolls away under the header and never covers content (or Accio's and
+  Portkey's sticky bars). Each colour twinkles by opacity.
+- **Footer scene** — a snow pile, snowy pines and Santa's sleigh on the
+  footer line, inside the 48px `.shell-main` already leaves above the footer,
+  so no page grows. The sleigh rides by every 40s, only while the footer is
+  on screen; reduced motion parks it. Hidden on phones with the footer.
+
 **Ambient motion exception:** the 150–200ms rule governs *interaction*
-feedback. The sky layer (aurora drift, bridge flow, relic float) is the one
-sanctioned slow-motion zone — owner-approved 2026-07-13.
+feedback. The sky layer (aurora drift, bridge flow, relic float, and a
+theme's snowfall, twinkling lights and sleigh ride) is the one sanctioned
+slow-motion zone — owner-approved 2026-07-13, extended 2026-11-21.
 
 ## Do / Don't
 

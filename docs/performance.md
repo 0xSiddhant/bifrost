@@ -116,7 +116,7 @@ How fast a page appears is measured with Lighthouse, on demand, the way PLAN-40 
 - **The median of three runs**, never one.
 - **One Lighthouse version for a before and its after**, named beside the numbers: scores move between major versions. When a newer version is all you have, take the before numbers again with it.
 - **The pages:** the hub's `/`, and the standalone site's `/` and `/runestone` (served as it is deployed: `./bifrost docker up standalone`, or the web host's `--standalone` mode).
-- **The theme matters.** A first visit lands on the built-in default theme (Halloween since 2026-10-29), whatever colour scheme headless Chrome prefers. To check contrast in another theme, open the page with that theme picked; Lighthouse's colour-contrast audit is axe-core's `color-contrast` rule, which can be run in any theme from a browser script.
+- **The theme matters.** A first visit lands on the built-in default theme (Yule since 2026-11-21, Halloween before it), whatever colour scheme headless Chrome prefers. To check contrast in another theme, open the page with that theme picked; Lighthouse's colour-contrast audit is axe-core's `color-contrast` rule, which can be run in any theme from a browser script.
 
 ### Reading the audits
 

@@ -89,7 +89,7 @@ bifrost/
 │       │                      #   offlineWarmLoad.ts (PLAN-22 — the id → import() loader map; it
 │       │                      #     lives here, not core/, because only the composition root may
 │       │                      #     reach across features)
-│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween;
+│       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween, yule;
 │       │                      #   relics/collections.ts holds the names apart from the drawings, PLAN-41)
 │       │                      #   + themes/*.json (bundled at build time, PLAN-35)
 │       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
@@ -107,7 +107,8 @@ bifrost/
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
 │       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
 │       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card, the sky's
-│       │                      #   relics: SkyRelics lazily loads RelicScatter, PLAN-41), JsonEditor (one `mode`
+│       │                      #   relics: SkyRelics lazily loads the skyDecor chunk, PLAN-41: RelicScatter, and the Yule world's
+│       │                      #   opt-in Snowfall, StringLights and FooterScene, gated by useThemeOptIn), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value

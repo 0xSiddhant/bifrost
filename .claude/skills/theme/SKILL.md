@@ -57,6 +57,23 @@ hub stays on-brand:
 - Cards are coloured by **position** (`cardToneClass(index + 1)`), so slot 1 is
   the first card on each page — order your palette so early slots look good first.
 
+## Opt-in decorations (snow, string lights, footer scene)
+
+Three decorations a theme can turn on, each with a 0–1 token; **omitted or 0
+means not rendered at all** (Yule turns all three on, every other theme leaves
+them off):
+
+- `--snow-alpha` — falling snow behind every page. `--snow` is the flake's
+  core (white), `--snow-rim` its edge: a light theme needs a soft dark rim
+  (Yule: `rgba(43, 98, 150, 0.3)`) or white snow vanishes on a white page,
+  and a cold wash at the top of `--sky` helps it show.
+- `--lights-alpha` — Christmas lights hung below the header. The bulbs are the
+  theme's `--accent`, `--accent-2`, `--ok` and `--warn`: pick those four so
+  they read as a strand.
+- `--footer-scene-alpha` — the snowy footer with Santa's sleigh, drawn in the
+  theme's colours (trees `--ok`, sleigh `--accent-2`, trim `--warn`, fur
+  `--surface`, reindeer a mix of `--warn` and `--text`).
+
 ## Screensaver palette (`--screen-*`) — Nótt, the idle overlay
 
 The idle particle screensaver reads seven optional colours; omit them and it
