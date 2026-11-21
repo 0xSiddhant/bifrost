@@ -1,6 +1,24 @@
 # Changelog
 
 
+## v2.2.0
+
+[compare changes](https://github.com/0xSiddhant/bifrost/compare/v2.1.1...v2.2.0)
+
+### 🚀 Enhancements
+
+- **plan-41:** First-load CSS — page styles with their pages, shell inline, lazy relics ([#113](https://github.com/0xSiddhant/bifrost/pull/113))
+
+### 🩹 Fixes
+
+- **core:** Bump auto-instrumentations-node to clear audit finding ([f735844](https://github.com/0xSiddhant/bifrost/commit/f735844))
+- **core:** Bump auto-instrumentations-node to clear audit finding ([#115](https://github.com/0xSiddhant/bifrost/pull/115))
+
+### ❤️ Contributors
+
+- 0xSiddhant <contactsiddhant2155@gmail.com>
+- Claude <noreply@anthropic.com>
+
 ## v2.1.1
 
 [compare changes](https://github.com/0xSiddhant/bifrost/compare/v2.1.0...v2.1.1)
