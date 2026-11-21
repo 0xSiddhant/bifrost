@@ -20,6 +20,11 @@ test.describe('shell', () => {
   test('every animation on the home page runs on the compositor', routes('/'), async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('.relic').first()).toBeAttached();
+    // The built-in default (Yule) turns on snow, string lights and the footer
+    // scene; each mount point can arrive on its own frame.
+    await expect(page.locator('.snowfall')).toBeAttached();
+    await expect(page.locator('.string-lights')).toBeAttached();
+    await expect(page.locator('.footer-scene')).toBeAttached();
     const animations = await page.evaluate(() =>
       document
         .getAnimations()
@@ -41,7 +46,17 @@ test.describe('shell', () => {
         })),
     );
     const names = new Set(animations.map((animation) => animation.name));
-    expect([...names].sort()).toEqual(['aurora-drift', 'bridge-flow', 'relic-float']);
+    const expected = [
+      'aurora-drift',
+      'bridge-flow',
+      'lights-twinkle',
+      'relic-float',
+      'snow-fall',
+      'snow-sway',
+    ];
+    // Phones hide the footer, and with it the sleigh (≤640 px).
+    if ((page.viewportSize()?.width ?? 0) > 640) expected.push('sleigh-bob', 'sleigh-ride');
+    expect([...names].sort()).toEqual(expected.sort());
     for (const { name, properties } of animations) {
       expect(properties.length, name).toBeGreaterThan(0);
       for (const property of properties) {

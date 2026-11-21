@@ -19,7 +19,7 @@ import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { RouteBoundary } from '../core/ui/RouteBoundary';
-import { SkyRelics } from '../core/ui/SkyRelics';
+import { FooterDecor, HeaderLights, SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
 import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
 import { GuideButton } from '../core/guide/GuideButton';
@@ -281,6 +281,8 @@ export function App() {
         <GuideButton />
         <ThemeSwitcher />
       </header>
+      {/* A theme's string lights (the Yule world), hung below the header. */}
+      <HeaderLights />
 
       {sseStatus === 'closed' && (
         <div className="offline-banner" role="status">
@@ -399,6 +401,8 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
+        {/* A theme's winter scene on the footer line (the Yule world). */}
+        <FooterDecor />
         {/* The address this site answers on: the hub's mDNS name, or the
             standalone site's own public host. */}
         <span className="mono caption footer-mark" aria-hidden="true">

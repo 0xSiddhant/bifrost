@@ -62,7 +62,7 @@ describe('SkyRelics', () => {
   it('fetches nothing during the first render, only once the browser is idle', async () => {
     vi.resetModules();
     const fresh = await import('./SkyRelics');
-    const load = vi.spyOn(fresh.relicScatterChunk, 'load');
+    const load = vi.spyOn(fresh.skyDecorChunk, 'load');
     act(() =>
       root.render(
         <MemoryRouter>
@@ -85,7 +85,7 @@ describe('SkyRelics', () => {
     const { log } = await import('../log');
     const warn = vi.spyOn(log, 'warn').mockImplementation(() => {});
     const load = vi
-      .spyOn(fresh.relicScatterChunk, 'load')
+      .spyOn(fresh.skyDecorChunk, 'load')
       .mockRejectedValue(
         new Error('Failed to fetch dynamically imported module: http://hub/assets/Relic-x.js'),
       );
@@ -106,5 +106,38 @@ describe('SkyRelics', () => {
     expect(load).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toContain("the relic drawings' chunk could not be loaded");
+  });
+
+  it('costs each mount point only its decoration, with one fetch and one warn each', async () => {
+    vi.resetModules();
+    const fresh = await import('./SkyRelics');
+    const { log } = await import('../log');
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => {});
+    const load = vi
+      .spyOn(fresh.skyDecorChunk, 'load')
+      .mockRejectedValue(new Error('Failed to fetch dynamically imported module'));
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <fresh.SkyRelics />
+          <header className="shell-header">header</header>
+          <fresh.HeaderLights />
+          <footer className="shell-footer">
+            <fresh.FooterDecor />
+            footer
+          </footer>
+        </MemoryRouter>,
+      ),
+    );
+
+    await settle(() => warn.mock.calls.length >= 3);
+
+    expect(container.querySelector('.shell-header')?.textContent).toBe('header');
+    expect(container.querySelector('.shell-footer')?.textContent).toBe('footer');
+    expect(load).toHaveBeenCalledTimes(1);
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages).toHaveLength(3);
+    expect(messages.some((m) => m.includes('the string lights could not be loaded'))).toBe(true);
+    expect(messages.some((m) => m.includes('the footer scene could not be loaded'))).toBe(true);
   });
 });

@@ -1,28 +1,64 @@
 import { ALL_COLLECTIONS, type RelicCollection } from '../assets/relics/collections';
 
 /**
- * Which relic collections drift through the sky. A visual preference of the
- * same class as the theme choice, so caching it locally is allowed (see
- * rules/coding.md). Heimdall's server-side settings arrive in PLAN-05.
+ * This device's sky: which relic collections drift through it, and whether
+ * snow falls in a theme that has snow (the Yule world). Visual preferences of
+ * the same class as the theme choice, so caching them locally is allowed (see
+ * rules/coding.md, "sky prefs").
  */
 
 const STORAGE_KEY = 'bifrost.relics';
+const SNOWFALL_KEY = 'bifrost.snowfall';
 const CHANGE_EVENT = 'bifrost:relics-changed';
 
+/**
+ * localStorage that cannot crash the page: Safari's private mode and a
+ * cleared or blocked store throw on access. Deliberately silent, a designed
+ * fallback like `core/theme`'s: the sky simply shows its defaults and the
+ * choice is not remembered for next time.
+ */
+function readStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string | null): void {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch {
+    // See readStorage.
+  }
+}
+
 export function getEnabledCollections(): RelicCollection[] {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = readStorage(STORAGE_KEY);
   if (stored === null) return [...ALL_COLLECTIONS]; // default: everything
   try {
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return [...ALL_COLLECTIONS];
     return ALL_COLLECTIONS.filter((name) => parsed.includes(name));
   } catch {
+    // A value this code did not write: the default, as for no value at all.
     return [...ALL_COLLECTIONS];
   }
 }
 
 export function setEnabledCollections(collections: RelicCollection[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(collections));
+  writeStorage(STORAGE_KEY, JSON.stringify(collections));
+  window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
+}
+
+/** Whether snow falls on this device in a theme that has snow. Default: on. */
+export function getSnowfallEnabled(): boolean {
+  return readStorage(SNOWFALL_KEY) !== 'off';
+}
+
+export function setSnowfallEnabled(enabled: boolean): void {
+  writeStorage(SNOWFALL_KEY, enabled ? null : 'off');
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 

@@ -245,6 +245,8 @@
 }
 
 .shell-footer {
+  /* The containing block of a theme's footer scene (core/ui/footer-scene.css). */
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
