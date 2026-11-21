@@ -33,7 +33,12 @@ import {
   type OfflineModeConfig,
 } from '../../core/offlineMode';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
-import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
+import {
+  getEnabledCollections,
+  getSnowfallEnabled,
+  setEnabledCollections,
+  setSnowfallEnabled,
+} from '../../core/relicPrefs';
 import {
   fetchAbout,
   fetchAudit,
@@ -522,6 +527,7 @@ function HubSettingsSection({ onLock }: SectionProps) {
 
 function RelicsSection() {
   const [enabled, setEnabled] = useState<RelicCollection[]>(getEnabledCollections);
+  const [snowfall, setSnowfall] = useState<boolean>(getSnowfallEnabled);
 
   const toggle = (name: RelicCollection) => {
     const next = enabled.includes(name)
@@ -551,6 +557,20 @@ function RelicsSection() {
             </label>
           ))}
         </div>
+        <label className="check-row" id={ctlId('snowfall')}>
+          <input
+            type="checkbox"
+            checked={snowfall}
+            onChange={() => {
+              setSnowfall(!snowfall);
+              setSnowfallEnabled(!snowfall);
+            }}
+          />
+          <span>Snowfall</span>
+        </label>
+        <p className="caption">
+          Falls in a theme that has snow (Yule). Off keeps this device&apos;s sky still.
+        </p>
       </div>
     </Card>
   );
@@ -1232,9 +1252,12 @@ const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
     label: 'Sky Relics',
     group: 'Realm',
     icon: <FolderIcon size={16} />,
-    blurb: 'The artifacts drifting in the background sky.',
+    blurb: 'The artifacts and the snow in the background sky.',
     Component: RelicsSection,
-    manifest: [{ controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] }],
+    manifest: [
+      { controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] },
+      { controlId: 'snowfall', label: 'Snowfall', keywords: ['snow', 'winter', 'yule', 'motion', 'sky'] },
+    ],
   },
   {
     id: 'loki',
