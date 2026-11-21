@@ -55,7 +55,7 @@ jobs:
         run: |
           # changelogen infers the bump (feat->minor, fix->patch, !/BREAKING
           # ->major), writes package.json + CHANGELOG.md.
-          npx --yes changelogen@latest --bump
+          npx --yes changelogen@latest --bump --hideAuthorEmail
           VERSION=$(node -p "require('./package.json').version")
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           # Keep the workspaces in lockstep with the root version.
