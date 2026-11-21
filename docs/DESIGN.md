@@ -130,9 +130,11 @@ theme that leaves them off:
   hung below the header in the space every page leaves empty there, so it
   scrolls away under the header and never covers content (or Accio's and
   Portkey's sticky bars). Each colour twinkles by opacity.
-- **Footer scene** — a snow pile, snowy pines and Santa's sleigh on the
-  footer line, inside the 48px `.shell-main` already leaves above the footer,
-  so no page grows. The sleigh rides by every 40s, only while the footer is
+- **Footer scene** — drifts, snowy pines and Santa's sleigh on the footer
+  line, and a snowbank filling the footer under its text (the border is
+  hidden while it shows: the snow's surface is the line). It uses only the
+  48px `.shell-main` already leaves above the footer and the footer's own
+  band, so no page grows. The sleigh rides by every 40s, only while the footer is
   on screen; reduced motion parks it. Hidden on phones with the footer.
 
 **Ambient motion exception:** the 150–200ms rule governs *interaction*

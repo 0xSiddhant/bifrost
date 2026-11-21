@@ -70,7 +70,8 @@ them off):
 - `--lights-alpha` — Christmas lights hung below the header. The bulbs are the
   theme's `--accent`, `--accent-2`, `--ok` and `--warn`: pick those four so
   they read as a strand.
-- `--footer-scene-alpha` — the snowy footer with Santa's sleigh, drawn in the
+- `--footer-scene-alpha` — the snowy footer with Santa's sleigh (drifts above
+  the footer line, a snowbank under the footer's text), drawn in the
   theme's colours (trees `--ok`, sleigh `--accent-2`, trim `--warn`, fur
   `--surface`, reindeer a mix of `--warn` and `--text`).
 
@@ -79,6 +80,9 @@ them off):
 The idle particle screensaver reads seven optional colours; omit them and it
 derives on-brand from your accents/veil, or set them for a house-specific idle sky:
 
+- `--screen-shade` — the vignette at the edges and the wash in the centre:
+  black for a dark theme, light for a light one (derived from `--bg`), or a
+  light veil greys. Yule uses a pale frost.
 - `--screen-veil` — the full-screen backdrop. **Keep it dark and near-opaque**
   (calm bar applies double here — it fills the whole screen). Light themes get a
   soft parchment veil with **dark** motes instead (a dark theme's pale stars
