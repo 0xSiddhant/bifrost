@@ -52,11 +52,16 @@ test.describe('shell', () => {
       'lights-twinkle',
       'relic-float',
       'snow-fall',
+      'snow-gust',
       'snow-sway',
     ];
     // Phones hide the footer, and with it the sleigh (≤640 px).
     if ((page.viewportSize()?.width ?? 0) > 640) expected.push('sleigh-bob', 'sleigh-ride');
-    expect([...names].sort()).toEqual(expected.sort());
+    // A crystal flake tumbles; which flakes are crystals is random, so the
+    // name is allowed, not required.
+    const allowed = [...expected, 'snow-tumble'];
+    for (const name of expected) expect(names, name).toContain(name);
+    for (const name of names) expect(allowed, `unexpected animation ${name}`).toContain(name);
     for (const { name, properties } of animations) {
       expect(properties.length, name).toBeGreaterThan(0);
       for (const property of properties) {

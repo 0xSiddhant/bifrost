@@ -63,7 +63,9 @@ describe('the opt-in decorations', () => {
     act(() => themeEngine.setTheme('yule'));
     renderDecor();
 
-    expect($('.snowfall__layer')).toHaveLength(3);
+    // jsdom's 1024×768 viewport: flakeCount gives it 112 flakes, in two fields.
+    expect($('.snowflake')).toHaveLength(112);
+    expect($('.snowfall__field')).toHaveLength(2);
     expect($('.string-lights__bulbs')).toHaveLength(4);
     expect($('.footer-scene')).toHaveLength(1);
     // The snowbank under the drifts fills the footer itself.

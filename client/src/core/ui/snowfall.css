@@ -1,12 +1,12 @@
 /* Falling snow (the Yule world), inside `.sky`: behind every card and panel,
-   in front of the relics. Three depth layers, each a block one tile taller
-   than the viewport, tiled with a few radial-gradient flakes. A layer falls
-   by exactly one tile and starts again, so the loop is seamless at any
-   viewport height (the bridge strip's trick, vertical), and each layer's
-   wrapper sways a few pixels with `translate`, which composes with the fall.
-   Both are compositor-only (the PLAN-40 rule), and `base.css`'s
-   reduced-motion rule leaves the flakes standing still. Flakes are `--snow`
-   with a `--snow-rim` edge, so white snow still shows on a white page. */
+   in front of the relics. Each flake is its own element: `.snowflake` falls
+   (`translate` from just above the screen to just below it, at its own
+   speed), `.snowflake__sway` drifts it side to side on its own rhythm, and a
+   crystal's body tumbles in 3D. Two fields, far and near, ride wind gusts of
+   different strength. Every animation moves `translate` or `transform` only,
+   so the compositor runs them (the PLAN-40 rule), and `base.css`'s
+   reduced-motion rule leaves each flake still at its resting place. The
+   per-flake values arrive as custom properties from `Snowfall.tsx`. */
 .snowfall {
   position: absolute;
   inset: 0;
@@ -14,94 +14,130 @@
   opacity: var(--snow-alpha, 1);
 }
 
-.snowfall__sway {
+.snowfall__field {
   position: absolute;
-  inset: 0 -24px;
-  animation: snow-sway var(--sway) ease-in-out infinite alternate;
+  inset: 0;
+  animation: snow-gust var(--gust-t) ease-in-out infinite;
 }
 
-.snowfall__layer {
+.snowfall__field--far {
+  --gust: 2.5vw;
+  --gust-t: 26s;
+}
+
+.snowfall__field--near {
+  --gust: 5vw;
+  --gust-t: 19s;
+  animation-delay: -6s;
+}
+
+.snowflake {
   position: absolute;
-  inset: calc(-1 * var(--tile)) 0 0;
-  background-size: var(--tile-w) var(--tile);
-  animation: snow-fall var(--fall) linear infinite;
-  will-change: transform;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  opacity: var(--alpha);
+  animation: snow-fall var(--fall) linear var(--delay) infinite;
 }
 
-.snowfall__sway--far {
-  --sway: 9s;
-}
-.snowfall__sway--mid {
-  --sway: 7s;
-  animation-delay: -3s;
-}
-.snowfall__sway--near {
-  --sway: 5.5s;
-  animation-delay: -1.5s;
+.snowflake__sway {
+  display: block;
+  width: 100%;
+  height: 100%;
+  perspective: 40px;
+  animation: snow-sway var(--sway-t) ease-in-out var(--sway-delay) infinite alternate;
 }
 
-/* Far: many small, slow flakes. */
-.snowfall__layer--far {
-  --tile: 260px;
-  --tile-w: 230px;
-  --fall: 26s;
-  background-image:
-    radial-gradient(circle 1.6px at 12% 8%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.3px at 46% 27%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.7px at 81% 14%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.4px at 28% 61%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.6px at 67% 52%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.3px at 92% 78%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.5px at 7% 88%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 1.4px at 55% 90%, var(--snow) 55%, var(--snow-rim) 85%, transparent);
+/* A soft round flake: a white body with a soft edge, and a small drop shadow
+   in the theme's rim colour, which is what makes white snow read on a white
+   page (a real flake against a pale sky shows by its shading). The nearest
+   are out of focus. */
+.snowflake__body {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle closest-side,
+    var(--snow) 55%,
+    color-mix(in srgb, var(--snow) 45%, transparent) 82%,
+    transparent 100%
+  );
+  filter: drop-shadow(0 1px 1.5px var(--snow-rim)) blur(var(--blur));
 }
 
-/* Mid. */
-.snowfall__layer--mid {
-  --tile: 320px;
-  --tile-w: 290px;
-  --fall: 19s;
-  background-image:
-    radial-gradient(circle 2.5px at 22% 12%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 2.2px at 70% 31%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 2.6px at 40% 58%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 2.3px at 88% 70%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 2.4px at 9% 84%, var(--snow) 55%, var(--snow-rim) 85%, transparent);
+/* A six-armed crystal, drawn twice: a rim under white ice. */
+.snowflake__body--crystal {
+  background: none;
+  border-radius: 0;
+  filter: drop-shadow(0 1px 1px var(--snow-rim));
+  overflow: visible;
+  animation: snow-tumble var(--spin) linear infinite;
+  animation-direction: var(--spin-dir);
 }
 
-/* Near: a few large, quick flakes. */
-.snowfall__layer--near {
-  --tile: 400px;
-  --tile-w: 370px;
-  --fall: 13s;
-  background-image:
-    radial-gradient(circle 3.5px at 31% 18%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 3.2px at 78% 47%, var(--snow) 55%, var(--snow-rim) 85%, transparent),
-    radial-gradient(circle 3.6px at 14% 74%, var(--snow) 55%, var(--snow-rim) 85%, transparent);
+.snowflake__rim,
+.snowflake__ice {
+  fill: none;
+  stroke-linecap: round;
 }
 
-/* Phones keep two layers: each is a full-viewport texture (about 12 MB at a
-   390 px phone's 3x density), and the far layer's flakes show least there. */
-@media (max-width: 640px) {
-  .snowfall__sway--far {
-    display: none;
-  }
+.snowflake__rim {
+  stroke: var(--snow-rim);
+  stroke-width: 4.6;
+}
+
+.snowflake__ice {
+  stroke: var(--snow);
+  stroke-width: 2.6;
 }
 
 @keyframes snow-fall {
   from {
-    transform: translate3d(0, 0, 0);
+    translate: 0 calc(-1 * var(--y) - 4vh);
   }
   to {
-    transform: translate3d(0, var(--tile), 0);
+    translate: 0 calc(104vh - var(--y));
   }
 }
 
 @keyframes snow-sway {
   from {
-    translate: -10px 0;
+    translate: calc(-1 * var(--sway)) 0;
   }
   to {
-    translate: 10px 0;
+    translate: var(--sway) 0;
+  }
+}
+
+/* Turning about a tilted, mostly upright axis: the crystal flips edge-on and
+   back as it falls, the way a real one flutters. */
+@keyframes snow-tumble {
+  from {
+    transform: rotate3d(0.35, 1, 0.2, 0deg);
+  }
+  to {
+    transform: rotate3d(0.35, 1, 0.2, 360deg);
+  }
+}
+
+/* Gusts: the field leans with the wind and eases back, never twice the same. */
+@keyframes snow-gust {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  22% {
+    translate: var(--gust) 0;
+  }
+  40% {
+    translate: calc(var(--gust) * 0.3) 0;
+  }
+  63% {
+    translate: calc(var(--gust) * 1.4) 0;
+  }
+  80% {
+    translate: calc(var(--gust) * -0.4) 0;
   }
 }

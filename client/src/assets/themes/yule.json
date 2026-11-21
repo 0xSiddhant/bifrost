@@ -23,7 +23,7 @@
     "--stars": "rgba(27, 111, 181, 0.35)",
     "--stars-alpha": "1",
     "--snow": "#ffffff",
-    "--snow-rim": "rgba(43, 98, 150, 0.3)",
+    "--snow-rim": "rgba(43, 98, 150, 0.45)",
     "--snow-alpha": "1",
     "--lights-alpha": "1",
     "--footer-scene-alpha": "1",
