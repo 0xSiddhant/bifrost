@@ -16,8 +16,8 @@
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Claude <noreply@anthropic.com>
+- [0xSiddhant](https://github.com/0xSiddhant)
+- Claude
 
 ## v2.1.1
 
@@ -29,7 +29,7 @@
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
+- [0xSiddhant](https://github.com/0xSiddhant)
 
 ## v2.1.0
 
@@ -60,8 +60,8 @@
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- [0xSiddhant](https://github.com/0xSiddhant)
+- [Siddhant Kumar](https://github.com/0xSiddhant)
 
 ## v2.0.0
 
@@ -123,8 +123,8 @@
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- [0xSiddhant](https://github.com/0xSiddhant)
+- [Siddhant Kumar](https://github.com/0xSiddhant)
 
 ## v1.4.0
 
@@ -183,9 +183,9 @@
 
 ### ❤️ Contributors
 
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Claude <noreply@anthropic.com>
+- [Siddhant Kumar](https://github.com/0xSiddhant)
+- [0xSiddhant](https://github.com/0xSiddhant)
+- Claude
 
 ## v1.3.0
 
@@ -256,9 +256,9 @@
 
 ### ❤️ Contributors
 
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Claude <noreply@anthropic.com>
+- [Siddhant Kumar](https://github.com/0xSiddhant)
+- [0xSiddhant](https://github.com/0xSiddhant)
+- Claude
 
 ## v1.2.0
 
@@ -317,8 +317,8 @@
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
+- [0xSiddhant](https://github.com/0xSiddhant)
+- [Siddhant Kumar](https://github.com/0xSiddhant)
 
 ## v1.1.0
 
@@ -422,9 +422,9 @@
 
 ### ❤️ Contributors
 
-- Siddhant Kumar <contactsiddhant2155@gmail.com>
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-- Claude <noreply@anthropic.com>
+- [Siddhant Kumar](https://github.com/0xSiddhant)
+- [0xSiddhant](https://github.com/0xSiddhant)
+- Claude
 
 ## v1.0.0 (2026-07-16)
 
@@ -515,5 +515,4 @@ First release: plans 00–06 — foundation, UI/UX system, file transfer, previe
 
 ### ❤️ Contributors
 
-- 0xSiddhant <contactsiddhant2155@gmail.com>
-
+- [0xSiddhant](https://github.com/0xSiddhant)

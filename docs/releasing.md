@@ -54,7 +54,7 @@ without a `!` commit), do it by hand on `main` and let the tag stand:
 ```bash
 git checkout main && git pull
 npm version 2.0.0 --no-git-tag-version --workspaces --include-workspace-root
-npx changelogen@latest --release --no-commit   # regenerate CHANGELOG only
+npx changelogen@latest --release --no-commit --hideAuthorEmail   # regenerate CHANGELOG only
 git commit -am "chore(release): v2.0.0"
 git tag v2.0.0
 git push origin main --follow-tags
