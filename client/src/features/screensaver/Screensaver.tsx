@@ -13,13 +13,8 @@ import {
   DEPTH_PAN,
   type Field,
 } from './particles';
-import {
-  advanceRipples,
-  rippleAlpha,
-  rippleRadius,
-  spawnRipple,
-  type Ripple,
-} from './ripple';
+import { paintStyle } from './ink';
+import { advanceRipples, rippleAlpha, rippleRadius, spawnRipple, type Ripple } from './ripple';
 import './screensaver.css';
 
 const FRAME_MS = 1000 / 30; // 30fps cap — this is a background flourish.
@@ -80,8 +75,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
   const leavingRef = useRef(false);
 
   const reducedMotion =
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Dismissal choreography: a click spawns a ripple then fades out; a keystroke
   // fades fast. Guarded so it only runs once.
@@ -180,6 +174,8 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
       const field = fieldRef.current;
       if (!field) return;
       const colors = colorsRef.current;
+      // Ink on a light veil, light on a dark one (ink.ts).
+      const paint = paintStyle(colors.veil);
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = colors.veil;
       ctx.fillRect(0, 0, width, height);
@@ -198,7 +194,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
       // constellation thins out toward the rim.
       if (config.connectLines) {
         ctx.strokeStyle = colors.line;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = paint.lineWidth;
         for (const link of nearPairs(field)) {
           const ax = sx(link.a);
           const ay = sy(link.a);
@@ -208,7 +204,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
             ? 1
             : Math.min(focusFactor(ax, ay, width, height), focusFactor(bx, by, width, height));
           if (f <= 0.03) continue;
-          ctx.globalAlpha = link.strength * 0.35 * (0.05 + 0.95 * f);
+          ctx.globalAlpha = link.strength * paint.lineAlpha * (0.05 + 0.95 * f);
           ctx.beginPath();
           ctx.moveTo(ax, ay);
           ctx.lineTo(bx, by);
@@ -232,9 +228,31 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
         const pulse = reducedMotion ? 1 : 1 + Math.sin(nowMs * p.twinkle + p.phase) * 0.28;
         const near = p.depth === LAYERS - 1;
         // Edges: dimmer (fewer) and a touch larger/softer; centre: crisp + full.
-        const radius = p.size * pulse * (1 + (1 - focus) * 0.6);
-        ctx.globalAlpha = p.alpha * pulse * (0.04 + 0.96 * focus);
-        if (near) {
+        const radius = p.size * paint.sizeScale * pulse * (1 + (1 - focus) * 0.6);
+        ctx.globalAlpha = Math.min(1, paint.particleAlpha(p.alpha) * pulse) * (0.04 + 0.96 * focus);
+        if (near && paint.ink) {
+          // A canvas shadow glows on a dark sky and smudges grey on a light
+          // one: on a light veil the sun's glow is a soft halo of its own.
+          const halo = ctx.createRadialGradient(
+            screenX,
+            screenY,
+            radius,
+            screenX,
+            screenY,
+            radius * 3.4,
+          );
+          halo.addColorStop(0, colors.glow);
+          halo.addColorStop(1, 'transparent');
+          ctx.shadowBlur = 0;
+          const alpha = ctx.globalAlpha;
+          ctx.globalAlpha = alpha * 0.45;
+          ctx.fillStyle = halo;
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, radius * 3.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = colors.particle2;
+        } else if (near) {
           ctx.shadowBlur = 10 + (1 - focus) * 6;
           ctx.shadowColor = colors.glow;
           ctx.fillStyle = colors.particle2;
@@ -339,9 +357,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
           <MoonIcon size={18} />
           <span className="nott__name">Nótt</span>
         </span>
-        <span className="nott__tag">
-          night over the bridge{clock ? ` · ${clock}` : ''}
-        </span>
+        <span className="nott__tag">night over the bridge{clock ? ` · ${clock}` : ''}</span>
       </div>
       {config.showQuotes && (
         <figure className="nott__quote" key={quote.text}>

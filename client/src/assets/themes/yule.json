@@ -28,7 +28,7 @@
     "--lights-alpha": "1",
     "--footer-scene-alpha": "1",
     "--screen-veil": "rgba(240, 246, 251, 0.96)",
-    "--screen-particle": "rgba(43, 98, 150, 0.45)",
+    "--screen-particle": "#2f6697",
     "--screen-particle-2": "#b3263a",
     "--screen-line": "#1b6fb5",
     "--screen-ripple": "#b3263a",
