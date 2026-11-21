@@ -65,9 +65,11 @@ Serialize close cleanup per feature with a mechanism whose cross-tab exclusion h
 
 If locking, storage access, schema validation or the peer check fails, do not delete. Saving or clearing a workspace affects only the current tab's key; no code path may implement a feature-wide `localStorage.clear()` or remove other tab IDs' entries. Storage quota and access errors are visible through the editor's existing notification/logging patterns, and never trigger cleanup as a fallback.
 
-### Migrate legacy singleton drafts without choosing a winner silently
+### Offer legacy singleton drafts once without assigning them to a guessed tab
 
-The existing keys (`bifrost.runestone.draft`, `bifrost.edda.draft`, `bifrost.groot.draft`, `bifrost.atlas.draft`) may contain the last writer from several tabs, so the data cannot reliably be assigned to its original tab. Treat each as one legacy recoverable draft, not as the current tab's own draft. Under the verified per-feature migration lock, preserve it until a new-format destination has been written and read back; then mark the legacy item migrated/consumed exactly once. If multiple tabs race, at most one receives it, and all others continue with their own isolated state. On any failure, leave the original key intact. Variant has no legacy draft.
+The existing keys (`bifrost.runestone.draft`, `bifrost.edda.draft`, `bifrost.groot.draft`, `bifrost.atlas.draft`) may contain the last writer from several tabs, so the data cannot reliably be assigned to its original tab. Treat each as one legacy recoverable draft, not as the current tab's own draft or as a known-closed tab's draft. When a tab has no same-tab draft, a hand-off seed, or a new-format closed-tab offer, show a distinct **Restore draft saved before this update?** offer for a valid legacy key matching the current feature/workspace. Dismissing it leaves the original key untouched; it remains eligible on a later visit. Show no more than one cross-tab/legacy restore offer at a time, prioritizing the current tab's own draft, then a hand-off seed, then a new-format closed-tab record, then a legacy draft.
+
+On acceptance, take the verified per-feature migration lock and re-read the legacy key. Persist a transfer journal/claim identifying the accepting tab and destination before writing the destination; write and read back the destination, mark the journal consumed, then remove the old key. If another tab has already consumed or claimed it, do not show/restore a duplicate. On the next access, reconcile an interrupted journal under the same lock: if the destination verifies, complete consumption/removal without re-offering; if it does not, keep the old key and make the draft eligible again only after safely releasing the incomplete claim. If journal, writing, verification, locking or removal fails, preserve the original legacy value (and any verified destination) and report the failure; never present a success-shaped fallback. Variant has no legacy draft.
 
 ### Preserve per-editor behavior while sharing only the storage mechanism
 
@@ -84,7 +86,8 @@ None. Draft recovery is entirely client-side; it adds no server routes or API ch
   - [ ] Add a stable per-tab ID backed by `sessionStorage`; spike and implement duplicate-tab collision detection in Chromium and WebKit before allowing either tab to write under a duplicated ID.
   - [ ] Implement cross-tab signaling and a verified per-feature lock/claim protocol for transfer, singleton migration and cleanup. If a browser cannot provide safe exclusion, fail closed: do not transfer or delete.
   - [ ] Implement the close-cleanup rule with a serialized peer recheck, preserving the last durable feature draft and leaving drafts untouched when close status is uncertain.
-  - [ ] Migrate the four existing singleton keys exactly once, preserving the original until the new-format record is verified and retaining it on any failed or concurrent migration.
+  - [ ] Add a distinct, blank-workspace legacy recovery offer for the four existing singleton keys; dismissing keeps the key eligible, while acceptance under a per-feature lock writes/verifies the accepting tab's destination before consuming the legacy key exactly once.
+  - [ ] Add a durable legacy-transfer journal recording the claimed destination before transfer. Reconcile interrupted claims under the same lock: complete consumption when the destination verifies, or safely release an incomplete claim while retaining the legacy value.
   - [ ] Surface storage/lock failures through `client/src/core/log.ts` and the editor notice pattern; a failed persistence or cleanup step must not be reported as success.
 - [ ] **Shared hook and editor integration**
   - [ ] Replace feature-provided singleton `save`/`clear` callbacks in `client/src/core/draftCache.ts` with a typed tab/workspace adapter while preserving the 500 ms mirror, unload flush and blank-buffer safeguards.
@@ -97,7 +100,7 @@ None. Draft recovery is entirely client-side; it adds no server routes or API ch
 - [ ] **Tests and docs**
   - [ ] Replace `client/src/core/draftCache.test.tsx`'s single-slot assumptions with multi-tab, multi-workspace tests; add tests for editor-specific serialization/workspace adapters and the shared store/identity/claims.
   - [ ] Add tests for two simultaneous editors saving different text, same-tab reload restoration, no-own-draft prompt, single-use transfer, transfer write failure, simultaneous restore, simultaneous close cleanup, and last-record retention.
-  - [ ] Add tests for duplicate sessionStorage IDs, React StrictMode double effects, pagehide/BFCache/offload ambiguity, malformed/legacy records, localStorage quota/security errors, stale server baselines and seeds overriding prompts.
+  - [ ] Add tests for duplicate sessionStorage IDs, React StrictMode double effects, pagehide/BFCache/offload ambiguity, malformed/legacy records, localStorage quota/security errors, stale server baselines, offer priority, seeds overriding prompts, and legacy-offer dismissal/acceptance/failure/concurrent acceptance.
   - [ ] Add Playwright journeys using two pages in the same browser context for each editor family: edit distinct content in both, reload one, verify both remain distinct, close one, verify the peer and last-draft rules, and attempt competing restores.
   - [ ] Update `docs/testing.md` with the multi-tab recovery test procedure and the supported-browser lifecycle limitations; update the README's editor description only if needed to explain tab-isolated recovery.
 
@@ -110,7 +113,7 @@ None. Draft recovery is entirely client-side; it adds no server routes or API ch
 5. Closing a tab removes only its own closed feature/workspace draft when another durable draft for that feature remains. The final durable draft is preserved, including when multiple tabs close concurrently.
 6. Uncertain lifecycle states—browser process kill, memory offload, hidden/frozen tabs, BFCache, reload, or unavailable close evidence—never cause a draft to be deleted or treated as a transferable known-closed draft. No TTL-only deletion is implemented.
 7. Duplicate tabs cannot share a tab ID and cannot collide while writing; if uniqueness cannot be proven, cross-tab mutation is disabled and existing records remain untouched.
-8. Legacy singleton records migrate at most once without being removed before a new record is verified. Concurrent startup or a failed migration leaves the legacy data recoverable.
+8. A valid legacy singleton key gets a distinct one-time recovery offer only after higher-priority same-tab draft, hand-off seed and eligible new-format transfer handling. Dismissal leaves it untouched; acceptance journals the claim, writes and verifies the accepting tab's record, then consumes the old key. Concurrent acceptance or any failed/uncertain step never loses the legacy copy or offers it twice.
 9. Runestone, Edda, Groot, Atlas and Variant all restore tab-specific content. Variant preserves both workspaces and their pane contents; derived compare results require a new explicit Compare.
 10. Restoring a saved-document edit never auto-saves it. If the server baseline changed, both versions remain recoverable and the user explicitly chooses Keep local or Use server.
 11. Existing blank-buffer restore behavior, seed precedence, Runestone/Groot in-session returns and Atlas skeleton handling remain correct.
@@ -125,7 +128,8 @@ None. Draft recovery is entirely client-side; it adds no server routes or API ch
 - [ ] Per-tab/per-feature/per-workspace keys isolate writes and deletes; corrupt or unsupported envelopes are ignored without being deleted.
 - [ ] Transfer claims are single-use under concurrent requests; source removal waits for destination read-back; failed writes/release preserve source data.
 - [ ] Cleanup serializes peers and never removes the last valid record, including two concurrent close attempts; no close proof means no cleanup.
-- [ ] Legacy migration is idempotent and race-safe, and the singleton remains until its destination is verified.
+- [ ] Legacy transfer journaling is idempotent and race-safe, and the singleton remains until its destination is verified and the transfer is marked consumed.
+- [ ] Legacy recovery is separately offered (not treated as a closed-tab record); priority is deterministic, dismissing retains the old key, accepting journals and transfers it once, and concurrent acceptance, interruption at every transfer phase, quota/lock errors and retries never lose or offer the only recoverable copy twice.
 - [ ] Hook tests pin debounce, latest-value flush, StrictMode, blank/offered behavior, seed precedence and workspace-scoped clear.
 - [ ] Saved-document restore keeps dirty text and the baseline; mismatches surface a conflict without discarding either version.
 - [ ] Variant restores both JSON/text panes and options without restoring stale compare results.
@@ -136,6 +140,6 @@ None. Draft recovery is entirely client-side; it adds no server routes or API ch
 - [ ] Chromium and WebKit: same-tab route navigation, saved-document route edits, Variant JSON/text switching, and pagehide/BFCache return do not cross-restore or clear workspaces.
 - [ ] Chromium and WebKit: close one of two tabs, close all but one, and close two concurrently; only the correct closed-tab record is removed and a final recoverable draft remains.
 - [ ] Chromium and WebKit: a new tab sees at most one eligible Restore offer; dismiss/accept and simultaneous acceptance preserve single-use ownership.
+- [ ] Chromium and WebKit: a profile with each legacy key offers that draft only as legacy recovery; dismissal leaves the key intact, acceptance restores into one tab and consumes it only after destination verification, and racing tabs cannot restore duplicates.
 - [ ] Simulate storage quota/blocked storage, duplicate tab identity and missing close events; the app reports persistence trouble and preserves all readable records.
-- [ ] Upgrade a browser profile containing each legacy singleton key and verify the original remains until its isolated replacement is durable.
 - [ ] Run the project `verify` skill and `live-verify` the built application with real multiple browser tabs before implementation is handed off.
