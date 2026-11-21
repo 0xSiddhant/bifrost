@@ -114,6 +114,10 @@ const ATMOSPHERE_COLOR_TOKENS = [
   '--tone-amber-soft',
   '--header-veil',
   '--relic-muted',
+  // Snowfall (the Yule world): the flake's core and its rim. A rim lets a
+  // white flake show on a white page; a dark theme leaves it transparent.
+  '--snow',
+  '--snow-rim',
 ] as const;
 
 const ATMOSPHERE_CSS_TOKENS = [
@@ -129,6 +133,11 @@ const ATMOSPHERE_CSS_TOKENS = [
   '--relic-alpha',
   '--shadow-1',
   '--shadow-2',
+  // Opt-in decorations (the Yule world), each a 0–1 opacity: omitted or 0
+  // means the element is not rendered at all, so no other theme pays for it.
+  '--snow-alpha',
+  '--lights-alpha',
+  '--footer-scene-alpha',
 ] as const;
 
 const TYPO_SHAPE_TOKENS = [

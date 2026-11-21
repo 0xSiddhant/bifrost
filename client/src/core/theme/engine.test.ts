@@ -107,3 +107,27 @@ describe('applying a theme', () => {
     await vi.waitFor(() => expect(root.getAttribute('data-theme')).toBe(BUILT_IN_DEFAULT_THEME));
   });
 });
+
+/**
+ * The Yule world's decorations ask the engine, not the stylesheet, whether the
+ * applied theme turns them on, so the map must follow every apply and keep its
+ * identity in between (`useSyncExternalStore` compares by identity).
+ */
+describe('the applied tokens', () => {
+  beforeEach(() => localStorage.clear());
+
+  it("are the applied theme's resolved map, the same object until the next apply", () => {
+    const listener = vi.fn();
+    const unsubscribe = themeEngine.subscribe(listener);
+    themeEngine.setTheme('olympus');
+    const olympus = themeEngine.getActiveTokens();
+    expect(olympus).toBe(BUNDLED_THEMES.find((theme) => theme.id === 'olympus')!.tokens);
+    expect(themeEngine.getActiveTokens()).toBe(olympus);
+    expect(listener).toHaveBeenCalled();
+
+    themeEngine.setTheme('tokyo');
+    expect(themeEngine.getActiveTokens()).not.toBe(olympus);
+    expect(themeEngine.getActiveTokens()['--snow-alpha']).toBe('0');
+    unsubscribe();
+  });
+});
