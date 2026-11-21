@@ -227,8 +227,8 @@ test.describe('standalone shell', () => {
     // BUILT_IN_DEFAULT_THEME (client/src/core/theme/builtInDefault.ts) wins over
     // the device's colour scheme, as the theme engine picks it.
     for (const [colorScheme, theme] of [
-      ['light', 'halloween'],
-      ['dark', 'halloween'],
+      ['light', 'yule'],
+      ['dark', 'yule'],
     ] as const) {
       const context = await browser.newContext({ javaScriptEnabled: false, colorScheme });
       const page = await context.newPage();

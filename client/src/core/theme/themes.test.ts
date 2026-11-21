@@ -51,7 +51,7 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the bundled themes', () => {
-  it('are the eight built-ins, all of them bundled', () => {
+  it('are the nine built-ins, all of them bundled', () => {
     expect(files.sort()).toEqual([
       'aurora.json',
       'daybreak.json',
@@ -61,6 +61,7 @@ describe('the bundled themes', () => {
       'olympus.json',
       'slytherin.json',
       'tokyo.json',
+      'yule.json',
     ]);
     expect(BUNDLED_THEMES.map((theme) => `${theme.id}.json`).sort()).toEqual(files);
   });
@@ -179,6 +180,16 @@ describe('resolveTheme derived defaults (the server cases, ported)', () => {
     const theme = minimalTheme();
     theme.tokens['--syn-key'] = '#ff0000';
     expect(resolveTheme(theme as ThemeFile).tokens['--syn-key']).toBe('#ff0000');
+  });
+
+  it('leaves the opt-in decorations off unless a theme turns them on', () => {
+    for (const mode of ['dark', 'light'] as const) {
+      const theme = resolveTheme(minimalTheme({ mode }) as ThemeFile);
+      expect(theme.tokens['--snow-alpha'], mode).toBe('0');
+      expect(theme.tokens['--lights-alpha'], mode).toBe('0');
+      expect(theme.tokens['--footer-scene-alpha'], mode).toBe('0');
+      expect(theme.tokens['--snow-rim'], mode).toBe('transparent');
+    }
   });
 
   it('derives light-mode variants for light themes', () => {
@@ -301,11 +312,11 @@ describe('--accent-text', () => {
     expect(resolveTheme(theme as ThemeFile).tokens['--accent-text']).toBe('#a7f3d0');
   });
 
-  it('changes only Daybreak and Tokyo among the bundled themes', () => {
+  it('changes only Daybreak, Tokyo and Yule among the bundled themes', () => {
     const changed = BUNDLED_THEMES.filter(
       (theme) => theme.tokens['--accent-text'] !== theme.tokens['--accent'],
     ).map((theme) => theme.id);
-    expect(changed.sort()).toEqual(['daybreak', 'tokyo']);
+    expect(changed.sort()).toEqual(['daybreak', 'tokyo', 'yule']);
   });
 
   it('checks secondary text on every surface, panels included', () => {
