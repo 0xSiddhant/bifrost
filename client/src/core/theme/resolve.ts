@@ -151,6 +151,9 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',
     '--qr-bg': dark ? '#eef1fa' : '#ffffff',
     '--screen-veil': screenVeil,
+    // The overlay's vignette: black deepens a dark veil, while a light theme's
+    // own page colour keeps its parchment clean instead of greying it.
+    '--screen-shade': dark ? '#000000' : bg,
     // The opt-in decorations are off unless a theme turns them on: 0 means
     // the snowfall, the string lights and the footer scene are not rendered.
     '--snow': '#ffffff',

@@ -157,6 +157,9 @@ export interface Backdrop {
 /** The surfaces text sits on, each measured as an opaque colour. */
 const SURFACES = ['--bg', '--surface', '--surface-2'];
 
+/** The share of `--screen-shade` in the screensaver's centre wash (screensaver.css). */
+const SCREEN_SHADE_CENTRE = 0.28;
+
 /** Every colour token `contrastWarnings` reads. */
 const LINTED_COLORS = [
   '--text',
@@ -167,6 +170,7 @@ const LINTED_COLORS = [
   '--accent-soft',
   '--header-veil',
   '--screen-veil',
+  '--screen-shade',
 ];
 
 /** The gradients accent text sits on, read layer by layer (`gradientStops`). */
@@ -255,7 +259,8 @@ const GRADIENT_SAMPLES = 8;
  *   translucent, so it is checked over every surface it can land on.
  * - Found by the inventory, outside that set: the `ACCENT_TINTS` over the
  *   page and over `--surface`, and the screensaver's `--screen-veil` over the
- *   page, behind `.nott__author` and its mark.
+ *   page, behind `.nott__author` and its mark, with `--screen-shade`'s centre
+ *   wash over that.
  *
  * Fills, borders and the bridge use `--accent` and need no text contrast.
  */
@@ -317,6 +322,15 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
   for (const name of ['--header-veil', '--screen-veil']) {
     const veil = tokens[name];
     if (page && veil) layered.push(over(name, veil, page));
+  }
+  // The screensaver's centre wash, `--screen-shade` at 28% over its veil, lies
+  // behind the quote's attribution: a dark shade on a light veil would grey it.
+  const screenVeil = tokens['--screen-veil'];
+  const shade = parseColor(tokens['--screen-shade'] ?? '');
+  const onVeil = page && screenVeil ? over('--screen-veil', screenVeil, page) : null;
+  if (onVeil && shade) {
+    const wash = `rgba(${shade.r}, ${shade.g}, ${shade.b}, ${SCREEN_SHADE_CENTRE})`;
+    layered.push(over('--screen-shade at 28%', wash, onVeil));
   }
   return [...surfaces, ...layered.filter((backdrop): backdrop is Backdrop => backdrop !== null)];
 }

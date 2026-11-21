@@ -40,16 +40,25 @@
   mask-image: radial-gradient(ellipse 60% 64% at 50% 46%, transparent 40%, #000 92%);
 }
 
-/* Cinematic edge darkening + a deep centre — the "hole" you look into; never
-   intercepts the dismiss click. */
+/* Cinematic edge shading + a deep centre — the "hole" you look into; never
+   intercepts the dismiss click. In the theme's `--screen-shade`: black on a
+   dark veil, a light colour on a light one (a black wash greyed it). */
 .nott::after {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(115% 90% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.6) 100%),
-    radial-gradient(60% 55% at 50% 46%, rgba(0, 0, 0, 0.28), transparent 70%);
+    radial-gradient(
+      115% 90% at 50% 46%,
+      transparent 52%,
+      color-mix(in srgb, var(--screen-shade, #000) 60%, transparent) 100%
+    ),
+    radial-gradient(
+      60% 55% at 50% 46%,
+      color-mix(in srgb, var(--screen-shade, #000) 28%, transparent),
+      transparent 70%
+    );
 }
 
 .nott__brand {

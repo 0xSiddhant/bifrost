@@ -192,6 +192,12 @@ describe('resolveTheme derived defaults (the server cases, ported)', () => {
     }
   });
 
+  it("shades the screensaver black on a dark theme and in the page's own colour on a light one", () => {
+    expect(resolveTheme(minimalTheme() as ThemeFile).tokens['--screen-shade']).toBe('#000000');
+    const light = minimalTheme({ mode: 'light' });
+    expect(resolveTheme(light as ThemeFile).tokens['--screen-shade']).toBe(light.tokens['--bg']);
+  });
+
   it('derives light-mode variants for light themes', () => {
     const theme = resolveTheme(minimalTheme({ mode: 'light' }) as ThemeFile);
     expect(theme.tokens['--stars']).toBe('transparent');
@@ -310,6 +316,13 @@ describe('--accent-text', () => {
     const theme = minimalTheme();
     theme.tokens['--accent-text'] = '#a7f3d0';
     expect(resolveTheme(theme as ThemeFile).tokens['--accent-text']).toBe('#a7f3d0');
+  });
+
+  it("flags a dark screensaver shade behind a light theme's accent text", () => {
+    const daybreak = BUNDLED_THEMES.find((theme) => theme.id === 'daybreak')!;
+    expect(contrastWarnings(daybreak.tokens)).toEqual([]);
+    const greyed = { ...daybreak.tokens, '--screen-shade': '#000000' };
+    expect(contrastWarnings(greyed).some((w) => w.includes('--screen-shade at 28%'))).toBe(true);
   });
 
   it('changes only Daybreak, Tokyo and Yule among the bundled themes', () => {

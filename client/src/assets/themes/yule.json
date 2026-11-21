@@ -33,6 +33,7 @@
     "--screen-line": "#1b6fb5",
     "--screen-ripple": "#b3263a",
     "--screen-glow": "#c9952e",
+    "--screen-shade": "#d6e6f4",
     "--glow-teal": "0 0 26px rgba(27, 111, 181, 0.22)",
     "--glow-violet": "0 0 26px rgba(179, 38, 58, 0.2)",
     "--glow-amber": "0 0 26px rgba(168, 105, 14, 0.2)",
