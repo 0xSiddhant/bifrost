@@ -66,6 +66,8 @@ describe('the opt-in decorations', () => {
     expect($('.snowfall__layer')).toHaveLength(3);
     expect($('.string-lights__bulbs')).toHaveLength(4);
     expect($('.footer-scene')).toHaveLength(1);
+    // The snowbank under the drifts fills the footer itself.
+    expect($('.footer-scene__bank')).toHaveLength(1);
     for (const element of $('.snowfall, .string-lights, .footer-scene')) {
       expect(element.getAttribute('aria-hidden')).toBe('true');
     }

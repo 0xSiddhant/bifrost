@@ -3,15 +3,17 @@ import { useThemeOptIn } from './useThemeOptIn';
 import './footer-scene.css';
 
 /**
- * The footer's winter scene (the Yule world): a snow pile along the footer
- * line, snowy pines at either end, and Santa's sleigh riding by now and then.
- * Drawn in a theme that turns it on with `--footer-scene-alpha`, and in
- * colours taken from the theme (footer-scene.css), never hard-coded.
+ * The footer's winter scene (the Yule world): a snowbank that fills the
+ * footer, with drifts heaped along its top, snowy pines at either end, and
+ * Santa's sleigh riding by now and then. Drawn in a theme that turns it on
+ * with `--footer-scene-alpha`, and in colours taken from the theme
+ * (footer-scene.css), never hard-coded.
  *
- * It lives in the 48 px every page already leaves empty above the footer
- * (`.shell-main`'s bottom padding), so no page grows and nothing moves: the
- * editors sized to the window keep their size. Behind the content, no
- * pointer events, hidden from assistive tech. The ride runs only while the
+ * It takes only space every page already has: the 48 px `.shell-main` leaves
+ * empty above the footer (its bottom padding) and the footer's own band,
+ * which the bank fills behind the footer's text. No page grows and nothing
+ * moves, so the editors sized to the window keep their size. Behind the
+ * content, no pointer events, hidden from assistive tech. The ride runs only while the
  * footer is on screen, so Santa comes by soon after you reach the bottom of a
  * page and nothing animates otherwise. Phones hide the footer, and with it
  * the scene.
@@ -43,37 +45,64 @@ export function FooterScene() {
       className={inView ? 'footer-scene footer-scene--riding' : 'footer-scene'}
       aria-hidden="true"
     >
-      <svg className="footer-scene__trees footer-scene__trees--left" viewBox="0 0 96 48">
-        <Pine x={18} h={34} decorated />
-        <Pine x={42} h={27} />
-        <Pine x={63} h={21} />
-      </svg>
-      <svg className="footer-scene__trees footer-scene__trees--right" viewBox="0 0 96 48">
-        <Pine x={33} h={22} />
-        <Pine x={56} h={34} decorated />
-        <Pine x={79} h={27} />
-      </svg>
-      <svg className="footer-scene__ground" viewBox="0 0 1200 48" preserveAspectRatio="none">
-        <path
-          className="fs-snow"
-          d="M0 48L0 34Q30 30 70 33Q110 37 150 39Q260 43 380 39Q470 36 560 40Q660 44 760 39Q860 35 960 40Q1060 44 1130 37Q1170 31 1200 33L1200 48Z"
-        />
-      </svg>
-      <div className="footer-scene__ride">
-        <svg className="footer-scene__sleigh" viewBox="0 0 224 40">
-          <Sleigh />
-          {[66, 106, 146, 186].map((x, i) => (
-            <Reindeer key={x} x={x} stride={i % 2 === 0} />
-          ))}
+      <div className="footer-scene__band">
+        {/* Back to front: a bluish back drift for depth, the pines, then the
+            front drift with a rim along its top. Heaped at both ends, where
+            the pines stand, and low in the middle, where the sleigh rides. */}
+        <svg className="footer-scene__drifts" viewBox="0 0 1200 26" preserveAspectRatio="none">
+          <path
+            className="fs-drift-back"
+            d="M0 26L0 9Q70 6 150 12Q240 19 340 17Q460 14 570 18Q690 22 810 16Q920 11 1000 15Q1060 18 1110 11Q1160 5 1200 8L1200 26Z"
+          />
         </svg>
+        <svg className="footer-scene__trees footer-scene__trees--left" viewBox="0 0 104 48">
+          <Pine x={19} h={33} decorated />
+          <Pine x={45} h={27} />
+          <Pine x={68} h={21} />
+          <Pine x={88} h={16} base={40} />
+        </svg>
+        <svg className="footer-scene__trees footer-scene__trees--right" viewBox="0 0 104 48">
+          <Pine x={16} h={17} base={41} />
+          <Pine x={36} h={23} base={40} />
+          <Pine x={60} h={33} decorated />
+          <Pine x={85} h={27} />
+        </svg>
+        <svg className="footer-scene__drifts" viewBox="0 0 1200 26" preserveAspectRatio="none">
+          <path
+            className="fs-snow"
+            d="M0 26L0 12Q50 9 110 13Q180 19 290 22Q430 23 560 24Q700 25 830 23Q950 21 1010 20Q1070 15 1120 13Q1170 11 1200 12L1200 26Z"
+          />
+          <path
+            className="fs-rim"
+            d="M0 12Q50 9 110 13Q180 19 290 22Q430 23 560 24Q700 25 830 23Q950 21 1010 20Q1070 15 1120 13Q1170 11 1200 12"
+          />
+        </svg>
+        <div className="footer-scene__ride">
+          <svg className="footer-scene__sleigh" viewBox="0 0 224 40">
+            <Sleigh />
+            {[66, 106, 146, 186].map((x, i) => (
+              <Reindeer key={x} x={x} stride={i % 2 === 0} />
+            ))}
+          </svg>
+        </div>
       </div>
+      <div className="footer-scene__bank" />
     </div>
   );
 }
 
-/** A snowy pine standing in the snow pile (its foot at y 40), three tiers. */
-function Pine({ x, h, decorated = false }: { x: number; h: number; decorated?: boolean }) {
-  const base = 40;
+/** A snowy pine planted in a drift (its foot at `base`, y 38 by default), three tiers. */
+function Pine({
+  x,
+  h,
+  base = 38,
+  decorated = false,
+}: {
+  x: number;
+  h: number;
+  base?: number;
+  decorated?: boolean;
+}) {
   const top = base - h;
   const width = h * 0.62;
   const tiers = [0, 1, 2].map((i) => ({
