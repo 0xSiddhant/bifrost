@@ -2,12 +2,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { setSnowfallEnabled } from '../relicPrefs';
-import { themeEngine } from '../theme';
+import { DecorSlot } from '../../core/decor/DecorSlot';
+import { setDecorationEnabled } from '../../core/decor/prefs';
+import { installSeason } from '../../core/decor/registry';
+import { themeEngine } from '../../core/theme';
+import { WINTER_COMPONENTS } from './components';
 import { FooterScene } from './FooterScene';
+import { WINTER } from '.';
 import { Snowfall } from './Snowfall';
 import { StringLights } from './StringLights';
-import { optInLevel } from './useThemeOptIn';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -42,86 +45,86 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  installSeason(null);
 });
-
-function renderDecor() {
-  act(() =>
-    root.render(
-      <>
-        <Snowfall />
-        <StringLights />
-        <FooterScene />
-      </>,
-    ),
-  );
-}
 
 const $ = (selector: string) => container.querySelectorAll(selector);
 
-describe('the opt-in decorations', () => {
-  it('draw snow, lights and the footer scene in a theme that turns them on', () => {
-    act(() => themeEngine.setTheme('yule'));
-    renderDecor();
+async function settle(done: () => boolean): Promise<void> {
+  for (let i = 0; i < 100 && !done(); i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
+}
 
+describe('the winter season', () => {
+  it('maps every decoration its manifest declares to a component, in a known slot', () => {
+    expect(Object.keys(WINTER_COMPONENTS).sort()).toEqual(
+      WINTER.decorations.map((decoration) => decoration.id).sort(),
+    );
+    expect(WINTER.decorations.map((d) => `${d.id}:${d.slot}`)).toEqual([
+      'snowfall:sky',
+      'string-lights:header',
+      'footer-scene:footer',
+    ]);
+    // Only the snow has a per-device switch.
+    expect(WINTER.decorations.filter((d) => d.switchable).map((d) => d.id)).toEqual(['snowfall']);
+  });
+
+  it('draws its decorations, hidden from assistive tech', () => {
+    act(() =>
+      root.render(
+        <>
+          <Snowfall />
+          <StringLights />
+          <FooterScene />
+        </>,
+      ),
+    );
     // jsdom's 1024×768 viewport: flakeCount gives it 112 flakes, in two fields.
     expect($('.snowflake')).toHaveLength(112);
     expect($('.snowfall__field')).toHaveLength(2);
     expect($('.string-lights__bulbs')).toHaveLength(4);
-    expect($('.footer-scene')).toHaveLength(1);
-    // The snowbank under the drifts fills the footer itself.
     expect($('.footer-scene__bank')).toHaveLength(1);
     for (const element of $('.snowfall, .string-lights, .footer-scene')) {
       expect(element.getAttribute('aria-hidden')).toBe('true');
     }
   });
 
-  it('render nothing at all in a theme without them, and follow a theme switch', () => {
-    act(() => themeEngine.setTheme('aurora'));
-    renderDecor();
-    expect(container.innerHTML).toBe('');
-
-    act(() => themeEngine.setTheme('yule'));
-    expect($('.snowfall')).toHaveLength(1);
-    expect($('.string-lights')).toHaveLength(1);
-
-    act(() => themeEngine.setTheme('halloween'));
-    expect(container.innerHTML).toBe('');
-  });
-
-  it("take the snow away when this device's Snowfall switch is off, and bring it back", () => {
-    act(() => themeEngine.setTheme('yule'));
-    renderDecor();
-
-    act(() => setSnowfallEnabled(false));
-    expect($('.snowfall')).toHaveLength(0);
-    // The switch is for the snow alone.
-    expect($('.string-lights')).toHaveLength(1);
-    expect($('.footer-scene')).toHaveLength(1);
-
-    act(() => setSnowfallEnabled(true));
-    expect($('.snowfall')).toHaveLength(1);
-  });
-
-  it('let the sleigh ride only while the footer is on screen', () => {
-    act(() => themeEngine.setTheme('yule'));
-    renderDecor();
+  it('lets the sleigh ride only while the footer is on screen', () => {
+    act(() => root.render(<FooterScene />));
     const scene = () => container.querySelector('.footer-scene');
-
     expect(scene()?.classList.contains('footer-scene--riding')).toBe(false);
     act(() => observed?.([{ isIntersecting: true }]));
     expect(scene()?.classList.contains('footer-scene--riding')).toBe(true);
     act(() => observed?.([{ isIntersecting: false }]));
     expect(scene()?.classList.contains('footer-scene--riding')).toBe(false);
   });
-});
 
-describe('optInLevel', () => {
-  it('reads a 0–1 token, and anything else as off', () => {
-    expect(optInLevel({ '--snow-alpha': '1' }, '--snow-alpha')).toBe(1);
-    expect(optInLevel({ '--snow-alpha': '0.6' }, '--snow-alpha')).toBe(0.6);
-    expect(optInLevel({ '--snow-alpha': '3' }, '--snow-alpha')).toBe(1);
-    expect(optInLevel({ '--snow-alpha': '0' }, '--snow-alpha')).toBe(0);
-    expect(optInLevel({ '--snow-alpha': 'lots' }, '--snow-alpha')).toBe(0);
-    expect(optInLevel({}, '--snow-alpha')).toBe(0);
+  it("plugs into the shell's slots: Yule turns it on, another theme and the switch take it off", async () => {
+    installSeason(WINTER);
+    act(() => themeEngine.setTheme('yule'));
+    act(() =>
+      root.render(
+        <>
+          <DecorSlot slot="sky" />
+          <DecorSlot slot="header" />
+          <DecorSlot slot="footer" />
+        </>,
+      ),
+    );
+    await settle(() => $('.footer-scene').length > 0 && $('.snowflake').length > 0);
+    expect($('.snowflake').length).toBeGreaterThan(0);
+    expect($('.string-lights')).toHaveLength(1);
+    expect($('.footer-scene')).toHaveLength(1);
+
+    act(() => setDecorationEnabled('snowfall', false));
+    expect($('.snowflake')).toHaveLength(0);
+    expect($('.string-lights')).toHaveLength(1);
+    act(() => setDecorationEnabled('snowfall', true));
+
+    act(() => themeEngine.setTheme('aurora'));
+    expect($('.snowflake, .string-lights, .footer-scene')).toHaveLength(0);
   });
 });

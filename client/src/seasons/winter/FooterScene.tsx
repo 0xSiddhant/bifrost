@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useThemeOptIn } from './useThemeOptIn';
 import './footer-scene.css';
 
 /**
- * The footer's winter scene (the Yule world): a snowbank that fills the
+ * Winter's footer decoration, rendered by the `footer` slot when the applied
+ * theme turns it on (`--decor-footer-scene`): a snowbank that fills the
  * footer, with drifts heaped along its top, snowy pines at either end, and
- * Santa's sleigh riding by now and then. Drawn in a theme that turns it on
- * with `--footer-scene-alpha`, and in colours taken from the theme
+ * Santa's sleigh riding by now and then, in colours taken from the theme
  * (footer-scene.css), never hard-coded.
  *
  * It takes only space every page already has: the 48 px `.shell-main` leaves
@@ -19,7 +18,6 @@ import './footer-scene.css';
  * the scene.
  */
 export function FooterScene() {
-  const level = useThemeOptIn('--footer-scene-alpha');
   const scene = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
 
@@ -36,9 +34,34 @@ export function FooterScene() {
     );
     observer.observe(element);
     return () => observer.disconnect();
-  }, [level]);
+  }, []);
 
-  if (level === 0) return null;
+  // The galloping bob: a Web Animation, played only while the sleigh rides
+  // in view. As a CSS animation its 0.42 s cycle fired an iteration event
+  // twice a second, each waking the main thread (see StringLights.tsx).
+  const bob = useRef<Animation | null>(null);
+  useEffect(() => {
+    const box = scene.current?.querySelector<HTMLElement>('.footer-scene__bob');
+    if (!box || typeof box.animate !== 'function') return undefined;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    bob.current = box.animate([{ translate: '0 0' }, { translate: '0 -1.5px' }], {
+      id: 'sleigh-bob',
+      duration: 420,
+      iterations: Infinity,
+      direction: 'alternate',
+      easing: 'ease-in-out',
+    });
+    bob.current.pause();
+    return () => {
+      bob.current?.cancel();
+      bob.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (inView) bob.current?.play();
+    else bob.current?.pause();
+  }, [inView]);
+
   return (
     <div
       ref={scene}
@@ -78,12 +101,17 @@ export function FooterScene() {
           />
         </svg>
         <div className="footer-scene__ride">
-          <svg className="footer-scene__sleigh" viewBox="0 0 224 40">
-            <Sleigh />
-            {[66, 106, 146, 186].map((x, i) => (
-              <Reindeer key={x} x={x} stride={i % 2 === 0} />
-            ))}
-          </svg>
+          {/* The bob moves an HTML box, not the SVG: Chrome cannot run an
+              individual-transform animation of an SVG element on the
+              compositor (its trace said so). */}
+          <div className="footer-scene__bob">
+            <svg className="footer-scene__sleigh" viewBox="0 0 224 40">
+              <Sleigh />
+              {[66, 106, 146, 186].map((x, i) => (
+                <Reindeer key={x} x={x} stride={i % 2 === 0} />
+              ))}
+            </svg>
+          </div>
         </div>
       </div>
       <div className="footer-scene__bank" />

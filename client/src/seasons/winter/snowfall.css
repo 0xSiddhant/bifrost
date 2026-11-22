@@ -1,34 +1,29 @@
 /* Falling snow (the Yule world), inside `.sky`: behind every card and panel,
-   in front of the relics. Each flake is its own element: `.snowflake` falls
-   (`translate` from just above the screen to just below it, at its own
-   speed), `.snowflake__sway` drifts it side to side on its own rhythm, and a
-   crystal's body tumbles in 3D. Two fields, far and near, ride wind gusts of
-   different strength. Every animation moves `translate` or `transform` only,
-   so the compositor runs them (the PLAN-40 rule), and `base.css`'s
-   reduced-motion rule leaves each flake still at its resting place. The
-   per-flake values arrive as custom properties from `Snowfall.tsx`. */
+   in front of the relics. Each flake is its own element: `.snowflake` falls,
+   `.snowflake__sway` drifts it side to side, and a crystal's body tumbles in
+   3D. Those three are Web Animations started by `Snowfall.tsx` (see there for
+   why not CSS animations); this sheet holds the flakes' look, their resting
+   place (where reduced motion leaves them) and the two fields' wind gusts,
+   which move `translate` only, with literal keyframes, so the compositor
+   runs them (the PLAN-40 rule). */
 .snowfall {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  opacity: var(--snow-alpha, 1);
+  opacity: var(--decor-snowfall, 1);
 }
 
 .snowfall__field {
   position: absolute;
   inset: 0;
-  animation: snow-gust var(--gust-t) ease-in-out infinite;
 }
 
 .snowfall__field--far {
-  --gust: 2.5vw;
-  --gust-t: 26s;
+  animation: snow-gust-far 26s ease-in-out infinite;
 }
 
 .snowfall__field--near {
-  --gust: 5vw;
-  --gust-t: 19s;
-  animation-delay: -6s;
+  animation: snow-gust-near 19s ease-in-out -6s infinite;
 }
 
 .snowflake {
@@ -38,7 +33,6 @@
   width: var(--size);
   height: var(--size);
   opacity: var(--alpha);
-  animation: snow-fall var(--fall) linear var(--delay) infinite;
 }
 
 .snowflake__sway {
@@ -46,11 +40,10 @@
   width: 100%;
   height: 100%;
   perspective: 40px;
-  animation: snow-sway var(--sway-t) ease-in-out var(--sway-delay) infinite alternate;
 }
 
 /* A soft round flake: a white body with a soft edge, and a small drop shadow
-   in the theme's rim colour, which is what makes white snow read on a white
+   in the theme's `--decor-snow-rim`, which is what makes white snow read on a white
    page (a real flake against a pale sky shows by its shading). The nearest
    are out of focus. */
 .snowflake__body {
@@ -60,21 +53,19 @@
   border-radius: 50%;
   background: radial-gradient(
     circle closest-side,
-    var(--snow) 55%,
-    color-mix(in srgb, var(--snow) 45%, transparent) 82%,
+    var(--decor-snow, #ffffff) 55%,
+    color-mix(in srgb, var(--decor-snow, #ffffff) 45%, transparent) 82%,
     transparent 100%
   );
-  filter: drop-shadow(0 1px 1.5px var(--snow-rim)) blur(var(--blur));
+  filter: drop-shadow(0 1px 1.5px var(--decor-snow-rim, transparent)) blur(var(--blur));
 }
 
 /* A six-armed crystal, drawn twice: a rim under white ice. */
 .snowflake__body--crystal {
   background: none;
   border-radius: 0;
-  filter: drop-shadow(0 1px 1px var(--snow-rim));
+  filter: drop-shadow(0 1px 1px var(--decor-snow-rim, transparent));
   overflow: visible;
-  animation: snow-tumble var(--spin) linear infinite;
-  animation-direction: var(--spin-dir);
 }
 
 .snowflake__rim,
@@ -84,60 +75,50 @@
 }
 
 .snowflake__rim {
-  stroke: var(--snow-rim);
+  stroke: var(--decor-snow-rim, transparent);
   stroke-width: 4.6;
 }
 
 .snowflake__ice {
-  stroke: var(--snow);
+  stroke: var(--decor-snow, #ffffff);
   stroke-width: 2.6;
 }
 
-@keyframes snow-fall {
-  from {
-    translate: 0 calc(-1 * var(--y) - 4vh);
-  }
-  to {
-    translate: 0 calc(104vh - var(--y));
-  }
-}
-
-@keyframes snow-sway {
-  from {
-    translate: calc(-1 * var(--sway)) 0;
-  }
-  to {
-    translate: var(--sway) 0;
-  }
-}
-
-/* Turning about a tilted, mostly upright axis: the crystal flips edge-on and
-   back as it falls, the way a real one flutters. */
-@keyframes snow-tumble {
-  from {
-    transform: rotate3d(0.35, 1, 0.2, 0deg);
-  }
-  to {
-    transform: rotate3d(0.35, 1, 0.2, 360deg);
-  }
-}
-
-/* Gusts: the field leans with the wind and eases back, never twice the same. */
-@keyframes snow-gust {
+/* Gusts: the field leans with the wind and eases back, never twice the same;
+   the near field is pushed twice as far as the far one. */
+@keyframes snow-gust-far {
   0%,
   100% {
     translate: 0 0;
   }
   22% {
-    translate: var(--gust) 0;
+    translate: 2.5vw 0;
   }
   40% {
-    translate: calc(var(--gust) * 0.3) 0;
+    translate: 0.75vw 0;
   }
   63% {
-    translate: calc(var(--gust) * 1.4) 0;
+    translate: 3.5vw 0;
   }
   80% {
-    translate: calc(var(--gust) * -0.4) 0;
+    translate: -1vw 0;
+  }
+}
+@keyframes snow-gust-near {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  22% {
+    translate: 5vw 0;
+  }
+  40% {
+    translate: 1.5vw 0;
+  }
+  63% {
+    translate: 7vw 0;
+  }
+  80% {
+    translate: -2vw 0;
   }
 }

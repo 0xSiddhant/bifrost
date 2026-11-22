@@ -231,7 +231,7 @@
 }
 
 .shell-footer {
-  /* The containing block of a theme's footer scene (core/ui/footer-scene.css). */
+  /* The containing block of the footer slot's decorations (core/decor). */
   position: relative;
   display: flex;
   align-items: center;

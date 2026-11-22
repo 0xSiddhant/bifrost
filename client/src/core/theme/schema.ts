@@ -117,10 +117,6 @@ const ATMOSPHERE_COLOR_TOKENS = [
   '--tone-amber-soft',
   '--header-veil',
   '--relic-muted',
-  // Snowfall (the Yule world): the flake's core and its rim. A rim lets a
-  // white flake show on a white page; a dark theme leaves it transparent.
-  '--snow',
-  '--snow-rim',
 ] as const;
 
 const ATMOSPHERE_CSS_TOKENS = [
@@ -136,12 +132,16 @@ const ATMOSPHERE_CSS_TOKENS = [
   '--relic-alpha',
   '--shadow-1',
   '--shadow-2',
-  // Opt-in decorations (the Yule world), each a 0–1 opacity: omitted or 0
-  // means the element is not rendered at all, so no other theme pays for it.
-  '--snow-alpha',
-  '--lights-alpha',
-  '--footer-scene-alpha',
 ] as const;
+
+/**
+ * A season's decorations (client/src/seasons/README.md) are themed through
+ * their own namespace: `--decor-<id>` turns a decoration on (a 0–1 level) and
+ * any other `--decor-*` token styles it. One pattern, so adding or removing a
+ * season never edits this schema; values are CSS values under the same guard
+ * rails as the atmosphere (no `url(`, `@`, `;`, braces).
+ */
+export const DECOR_TOKEN_PATTERN = '^--decor-[a-z0-9-]{1,48}$';
 
 const TYPO_SHAPE_TOKENS = [
   '--text-xs',
@@ -212,6 +212,7 @@ export const themeSchema = {
       additionalProperties: false,
       required: [...REQUIRED_COLOR_ROLES],
       properties: tokenProperties,
+      patternProperties: { [DECOR_TOKEN_PATTERN]: cssValue },
     },
   },
 } as const;

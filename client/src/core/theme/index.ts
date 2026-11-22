@@ -66,8 +66,8 @@ class ThemeEngine {
   /**
    * The token map of the applied theme, the same object until the next apply,
    * so `useSyncExternalStore` can compare it by identity. Empty before any
-   * theme is applied. The decorations a theme opts into (`--snow-alpha`,
-   * `--lights-alpha`, `--footer-scene-alpha`) are read from it.
+   * theme is applied. A season's decorations read their opt-in tokens
+   * (`--decor-<id>`) from it (core/decor).
    */
   getActiveTokens(): Readonly<Record<string, string>> {
     return this.activeTokens;

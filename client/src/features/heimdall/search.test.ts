@@ -32,9 +32,4 @@ describe('searchSections', () => {
     expect(hits.some((hit) => hit.sectionId === 'network')).toBe(true);
   });
 
-  it('finds the Snowfall switch in the Sky Relics card by a keyword', () => {
-    const hits = searchSections('snow');
-    const control = hits.find((hit) => hit.controlId === 'snowfall');
-    expect(control?.sectionId).toBe('relics');
-  });
 });

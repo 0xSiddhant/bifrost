@@ -154,6 +154,30 @@ describe('the theme schema', () => {
   });
 });
 
+describe("a season's token namespace", () => {
+  it('accepts any --decor-* token under the CSS-value guard rails, and nothing else unknown', () => {
+    const theme = minimalTheme();
+    theme.tokens['--decor-flurry'] = '1';
+    theme.tokens['--decor-flurry-tint'] = 'rgba(43, 98, 150, 0.45)';
+    expect(validate(theme), JSON.stringify(validate.errors)).toBe(true);
+
+    const fetching = minimalTheme();
+    fetching.tokens['--decor-flurry'] = 'url(https://example.com/x.png)';
+    expect(validate(fetching)).toBe(false);
+
+    const unknown = minimalTheme();
+    unknown.tokens['--snow-alpha'] = '1';
+    expect(validate(unknown)).toBe(false);
+  });
+
+  it('is used only by the themes that turn a decoration on', () => {
+    const decorated = BUNDLED_THEMES.filter((theme) =>
+      Object.keys(theme.tokens).some((key) => key.startsWith('--decor-')),
+    ).map((theme) => theme.id);
+    expect(decorated).toEqual(['yule']);
+  });
+});
+
 describe('resolveTheme derived defaults (the server cases, ported)', () => {
   const resolved = () => resolveTheme(minimalTheme() as ThemeFile);
 
@@ -182,13 +206,10 @@ describe('resolveTheme derived defaults (the server cases, ported)', () => {
     expect(resolveTheme(theme as ThemeFile).tokens['--syn-key']).toBe('#ff0000');
   });
 
-  it('leaves the opt-in decorations off unless a theme turns them on', () => {
+  it('derives nothing in the season namespace: a decoration is off unless a theme turns it on', () => {
     for (const mode of ['dark', 'light'] as const) {
-      const theme = resolveTheme(minimalTheme({ mode }) as ThemeFile);
-      expect(theme.tokens['--snow-alpha'], mode).toBe('0');
-      expect(theme.tokens['--lights-alpha'], mode).toBe('0');
-      expect(theme.tokens['--footer-scene-alpha'], mode).toBe('0');
-      expect(theme.tokens['--snow-rim'], mode).toBe('transparent');
+      const tokens = resolveTheme(minimalTheme({ mode }) as ThemeFile).tokens;
+      expect(Object.keys(tokens).filter((key) => key.startsWith('--decor-')), mode).toEqual([]);
     }
   });
 

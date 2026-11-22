@@ -17,7 +17,7 @@
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  opacity: var(--footer-scene-alpha, 1);
+  opacity: var(--decor-footer-scene, 1);
 }
 
 .shell-footer:has(.footer-scene) {
@@ -52,8 +52,8 @@
   bottom: 0;
   background: linear-gradient(
     180deg,
-    var(--snow) 0%,
-    color-mix(in srgb, var(--snow) 86%, var(--snow-rim)) 100%
+    var(--decor-snow, #ffffff) 0%,
+    color-mix(in srgb, var(--decor-snow, #ffffff) 86%, var(--decor-snow-rim, transparent)) 100%
   );
 }
 
@@ -86,16 +86,19 @@
   animation-play-state: paused;
 }
 
+/* Bobs as it gallops: a Web Animation (FooterScene.tsx), played in view. */
+.footer-scene__bob {
+  width: 100%;
+  height: 100%;
+}
+
 .footer-scene__sleigh {
   display: block;
   width: 100%;
   height: 100%;
-  animation: sleigh-bob 0.42s ease-in-out infinite alternate;
-  animation-play-state: paused;
 }
 
-.footer-scene--riding .footer-scene__ride,
-.footer-scene--riding .footer-scene__sleigh {
+.footer-scene--riding .footer-scene__ride {
   animation-play-state: running;
 }
 
@@ -104,9 +107,6 @@
   .footer-scene__ride {
     animation: none;
     transform: translateX(calc(50vw - 112px));
-  }
-  .footer-scene__sleigh {
-    animation: none;
   }
 }
 
@@ -122,30 +122,21 @@
   }
 }
 
-@keyframes sleigh-bob {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: 0 -1.5px;
-  }
-}
-
 /* The drawing's colours. */
 .fs-snow {
-  fill: var(--snow);
+  fill: var(--decor-snow, #ffffff);
 }
 .fs-drift-back {
-  fill: color-mix(in srgb, var(--snow) 78%, var(--snow-rim));
+  fill: color-mix(in srgb, var(--decor-snow, #ffffff) 78%, var(--decor-snow-rim, transparent));
 }
 .fs-rim {
   fill: none;
-  stroke: var(--snow-rim);
+  stroke: var(--decor-snow-rim, transparent);
   stroke-width: 1.2px;
   vector-effect: non-scaling-stroke;
 }
 .fs-snow-cap {
-  fill: var(--snow);
+  fill: var(--decor-snow, #ffffff);
 }
 .fs-tree {
   fill: var(--ok);
@@ -171,7 +162,7 @@
 }
 .fs-fur {
   fill: var(--surface);
-  stroke: var(--snow-rim);
+  stroke: var(--decor-snow-rim, transparent);
   stroke-width: 0.4px;
 }
 .fs-sack {

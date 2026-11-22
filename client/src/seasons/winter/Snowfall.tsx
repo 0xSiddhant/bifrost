@@ -1,20 +1,30 @@
-import { useMemo, type CSSProperties } from 'react';
-import { useSnowfallEnabled, useThemeOptIn } from './useThemeOptIn';
+import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import './snowfall.css';
 
 /**
- * Snow falling behind every page, in a theme that turns it on with
- * `--snow-alpha` (the Yule world), unless this device switched it off in
- * Heimdall → Sky Relics. Not rendered at all otherwise.
+ * Winter's sky decoration: snow falling behind every page. The `sky` slot
+ * renders it when the applied theme turns it on (`--decor-snowfall`, Yule
+ * does) and this device has not switched it off (Heimdall → Sky Relics);
+ * otherwise it is not rendered at all.
  *
  * Every flake is its own element with its own physics, so the snow reads as
  * snow and not as a sheet of dots sliding down: a depth that sets its size,
  * speed, opacity and focus (near flakes are large, quick and soft; far ones
  * small, slow and faint), its own sway, and for the nearer ones a six-armed
  * crystal that tumbles as it falls. Wind gusts push the near field further
- * than the far one. All of it is CSS animation of `translate`, `transform`
- * and nothing else, so it runs on the compositor (the PLAN-40 rule): no
- * script runs per frame. Reduced motion leaves the flakes where they are.
+ * than the far one. Every animation moves `translate` or `transform` only,
+ * so it runs on the compositor (the PLAN-40 rule), and no script runs per
+ * frame. Reduced motion leaves the flakes where they are.
+ *
+ * ⚠️ The flakes are Web Animations (`element.animate`), not CSS animations.
+ * React listens for `animationiteration` at its root, and while anything
+ * listens Chrome must wake the main thread to fire that event whenever any
+ * CSS animation completes an iteration: with ~350 short looping animations
+ * that was ~45 wake-ups a second, each restyling every animated element
+ * (measured: 0.9 s of main-thread work in every 3 s, against 18 ms for the
+ * same animations with no script on the page). Web Animations fire no
+ * iteration events, so the compositor runs them alone. The wind gusts on the
+ * two fields stay CSS: two animations with 20-second iterations cost nothing.
  */
 
 export interface Flake {
@@ -122,14 +132,19 @@ export const CRYSTALS: readonly string[] = [
 ];
 
 export function Snowfall() {
-  const level = useThemeOptIn('--snow-alpha');
-  const enabled = useSnowfallEnabled();
-  // One sky per mount: a theme switch or the switch remounts it, a resize
+  // One sky per mount: a theme switch or the device switch remounts it, a resize
   // does not (positions are in vw/vh, so it still fills the screen).
   const flakes = useMemo(() => makeFlakes(flakeCount(window.innerWidth, window.innerHeight)), []);
-  if (level === 0 || !enabled) return null;
+  const sky = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = sky.current;
+    if (!root) return undefined;
+    return animateFlakes(root, flakes);
+  }, [flakes]);
+
   return (
-    <div className="snowfall" aria-hidden="true">
+    <div ref={sky} className="snowfall" aria-hidden="true">
       {(['far', 'near'] as const).map((field) => (
         <div key={field} className={`snowfall__field snowfall__field--${field}`}>
           {flakes
@@ -159,14 +174,79 @@ function flakeStyle(flake: Flake): CSSProperties {
     '--x': `${flake.x.toFixed(2)}vw`,
     '--y': `${flake.y.toFixed(2)}vh`,
     '--size': `${flake.size.toFixed(1)}px`,
-    '--fall': `${flake.fall.toFixed(2)}s`,
-    '--delay': `${flake.delay.toFixed(2)}s`,
-    '--sway': `${flake.sway.toFixed(1)}px`,
-    '--sway-t': `${flake.swayTime.toFixed(2)}s`,
-    '--sway-delay': `${flake.swayDelay.toFixed(2)}s`,
     '--alpha': flake.alpha.toFixed(2),
     '--blur': `${flake.blur.toFixed(2)}px`,
-    '--spin': `${flake.spin.toFixed(2)}s`,
-    '--spin-dir': flake.spinReverse ? 'reverse' : 'normal',
   } as CSSProperties;
+}
+
+/**
+ * Starts every flake's fall, sway and tumble as Web Animations with literal
+ * keyframes, and returns the stop. Nothing starts under reduced motion: the
+ * flakes then rest where they stand (`top: var(--y)`). jsdom has no
+ * `element.animate`, so tests see the static sky.
+ */
+export function animateFlakes(root: HTMLElement, flakes: readonly Flake[]): () => void {
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  if (reduced || typeof root.animate !== 'function') return () => {};
+  const running: Animation[] = [];
+  const nodes = root.querySelectorAll<HTMLElement>('.snowflake');
+  // The fields render far flakes first, then near ones: map back by depth.
+  const ordered = [
+    ...flakes.filter((flake) => flake.depth < NEAR_DEPTH),
+    ...flakes.filter((flake) => flake.depth >= NEAR_DEPTH),
+  ];
+  nodes.forEach((node, i) => {
+    const flake = ordered[i];
+    const sway = node.firstElementChild as HTMLElement | null;
+    const body = sway?.firstElementChild as HTMLElement | null;
+    if (!flake || !sway || !body) return;
+    // From just above the screen to just below it, wherever it rests.
+    const top = -(flake.y + 4);
+    const bottom = 104 - flake.y;
+    running.push(
+      node.animate(
+        [{ translate: `0 ${top.toFixed(2)}vh` }, { translate: `0 ${bottom.toFixed(2)}vh` }],
+        {
+          id: 'snow-fall',
+          duration: flake.fall * 1000,
+          delay: flake.delay * 1000,
+          iterations: Infinity,
+          easing: 'linear',
+        },
+      ),
+      sway.animate(
+        [
+          { translate: `${(-flake.sway).toFixed(1)}px 0` },
+          { translate: `${flake.sway.toFixed(1)}px 0` },
+        ],
+        {
+          id: 'snow-sway',
+          duration: flake.swayTime * 1000,
+          delay: flake.swayDelay * 1000,
+          iterations: Infinity,
+          direction: 'alternate',
+          easing: 'ease-in-out',
+        },
+      ),
+    );
+    if (flake.crystal !== null) {
+      running.push(
+        body.animate(
+          [
+            { transform: 'rotate3d(0.35, 1, 0.2, 0deg)' },
+            { transform: 'rotate3d(0.35, 1, 0.2, 360deg)' },
+          ],
+          {
+            id: 'snow-tumble',
+            duration: flake.spin * 1000,
+            iterations: Infinity,
+            direction: flake.spinReverse ? 'reverse' : 'normal',
+          },
+        ),
+      );
+    }
+  });
+  return () => {
+    for (const animation of running) animation.cancel();
+  };
 }

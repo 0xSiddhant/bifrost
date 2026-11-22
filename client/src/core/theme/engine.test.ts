@@ -127,7 +127,8 @@ describe('the applied tokens', () => {
 
     themeEngine.setTheme('tokyo');
     expect(themeEngine.getActiveTokens()).not.toBe(olympus);
-    expect(themeEngine.getActiveTokens()['--snow-alpha']).toBe('0');
+    // Tokyo turns no season decoration on.
+    expect(themeEngine.getActiveTokens()['--decor-snowfall']).toBeUndefined();
     unsubscribe();
   });
 });
