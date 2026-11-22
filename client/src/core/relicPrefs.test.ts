@@ -11,11 +11,28 @@ describe('relic prefs', () => {
     expect(getEnabledCollections()).toEqual([...ALL_COLLECTIONS]);
   });
 
-  it('keeps a saved relic choice exactly, a later collection unticked', () => {
+  it('keeps a saved relic choice exactly', () => {
     setEnabledCollections(['norse', 'ghibli']);
     expect(getEnabledCollections()).toEqual(['norse', 'ghibli']);
     setEnabledCollections([]);
     expect(getEnabledCollections()).toEqual([]);
+  });
+
+  it('stores what was unticked, so a collection added later shows for everyone', () => {
+    setEnabledCollections(ALL_COLLECTIONS.filter((name) => name !== 'ghibli'));
+    expect(localStorage.getItem('bifrost.relics.off')).toBe('["ghibli"]');
+    // A device that saved before a collection existed has no word on it: on.
+    localStorage.setItem('bifrost.relics.off', '["ghibli","no-such-collection"]');
+    expect(getEnabledCollections()).toEqual(ALL_COLLECTIONS.filter((name) => name !== 'ghibli'));
+  });
+
+  it('reads an old saved choice (the ticked ones) with every newer collection on, and replaces it', () => {
+    // Saved before Yule existed: Olympus unticked, the rest ticked.
+    localStorage.setItem('bifrost.relics', '["norse","wizarding","ghibli","halloween"]');
+    expect(getEnabledCollections()).toEqual(['norse', 'wizarding', 'ghibli', 'halloween', 'yule']);
+    setEnabledCollections(getEnabledCollections());
+    expect(localStorage.getItem('bifrost.relics')).toBeNull();
+    expect(localStorage.getItem('bifrost.relics.off')).toBe('["olympus"]');
   });
 
   it('announces each change', () => {
