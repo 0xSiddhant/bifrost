@@ -33,14 +33,15 @@ describe('the snowfall', () => {
     expect(flakes.filter((f) => f.depth < 0.5).length).toBeGreaterThan(flakes.length / 2);
   });
 
-  it('makes only the nearer flakes crystals, and blurs only the nearest', () => {
+  it('makes only the nearer flakes crystals, and softens only the nearest', () => {
     const flakes = makeFlakes(400, seeded(11));
     for (const flake of flakes) {
       if (flake.crystal !== null) {
         expect(flake.depth).toBeGreaterThanOrEqual(CRYSTAL_DEPTH);
         expect(CRYSTALS[flake.crystal]).toBeTruthy();
       }
-      if (flake.blur > 0) expect(flake.depth).toBeGreaterThan(0.82);
+      if (flake.soft > 0) expect(flake.depth).toBeGreaterThan(0.82);
+      expect(flake.soft).toBeLessThanOrEqual(1);
       // Already mid-fall when the sky appears, and never a frozen sway.
       expect(flake.delay).toBeLessThanOrEqual(0);
       expect(flake.delay).toBeGreaterThan(-flake.fall);

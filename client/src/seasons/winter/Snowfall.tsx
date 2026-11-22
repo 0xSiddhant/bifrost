@@ -25,6 +25,13 @@ import './snowfall.css';
  * same animations with no script on the page). Web Animations fire no
  * iteration events, so the compositor runs them alone. The wind gusts on the
  * two fields stay CSS: two animations with 20-second iterations cost nothing.
+ *
+ * ⚠️ No CSS `filter` on a flake (no `blur()`, no `drop-shadow()`): an engine
+ * that composites in software, as WebKit does in CI's headless containers,
+ * re-applies a moving layer's filter every frame, and a hundred of them
+ * starved its animation frames for seconds. The soft edge, the rim that
+ * shows white snow on a white page and the near flakes' focus are all drawn
+ * into the flake's own gradient (snowfall.css).
  */
 
 export interface Flake {
@@ -45,8 +52,9 @@ export interface Flake {
   swayTime: number;
   swayDelay: number;
   alpha: number;
-  /** Depth-of-field blur, in px: only the nearest flakes are out of focus. */
-  blur: number;
+  /** Depth of field, 0 (sharp) to 1 (softest): only the nearest flakes are
+   *  out of focus. Drawn into the flake's own gradient, not by a filter. */
+  soft: number;
   /** Index into `CRYSTALS`, or null for a soft round flake. */
   crystal: number | null;
   /** Seconds per tumble, and which way it turns. */
@@ -84,7 +92,7 @@ export function makeFlakes(count: number, rng: () => number = Math.random): Flak
       swayTime,
       swayDelay: -rng() * swayTime,
       alpha: 0.7 + depth * 0.3,
-      blur: depth > 0.82 ? (depth - 0.82) * 7 : 0,
+      soft: depth > 0.82 ? (depth - 0.82) / 0.18 : 0,
       crystal,
       spin,
       spinReverse: rng() < 0.5,
@@ -153,7 +161,7 @@ export function Snowfall() {
               <span key={i} className="snowflake" style={flakeStyle(flake)}>
                 <span className="snowflake__sway">
                   {flake.crystal === null ? (
-                    <span className="snowflake__body" />
+                    <span className="snowflake__body snowflake__body--round" />
                   ) : (
                     <svg className="snowflake__body snowflake__body--crystal" viewBox="0 0 24 24">
                       <path className="snowflake__rim" d={CRYSTALS[flake.crystal]} />
@@ -175,7 +183,7 @@ function flakeStyle(flake: Flake): CSSProperties {
     '--y': `${flake.y.toFixed(2)}vh`,
     '--size': `${flake.size.toFixed(1)}px`,
     '--alpha': flake.alpha.toFixed(2),
-    '--blur': `${flake.blur.toFixed(2)}px`,
+    '--soft': flake.soft.toFixed(2),
   } as CSSProperties;
 }
 
@@ -233,8 +241,8 @@ export function animateFlakes(root: HTMLElement, flakes: readonly Flake[]): () =
       running.push(
         body.animate(
           [
-            { transform: 'rotate3d(0.35, 1, 0.2, 0deg)' },
-            { transform: 'rotate3d(0.35, 1, 0.2, 360deg)' },
+            { transform: 'perspective(40px) rotate3d(0.35, 1, 0.2, 0deg)' },
+            { transform: 'perspective(40px) rotate3d(0.35, 1, 0.2, 360deg)' },
           ],
           {
             id: 'snow-tumble',

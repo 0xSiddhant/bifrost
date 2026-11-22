@@ -39,32 +39,46 @@
   display: block;
   width: 100%;
   height: 100%;
-  perspective: 40px;
 }
 
-/* A soft round flake: a white body with a soft edge, and a small drop shadow
-   in the theme's `--decor-snow-rim`, which is what makes white snow read on a white
-   page (a real flake against a pale sky shows by its shading). The nearest
-   are out of focus. */
 .snowflake__body {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* A soft round flake: a white body over a shade in the theme's
+   `--decor-snow-rim`, set a little low, which is what makes white snow read
+   on a white page (a real flake against a pale sky shows by its shading).
+   The nearest are out of focus (`--soft`, 0–1): a smaller solid core and a
+   longer fall-off. The body is 30% larger than the flake, centred on it, so
+   the shade has room to fade out around it. All of it is gradients, no
+   `filter`: a software compositor re-applies a filter to every moving flake
+   every frame (see Snowfall.tsx). */
+.snowflake__body--round {
+  width: 130%;
+  height: 130%;
+  margin: -15%;
   border-radius: 50%;
-  background: radial-gradient(
-    circle closest-side,
-    var(--decor-snow, #ffffff) 55%,
-    color-mix(in srgb, var(--decor-snow, #ffffff) 45%, transparent) 82%,
-    transparent 100%
-  );
-  filter: drop-shadow(0 1px 1.5px var(--decor-snow-rim, transparent)) blur(var(--blur));
+  background:
+    radial-gradient(
+      closest-side,
+      var(--decor-snow, #ffffff) calc(42% - var(--soft, 0) * 20%),
+      color-mix(in srgb, var(--decor-snow, #ffffff) 55%, transparent)
+        calc(62% - var(--soft, 0) * 4%),
+      transparent calc(76% + var(--soft, 0) * 12%)
+    ),
+    radial-gradient(
+      closest-side at 50% 55%,
+      color-mix(in srgb, var(--decor-snow-rim, transparent) 85%, transparent)
+        calc(44% - var(--soft, 0) * 16%),
+      color-mix(in srgb, var(--decor-snow-rim, transparent) 25%, transparent) 66%,
+      transparent calc(84% + var(--soft, 0) * 10%)
+    );
 }
 
 /* A six-armed crystal, drawn twice: a rim under white ice. */
 .snowflake__body--crystal {
-  background: none;
-  border-radius: 0;
-  filter: drop-shadow(0 1px 1px var(--decor-snow-rim, transparent));
   overflow: visible;
 }
 
