@@ -8,9 +8,10 @@ import type { Season } from '../../core/decor/types';
  *
  * This file is the season's manifest and holds no component: the shell and
  * Heimdall read it at boot, and the decorations themselves load in one chunk
- * (`components.ts`) once the browser is idle. To take winter out, point
- * `app/season.ts` at another season (or `null`) and delete this folder; no
- * other code names it (see `client/src/seasons/README.md`).
+ * (`components.ts`) once the browser is idle. To take winter out, remove its
+ * import from `app/season.ts`, point `SEASON` at another season (or `null`)
+ * and delete this folder; no other code names it (see
+ * `client/src/seasons/README.md`).
  */
 export const WINTER: Season = {
   id: 'winter',

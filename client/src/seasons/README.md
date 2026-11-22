@@ -21,13 +21,16 @@ relics are not seasons: they stay.
 
 ## Remove a season
 
-1. `app/season.ts`: `export const SEASON: Season | null = null;` (or the next season).
+1. `app/season.ts`: delete the season's import (`import { WINTER } from
+   '../seasons/winter';`) and set `export const SEASON: Season | null = null;`
+   (or import the next season and set it instead).
 2. Delete its folder, e.g. `seasons/winter/`, and its journey,
    `e2e/browser/season-winter.spec.ts`.
 3. Optionally drop its `--decor-*` tokens from the themes that set them
    (`assets/themes/yule.json`); left in, they are simply unused.
 
 Nothing else changes: the slots render empty and Heimdall shows no switches.
+Typecheck, lint and the build then confirm nothing else named the season.
 
 ## Add a season
 
