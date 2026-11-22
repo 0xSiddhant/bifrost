@@ -23,13 +23,7 @@ test.describe('the winter season', () => {
       await expect(page.locator('[data-decor-slot="footer"] .footer-scene')).toBeAttached();
 
       const names = new Set((await runningAnimations(page)).map((animation) => animation.name));
-      const expected = [
-        'snow-fall',
-        'snow-sway',
-        'snow-gust-far',
-        'snow-gust-near',
-        'lights-twinkle',
-      ];
+      const expected = ['snow-fall', 'snow-gust-far', 'snow-gust-near', 'lights-twinkle'];
       // Phones hide the footer, and with it the sleigh (≤640 px).
       if ((page.viewportSize()?.width ?? 0) > 640) expected.push('sleigh-ride', 'sleigh-bob');
       for (const name of expected) expect(names, name).toContain(name);

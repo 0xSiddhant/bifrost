@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRYSTAL_DEPTH, CRYSTALS, flakeCount, makeFlakes } from './Snowfall';
+import { CRYSTAL_DEPTH, CRYSTALS, fallPath, flakeCount, makeFlakes } from './Snowfall';
 
 /** A small deterministic generator (mulberry32). */
 function seeded(seed: number): () => number {
@@ -54,5 +54,29 @@ describe('the snowfall', () => {
   it('draws three six-armed crystal designs', () => {
     expect(CRYSTALS).toHaveLength(3);
     for (const d of CRYSTALS) expect((d.match(/M12\.00 12\.00L/g) ?? []).length).toBe(6);
+  });
+});
+
+describe('fallPath', () => {
+  it('falls from above the screen to below it, swaying within its reach, in one path', () => {
+    for (const flake of makeFlakes(60, seeded(5))) {
+      const frames = fallPath(flake);
+      const points = frames.map((frame) => {
+        const [x, y] = String(frame.translate).split(' ');
+        return { x: Number.parseFloat(x ?? ''), y: Number.parseFloat(y ?? '') };
+      });
+      // Off screen at both ends, wherever it rests: the wrap is never seen.
+      expect(flake.y + points[0]!.y).toBeCloseTo(-4, 1);
+      expect(flake.y + points.at(-1)!.y).toBeCloseTo(104, 1);
+      // Steadily down, and never further aside than its own sway.
+      for (let i = 1; i < points.length; i += 1) {
+        expect(points[i]!.y).toBeGreaterThan(points[i - 1]!.y);
+      }
+      expect(Math.max(...points.map((point) => Math.abs(point.x)))).toBeLessThanOrEqual(
+        flake.sway + 0.05,
+      );
+      // Enough points that each half-swing reads as a curve.
+      expect(frames.length - 1).toBeGreaterThanOrEqual((flake.fall / flake.swayTime) * 6);
+    }
   });
 });

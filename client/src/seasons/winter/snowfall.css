@@ -1,8 +1,8 @@
 /* Falling snow (the Yule world), inside `.sky`: behind every card and panel,
-   in front of the relics. Each flake is its own element: `.snowflake` falls,
-   `.snowflake__sway` drifts it side to side, and a crystal's body tumbles in
-   3D. Those three are Web Animations started by `Snowfall.tsx` (see there for
-   why not CSS animations); this sheet holds the flakes' look, their resting
+   in front of the relics. Each flake is its own element: `.snowflake` falls
+   and sways along one path, and a crystal's body tumbles in 3D. Both are Web
+   Animations started by `Snowfall.tsx` (see there for why not CSS
+   animations, and why the sway rides in the fall); this sheet holds the flakes' look, their resting
    place (where reduced motion leaves them) and the two fields' wind gusts,
    which move `translate` only, with literal keyframes, so the compositor
    runs them (the PLAN-40 rule). */
@@ -33,12 +33,6 @@
   width: var(--size);
   height: var(--size);
   opacity: var(--alpha);
-}
-
-.snowflake__sway {
-  display: block;
-  width: 100%;
-  height: 100%;
 }
 
 .snowflake__body {

@@ -162,16 +162,14 @@ export function Snowfall() {
             .filter((flake) => (flake.depth >= NEAR_DEPTH ? 'near' : 'far') === field)
             .map((flake, i) => (
               <span key={i} className="snowflake" style={flakeStyle(flake)}>
-                <span className="snowflake__sway">
-                  {flake.crystal === null ? (
-                    <span className="snowflake__body snowflake__body--round" />
-                  ) : (
-                    <svg className="snowflake__body snowflake__body--crystal" viewBox="0 0 24 24">
-                      <path className="snowflake__rim" d={CRYSTALS[flake.crystal]} />
-                      <path className="snowflake__ice" d={CRYSTALS[flake.crystal]} />
-                    </svg>
-                  )}
-                </span>
+                {flake.crystal === null ? (
+                  <span className="snowflake__body snowflake__body--round" />
+                ) : (
+                  <svg className="snowflake__body snowflake__body--crystal" viewBox="0 0 24 24">
+                    <path className="snowflake__rim" d={CRYSTALS[flake.crystal]} />
+                    <path className="snowflake__ice" d={CRYSTALS[flake.crystal]} />
+                  </svg>
+                )}
               </span>
             ))}
         </div>
@@ -188,6 +186,33 @@ function flakeStyle(flake: Flake): CSSProperties {
     '--alpha': flake.alpha.toFixed(2),
     '--soft': flake.soft.toFixed(2),
   } as CSSProperties;
+}
+
+/** Points per half-swing of a flake's sway: enough that the drift reads as a curve. */
+const SWAY_STEPS = 6;
+
+/**
+ * One flake's whole path as literal keyframes: from just above the screen to
+ * just below it, wherever it rests, swaying side to side on its own rhythm
+ * (a cosine, sampled `SWAY_STEPS` times per half-swing). The sway rides in
+ * the fall's own keyframes rather than a second animated element, so each
+ * flake is one moving layer, not two: a compositor without a GPU (WebKit in
+ * CI's headless containers) moves every layer itself, every frame. Where the
+ * loop wraps, the flake is off screen, so its sway may jump there unseen.
+ */
+export function fallPath(flake: Flake): Keyframe[] {
+  const top = -(flake.y + 4);
+  const bottom = 104 - flake.y;
+  const steps = Math.max(2, Math.ceil((flake.fall / flake.swayTime) * SWAY_STEPS));
+  const frames: Keyframe[] = [];
+  for (let i = 0; i <= steps; i += 1) {
+    const share = i / steps;
+    const seconds = share * flake.fall;
+    const x = -flake.sway * Math.cos((Math.PI * (seconds - flake.swayDelay)) / flake.swayTime);
+    const y = top + (bottom - top) * share;
+    frames.push({ translate: `${x.toFixed(1)}px ${y.toFixed(2)}vh` });
+  }
+  return frames;
 }
 
 /**
@@ -207,37 +232,16 @@ export function animateFlakes(root: HTMLElement, flakes: readonly Flake[]): () =
   ];
   nodes.forEach((node, i) => {
     const flake = ordered[i];
-    const sway = node.firstElementChild as HTMLElement | null;
-    const body = sway?.firstElementChild as HTMLElement | null;
-    if (!flake || !sway || !body) return;
-    // From just above the screen to just below it, wherever it rests.
-    const top = -(flake.y + 4);
-    const bottom = 104 - flake.y;
+    const body = node.firstElementChild as HTMLElement | null;
+    if (!flake || !body) return;
     running.push(
-      node.animate(
-        [{ translate: `0 ${top.toFixed(2)}vh` }, { translate: `0 ${bottom.toFixed(2)}vh` }],
-        {
-          id: 'snow-fall',
-          duration: flake.fall * 1000,
-          delay: flake.delay * 1000,
-          iterations: Infinity,
-          easing: 'linear',
-        },
-      ),
-      sway.animate(
-        [
-          { translate: `${(-flake.sway).toFixed(1)}px 0` },
-          { translate: `${flake.sway.toFixed(1)}px 0` },
-        ],
-        {
-          id: 'snow-sway',
-          duration: flake.swayTime * 1000,
-          delay: flake.swayDelay * 1000,
-          iterations: Infinity,
-          direction: 'alternate',
-          easing: 'ease-in-out',
-        },
-      ),
+      node.animate(fallPath(flake), {
+        id: 'snow-fall',
+        duration: flake.fall * 1000,
+        delay: flake.delay * 1000,
+        iterations: Infinity,
+        easing: 'linear',
+      }),
     );
     if (flake.crystal !== null) {
       running.push(
