@@ -9,6 +9,7 @@ import {
   contrastWarnings,
   parseColor,
   parseRgba,
+  SCREEN_SHADE_CENTRE,
 } from './color';
 import { ACCENT_TEXT_MAX_STEPS, ACCENT_TEXT_STEP, resolveTheme, type ThemeFile } from './resolve';
 import { themeSchema } from './schema';
@@ -209,7 +210,10 @@ describe('resolveTheme derived defaults (the server cases, ported)', () => {
   it('derives nothing in the season namespace: a decoration is off unless a theme turns it on', () => {
     for (const mode of ['dark', 'light'] as const) {
       const tokens = resolveTheme(minimalTheme({ mode }) as ThemeFile).tokens;
-      expect(Object.keys(tokens).filter((key) => key.startsWith('--decor-')), mode).toEqual([]);
+      expect(
+        Object.keys(tokens).filter((key) => key.startsWith('--decor-')),
+        mode,
+      ).toEqual([]);
     }
   });
 
@@ -344,6 +348,31 @@ describe('--accent-text', () => {
     expect(contrastWarnings(daybreak.tokens)).toEqual([]);
     const greyed = { ...daybreak.tokens, '--screen-shade': '#000000' };
     expect(contrastWarnings(greyed).some((w) => w.includes('--screen-shade at 28%'))).toBe(true);
+  });
+
+  it('models a translucent screensaver shade with its own alpha, as the CSS mixes it', () => {
+    const daybreak = BUNDLED_THEMES.find((theme) => theme.id === 'daybreak')!;
+    const wash = (shade: string) =>
+      accentTextBackdrops({ ...daybreak.tokens, '--screen-shade': shade }).find((backdrop) =>
+        backdrop.label.startsWith('--screen-shade at 28%'),
+      )?.color;
+    const solid = parseRgba(wash('#000000') ?? '')!;
+    const faint = parseRgba(wash('rgba(0, 0, 0, 0.4)') ?? '')!;
+    // 28% of a 0.4 black darkens the veil far less than 28% of a solid one.
+    expect(faint.r).toBeGreaterThan(solid.r);
+    expect(wash('rgba(0, 0, 0, 0)')).toBeUndefined();
+  });
+
+  it("holds the lint's 28% to the screensaver stylesheet's centre wash", () => {
+    const css = readFileSync(
+      new URL('../../features/screensaver/screensaver.css', import.meta.url),
+      'utf8',
+    );
+    const centre =
+      /color-mix\(in srgb, var\(--screen-shade\) (\d+)%, transparent\),\s*transparent 70%/.exec(
+        css,
+      );
+    expect(centre?.[1]).toBe(String(Math.round(SCREEN_SHADE_CENTRE * 100)));
   });
 
   it('changes only Daybreak, Tokyo and Yule among the bundled themes', () => {

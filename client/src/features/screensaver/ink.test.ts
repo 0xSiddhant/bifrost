@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paintStyle } from './ink';
+import { clearOf, paintStyle } from './ink';
 
 describe('paintStyle', () => {
   it('keeps the night numbers on a dark veil', () => {
@@ -24,5 +24,13 @@ describe('paintStyle', () => {
 
   it('treats a colour it cannot read as night', () => {
     expect(paintStyle('not a colour').ink).toBe(false);
+  });
+});
+
+describe('clearOf', () => {
+  it('fades a halo to its own colour, not to transparent black', () => {
+    expect(clearOf('#c9952e')).toBe('rgba(201, 149, 46, 0)');
+    expect(clearOf('rgba(179, 38, 58, 0.8)')).toBe('rgba(179, 38, 58, 0)');
+    expect(clearOf('not a colour')).toBe('transparent');
   });
 });

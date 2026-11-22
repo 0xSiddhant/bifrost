@@ -52,11 +52,12 @@
     radial-gradient(
       115% 90% at 50% 46%,
       transparent 52%,
-      color-mix(in srgb, var(--screen-shade, #000) 60%, transparent) 100%
+      color-mix(in srgb, var(--screen-shade) 60%, transparent) 100%
     ),
     radial-gradient(
       60% 55% at 50% 46%,
-      color-mix(in srgb, var(--screen-shade, #000) 28%, transparent),
+      /* 28%: SCREEN_SHADE_CENTRE in core/theme/color.ts, the contrast lint's model of it. */
+      color-mix(in srgb, var(--screen-shade) 28%, transparent),
       transparent 70%
     );
 }

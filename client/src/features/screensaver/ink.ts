@@ -58,3 +58,15 @@ export function paintStyle(veil: string): PaintStyle {
   cached = { veil, style };
   return style;
 }
+
+/**
+ * `color` with no opacity, for the outer stop of a halo. A canvas gradient
+ * blends its stops' colour and alpha separately, so a fade to `transparent`
+ * (transparent *black*) passes through a darkened colour and rings the halo
+ * in grey: fading to the same colour at alpha 0 fades it out clean. A colour
+ * this cannot read fades to `transparent` as before.
+ */
+export function clearOf(color: string): string {
+  const rgba = parseRgba(color);
+  return rgba ? `rgba(${rgba.r}, ${rgba.g}, ${rgba.b}, 0)` : 'transparent';
+}

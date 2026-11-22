@@ -157,8 +157,12 @@ export interface Backdrop {
 /** The surfaces text sits on, each measured as an opaque colour. */
 const SURFACES = ['--bg', '--surface', '--surface-2'];
 
-/** The share of `--screen-shade` in the screensaver's centre wash (screensaver.css). */
-const SCREEN_SHADE_CENTRE = 0.28;
+/**
+ * The share of `--screen-shade` in the screensaver's centre wash: the `28%`
+ * of `.nott::after` in features/screensaver/screensaver.css, which
+ * themes.test.ts holds to this number.
+ */
+export const SCREEN_SHADE_CENTRE = 0.28;
 
 /** Every colour token `contrastWarnings` reads. */
 const LINTED_COLORS = [
@@ -325,11 +329,13 @@ export function accentTextBackdrops(tokens: Record<string, string>): Backdrop[] 
   }
   // The screensaver's centre wash, `--screen-shade` at 28% over its veil, lies
   // behind the quote's attribution: a dark shade on a light veil would grey it.
+  // The CSS mixes the shade 28% into transparent, so a translucent shade
+  // keeps its own alpha in the wash: 28% of it.
   const screenVeil = tokens['--screen-veil'];
-  const shade = parseColor(tokens['--screen-shade'] ?? '');
+  const shade = parseRgba(tokens['--screen-shade'] ?? '');
   const onVeil = page && screenVeil ? over('--screen-veil', screenVeil, page) : null;
-  if (onVeil && shade) {
-    const wash = `rgba(${shade.r}, ${shade.g}, ${shade.b}, ${SCREEN_SHADE_CENTRE})`;
+  if (onVeil && shade && shade.a > 0) {
+    const wash = `rgba(${shade.r}, ${shade.g}, ${shade.b}, ${SCREEN_SHADE_CENTRE * shade.a})`;
     layered.push(over('--screen-shade at 28%', wash, onVeil));
   }
   return [...surfaces, ...layered.filter((backdrop): backdrop is Backdrop => backdrop !== null)];

@@ -13,7 +13,7 @@ import {
   DEPTH_PAN,
   type Field,
 } from './particles';
-import { paintStyle } from './ink';
+import { clearOf, paintStyle } from './ink';
 import { advanceRipples, rippleAlpha, rippleRadius, spawnRipple, type Ripple } from './ripple';
 import './screensaver.css';
 
@@ -176,6 +176,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
       const colors = colorsRef.current;
       // Ink on a light veil, light on a dark one (ink.ts).
       const paint = paintStyle(colors.veil);
+      const glowClear = clearOf(colors.glow);
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = colors.veil;
       ctx.fillRect(0, 0, width, height);
@@ -242,7 +243,7 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
             radius * 3.4,
           );
           halo.addColorStop(0, colors.glow);
-          halo.addColorStop(1, 'transparent');
+          halo.addColorStop(1, glowClear);
           ctx.shadowBlur = 0;
           const alpha = ctx.globalAlpha;
           ctx.globalAlpha = alpha * 0.45;
