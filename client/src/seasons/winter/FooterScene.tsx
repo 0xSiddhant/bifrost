@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from '../../core/ui/useReducedMotion';
 import './footer-scene.css';
 
 /**
@@ -40,10 +41,10 @@ export function FooterScene() {
   // in view. As a CSS animation its 0.42 s cycle fired an iteration event
   // twice a second, each waking the main thread (see StringLights.tsx).
   const bob = useRef<Animation | null>(null);
+  const reduced = useReducedMotion();
   useEffect(() => {
     const box = scene.current?.querySelector<HTMLElement>('.footer-scene__bob');
-    if (!box || typeof box.animate !== 'function') return undefined;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (!box || typeof box.animate !== 'function' || reduced) return undefined;
     bob.current = box.animate([{ translate: '0 0' }, { translate: '0 -1.5px' }], {
       id: 'sleigh-bob',
       duration: 420,
@@ -56,11 +57,13 @@ export function FooterScene() {
       bob.current?.cancel();
       bob.current = null;
     };
-  }, []);
+  }, [reduced]);
+  // After the bob above, so a bob made again (reduced motion turned off) is
+  // played at once if the sleigh is in view.
   useEffect(() => {
     if (inView) bob.current?.play();
     else bob.current?.pause();
-  }, [inView]);
+  }, [inView, reduced]);
 
   return (
     <div

@@ -92,6 +92,50 @@ describe('the winter season', () => {
     }
   });
 
+  it('stops its Web Animations the moment reduced motion turns on, and restarts them when it turns off', () => {
+    // A live media query and a recording `element.animate` (jsdom has neither).
+    let reduced = false;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      media: query,
+      get matches() {
+        return reduced;
+      },
+      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+    }));
+    const started: { cancel: ReturnType<typeof vi.fn> }[] = [];
+    const animate = vi.fn(() => {
+      const animation = { cancel: vi.fn(), pause: vi.fn(), play: vi.fn() };
+      started.push(animation);
+      return animation;
+    });
+    Object.defineProperty(Element.prototype, 'animate', { value: animate, configurable: true });
+    try {
+      act(() =>
+        root.render(
+          <>
+            <Snowfall />
+            <StringLights />
+          </>,
+        ),
+      );
+      const first = started.length;
+      expect(first).toBeGreaterThan(0);
+
+      reduced = true;
+      act(() => listeners.forEach((listener) => listener()));
+      expect(started.every((animation) => animation.cancel.mock.calls.length === 1)).toBe(true);
+      expect(started).toHaveLength(first);
+
+      reduced = false;
+      act(() => listeners.forEach((listener) => listener()));
+      expect(started).toHaveLength(first * 2);
+    } finally {
+      delete (Element.prototype as { animate?: unknown }).animate;
+    }
+  });
+
   it('lets the sleigh ride only while the footer is on screen', () => {
     act(() => root.render(<FooterScene />));
     const scene = () => container.querySelector('.footer-scene');

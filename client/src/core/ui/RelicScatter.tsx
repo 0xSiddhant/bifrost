@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RELIC_COLLECTIONS, type Relic } from '../../assets/relics';
 import { getEnabledCollections, onRelicPrefsChange } from '../relicPrefs';
+import { useReducedMotion } from './useReducedMotion';
 
 /**
  * Scatters a few random relics through the sky layer — a different handful
@@ -98,8 +99,9 @@ export function RelicScatter() {
   // each one woke the main thread to restyle every animated element in the
   // sky, the Yule world's falling flakes included (see Snowfall.tsx).
   const nodes = useRef<(HTMLSpanElement | null)[]>([]);
+  const reduced = useReducedMotion();
   useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (reduced) return undefined;
     const running: Animation[] = [];
     placements.forEach((p, i) => {
       const node = nodes.current[i];
@@ -118,7 +120,7 @@ export function RelicScatter() {
     return () => {
       for (const animation of running) animation.cancel();
     };
-  }, [placements]);
+  }, [placements, reduced]);
 
   return (
     <>

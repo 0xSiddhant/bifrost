@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useReducedMotion } from '../../core/ui/useReducedMotion';
 import './snowfall.css';
 
 /**
@@ -144,12 +145,14 @@ export function Snowfall() {
   // does not (positions are in vw/vh, so it still fills the screen).
   const flakes = useMemo(() => makeFlakes(flakeCount(window.innerWidth, window.innerHeight)), []);
   const sky = useRef<HTMLDivElement>(null);
+  // Live: turning reduced motion on stops the snow where it is, off restarts it.
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const root = sky.current;
-    if (!root) return undefined;
+    if (!root || reduced) return undefined;
     return animateFlakes(root, flakes);
-  }, [flakes]);
+  }, [flakes, reduced]);
 
   return (
     <div ref={sky} className="snowfall" aria-hidden="true">
@@ -189,13 +192,12 @@ function flakeStyle(flake: Flake): CSSProperties {
 
 /**
  * Starts every flake's fall, sway and tumble as Web Animations with literal
- * keyframes, and returns the stop. Nothing starts under reduced motion: the
- * flakes then rest where they stand (`top: var(--y)`). jsdom has no
- * `element.animate`, so tests see the static sky.
+ * keyframes, and returns the stop. The caller starts none under reduced
+ * motion: the flakes then rest where they stand (`top: var(--y)`). jsdom has
+ * no `element.animate`, so tests see the static sky.
  */
 export function animateFlakes(root: HTMLElement, flakes: readonly Flake[]): () => void {
-  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  if (reduced || typeof root.animate !== 'function') return () => {};
+  if (typeof root.animate !== 'function') return () => {};
   const running: Animation[] = [];
   const nodes = root.querySelectorAll<HTMLElement>('.snowflake');
   // The fields render far flakes first, then near ones: map back by depth.

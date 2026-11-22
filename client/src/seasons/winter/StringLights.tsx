@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from '../../core/ui/useReducedMotion';
 import './string-lights.css';
 
 /**
@@ -27,11 +28,11 @@ const TWINKLE: readonly (readonly [number, number])[] = [
 
 export function StringLights() {
   const strand = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     const root = strand.current;
-    if (!root || typeof root.animate !== 'function') return undefined;
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (!root || typeof root.animate !== 'function' || reduced) return undefined;
     const running = [...root.querySelectorAll<HTMLElement>('.string-lights__bulbs')].map(
       (layer, i) => {
         const [half, delay] = TWINKLE[i % TWINKLE.length] ?? [2, 0];
@@ -48,7 +49,7 @@ export function StringLights() {
     return () => {
       for (const animation of running) animation.cancel();
     };
-  }, []);
+  }, [reduced]);
 
   return (
     <div ref={strand} className="string-lights" aria-hidden="true">
