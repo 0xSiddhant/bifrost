@@ -68,6 +68,12 @@ describe('CONNECTION_LOSS', () => {
     const allowed: Violation[] = [
       { kind: 'requestfailed', page: '', url, detail: 'net::ERR_CONNECTION_REFUSED' },
       { kind: 'requestfailed', page: '', url, detail: 'net::ERR_CONNECTION_RESET' },
+      { kind: 'requestfailed', page: '', url, detail: 'net::ERR_SOCKET_NOT_CONNECTED' },
+      {
+        kind: 'console.error',
+        page: '',
+        detail: 'Failed to load resource: net::ERR_SOCKET_NOT_CONNECTED',
+      },
       { kind: 'requestfailed', page: '', url, detail: 'Could not connect to the server.' },
       {
         kind: 'requestfailed',
