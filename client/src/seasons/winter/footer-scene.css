@@ -52,8 +52,9 @@
   bottom: 0;
   background: linear-gradient(
     180deg,
-    var(--decor-snow, #ffffff) 0%,
-    color-mix(in srgb, var(--decor-snow, #ffffff) 86%, var(--decor-snow-rim, transparent)) 100%
+    var(--decor-snow, var(--surface)) 0%,
+    color-mix(in srgb, var(--decor-snow, var(--surface)) 86%, var(--decor-snow-rim, transparent))
+      100%
   );
 }
 
@@ -124,10 +125,14 @@
 
 /* The drawing's colours. */
 .fs-snow {
-  fill: var(--decor-snow, #ffffff);
+  fill: var(--decor-snow, var(--surface));
 }
 .fs-drift-back {
-  fill: color-mix(in srgb, var(--decor-snow, #ffffff) 78%, var(--decor-snow-rim, transparent));
+  fill: color-mix(
+    in srgb,
+    var(--decor-snow, var(--surface)) 78%,
+    var(--decor-snow-rim, transparent)
+  );
 }
 .fs-rim {
   fill: none;
@@ -136,7 +141,7 @@
   vector-effect: non-scaling-stroke;
 }
 .fs-snow-cap {
-  fill: var(--decor-snow, #ffffff);
+  fill: var(--decor-snow, var(--surface));
 }
 .fs-tree {
   fill: var(--ok);

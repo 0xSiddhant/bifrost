@@ -63,8 +63,8 @@
   background:
     radial-gradient(
       closest-side,
-      var(--decor-snow, #ffffff) calc(42% - var(--soft, 0) * 20%),
-      color-mix(in srgb, var(--decor-snow, #ffffff) 55%, transparent)
+      var(--decor-snow, var(--surface)) calc(42% - var(--soft, 0) * 20%),
+      color-mix(in srgb, var(--decor-snow, var(--surface)) 55%, transparent)
         calc(62% - var(--soft, 0) * 4%),
       transparent calc(76% + var(--soft, 0) * 12%)
     ),
@@ -94,7 +94,7 @@
 }
 
 .snowflake__ice {
-  stroke: var(--decor-snow, #ffffff);
+  stroke: var(--decor-snow, var(--surface));
   stroke-width: 2.6;
 }
 

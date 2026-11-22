@@ -1,18 +1,19 @@
-/* String lights (the Yule world): absolute in `.shell`, right under the
-   header (the 3 px bridge strip plus `--header-h`), in the 24–32 px every page
-   leaves empty there. Under the header (z-index 10) once scrolled, so it
-   never sits over content. The wire is a run of sagging arcs, one per bulb;
-   the bulbs are four layers, one per colour, each holding every fourth bulb,
-   and each layer twinkles by `opacity` on its own rhythm (a Web Animation
-   started by StringLights.tsx). */
+/* String lights (the Yule world): in the shell's flow straight after the
+   header, so they hang from its real bottom edge whatever its height (a
+   larger text size, a control that wraps), in the 24–32 px every page leaves
+   empty there; the negative margin gives their 20 px back, so nothing below
+   moves. Under the header (z-index 10) once scrolled, so they never sit over
+   content. The wire is a run of sagging arcs, one per bulb; the bulbs are
+   four layers, one per colour, each holding every fourth bulb, and each layer
+   twinkles by `opacity` on its own rhythm (a Web Animation started by
+   StringLights.tsx). */
 .string-lights {
   --bulb-gap: 46px;
   --wire: color-mix(in srgb, var(--text-muted) 70%, transparent);
-  position: absolute;
-  top: calc(3px + var(--header-h));
-  left: 0;
-  right: 0;
+  position: relative;
+  flex: none;
   height: 20px;
+  margin-bottom: -20px;
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
