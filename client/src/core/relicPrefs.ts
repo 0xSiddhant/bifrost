@@ -10,9 +10,12 @@ import { ALL_COLLECTIONS, type RelicCollection } from '../assets/relics/collecti
 /**
  * The collections this device has unticked. Stored as the ones switched off,
  * not the ones on, so a collection added later (Yule, Halloween before it)
- * shows for everyone until they untick it.
+ * shows for everyone until they untick it; except a device that switched the
+ * relics off altogether (`ALL_OFF`), whose sky stays empty as collections
+ * are added.
  */
 const STORAGE_KEY = 'bifrost.relics.off';
+const ALL_OFF = '*';
 /**
  * Before 2026-11-22 the choice was stored as the collections ticked, which
  * hid every later collection from anyone who had ever saved one. Read once,
@@ -77,17 +80,25 @@ function switchedOff(): readonly string[] {
   const off = readNames(STORAGE_KEY);
   if (off) return off;
   const legacyOn = readNames(LEGACY_KEY);
-  if (legacyOn) return LEGACY_COLLECTIONS.filter((name) => !legacyOn.includes(name));
+  if (legacyOn) {
+    // An old choice with nothing ticked was an empty sky: keep it empty.
+    if (legacyOn.length === 0) return [ALL_OFF];
+    return LEGACY_COLLECTIONS.filter((name) => !legacyOn.includes(name));
+  }
   return []; // default: everything
 }
 
 export function getEnabledCollections(): RelicCollection[] {
   const off = switchedOff();
+  if (off.includes(ALL_OFF)) return [];
   return ALL_COLLECTIONS.filter((name) => !off.includes(name));
 }
 
 export function setEnabledCollections(collections: RelicCollection[]): void {
-  const off = ALL_COLLECTIONS.filter((name) => !collections.includes(name));
+  const off =
+    collections.length === 0
+      ? [ALL_OFF]
+      : ALL_COLLECTIONS.filter((name) => !collections.includes(name));
   writeStorage(STORAGE_KEY, JSON.stringify(off));
   removeStorage(LEGACY_KEY);
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));

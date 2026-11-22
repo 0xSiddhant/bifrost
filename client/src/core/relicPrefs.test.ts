@@ -26,6 +26,16 @@ describe('relic prefs', () => {
     expect(getEnabledCollections()).toEqual(ALL_COLLECTIONS.filter((name) => name !== 'ghibli'));
   });
 
+  it('keeps a sky switched off altogether empty, as collections are added', () => {
+    setEnabledCollections([]);
+    expect(localStorage.getItem('bifrost.relics.off')).toBe('["*"]');
+    expect(getEnabledCollections()).toEqual([]);
+    // An old choice with nothing ticked was an empty sky too: Yule does not appear in it.
+    localStorage.clear();
+    localStorage.setItem('bifrost.relics', '[]');
+    expect(getEnabledCollections()).toEqual([]);
+  });
+
   it('reads an old saved choice (the ticked ones) with every newer collection on, and replaces it', () => {
     // Saved before Yule existed: Olympus unticked, the rest ticked.
     localStorage.setItem('bifrost.relics', '["norse","wizarding","ghibli","halloween"]');
