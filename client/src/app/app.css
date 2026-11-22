@@ -59,13 +59,12 @@
 }
 
 /* ── relics — random Norse artifacts drifting in the sky ────── */
+/* Each relic floats up and down by a Web Animation of `translate`
+   (RelicScatter.tsx), which composes with its inline `rotate()` and runs on
+   the compositor, firing no iteration events. */
 .relic {
   position: absolute;
   opacity: var(--relic-alpha);
-  animation-name: relic-float;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
 }
 
 .relic--muted {
@@ -78,19 +77,6 @@
 
 .relic--violet {
   color: var(--accent-2);
-}
-
-/* The individual `translate` property, not `transform` (PLAN-40): each relic's
-   inline `transform: rotate(…)` would be overwritten by a transform animation,
-   while `translate` composes with it, in screen space as margin-top moved it,
-   and runs on the compositor instead of re-running layout every frame. */
-@keyframes relic-float {
-  from {
-    translate: 0 -0.75rem;
-  }
-  to {
-    translate: 0 0.75rem;
-  }
 }
 
 /* The gradient flows on the compositor (PLAN-40): it sits on a layer that
