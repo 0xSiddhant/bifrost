@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ScreensaverConfig } from '../../core/screensaver';
 import { themeEngine } from '../../core/theme';
 import { MoonIcon } from '../../core/ui/icons';
@@ -321,25 +321,33 @@ export function Screensaver({ config, onDismiss }: ScreensaverProps) {
       pointerRef.current = { x: e.clientX, y: e.clientY };
       if (reducedMotion) draw();
     };
-    const onPointerDown = (e: PointerEvent) => {
-      beginDismiss(true, { x: e.clientX, y: e.clientY });
-    };
-    const onKeyDown = () => beginDismiss(false);
 
     window.addEventListener('resize', onResize);
     window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('pointerdown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
       clearTimeout(resizeTimer);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('pointermove', onPointerMove);
+    };
+  }, [config, reducedMotion]);
+
+  // A click or key sends the overlay away from the first frame it shows: the
+  // listeners are attached before the browser paints it, not after (a passive
+  // effect runs after the paint, and a key pressed in between was lost).
+  useLayoutEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      beginDismiss(true, { x: e.clientX, y: e.clientY });
+    };
+    const onKeyDown = () => beginDismiss(false);
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
       window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [config, reducedMotion, beginDismiss]);
+  }, [beginDismiss]);
 
   return (
     <div
