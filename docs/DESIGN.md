@@ -73,6 +73,9 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
 - **Motion**: `--dur-1` (150ms) · `--dur-2` (200ms) · `--ease`
 - **Decorative loops animate only `transform`, `translate` or `opacity`** (PLAN-40), so
   they run on the compositor; a shell journey checks every animation on the home page.
+  A short loop (the relics' float, the snow, the lights' twinkle) is a Web Animation
+  with an `id`, not a CSS animation: CSS iteration events wake the main thread
+  (`.agents/rules/coding.md`, Frontend).
 
 ## The bridge gradient
 
@@ -118,14 +121,25 @@ Rules that keep them tasteful:
 - gentle 10–19s vertical drift, frozen by `prefers-reduced-motion`
 - `aria-hidden`, `pointer-events: none` — decoration only, never content
 
-**A theme's opt-in decorations** (the Yule world, THEME-SPEC.md) come with
-the relics' chunk, after the first paint, and are not rendered at all in a
-theme that leaves them off:
+**Seasonal decorations** are plug-in UI that comes and goes with the season,
+unlike themes and relics, which stay. The shell has three slots (`sky`,
+`header`, `footer`, `core/decor/`) and names no decoration; the installed
+season (`app/season.ts`, one line) fills them, from its own folder under
+`client/src/seasons/` (its README says how to add or remove one). A slot
+shows a decoration when the applied theme turns it on (`--decor-<id>`,
+THEME-SPEC.md) and the device has not switched it off; its chunk loads once
+the browser is idle. Winter's three (Yule turns them on):
 
-- **Snowfall** — three depth layers of flakes in `.sky`, in front of the
-  relics and behind every card; each layer falls one tile and loops, and
-  sways a few pixels. Phones keep two layers. Heimdall → Sky Relics has a
-  per-device Snowfall switch; reduced motion leaves the flakes still.
+- **Snowfall** — individual flakes in `.sky`, in front of the relics and
+  behind every card, about one per 7,000 px² of screen (50 on a phone, up to
+  180). Each has its own depth, which sets its size (3–18 px), speed,
+  opacity and focus: near flakes are large, quick and softly blurred, far
+  ones small and slow. Each sways on its own rhythm, the nearer third may be
+  six-armed crystals that tumble as they fall, and wind gusts push the near
+  field further than the far one. A soft shadow in `--decor-snow-rim` is what lets
+  white snow read on a white page. All compositor animation, no script per
+  frame. Heimdall → Sky Relics has a per-device Snowfall switch; reduced
+  motion leaves the flakes still.
 - **String lights** — a strand of bulbs in the theme's four role colours,
   hung below the header in the space every page leaves empty there, so it
   scrolls away under the header and never covers content (or Accio's and

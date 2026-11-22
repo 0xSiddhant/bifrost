@@ -82,7 +82,8 @@ bifrost/
 │   ├── inlineCss.ts           # both builds (PLAN-41): the shell's stylesheet inline in every HTML file,
 │   │                          #   the file dropped (a page's own styles load with its chunk)
 │   └── src/
-│       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs);
+│       ├── app/               # shell, router, feature-gated CATEGORY nav (3 hub tabs); season.ts (the
+│       │                      #   installed season, one line);
 │       │                      #   pages/: Midgard (home hub) + Ollivanders / Diagon Alley category hubs
 │       │                      #   + PensievePage (PLAN-21) — a shell ACROSS features, so it lives
 │       │                      #     here rather than in features/; its logic is in core/library/
@@ -92,7 +93,12 @@ bifrost/
 │       ├── assets/            # self-hosted fonts + relic line-art (shared, norse, potter, greek, ghibli, halloween, yule;
 │       │                      #   relics/collections.ts holds the names apart from the drawings, PLAN-41)
 │       │                      #   + themes/*.json (bundled at build time, PLAN-35)
+│       ├── seasons/           # plug-in seasonal decorations (README.md): winter/ (index.ts manifest,
+│       │                      #   components.ts, Snowfall, StringLights, FooterScene + their CSS); only
+│       │                      #   app/season.ts imports one (lint element `client-season`)
 │       ├── core/              # features.ts (what each build ships, PLAN-35), bridge.ts + ui/BridgeClosed
+│       │                      #   decor/ (the season plug-in: DecorSlot, registry, device switches,
+│       │                      #   the --decor-<id> opt-in),
 │       │                      #   (the "Bifröst is closed" sheet), settings/ (SettingsStore: hub API or
 │       │                      #   bifrost.local.* localStorage, rules.ts + rules.cases.json),
 │       │                      #   api/sse clients (hub-only stubs in standalone), log.ts (batched
@@ -107,8 +113,7 @@ bifrost/
 │       │                      #   ExpandingGrid + expandingGridMath (in-place tool panel, PLAN-18),
 │       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
 │       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card, the sky's
-│       │                      #   relics: SkyRelics lazily loads the skyDecor chunk, PLAN-41: RelicScatter, and the Yule world's
-│       │                      #   opt-in Snowfall, StringLights and FooterScene, gated by useThemeOptIn), JsonEditor (one `mode`
+│       │                      #   relics: SkyRelics lazily loads RelicScatter, PLAN-41; whenIdle.ts), JsonEditor (one `mode`
 │       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
