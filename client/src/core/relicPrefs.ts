@@ -1,28 +1,106 @@
 import { ALL_COLLECTIONS, type RelicCollection } from '../assets/relics/collections';
 
 /**
- * Which relic collections drift through the sky. A visual preference of the
- * same class as the theme choice, so caching it locally is allowed (see
- * rules/coding.md). Heimdall's server-side settings arrive in PLAN-05.
+ * Which relic collections drift through this device's sky. A visual
+ * preference of the same class as the theme choice, so caching it locally is
+ * allowed (see rules/coding.md, "sky prefs"). A season's decorations have
+ * their own switches (`core/decor/prefs.ts`).
  */
 
-const STORAGE_KEY = 'bifrost.relics';
+/**
+ * The collections this device has unticked. Stored as the ones switched off,
+ * not the ones on, so a collection added later (Yule, Halloween before it)
+ * shows for everyone until they untick it; except a device that switched the
+ * relics off altogether (`ALL_OFF`), whose sky stays empty as collections
+ * are added.
+ */
+const STORAGE_KEY = 'bifrost.relics.off';
+const ALL_OFF = '*';
+/**
+ * Before 2026-11-22 the choice was stored as the collections ticked, which
+ * hid every later collection from anyone who had ever saved one. Read once,
+ * against the collections that existed then, and replaced on the next save.
+ */
+const LEGACY_KEY = 'bifrost.relics';
+const LEGACY_COLLECTIONS: readonly RelicCollection[] = [
+  'norse',
+  'wizarding',
+  'olympus',
+  'ghibli',
+  'halloween',
+];
 const CHANGE_EVENT = 'bifrost:relics-changed';
 
-export function getEnabledCollections(): RelicCollection[] {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === null) return [...ALL_COLLECTIONS]; // default: everything
+/**
+ * localStorage that cannot crash the page: Safari's private mode and a
+ * cleared or blocked store throw on access. Deliberately silent, a designed
+ * fallback like `core/theme`'s: the sky simply shows its defaults and the
+ * choice is not remembered for next time.
+ */
+function readStorage(key: string): string | null {
   try {
-    const parsed: unknown = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [...ALL_COLLECTIONS];
-    return ALL_COLLECTIONS.filter((name) => parsed.includes(name));
+    return localStorage.getItem(key);
   } catch {
-    return [...ALL_COLLECTIONS];
+    return null;
   }
 }
 
+function writeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // See readStorage.
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // See readStorage.
+  }
+}
+
+/** A stored JSON array of names, or null when absent or not one this code wrote. */
+function readNames(key: string): string[] | null {
+  const stored = readStorage(key);
+  if (stored === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    return Array.isArray(parsed)
+      ? parsed.filter((name): name is string => typeof name === 'string')
+      : null;
+  } catch {
+    // A value this code did not write: the default, as for no value at all.
+    return null;
+  }
+}
+
+function switchedOff(): readonly string[] {
+  const off = readNames(STORAGE_KEY);
+  if (off) return off;
+  const legacyOn = readNames(LEGACY_KEY);
+  if (legacyOn) {
+    // An old choice with nothing ticked was an empty sky: keep it empty.
+    if (legacyOn.length === 0) return [ALL_OFF];
+    return LEGACY_COLLECTIONS.filter((name) => !legacyOn.includes(name));
+  }
+  return []; // default: everything
+}
+
+export function getEnabledCollections(): RelicCollection[] {
+  const off = switchedOff();
+  if (off.includes(ALL_OFF)) return [];
+  return ALL_COLLECTIONS.filter((name) => !off.includes(name));
+}
+
 export function setEnabledCollections(collections: RelicCollection[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(collections));
+  const off =
+    collections.length === 0
+      ? [ALL_OFF]
+      : ALL_COLLECTIONS.filter((name) => !collections.includes(name));
+  writeStorage(STORAGE_KEY, JSON.stringify(off));
+  removeStorage(LEGACY_KEY);
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 

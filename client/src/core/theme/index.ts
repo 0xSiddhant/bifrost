@@ -55,11 +55,22 @@ class ThemeEngine {
     preview,
   }));
   private activeId: string | null = null;
+  private activeTokens: Readonly<Record<string, string>> = {};
   private appliedKeys: string[] = [];
   private readonly listeners = new Set<Listener>();
 
   getState(): ThemeEngineState {
     return { themes: this.themes, activeId: this.activeId };
+  }
+
+  /**
+   * The token map of the applied theme, the same object until the next apply,
+   * so `useSyncExternalStore` can compare it by identity. Empty before any
+   * theme is applied. A season's decorations read their opt-in tokens
+   * (`--decor-<id>`) from it (core/decor).
+   */
+  getActiveTokens(): Readonly<Record<string, string>> {
+    return this.activeTokens;
   }
 
   subscribe(listener: Listener): () => void {
@@ -149,6 +160,7 @@ class ThemeEngine {
       root.classList.remove(INSTANT_CLASS);
     }
     this.activeId = theme.id;
+    this.activeTokens = theme.tokens;
     if (options.cache) {
       writeStorage(
         CACHE_KEY,

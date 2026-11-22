@@ -52,6 +52,7 @@
   --screen-line: #2dd4bf;
   --screen-ripple: #2dd4bf;
   --screen-glow: #8b7cf6;
+  --screen-shade: #000000;
 
   /* glows — per-tone halos for icons, portals, focus moments */
   --glow-teal: 0 0 26px rgba(45, 212, 191, 0.35);
@@ -196,6 +197,7 @@
   --screen-line: #0f9d8f;
   --screen-ripple: #0f9d8f;
   --screen-glow: #6d5fd0;
+  --screen-shade: #faf7f1;
 
   --glow-teal: 0 0 26px rgba(15, 157, 143, 0.22);
   --glow-violet: 0 0 26px rgba(109, 95, 208, 0.22);

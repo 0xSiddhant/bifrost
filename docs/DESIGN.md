@@ -17,15 +17,23 @@ declared in `core/fonts.css` with `font-display: swap` and system fallbacks.
 
 ## Themes
 
-Eight themes ship built in; users add more as JSON — see
+Nine themes ship built in; users add more as JSON — see
 [THEME-SPEC.md](THEME-SPEC.md) for the schema and resolver.
 
-- **Halloween** (default, dark) — near-black aubergine base, bone text,
+- **Yule** (default, light) — winter and Christmas: frost-white base, white
+  cards, glacier-blue `--accent` (frozen water), holly-red `--accent-2`,
+  evergreen `--ok`, ornament-gold `--warn`. Its sky paints a pale aurora, a
+  winter-sun halo and a cold blue wash; the starfield becomes blue frost
+  glints; snow falls behind every page, Christmas lights hang below the
+  header, and Santa's sleigh rides along a snowy footer (the opt-in
+  decorations, THEME-SPEC.md). The default for every first visit, whatever
+  the device's colour scheme (`core/theme/builtInDefault.ts`), since
+  2026-11-21.
+- **Halloween** (dark) — near-black aubergine base, bone text,
   pumpkin `--accent`, witch-violet `--accent-2`, potion-green `--ok`. Its sky
   paints a harvest-moon disc, a violet glow and a low graveyard mist; the
   bridge runs candy-corn into witchlight; the idle screensaver floats embers
-  and green will-o'-the-wisps. The default for every first visit, whatever
-  the device's colour scheme (`core/theme/builtInDefault.ts`).
+  and green will-o'-the-wisps. The default from 2026-10-29 until Yule.
 - **Aurora** (dark) — near-black blue-slate, aurora accents
   (teal `--accent`, violet `--accent-2`, green `--ok`) used sparingly.
 - **Daybreak** (light) — warm paper background, same hues desaturated.
@@ -65,6 +73,9 @@ the `--diff-add/remove/change` group Variant (PLAN-08) paints diffs with.
 - **Motion**: `--dur-1` (150ms) · `--dur-2` (200ms) · `--ease`
 - **Decorative loops animate only `transform`, `translate` or `opacity`** (PLAN-40), so
   they run on the compositor; a shell journey checks every animation on the home page.
+  A short loop (the relics' float, the snow, the lights' twinkle) is a Web Animation
+  with an `id`, not a CSS animation: CSS iteration events wake the main thread
+  (`.agents/rules/coding.md`, Frontend).
 
 ## The bridge gradient
 
@@ -75,10 +86,11 @@ progress fills, the wordmark, hero accents, and primary-action gradients.
 ## Atmosphere — the sky and its relics
 
 Every page sits under `.sky`: layered aurora glows (`--sky`), a slow drifting
-aurora ribbon, and a faint starfield (dark theme only, via `--stars-alpha`).
+aurora ribbon, and a faint starfield (dark themes by default, via
+`--stars-alpha`; Yule turns it on as blue frost glints).
 
 **Relics** are the fun layer: 10–14 random line-art artifacts scattered through
-the sky, re-shuffled on every route change and reload. Five collections live
+the sky, re-shuffled on every route change and reload. Six collections live
 in `client/src/assets/relics/` (shared primitives in `shared.tsx`, each
 collection registered in `index.ts`):
 
@@ -89,6 +101,7 @@ collection registered in `index.ts`):
 | Olympus (`greek.tsx`) | 20 | trident, lyre, laurel, labyrinth, owl, Ω Δ Ψ… |
 | Ghibli world (`ghibli.tsx`) | 19 | soot sprites, forest spirit, 森 風 火 kanji… |
 | Halloween (`halloween.tsx`) | 35 | jack-o'-lantern, ghost, bat, witch's hat, vampire, cemetery gate, BOO… |
+| Yule (`yule.tsx`) | 40 | baubles, star topper, wreath, holly, candy cane, gingerbread, nutcracker, three snowflakes, snowman, ice palace, JÓL, NOËL… |
 
 Heimdall → **Sky relics** lets the owner enable/disable collections per
 device (default: all). It's a client-side visual preference (localStorage via
@@ -108,9 +121,41 @@ Rules that keep them tasteful:
 - gentle 10–19s vertical drift, frozen by `prefers-reduced-motion`
 - `aria-hidden`, `pointer-events: none` — decoration only, never content
 
+**Seasonal decorations** are plug-in UI that comes and goes with the season,
+unlike themes and relics, which stay. The shell has three slots (`sky`,
+`header`, `footer`, `core/decor/`) and names no decoration; the installed
+season (`app/season.ts`, one line) fills them, from its own folder under
+`client/src/seasons/` (its README says how to add or remove one). A slot
+shows a decoration when the applied theme turns it on (`--decor-<id>`,
+THEME-SPEC.md) and the device has not switched it off; its chunk loads once
+the browser is idle. Winter's three (Yule turns them on):
+
+- **Snowfall** — individual flakes in `.sky`, in front of the relics and
+  behind every card, about one per 7,000 px² of screen (50 on a phone, up to
+  180). Each has its own depth, which sets its size (3–18 px), speed,
+  opacity and focus: near flakes are large, quick and out of focus, far
+  ones small and slow. Each sways on its own rhythm, the nearer third may be
+  six-armed crystals that tumble as they fall, and wind gusts push the near
+  field further than the far one. A soft shade in `--decor-snow-rim` is what lets
+  white snow read on a white page. All compositor animation, no script per
+  frame, and no CSS `filter` on a flake: the shade and the focus are drawn
+  into its gradient. Heimdall → Sky Relics has a per-device Snowfall switch; reduced
+  motion leaves the flakes still.
+- **String lights** — a strand of bulbs in the theme's four role colours,
+  hung below the header in the space every page leaves empty there, so it
+  scrolls away under the header and never covers content (or Accio's and
+  Portkey's sticky bars). Each colour twinkles by opacity.
+- **Footer scene** — drifts, snowy pines and Santa's sleigh on the footer
+  line, and a snowbank filling the footer under its text (the border is
+  hidden while it shows: the snow's surface is the line). It uses only the
+  48px `.shell-main` already leaves above the footer and the footer's own
+  band, so no page grows. The sleigh rides by every 40s, only while the footer is
+  on screen; reduced motion parks it. Hidden on phones with the footer.
+
 **Ambient motion exception:** the 150–200ms rule governs *interaction*
-feedback. The sky layer (aurora drift, bridge flow, relic float) is the one
-sanctioned slow-motion zone — owner-approved 2026-07-13.
+feedback. The sky layer (aurora drift, bridge flow, relic float, and a
+theme's snowfall, twinkling lights and sleigh ride) is the one sanctioned
+slow-motion zone — owner-approved 2026-07-13, extended 2026-11-21.
 
 ## Do / Don't
 

@@ -11,7 +11,7 @@ describe('quotes bank', () => {
     }
   });
 
-  it('covers all six worlds', () => {
+  it('covers all seven worlds', () => {
     const worlds = new Set(QUOTES.map((q) => q.world));
     expect(worlds).toEqual(new Set(Object.keys(WORLD_LABELS)));
   });

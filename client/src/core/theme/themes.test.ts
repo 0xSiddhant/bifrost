@@ -9,6 +9,7 @@ import {
   contrastWarnings,
   parseColor,
   parseRgba,
+  SCREEN_SHADE_CENTRE,
 } from './color';
 import { ACCENT_TEXT_MAX_STEPS, ACCENT_TEXT_STEP, resolveTheme, type ThemeFile } from './resolve';
 import { themeSchema } from './schema';
@@ -51,7 +52,7 @@ function minimalTheme(overrides: Record<string, unknown> = {}) {
 }
 
 describe('the bundled themes', () => {
-  it('are the eight built-ins, all of them bundled', () => {
+  it('are the nine built-ins, all of them bundled', () => {
     expect(files.sort()).toEqual([
       'aurora.json',
       'daybreak.json',
@@ -61,6 +62,7 @@ describe('the bundled themes', () => {
       'olympus.json',
       'slytherin.json',
       'tokyo.json',
+      'yule.json',
     ]);
     expect(BUNDLED_THEMES.map((theme) => `${theme.id}.json`).sort()).toEqual(files);
   });
@@ -153,6 +155,30 @@ describe('the theme schema', () => {
   });
 });
 
+describe("a season's token namespace", () => {
+  it('accepts any --decor-* token under the CSS-value guard rails, and nothing else unknown', () => {
+    const theme = minimalTheme();
+    theme.tokens['--decor-flurry'] = '1';
+    theme.tokens['--decor-flurry-tint'] = 'rgba(43, 98, 150, 0.45)';
+    expect(validate(theme), JSON.stringify(validate.errors)).toBe(true);
+
+    const fetching = minimalTheme();
+    fetching.tokens['--decor-flurry'] = 'url(https://example.com/x.png)';
+    expect(validate(fetching)).toBe(false);
+
+    const unknown = minimalTheme();
+    unknown.tokens['--snow-alpha'] = '1';
+    expect(validate(unknown)).toBe(false);
+  });
+
+  it('is used only by the themes that turn a decoration on', () => {
+    const decorated = BUNDLED_THEMES.filter((theme) =>
+      Object.keys(theme.tokens).some((key) => key.startsWith('--decor-')),
+    ).map((theme) => theme.id);
+    expect(decorated).toEqual(['yule']);
+  });
+});
+
 describe('resolveTheme derived defaults (the server cases, ported)', () => {
   const resolved = () => resolveTheme(minimalTheme() as ThemeFile);
 
@@ -179,6 +205,22 @@ describe('resolveTheme derived defaults (the server cases, ported)', () => {
     const theme = minimalTheme();
     theme.tokens['--syn-key'] = '#ff0000';
     expect(resolveTheme(theme as ThemeFile).tokens['--syn-key']).toBe('#ff0000');
+  });
+
+  it('derives nothing in the season namespace: a decoration is off unless a theme turns it on', () => {
+    for (const mode of ['dark', 'light'] as const) {
+      const tokens = resolveTheme(minimalTheme({ mode }) as ThemeFile).tokens;
+      expect(
+        Object.keys(tokens).filter((key) => key.startsWith('--decor-')),
+        mode,
+      ).toEqual([]);
+    }
+  });
+
+  it("shades the screensaver black on a dark theme and in the page's own colour on a light one", () => {
+    expect(resolveTheme(minimalTheme() as ThemeFile).tokens['--screen-shade']).toBe('#000000');
+    const light = minimalTheme({ mode: 'light' });
+    expect(resolveTheme(light as ThemeFile).tokens['--screen-shade']).toBe(light.tokens['--bg']);
   });
 
   it('derives light-mode variants for light themes', () => {
@@ -301,11 +343,43 @@ describe('--accent-text', () => {
     expect(resolveTheme(theme as ThemeFile).tokens['--accent-text']).toBe('#a7f3d0');
   });
 
-  it('changes only Daybreak and Tokyo among the bundled themes', () => {
+  it("flags a dark screensaver shade behind a light theme's accent text", () => {
+    const daybreak = BUNDLED_THEMES.find((theme) => theme.id === 'daybreak')!;
+    expect(contrastWarnings(daybreak.tokens)).toEqual([]);
+    const greyed = { ...daybreak.tokens, '--screen-shade': '#000000' };
+    expect(contrastWarnings(greyed).some((w) => w.includes('--screen-shade at 28%'))).toBe(true);
+  });
+
+  it('models a translucent screensaver shade with its own alpha, as the CSS mixes it', () => {
+    const daybreak = BUNDLED_THEMES.find((theme) => theme.id === 'daybreak')!;
+    const wash = (shade: string) =>
+      accentTextBackdrops({ ...daybreak.tokens, '--screen-shade': shade }).find((backdrop) =>
+        backdrop.label.startsWith('--screen-shade at 28%'),
+      )?.color;
+    const solid = parseRgba(wash('#000000') ?? '')!;
+    const faint = parseRgba(wash('rgba(0, 0, 0, 0.4)') ?? '')!;
+    // 28% of a 0.4 black darkens the veil far less than 28% of a solid one.
+    expect(faint.r).toBeGreaterThan(solid.r);
+    expect(wash('rgba(0, 0, 0, 0)')).toBeUndefined();
+  });
+
+  it("holds the lint's 28% to the screensaver stylesheet's centre wash", () => {
+    const css = readFileSync(
+      new URL('../../features/screensaver/screensaver.css', import.meta.url),
+      'utf8',
+    );
+    const centre =
+      /color-mix\(in srgb, var\(--screen-shade\) (\d+)%, transparent\),\s*transparent 70%/.exec(
+        css,
+      );
+    expect(centre?.[1]).toBe(String(Math.round(SCREEN_SHADE_CENTRE * 100)));
+  });
+
+  it('changes only Daybreak, Tokyo and Yule among the bundled themes', () => {
     const changed = BUNDLED_THEMES.filter(
       (theme) => theme.tokens['--accent-text'] !== theme.tokens['--accent'],
     ).map((theme) => theme.id);
-    expect(changed.sort()).toEqual(['daybreak', 'tokyo']);
+    expect(changed.sort()).toEqual(['daybreak', 'tokyo', 'yule']);
   });
 
   it('checks secondary text on every surface, panels included', () => {

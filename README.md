@@ -65,7 +65,7 @@ The app is organized into three category tabs, plus a few things that work every
 
 ### Everywhere
 
-- 🎨 Themes (Halloween, the default, plus Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Slytherin and Tokyo built in), bundled with the client: add one as a JSON file and rebuild
+- 🎨 Themes (Yule, the default, a light winter-and-Christmas world with falling snow, string lights and Santa on the footer, plus Aurora, Daybreak, Ghibli Dusk, Olympus, Gryffindor, Halloween, Slytherin and Tokyo built in), bundled with the client: add one as a JSON file and rebuild
 - 🌌 **Nótt** — idle screensaver overlay (particle constellations), desktop-only and tunable from Heimdall
 - 🛡 **Heimdall** — hidden admin panel (secret gesture/shortcut + PIN)
 - 📜 **Wardens** — device presence dashboard with character-name aliases; upload history & activity log in Heimdall

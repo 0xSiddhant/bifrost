@@ -69,7 +69,9 @@ export const ALLOWLIST: AllowEntry[] = [
  * (`guard.allowConnectionLoss()`): every request the page makes then fails to
  * connect, and the browser says so on the console. A request already in
  * flight when the server stops is cut off instead (Chromium's
- * `ERR_CONNECTION_RESET`, WebKit's "Connection reset by peer"). Page errors,
+ * `ERR_CONNECTION_RESET`, WebKit's "Connection reset by peer"), and one sent
+ * on a kept-alive socket the stopping server has just closed, such as the live
+ * events stream reconnecting, fails as `ERR_SOCKET_NOT_CONNECTED`. Page errors,
  * 5xx and any other console line still fail the test.
  */
 export const CONNECTION_LOSS: AllowEntry = {
@@ -77,11 +79,11 @@ export const CONNECTION_LOSS: AllowEntry = {
     'The test stopped the server on purpose (offline mode): a refused connection is the expected state, and the browser logs each one.',
   matches: (v) =>
     (v.kind === 'requestfailed' &&
-      /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|Could not connect|Connection refused|Connection reset by peer|network connection was lost/i.test(
+      /ERR_CONNECTION_REFUSED|ERR_CONNECTION_RESET|ERR_EMPTY_RESPONSE|ERR_SOCKET_NOT_CONNECTED|Could not connect|Connection refused|Connection reset by peer|network connection was lost/i.test(
         v.detail,
       )) ||
     (v.kind === 'console.error' &&
-      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE|Could not connect|Error receiving data: Connection reset by peer)/i.test(
+      /Failed to load resource: (net::ERR_CONNECTION_REFUSED|net::ERR_CONNECTION_RESET|net::ERR_EMPTY_RESPONSE|net::ERR_SOCKET_NOT_CONNECTED|Could not connect|Error receiving data: Connection reset by peer)/i.test(
         v.detail,
       )) ||
     // Vite's own preload helper reports a lazy chunk's stylesheet it could not

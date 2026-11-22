@@ -19,6 +19,7 @@ import { useIdle } from '../features/screensaver/useIdle';
 import { ThemeSwitcher } from '../core/ui/ThemeSwitcher';
 import { OfflineModeToggle } from '../core/ui/OfflineModeToggle';
 import { RouteBoundary } from '../core/ui/RouteBoundary';
+import { DecorSlot } from '../core/decor/DecorSlot';
 import { SkyRelics } from '../core/ui/SkyRelics';
 import { NotificationHost } from '../core/notify';
 import { BridgeClosedHost, BridgeClosedPage } from '../core/ui/BridgeClosed';
@@ -256,6 +257,9 @@ export function App() {
     <div className="shell">
       <div className="sky" aria-hidden="true">
         <SkyRelics />
+        {/* The season's decorations (seasons/README.md): one slot in the sky,
+            in front of the relics… */}
+        <DecorSlot slot="sky" />
       </div>
       <div className="bridge-strip" aria-hidden="true" />
       <header className="shell-header">
@@ -281,6 +285,8 @@ export function App() {
         <GuideButton />
         <ThemeSwitcher />
       </header>
+      {/* …one under the header… */}
+      <DecorSlot slot="header" />
 
       {sseStatus === 'closed' && (
         <div className="offline-banner" role="status">
@@ -399,6 +405,8 @@ export function App() {
       </nav>
 
       <footer className="shell-footer">
+        {/* …and one in the footer. */}
+        <DecorSlot slot="footer" />
         {/* The address this site answers on: the hub's mDNS name, or the
             standalone site's own public host. */}
         <span className="mono caption footer-mark" aria-hidden="true">

@@ -31,4 +31,5 @@ describe('searchSections', () => {
     const hits = searchSections('lan');
     expect(hits.some((hit) => hit.sectionId === 'network')).toBe(true);
   });
+
 });

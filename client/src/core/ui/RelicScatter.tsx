@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RELIC_COLLECTIONS, type Relic } from '../../assets/relics';
 import { getEnabledCollections, onRelicPrefsChange } from '../relicPrefs';
+import { useReducedMotion } from './useReducedMotion';
 
 /**
  * Scatters a few random relics through the sky layer — a different handful
@@ -93,6 +94,34 @@ export function RelicScatter() {
   // re-seed per route and per prefs change; Math.random() varies every reload
   const placements = useMemo(seed, [pathname, prefsVersion]);
 
+  // The float is a Web Animation, not a CSS one: a looping CSS animation fires
+  // an iteration event every cycle, and while React listens for those events
+  // each one woke the main thread to restyle every animated element in the
+  // sky, the Yule world's falling flakes included (see Snowfall.tsx).
+  const nodes = useRef<(HTMLSpanElement | null)[]>([]);
+  const reduced = useReducedMotion();
+  useEffect(() => {
+    if (reduced) return undefined;
+    const running: Animation[] = [];
+    placements.forEach((p, i) => {
+      const node = nodes.current[i];
+      if (!node || typeof node.animate !== 'function') return;
+      running.push(
+        node.animate([{ translate: '0 -0.75rem' }, { translate: '0 0.75rem' }], {
+          id: 'relic-float',
+          duration: p.duration * 1000,
+          delay: p.delay * 1000,
+          iterations: Infinity,
+          direction: 'alternate',
+          easing: 'ease-in-out',
+        }),
+      );
+    });
+    return () => {
+      for (const animation of running) animation.cancel();
+    };
+  }, [placements, reduced]);
+
   return (
     <>
       {placements.map((p, i) => {
@@ -100,6 +129,9 @@ export function RelicScatter() {
         return (
           <span
             key={`${pathname}-${prefsVersion}-${i}`}
+            ref={(node) => {
+              nodes.current[i] = node;
+            }}
             className={`relic relic--${p.tone}`}
             style={{
               left: p.leftPx,
@@ -107,8 +139,6 @@ export function RelicScatter() {
               width: p.size,
               height: p.size,
               transform: `rotate(${p.rotate}deg)`,
-              animationDuration: `${p.duration}s`,
-              animationDelay: `${p.delay}s`,
             }}
           >
             <RelicArt width="100%" height="100%" />

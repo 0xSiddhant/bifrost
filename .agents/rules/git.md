@@ -28,6 +28,7 @@
 - **No `Co-authored-by` trailer in a commit message** unless the owner explicitly asks for one on that commit (owner, 2026-10-28). This holds for commits made by AI agents too.
 - **A PR's merge (squash) message carries `Co-authored-by` lines only when the PR holds commits from more than one author**: one line per author other than the one merging, taken from the PR's commits. A single-author PR's merge message has none.
 - **A PR's merge (squash) message carries `Reviewed-by` lines only when the PR had reviewers**: one line per person or review bot, other than the PR's author, who submitted a review on it (an approval, changes requested, or review comments), written `Reviewed-by: <name> (<GitHub login>)`, e.g. `Reviewed-by: Codex (chatgpt-codex-connector[bot])`. No `@` before the login, so the merge notifies nobody. The lines go at the end of the message, before any `Co-authored-by` lines. A PR nobody else reviewed has none, and an ordinary commit never carries one (owner, 2026-10-28).
+- **A PR's description carries the same `Reviewed-by` lines while it is open**: whenever a person or review bot other than the PR's author submits a review, add their line to the end of the description, just before the closing attribution lines, in exactly the merge message's form (`Reviewed-by: <name> (<GitHub login>)`, no `@`), so the credit shows on the PR itself and the merge message can copy the lines. One line per reviewer however many reviews they leave (owner, 2026-11-22).
 
 Example:
 

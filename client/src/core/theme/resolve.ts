@@ -51,7 +51,7 @@ export const ACCENT_TEXT_STEP = 0.04;
  * is more white (or black) than accent, the accent's in name only, so the
  * derivation gives up: `--accent-text` is left as the accent, `themes.test.ts`
  * fails the theme, and the theme authors its own. Of the bundled themes,
- * Daybreak needs 7 steps and Tokyo 11; the other five need none.
+ * Daybreak needs 7 steps, Tokyo 11 and Yule 2; the other six need none.
  */
 export const ACCENT_TEXT_MAX_STEPS = 12;
 
@@ -151,6 +151,9 @@ export function resolveTheme(theme: ThemeFile): ResolvedTheme {
     '--qr-module-b': dark ? '#6d28d9' : '#4c3aa8',
     '--qr-bg': dark ? '#eef1fa' : '#ffffff',
     '--screen-veil': screenVeil,
+    // The overlay's vignette: black deepens a dark veil, while a light theme's
+    // own page colour keeps its parchment clean instead of greying it.
+    '--screen-shade': dark ? '#000000' : bg,
   };
 
   const tokens: Record<string, string> = { ...derived, ...theme.tokens };

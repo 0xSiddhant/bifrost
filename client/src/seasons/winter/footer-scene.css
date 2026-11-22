@@ -1,0 +1,233 @@
+/* The footer's winter scene (the Yule world). It spans the 48 px
+   (`--space-12`) every page already leaves empty above the footer as
+   `.shell-main`'s bottom padding, and the footer's own band, which the
+   snowbank fills behind the footer's text; so it adds no height to any page.
+   Behind the page content (z-index -1 in `.shell`'s stacking context, after
+   the sky), no pointer events. The snow's surface is the footer line now, so
+   the border is hidden while the scene is there. Every colour is the theme's: the snow's, the
+   evergreen `--ok`, holly `--accent-2`, gold `--warn`, white `--surface`, and
+   a warm brown mixed from the gold and the text colour. */
+.footer-scene {
+  --deer: color-mix(in srgb, var(--warn) 55%, var(--text));
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(-1 * var(--space-12));
+  bottom: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--decor-footer-scene, 1);
+}
+
+.shell-footer:has(.footer-scene) {
+  border-top-color: transparent;
+}
+
+/* Above the footer line: the drifts, the pines and the ride. */
+.footer-scene__band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--space-12);
+}
+
+.footer-scene__drifts {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* one pixel into the bank, so no seam shows between the two */
+  bottom: -1px;
+  width: 100%;
+  height: 27px;
+}
+
+/* The footer's band: packed snow, a shade bluer towards the bottom. */
+.footer-scene__bank {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--space-12);
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    var(--decor-snow, var(--surface)) 0%,
+    color-mix(in srgb, var(--decor-snow, var(--surface)) 86%, var(--decor-snow-rim, transparent))
+      100%
+  );
+}
+
+.footer-scene__trees {
+  position: absolute;
+  bottom: 0;
+  width: 104px;
+  height: 48px;
+}
+
+.footer-scene__trees--left {
+  left: max(var(--space-4), env(safe-area-inset-left));
+}
+
+.footer-scene__trees--right {
+  right: max(var(--space-4), env(safe-area-inset-right));
+}
+
+/* Santa rides left to right, about 12 s across, then is gone for the rest of
+   a 40 s round; only while the footer is on screen (`--riding`), so nothing
+   runs while it isn't. Compositor-only, like the rest of the sky. */
+.footer-scene__ride {
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 224px;
+  height: 40px;
+  transform: translateX(-240px);
+  animation: sleigh-ride 40s linear infinite;
+  animation-play-state: paused;
+}
+
+/* Bobs as it gallops: a Web Animation (FooterScene.tsx), played in view. */
+.footer-scene__bob {
+  width: 100%;
+  height: 100%;
+}
+
+.footer-scene__sleigh {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.footer-scene--riding .footer-scene__ride {
+  animation-play-state: running;
+}
+
+/* Reduced motion: the sleigh is parked in the middle of the scene, still. */
+@media (prefers-reduced-motion: reduce) {
+  .footer-scene__ride {
+    animation: none;
+    transform: translateX(calc(50vw - 112px));
+  }
+}
+
+@keyframes sleigh-ride {
+  0% {
+    transform: translateX(-240px);
+  }
+  30% {
+    transform: translateX(calc(100vw + 20px));
+  }
+  100% {
+    transform: translateX(calc(100vw + 20px));
+  }
+}
+
+/* The drawing's colours. */
+.fs-snow {
+  fill: var(--decor-snow, var(--surface));
+}
+.fs-drift-back {
+  fill: color-mix(
+    in srgb,
+    var(--decor-snow, var(--surface)) 78%,
+    var(--decor-snow-rim, transparent)
+  );
+}
+.fs-rim {
+  fill: none;
+  stroke: var(--decor-snow-rim, transparent);
+  stroke-width: 1.2px;
+  vector-effect: non-scaling-stroke;
+}
+.fs-snow-cap {
+  fill: var(--decor-snow, var(--surface));
+}
+.fs-tree {
+  fill: var(--ok);
+}
+.fs-trunk,
+.fs-deer {
+  fill: var(--deer);
+}
+.fs-star,
+.fs-bauble-gold,
+.fs-bell {
+  fill: var(--warn);
+}
+.fs-bauble-red,
+.fs-red {
+  fill: var(--accent-2);
+}
+.fs-bauble-blue {
+  fill: var(--accent);
+}
+.fs-skin {
+  fill: color-mix(in srgb, var(--warn) 28%, var(--surface));
+}
+.fs-fur {
+  fill: var(--surface);
+  stroke: var(--decor-snow-rim, transparent);
+  stroke-width: 0.4px;
+}
+.fs-sack {
+  fill: color-mix(in srgb, var(--warn) 45%, var(--surface));
+}
+.fs-eye,
+.fs-mitten {
+  fill: var(--text);
+}
+.fs-rein,
+.fs-trace,
+.fs-tie,
+.fs-belt,
+.fs-arm,
+.fs-gold-line,
+.fs-runner,
+.fs-legs,
+.fs-antler,
+.fs-harness {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fs-rein {
+  stroke: var(--deer);
+  stroke-width: 0.8px;
+}
+.fs-trace {
+  stroke: var(--accent-2);
+  stroke-width: 0.9px;
+}
+.fs-tie {
+  stroke: var(--deer);
+  stroke-width: 0.9px;
+}
+.fs-belt {
+  stroke: var(--text);
+  stroke-width: 1.4px;
+}
+.fs-arm {
+  stroke: var(--accent-2);
+  stroke-width: 2.6px;
+}
+.fs-gold-line {
+  stroke: var(--warn);
+  stroke-width: 1.2px;
+}
+.fs-runner {
+  stroke: var(--warn);
+  stroke-width: 1.5px;
+}
+.fs-legs {
+  stroke: var(--deer);
+  stroke-width: 1.5px;
+}
+.fs-antler {
+  stroke: color-mix(in srgb, var(--warn) 70%, var(--text));
+  stroke-width: 1.1px;
+}
+.fs-harness {
+  stroke: var(--accent-2);
+  stroke-width: 1.3px;
+}

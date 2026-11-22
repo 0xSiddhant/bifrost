@@ -37,6 +37,8 @@ export default tseslint.config(
         { type: 'client-core', pattern: 'client/src/core' },
         { type: 'client-feature', pattern: 'client/src/features/*', capture: ['feature'] },
         { type: 'client-app', pattern: 'client/src/app' },
+        // A season's plug-in decorations (client/src/seasons/README.md).
+        { type: 'client-season', pattern: 'client/src/seasons/*', capture: ['season'] },
       ],
       // Composition roots are single files, so they are classified as file
       // categories rather than folder elements.
@@ -103,7 +105,25 @@ export default tseslint.config(
             },
             {
               from: { element: { type: 'client-app' } },
-              allow: { to: { element: { type: '(client-core|client-feature|client-app)' } } },
+              allow: {
+                to: { element: { type: '(client-core|client-feature|client-app|client-season)' } },
+              },
+            },
+            // A season sees core and itself, and only the composition root
+            // (app/season.ts) sees a season: removing one touches nothing else.
+            {
+              from: { element: { type: 'client-season' } },
+              allow: {
+                to: {
+                  element: [
+                    { type: 'client-core' },
+                    {
+                      type: 'client-season',
+                      captured: { season: '{{from.element.captured.season}}' },
+                    },
+                  ],
+                },
+              },
             },
             // Composition roots and entry files may be imported by tests/tooling.
             {

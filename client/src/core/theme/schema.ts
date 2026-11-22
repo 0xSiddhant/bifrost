@@ -92,7 +92,9 @@ export const CARD_TONE_TOKENS = [
  * the click ripple, and the sun-glow. Omitted slots fall back to the stylesheet
  * defaults (tokens.css) / the core roles at draw time, so a theme need not set
  * them; override for a house-specific idle sky. `--screen-quote` is the quote
- * text colour (defaults to `--text`).
+ * text colour (defaults to `--text`). `--screen-shade` is the colour of the
+ * overlay's edge vignette and its centre wash: black for a dark theme, a light
+ * colour for a light one, or the centre greys behind the quote.
  */
 export const SCREENSAVER_TOKENS = [
   '--screen-veil',
@@ -102,6 +104,7 @@ export const SCREENSAVER_TOKENS = [
   '--screen-ripple',
   '--screen-glow',
   '--screen-quote',
+  '--screen-shade',
 ] as const;
 
 const ATMOSPHERE_COLOR_TOKENS = [
@@ -130,6 +133,15 @@ const ATMOSPHERE_CSS_TOKENS = [
   '--shadow-1',
   '--shadow-2',
 ] as const;
+
+/**
+ * A season's decorations (client/src/seasons/README.md) are themed through
+ * their own namespace: `--decor-<id>` turns a decoration on (a 0–1 level) and
+ * any other `--decor-*` token styles it. One pattern, so adding or removing a
+ * season never edits this schema; values are CSS values under the same guard
+ * rails as the atmosphere (no `url(`, `@`, `;`, braces).
+ */
+export const DECOR_TOKEN_PATTERN = '^--decor-[a-z0-9-]{1,48}$';
 
 const TYPO_SHAPE_TOKENS = [
   '--text-xs',
@@ -200,6 +212,7 @@ export const themeSchema = {
       additionalProperties: false,
       required: [...REQUIRED_COLOR_ROLES],
       properties: tokenProperties,
+      patternProperties: { [DECOR_TOKEN_PATTERN]: cssValue },
     },
   },
 } as const;

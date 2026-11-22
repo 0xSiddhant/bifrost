@@ -57,11 +57,37 @@ hub stays on-brand:
 - Cards are coloured by **position** (`cardToneClass(index + 1)`), so slot 1 is
   the first card on each page — order your palette so early slots look good first.
 
+## Season decorations (`--decor-*`)
+
+Seasonal UI (winter's snowfall, string lights, snowy footer) lives in
+`client/src/seasons/<name>/`, not in a theme. A theme opts in with
+`"--decor-<id>": "1"` (a 0–1 level; omitted or 0 means not rendered at all)
+and styles it with the season's other `--decor-*` tokens; the schema accepts
+the whole namespace, so a theme never needs a schema change for a season.
+Winter's:
+
+- `--decor-snowfall`, `--decor-string-lights`, `--decor-footer-scene` — on.
+- `--decor-snow` (a flake's colour, white) and `--decor-snow-rim` (its
+  shading): a light theme needs a real tint here (Yule:
+  `rgba(43, 98, 150, 0.45)`) or white snow vanishes on a white page, and a
+  cold wash at the top of `--sky` helps it show.
+- The lights' bulbs are the theme's `--accent`, `--accent-2`, `--ok` and
+  `--warn`, and the footer is drawn in the core roles: pick those to read
+  as a strand and a winter scene.
+
 ## Screensaver palette (`--screen-*`) — Nótt, the idle overlay
+
+On a light veil Nótt draws in "ink" (`features/screensaver/ink.ts`): bolder
+lines, lifted far stars, larger dots, a halo instead of a glow shadow. Give
+a light theme deep, **opaque** `--screen-particle`/`--screen-line` colours
+(Yule: `#2f6697`, `#1b6fb5`); a translucent one is multiplied down again.
 
 The idle particle screensaver reads seven optional colours; omit them and it
 derives on-brand from your accents/veil, or set them for a house-specific idle sky:
 
+- `--screen-shade` — the vignette at the edges and the wash in the centre:
+  black for a dark theme, light for a light one (derived from `--bg`), or a
+  light veil greys. Yule uses a pale frost.
 - `--screen-veil` — the full-screen backdrop. **Keep it dark and near-opaque**
   (calm bar applies double here — it fills the whole screen). Light themes get a
   soft parchment veil with **dark** motes instead (a dark theme's pale stars

@@ -5,6 +5,7 @@ import { POTTER_RELICS } from './potter';
 import { GREEK_RELICS } from './greek';
 import { GHIBLI_RELICS } from './ghibli';
 import { HALLOWEEN_RELICS } from './halloween';
+import { YULE_RELICS } from './yule';
 
 export { ALL_COLLECTIONS, type RelicCollection } from './collections';
 
@@ -20,4 +21,5 @@ export const RELIC_COLLECTIONS: Record<
   olympus: { label: 'Olympus', relics: GREEK_RELICS },
   ghibli: { label: 'Ghibli world', relics: GHIBLI_RELICS },
   halloween: { label: 'Halloween', relics: HALLOWEEN_RELICS },
+  yule: { label: 'Yule', relics: YULE_RELICS },
 };

@@ -1,0 +1,135 @@
+/* Falling snow (the Yule world), inside `.sky`: behind every card and panel,
+   in front of the relics. Each flake is its own element: `.snowflake` falls
+   and sways along one path, and a crystal's body tumbles in 3D. Both are Web
+   Animations started by `Snowfall.tsx` (see there for why not CSS
+   animations, and why the sway rides in the fall); this sheet holds the flakes' look, their resting
+   place (where reduced motion leaves them) and the two fields' wind gusts,
+   which move `transform` only, with literal keyframes, so the compositor
+   runs them (the PLAN-40 rule). */
+.snowfall {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: var(--decor-snowfall, 1);
+}
+
+.snowfall__field {
+  position: absolute;
+  inset: 0;
+}
+
+.snowfall__field--far {
+  animation: snow-gust-far 26s ease-in-out infinite;
+}
+
+.snowfall__field--near {
+  animation: snow-gust-near 19s ease-in-out -6s infinite;
+}
+
+.snowflake {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  opacity: var(--alpha);
+  /* Each flake moves for as long as the tab is open: its own layer from the
+     start, so the compositor moves it rather than the page repainting it. */
+  will-change: transform;
+}
+
+.snowflake__body {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A soft round flake: a white body over a shade in the theme's
+   `--decor-snow-rim`, set a little low, which is what makes white snow read
+   on a white page (a real flake against a pale sky shows by its shading).
+   The nearest are out of focus (`--soft`, 0–1): a smaller solid core and a
+   longer fall-off. The body is 30% larger than the flake, centred on it, so
+   the shade has room to fade out around it. All of it is gradients, no
+   `filter`: a software compositor re-applies a filter to every moving flake
+   every frame (see Snowfall.tsx). */
+.snowflake__body--round {
+  width: 130%;
+  height: 130%;
+  margin: -15%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      closest-side,
+      var(--decor-snow, var(--surface)) calc(42% - var(--soft, 0) * 20%),
+      color-mix(in srgb, var(--decor-snow, var(--surface)) 55%, transparent)
+        calc(62% - var(--soft, 0) * 4%),
+      transparent calc(76% + var(--soft, 0) * 12%)
+    ),
+    radial-gradient(
+      closest-side at 50% 55%,
+      color-mix(in srgb, var(--decor-snow-rim, transparent) 85%, transparent)
+        calc(44% - var(--soft, 0) * 16%),
+      color-mix(in srgb, var(--decor-snow-rim, transparent) 25%, transparent) 66%,
+      transparent calc(84% + var(--soft, 0) * 10%)
+    );
+}
+
+/* A six-armed crystal, drawn twice: a rim under white ice. */
+.snowflake__body--crystal {
+  overflow: visible;
+}
+
+.snowflake__rim,
+.snowflake__ice {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.snowflake__rim {
+  stroke: var(--decor-snow-rim, transparent);
+  stroke-width: 4.6;
+}
+
+.snowflake__ice {
+  stroke: var(--decor-snow, var(--surface));
+  stroke-width: 2.6;
+}
+
+/* Gusts: the field leans with the wind and eases back, never twice the same;
+   the near field is pushed twice as far as the far one. */
+@keyframes snow-gust-far {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  22% {
+    transform: translate3d(2.5vw, 0, 0);
+  }
+  40% {
+    transform: translate3d(0.75vw, 0, 0);
+  }
+  63% {
+    transform: translate3d(3.5vw, 0, 0);
+  }
+  80% {
+    transform: translate3d(-1vw, 0, 0);
+  }
+}
+@keyframes snow-gust-near {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  22% {
+    transform: translate3d(5vw, 0, 0);
+  }
+  40% {
+    transform: translate3d(1.5vw, 0, 0);
+  }
+  63% {
+    transform: translate3d(7vw, 0, 0);
+  }
+  80% {
+    transform: translate3d(-2vw, 0, 0);
+  }
+}

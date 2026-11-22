@@ -1,6 +1,7 @@
 import { test, expect } from '../support/fixtures.js';
 import { routes } from '../support/journey.js';
 import { isMobile, waitForLive } from '../support/ui.js';
+import { waitForSkyAndSlots } from '../support/animations.js';
 
 /**
  * Journey 16 — Nótt: the idle overlay appears after the configured idle time
@@ -14,6 +15,10 @@ test(
     await page.clock.install();
     await page.goto('/');
     await waitForLive(page);
+    // Let the sky's chunks (relics, the season's decorations) arrive before
+    // the minute of idleness: they load once the browser is idle, and a fake
+    // minute run over a fetch in flight fires its 8 s timeout at once.
+    await waitForSkyAndSlots(page);
     const overlay = page.locator('.nott');
 
     // The default idle time is 60 seconds.

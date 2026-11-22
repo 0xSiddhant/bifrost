@@ -6,6 +6,6 @@
  *
  * One constant for the runtime (`resolveThemeChoice`) and the build's first
  * paint (`seoBuild.ts`), so the two cannot disagree; `themes.test.ts` checks it
- * names a bundled theme.
+ * names a bundled theme. Halloween from 2026-10-29, Yule since 2026-11-21.
  */
-export const BUILT_IN_DEFAULT_THEME: string | null = 'halloween';
+export const BUILT_IN_DEFAULT_THEME: string | null = 'yule';
