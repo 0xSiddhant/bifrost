@@ -133,12 +133,13 @@ the browser is idle. Winter's three (Yule turns them on):
 - **Snowfall** — individual flakes in `.sky`, in front of the relics and
   behind every card, about one per 7,000 px² of screen (50 on a phone, up to
   180). Each has its own depth, which sets its size (3–18 px), speed,
-  opacity and focus: near flakes are large, quick and softly blurred, far
+  opacity and focus: near flakes are large, quick and out of focus, far
   ones small and slow. Each sways on its own rhythm, the nearer third may be
   six-armed crystals that tumble as they fall, and wind gusts push the near
-  field further than the far one. A soft shadow in `--decor-snow-rim` is what lets
+  field further than the far one. A soft shade in `--decor-snow-rim` is what lets
   white snow read on a white page. All compositor animation, no script per
-  frame. Heimdall → Sky Relics has a per-device Snowfall switch; reduced
+  frame, and no CSS `filter` on a flake: the shade and the focus are drawn
+  into its gradient. Heimdall → Sky Relics has a per-device Snowfall switch; reduced
   motion leaves the flakes still.
 - **String lights** — a strand of bulbs in the theme's four role colours,
   hung below the header in the space every page leaves empty there, so it
