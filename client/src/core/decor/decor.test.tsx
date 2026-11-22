@@ -116,9 +116,9 @@ describe('decoration slots', () => {
     expect(container.querySelector('.fake-flurry')).not.toBeNull();
   });
 
-  it('cost only the decorations when the chunk cannot load: one warn, the shell intact', async () => {
+  it('cost only the decorations when the chunk cannot load: one warn for every slot', async () => {
     const { DecorSlot, log } = await setup(
-      { '--decor-flurry': '1' },
+      { '--decor-flurry': '1', '--decor-banner': '1' },
       fakeSeason(() => Promise.reject(new Error('Failed to fetch dynamically imported module'))),
     );
     const warn = vi.spyOn(log, 'warn').mockImplementation(() => {});
@@ -127,16 +127,67 @@ describe('decoration slots', () => {
         <>
           <p className="shell-text">the shell</p>
           <DecorSlot slot="sky" />
+          <DecorSlot slot="header" />
         </>,
       ),
     );
-    await settle(() => warn.mock.calls.length > 0);
+    await settle(() => slotState('sky') === 'failed' && slotState('header') === 'failed');
     expect(container.querySelector('.shell-text')?.textContent).toBe('the shell');
     expect(container.querySelector('.fake-flurry')).toBeNull();
     expect(warn).toHaveBeenCalledTimes(1);
     expect(String(warn.mock.calls[0]?.[0])).toContain(
-      "the sky slot's decorations could not be loaded",
+      "the fake season's decorations could not be loaded",
     );
+  });
+
+  it('fetch again when a slot that failed next mounts, reporting loading until it lands', async () => {
+    let release: (value: typeof components) => void = () => {};
+    const load = vi
+      .fn<Season['load']>()
+      .mockRejectedValueOnce(new Error('Timed out fetching dynamically imported module'))
+      .mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+    const { DecorSlot, prefs, log } = await setup({ '--decor-flurry': '1' }, fakeSeason(load));
+    vi.spyOn(log, 'warn').mockImplementation(() => {});
+    act(() => root.render(<DecorSlot slot="sky" />));
+    await settle(() => slotState('sky') === 'failed');
+
+    // The switch turns the decoration off and on: the slot remounts and asks again.
+    act(() => prefs.setDecorationEnabled('flurry', false));
+    expect(slotState('sky')).toBe('empty');
+    act(() => prefs.setDecorationEnabled('flurry', true));
+    await settle(() => load.mock.calls.length === 2);
+    expect(slotState('sky')).toBe('loading');
+
+    await act(async () => release(components));
+    await settle(() => slotState('sky') === 'ready');
+    expect(container.querySelector('.fake-flurry')).not.toBeNull();
+  });
+
+  it("contain a decoration's own bug: the shell stays, the slot is emptied and the error logged", async () => {
+    const broken = {
+      ...components,
+      flurry: () => {
+        throw new TypeError('flake is undefined');
+      },
+    };
+    const { DecorSlot, log } = await setup(
+      { '--decor-flurry': '1' },
+      fakeSeason(() => Promise.resolve(broken)),
+    );
+    const reported = vi.spyOn(log, 'reportError').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    act(() =>
+      root.render(
+        <>
+          <p className="shell-text">the shell</p>
+          <DecorSlot slot="sky" />
+        </>,
+      ),
+    );
+    await settle(() => slotState('sky') === 'failed');
+    expect(container.querySelector('.shell-text')?.textContent).toBe('the shell');
+    expect(reported).toHaveBeenCalledTimes(1);
+    expect(String(reported.mock.calls[0]?.[0])).toContain('in the sky slot failed and was removed');
   });
 });
 
@@ -162,6 +213,32 @@ describe('decoration prefs', () => {
     });
     expect(prefs.isDecorationEnabled('flurry')).toBe(true);
     expect(() => prefs.setDecorationEnabled('flurry', false)).not.toThrow();
+  });
+
+  it('still switch a decoration off for this session when the store refuses the write', async () => {
+    const prefs = await import('./prefs');
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+    const before = prefs.decorPrefsSnapshot();
+    prefs.setDecorationEnabled('flurry', false);
+    expect(prefs.isDecorationEnabled('flurry')).toBe(false);
+    // A new snapshot, so the slots re-render and the snow actually stops.
+    expect(prefs.decorPrefsSnapshot()).not.toBe(before);
+    prefs.setDecorationEnabled('flurry', true);
+    expect(prefs.isDecorationEnabled('flurry')).toBe(true);
+  });
+
+  it("hear another tab's switch through the storage event", async () => {
+    const prefs = await import('./prefs');
+    const listener = vi.fn();
+    const stop = prefs.onDecorPrefsChange(listener);
+    window.dispatchEvent(new StorageEvent('storage', { key: 'bifrost.decor.off' }));
+    window.dispatchEvent(new StorageEvent('storage', { key: 'bifrost.theme' }));
+    expect(listener).toHaveBeenCalledTimes(1);
+    stop();
+    window.dispatchEvent(new StorageEvent('storage', { key: 'bifrost.decor.off' }));
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });
 

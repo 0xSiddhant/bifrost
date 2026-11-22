@@ -9,8 +9,8 @@ import {
 } from 'react';
 import { withChunkTimeout } from '../chunkError';
 import { log } from '../log';
-import { ChunkBoundary } from '../ui/ChunkBoundary';
 import { whenIdle } from '../ui/whenIdle';
+import { DecorBoundary } from './DecorBoundary';
 import { installedSeason } from './registry';
 import type { DecorationComponents, DecorSlotName, Season } from './types';
 import { useSlotDecorations } from './useSlotDecorations';
@@ -25,43 +25,40 @@ import { useSlotDecorations } from './useSlotDecorations';
  *
  * The season's components are one chunk, asked for once the browser is idle
  * after the first paint (like the relics, PLAN-41), and fetched once for all
- * three slots. A chunk that cannot load costs the decorations, never the
- * shell: one `warn`, and the slot stays empty.
+ * three slots. Whatever goes wrong inside costs the decorations, never the
+ * shell (`DecorBoundary`): a chunk that cannot load is reported once and the
+ * slot stays empty until it next mounts (the theme or a switch turning its
+ * decorations off and on), which tries again.
  *
  * The wrapper is `display: contents`, so a decoration lays out as if it were
  * the slot's parent's own child; `data-decor-state` (`empty`, `loading`,
- * `ready`) is what the e2e journeys wait for.
+ * `ready`, `failed`) is what the e2e journeys wait for.
  */
 export function DecorSlot({ slot }: { slot: DecorSlotName }) {
   const decorations = useSlotDecorations(slot);
   const season = installedSeason();
   const [idle, setIdle] = useState(false);
-  const [ready, setReady] = useState(false);
-  const markReady = useCallback(() => setReady(true), []);
+  const [settled, setSettled] = useState<'ready' | 'failed' | null>(null);
+  const markReady = useCallback(() => setSettled('ready'), []);
+  const markFailed = useCallback(() => setSettled('failed'), []);
   useEffect(() => whenIdle(() => setIdle(true)), []);
 
   const ids = decorations.map((decoration) => decoration.id);
   const wanted = season !== null && ids.length > 0;
-  const state = !wanted ? 'empty' : ready ? 'ready' : 'loading';
+  // A slot that stops showing decorations forgets how its last ones ended, so
+  // the next ones report `loading` until they are actually on the page.
+  if (!wanted && settled !== null) setSettled(null);
+  const state = !wanted ? 'empty' : (settled ?? 'loading');
   const View = wanted && idle ? seasonView(season) : null;
 
   return (
     <div style={{ display: 'contents' }} data-decor-slot={slot} data-decor-state={state}>
       {View && (
-        <ChunkBoundary
-          onChunkError={(error) =>
-            log.warn(
-              `decor: the ${slot} slot's decorations could not be loaded: ${error.message}`,
-              {
-                module: 'decor',
-              },
-            )
-          }
-        >
+        <DecorBoundary slot={slot} onError={markFailed}>
           <Suspense fallback={null}>
             <View ids={ids} onReady={markReady} />
           </Suspense>
-        </ChunkBoundary>
+        </DecorBoundary>
       )}
     </div>
   );
@@ -76,11 +73,23 @@ interface ViewProps {
 const chunks = new WeakMap<Season, Promise<DecorationComponents>>();
 const views = new WeakMap<Season, LazyExoticComponent<ComponentType<ViewProps>>>();
 
-/** The season's components, fetched once (and after a failure, not retried). */
+/**
+ * The season's components, fetched once for all three slots. A failed fetch
+ * is reported once and forgotten, so the next slot to mount fetches again
+ * rather than replaying the failure for the rest of the session.
+ */
 export function loadSeason(season: Season): Promise<DecorationComponents> {
   let chunk = chunks.get(season);
   if (!chunk) {
-    chunk = withChunkTimeout(season.load());
+    chunk = withChunkTimeout(season.load()).catch((error: unknown) => {
+      chunks.delete(season);
+      views.delete(season);
+      const reason = error instanceof Error ? error.message : String(error);
+      log.warn(`decor: the ${season.id} season's decorations could not be loaded: ${reason}`, {
+        module: 'decor',
+      });
+      throw error;
+    });
     chunks.set(season, chunk);
   }
   return chunk;

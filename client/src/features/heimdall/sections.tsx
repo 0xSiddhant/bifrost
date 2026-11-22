@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ApiError } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceLabel, deviceName } from '../../core/devices';
@@ -34,7 +34,12 @@ import {
 } from '../../core/offlineMode';
 import { ALL_COLLECTIONS, RELIC_COLLECTIONS, type RelicCollection } from '../../assets/relics';
 import { getEnabledCollections, setEnabledCollections } from '../../core/relicPrefs';
-import { isDecorationEnabled, setDecorationEnabled } from '../../core/decor/prefs';
+import {
+  decorPrefsSnapshot,
+  isDecorationEnabled,
+  onDecorPrefsChange,
+  setDecorationEnabled,
+} from '../../core/decor/prefs';
 import { decorationCatalog } from '../../core/decor/registry';
 import {
   fetchAbout,
@@ -525,13 +530,10 @@ function HubSettingsSection({ onLock }: SectionProps) {
 function RelicsSection() {
   const [enabled, setEnabled] = useState<RelicCollection[]>(getEnabledCollections);
   // The installed season's switchable decorations (core/decor): none, and no
-  // rows, when no season is installed.
+  // rows, when no season is installed. Each box reads the switch itself, so it
+  // follows another tab's change and never disagrees with the sky.
   const switches = decorationCatalog().filter((decoration) => decoration.switchable);
-  const [decorOn, setDecorOn] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(
-      switches.map((decoration) => [decoration.id, isDecorationEnabled(decoration.id)]),
-    ),
-  );
+  useSyncExternalStore(onDecorPrefsChange, decorPrefsSnapshot);
 
   const toggle = (name: RelicCollection) => {
     const next = enabled.includes(name)
@@ -566,12 +568,8 @@ function RelicsSection() {
             <label className="check-row" id={ctlId(`decor-${decoration.id}`)}>
               <input
                 type="checkbox"
-                checked={decorOn[decoration.id] ?? true}
-                onChange={() => {
-                  const next = !(decorOn[decoration.id] ?? true);
-                  setDecorOn((current) => ({ ...current, [decoration.id]: next }));
-                  setDecorationEnabled(decoration.id, next);
-                }}
+                checked={isDecorationEnabled(decoration.id)}
+                onChange={(event) => setDecorationEnabled(decoration.id, event.target.checked)}
               />
               <span>{decoration.label}</span>
             </label>
@@ -1261,16 +1259,20 @@ const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
     icon: <FolderIcon size={16} />,
     blurb: "The artifacts in the background sky, and the season's decorations.",
     Component: RelicsSection,
-    manifest: [
-      { controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] },
-      ...decorationCatalog()
-        .filter((decoration) => decoration.switchable)
-        .map((decoration) => ({
-          controlId: `decor-${decoration.id}`,
-          label: decoration.label,
-          keywords: ['season', 'decoration', ...(decoration.keywords ?? [])],
-        })),
-    ],
+    // Read when searched, not when this module loads: main.tsx installs the
+    // season after every static import, so a list built here could predate it.
+    get manifest() {
+      return [
+        { controlId: 'relics', label: 'Relic collections', keywords: ['background', 'artifacts', 'sky'] },
+        ...decorationCatalog()
+          .filter((decoration) => decoration.switchable)
+          .map((decoration) => ({
+            controlId: `decor-${decoration.id}`,
+            label: decoration.label,
+            keywords: ['season', 'decoration', ...(decoration.keywords ?? [])],
+          })),
+      ];
+    },
   },
   {
     id: 'loki',
