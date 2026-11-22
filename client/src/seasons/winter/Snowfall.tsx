@@ -199,6 +199,10 @@ const SWAY_STEPS = 6;
  * flake is one moving layer, not two: a compositor without a GPU (WebKit in
  * CI's headless containers) moves every layer itself, every frame. Where the
  * loop wraps, the flake is off screen, so its sway may jump there unseen.
+ *
+ * `transform`, not the `translate` property: WebKit's Linux builds (CI's)
+ * hand a `transform` animation to the compositor but may run a `translate`
+ * one on the main thread, restyling every flake every frame.
  */
 export function fallPath(flake: Flake): Keyframe[] {
   const top = -(flake.y + 4);
@@ -210,7 +214,7 @@ export function fallPath(flake: Flake): Keyframe[] {
     const seconds = share * flake.fall;
     const x = -flake.sway * Math.cos((Math.PI * (seconds - flake.swayDelay)) / flake.swayTime);
     const y = top + (bottom - top) * share;
-    frames.push({ translate: `${x.toFixed(1)}px ${y.toFixed(2)}vh` });
+    frames.push({ transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(2)}vh, 0)` });
   }
   return frames;
 }

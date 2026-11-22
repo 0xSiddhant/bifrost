@@ -62,8 +62,11 @@ describe('fallPath', () => {
     for (const flake of makeFlakes(60, seeded(5))) {
       const frames = fallPath(flake);
       const points = frames.map((frame) => {
-        const [x, y] = String(frame.translate).split(' ');
-        return { x: Number.parseFloat(x ?? ''), y: Number.parseFloat(y ?? '') };
+        const [x, y] = /translate3d\(([-\d.]+)px, ([-\d.]+)vh, 0\)/
+          .exec(String(frame.transform))!
+          .slice(1)
+          .map(Number);
+        return { x: x!, y: y! };
       });
       // Off screen at both ends, wherever it rests: the wrap is never seen.
       expect(flake.y + points[0]!.y).toBeCloseTo(-4, 1);

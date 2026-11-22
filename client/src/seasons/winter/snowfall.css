@@ -4,7 +4,7 @@
    Animations started by `Snowfall.tsx` (see there for why not CSS
    animations, and why the sway rides in the fall); this sheet holds the flakes' look, their resting
    place (where reduced motion leaves them) and the two fields' wind gusts,
-   which move `translate` only, with literal keyframes, so the compositor
+   which move `transform` only, with literal keyframes, so the compositor
    runs them (the PLAN-40 rule). */
 .snowfall {
   position: absolute;
@@ -33,6 +33,9 @@
   width: var(--size);
   height: var(--size);
   opacity: var(--alpha);
+  /* Each flake moves for as long as the tab is open: its own layer from the
+     start, so the compositor moves it rather than the page repainting it. */
+  will-change: transform;
 }
 
 .snowflake__body {
@@ -97,36 +100,36 @@
 @keyframes snow-gust-far {
   0%,
   100% {
-    translate: 0 0;
+    transform: translate3d(0, 0, 0);
   }
   22% {
-    translate: 2.5vw 0;
+    transform: translate3d(2.5vw, 0, 0);
   }
   40% {
-    translate: 0.75vw 0;
+    transform: translate3d(0.75vw, 0, 0);
   }
   63% {
-    translate: 3.5vw 0;
+    transform: translate3d(3.5vw, 0, 0);
   }
   80% {
-    translate: -1vw 0;
+    transform: translate3d(-1vw, 0, 0);
   }
 }
 @keyframes snow-gust-near {
   0%,
   100% {
-    translate: 0 0;
+    transform: translate3d(0, 0, 0);
   }
   22% {
-    translate: 5vw 0;
+    transform: translate3d(5vw, 0, 0);
   }
   40% {
-    translate: 1.5vw 0;
+    transform: translate3d(1.5vw, 0, 0);
   }
   63% {
-    translate: 7vw 0;
+    transform: translate3d(7vw, 0, 0);
   }
   80% {
-    translate: -2vw 0;
+    transform: translate3d(-2vw, 0, 0);
   }
 }
