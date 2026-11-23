@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import {
+  Compartment,
   EditorState,
   Prec,
   StateEffect,
@@ -52,6 +53,7 @@ import {
   unfoldAll,
 } from '@codemirror/language';
 import { json } from '@codemirror/lang-json';
+import { jsonc as jsoncLang, jsoncLanguage } from '@shopify/lang-jsonc';
 import { markdown as markdownLang } from '@codemirror/lang-markdown';
 import { javascript } from '@codemirror/lang-javascript';
 import { yaml as yamlLang } from '@codemirror/lang-yaml';
@@ -98,13 +100,15 @@ export interface DiffHighlight {
  * doc comment and a nested ternary that grew a branch per language.
  *
  * - `json` (default) — Runestone/Variant: lint, fold, bracket pairing.
+ * - `jsonc` — Runestone's JSONC documents and Variant's structured panes
+ *   (PLAN-42): the same, over a grammar that knows comments and trailing commas.
  * - `markdown` — Edda: syntax tinting only.
  * - `javascript` — Loki: tinting, folding, bracket pairing, no lint.
  * - `yaml` — Groot: tinting, folding, bracket pairing, YAML lint.
  * - `xml` — Atlas: tinting, tag folding, bracket pairing, well-formedness lint.
  * - `plain` — Variant's text panes: nothing, so typing costs nothing.
  */
-export type EditorMode = 'json' | 'markdown' | 'javascript' | 'plain' | 'yaml' | 'xml';
+export type EditorMode = 'json' | 'jsonc' | 'markdown' | 'javascript' | 'plain' | 'yaml' | 'xml';
 
 export interface JsonEditorProps {
   value: string;
@@ -209,7 +213,7 @@ const diffHighlightField = StateField.define<DecorationSet>({
 });
 
 /** JSON token colors — every value is a theme token (coding rule: no hex here). */
-const jsonHighlight = HighlightStyle.define([
+const jsonHighlightSpecs = [
   { tag: tags.propertyName, color: 'var(--syn-key)' },
   { tag: tags.string, color: 'var(--syn-string)' },
   { tag: tags.number, color: 'var(--syn-number)' },
@@ -219,6 +223,17 @@ const jsonHighlight = HighlightStyle.define([
   { tag: tags.bracket, color: 'var(--syn-punct)' },
   { tag: tags.separator, color: 'var(--syn-punct)' },
   { tag: tags.invalid, color: 'var(--danger)' },
+];
+const jsonHighlight = HighlightStyle.define(jsonHighlightSpecs);
+
+/** JSONC (PLAN-42): JSON's colours, plus comments styled as Loki styles them. */
+export const jsoncHighlight = HighlightStyle.define([
+  ...jsonHighlightSpecs,
+  {
+    tag: [tags.comment, tags.lineComment, tags.blockComment],
+    color: 'var(--syn-null)',
+    fontStyle: 'italic',
+  },
 ]);
 
 /** Markdown token colors (Edda) — every value is a theme token, no hex here. */
@@ -620,6 +635,41 @@ export function jsonModeExtensions(): Extension[] {
   ];
 }
 
+/** Every JSONC error as a CM diagnostic — comments and trailing commas are fine here. */
+function jsoncDiagnostics(view: EditorView): Diagnostic[] {
+  const text = view.state.doc.toString();
+  if (text.trim() === '') return [];
+  return validateJson(text, 'jsonc').map((issue) => ({
+    from: Math.min(issue.offset, text.length),
+    to: Math.min(issue.offset + issue.length, text.length),
+    severity: 'error',
+    message: issue.message,
+  }));
+}
+
+/**
+ * JSONC mode (PLAN-42). `@codemirror/lang-json`'s grammar marks every comment
+ * and trailing comma as a syntax error (a `jsonc` dialect changes nothing), so
+ * this mode uses `@shopify/lang-jsonc`, the same Lezer JSON grammar with both
+ * as skipped/allowed syntax and the same Object/Array folding. The lint is
+ * still `core/json` in JSONC mode, so the gutter and the page agree. Comment
+ * tokens are declared so ⌘/Ctrl-/ toggles a line comment.
+ */
+export function jsoncModeExtensions(): Extension[] {
+  return [
+    foldGutter(),
+    indentOnInput(),
+    indentUnit.of('  '),
+    bracketMatching(),
+    closeBrackets(),
+    jsoncLang(),
+    jsoncLanguage.data.of({ commentTokens: { line: '//', block: { open: '/*', close: '*/' } } }),
+    syntaxHighlighting(jsoncHighlight),
+    linter(jsoncDiagnostics, { delay: 300 }),
+    lintGutter(),
+  ];
+}
+
 /** Markdown mode (Edda) — syntax tinting only, no lint/fold/bracket pairing. */
 function markdownModeExtensions(): Extension[] {
   return [markdownLang(), syntaxHighlighting(markdownHighlight)];
@@ -788,7 +838,28 @@ function modeExtensionsFor(mode: EditorMode): Extension[] {
       return [];
     case 'json':
       return jsonModeExtensions();
+    case 'jsonc':
+      return jsoncModeExtensions();
   }
+}
+
+/**
+ * Everything that depends on the mode: the language, and the bracket and fold
+ * keys, which bind ahead of the default keymap (closeBrackets' Backspace must
+ * win over the plain delete). Bracket auto-close and folding apply to JSON,
+ * JSONC, JS, YAML and XML; markdown and plain get neither.
+ */
+function modeConfigFor(mode: EditorMode): Extension[] {
+  const structured =
+    mode === 'json' ||
+    mode === 'jsonc' ||
+    mode === 'javascript' ||
+    mode === 'yaml' ||
+    mode === 'xml';
+  return [
+    ...modeExtensionsFor(mode),
+    ...(structured ? [keymap.of([...closeBracketsKeymap, ...foldKeymap])] : []),
+  ];
 }
 
 export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function JsonEditor(
@@ -816,16 +887,18 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
   onCursorRef.current = onCursor;
   onSearchMatchRef.current = onSearchMatch;
 
+  // The language lives in a compartment (PLAN-42): Runestone switches a
+  // document between JSON and JSONC, and that must reconfigure the open editor
+  // in place — keeping its text, undo history, selection and scroll — rather
+  // than rebuild it the way a structural prop change does.
+  const modeCompartment = useRef(new Compartment());
+  const appliedMode = useRef(mode);
+
   useEffect(() => {
     const parent = containerRef.current;
     if (!parent) return;
 
-    const modeExtensions = modeExtensionsFor(mode);
-    // Bracket auto-close and folding both apply to JSON, JS, YAML and XML;
-    // markdown and plain get neither.
-    const closeBracketsMode =
-      mode === 'json' || mode === 'javascript' || mode === 'yaml' || mode === 'xml';
-    const foldMode = closeBracketsMode;
+    appliedMode.current = mode;
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -835,21 +908,14 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
         drawSelection(),
         highlightActiveLine(),
         EditorView.lineWrapping,
-        ...modeExtensions,
+        modeCompartment.current.of(modeConfigFor(mode)),
         diffHighlightField,
         // In-editor find for every consumer (Runestone / Variant / Edda). The
         // browser's own find can't reach text in a large scrolled buffer; this
         // can. Works in every mode alike. The count plugin adds "N of M".
         search({ top: true }),
         searchMatchCount,
-        keymap.of([
-          ...searchKeymap,
-          ...(closeBracketsMode ? closeBracketsKeymap : []),
-          ...defaultKeymap,
-          ...historyKeymap,
-          ...(foldMode ? foldKeymap : []),
-          indentWithTab,
-        ]),
+        keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         ...(placeholder ? [cmPlaceholder(placeholder)] : []),
         EditorState.readOnly.of(readOnly),
         EditorView.editable.of(!readOnly),
@@ -893,8 +959,16 @@ export const JsonEditor = forwardRef<JsonEditorHandle, JsonEditorProps>(function
       view.destroy();
     };
     // The view is created once per structural prop change; `value` flows
-    // through the sync effect below instead of re-creating the editor.
-  }, [readOnly, height, placeholder, mode]);
+    // through the sync effect below instead of re-creating the editor, and
+    // `mode` through the compartment effect below.
+  }, [readOnly, height, placeholder]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view || appliedMode.current === mode) return;
+    appliedMode.current = mode;
+    view.dispatch({ effects: modeCompartment.current.reconfigure(modeConfigFor(mode)) });
+  }, [mode]);
 
   useEffect(() => {
     const view = viewRef.current;
