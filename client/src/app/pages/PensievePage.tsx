@@ -114,6 +114,20 @@ export function PensievePage() {
     : null;
   const pageParam = parsePageParam(searchParams.get('page'));
 
+  // The format filter (PLAN-42) belongs to one kind: it shows while that kind
+  // is the one listed (its chip, or the only kind there is), and `?format=`
+  // naming anything it does not offer reads as every format.
+  const formatEntry = activeKind
+    ? entryFor(LIBRARY_REGISTRY, activeKind)
+    : kinds.length === 1
+      ? kinds[0]
+      : undefined;
+  const formatParam = searchParams.get('format');
+  const activeFormat =
+    formatEntry?.formats?.some((option) => option.value === formatParam) && formatParam
+      ? formatParam
+      : null;
+
   // The type chip decides which kinds are *fetched* (PLAN-31). Applying it
   // client-side would turn a page of 30 into however many of those 30 matched.
   const fetched = useMemo(
@@ -129,6 +143,7 @@ export function PensievePage() {
     author: undefined,
     sort,
     order,
+    format: activeFormat ?? undefined,
   });
   useEffect(() => {
     const next: LibraryQuery = {
@@ -136,6 +151,7 @@ export function PensievePage() {
       author: author || undefined,
       sort,
       order,
+      format: activeFormat ?? undefined,
     };
     const timer = window.setTimeout(
       () =>
@@ -143,14 +159,15 @@ export function PensievePage() {
           current.q === next.q &&
           current.author === next.author &&
           current.sort === next.sort &&
-          current.order === next.order
+          current.order === next.order &&
+          current.format === next.format
             ? current
             : next,
         ),
       REFRESH_DEBOUNCE_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [q, author, sort, order]);
+  }, [q, author, sort, order, activeFormat]);
 
   // One pager per kind set and query: it owns the boundary cache for exactly
   // that list, so a new filter can never reuse another list's offsets.
@@ -283,6 +300,16 @@ export function PensievePage() {
     const next = new URLSearchParams(searchParams);
     if (kind) next.set('type', kind);
     else next.delete('type');
+    // A format is one kind's filter; it does not carry over to another.
+    next.delete('format');
+    next.delete('page');
+    setSearchParams(next);
+  };
+
+  const setFormat = (format: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (format) next.set('format', format);
+    else next.delete('format');
     next.delete('page');
     setSearchParams(next);
   };
@@ -324,7 +351,7 @@ export function PensievePage() {
   // The facet is unfiltered, and the current selection always stays an option,
   // so the control never shows a value it does not list.
   const authorOptions = [...new Set([...(view?.authors ?? []), ...(author ? [author] : [])])];
-  const filtering = Boolean(q || author || activeKind);
+  const filtering = Boolean(q || author || activeKind || activeFormat);
   const hasPages = (view?.pageCount ?? 1) > 1;
   // With one kind the "new one" button can be that kind's; with several the
   // page will not guess, and each editor is a click away from its own card.
@@ -435,6 +462,40 @@ export function PensievePage() {
             </div>
           )}
 
+          {/* The listed kind's formats (PLAN-42): a filter inside one kind, so it
+              narrows that kind's own server query and its page totals. */}
+          {formatEntry?.formats && (
+            <div
+              className="lib-chips lib-chips--formats"
+              role="group"
+              aria-label={`Filter ${formatEntry.label} documents by format`}
+            >
+              <button
+                type="button"
+                className={activeFormat === null ? 'lib-chip lib-chip--on' : 'lib-chip'}
+                aria-pressed={activeFormat === null}
+                onClick={() => setFormat(null)}
+              >
+                Any format
+              </button>
+              {formatEntry.formats.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={
+                    activeFormat === option.value
+                      ? `lib-chip lib-chip--on ${cardToneClass(formatEntry.tone)}`
+                      : `lib-chip ${cardToneClass(formatEntry.tone)}`
+                  }
+                  aria-pressed={activeFormat === option.value}
+                  onClick={() => setFormat(option.value)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* One strip per kind that is down. Non-blocking on purpose: the
               kinds that answered are already rendered below it (criterion 6). */}
           {failed.map((kind) => {
@@ -492,14 +553,16 @@ export function PensievePage() {
               {rows.map((item) => {
                 const entry = entryFor(LIBRARY_REGISTRY, item.kind);
                 if (!entry) return null;
+                // JSON or JSONC for a runestone (PLAN-42); the kind's label otherwise.
+                const badge = entry.labelFor?.(item) ?? entry.label;
                 return (
                   <div className="lib-row" key={`${item.kind}:${item.id}`}>
                     <span
                       className={`lib-badge ${cardToneClass(entry.tone)}`}
-                      title={`${entry.label} document`}
+                      title={`${badge} document`}
                     >
                       {entry.icon}
-                      <span className="lib-badge__label">{entry.label}</span>
+                      <span className="lib-badge__label">{badge}</span>
                     </span>
                     <div className="lib-row__body">
                       <Link className="lib-row__name" to={entry.editorRoute(item)}>

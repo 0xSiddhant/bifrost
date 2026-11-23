@@ -16,5 +16,7 @@ export function buildCurlCommand(
 ): string | null {
   if (!entry.apiRoute || !entry.mimeType) return null;
   const url = `${origin}${entry.apiRoute(item)}`;
-  return `curl -sS -H 'Accept: ${entry.mimeType}' '${url}'`;
+  // The row's own type where the kind serves more than one (PLAN-42).
+  const mimeType = entry.mimeTypeFor?.(item) ?? entry.mimeType;
+  return `curl -sS -H 'Accept: ${mimeType}' '${url}'`;
 }

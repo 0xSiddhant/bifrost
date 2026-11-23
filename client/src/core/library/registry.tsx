@@ -5,6 +5,7 @@ import { deleteRunestone, listRunestonesPage } from '../runestone';
 import { BracesIcon, DocFileIcon, GlobeIcon, TreeIcon } from '../ui/icons';
 import type { LibraryEntry, LibraryItem, LibraryKind } from './types';
 import { API_V1 } from '../api';
+import { FORMAT_FILE, JSON_FORMATS, asJsonFormat } from '../json';
 
 /**
  * The document-kind registry behind the Pensieve (PLAN-21).
@@ -20,7 +21,10 @@ import { API_V1 } from '../api';
  * its own editor. This adapts them; it does not replace them.
  */
 
-/** Both clients return the shared summary shape; only `kind` has to be added. */
+/**
+ * Every client returns the shared summary shape; only `kind` has to be added,
+ * plus the format for the one kind that has more than one (PLAN-42).
+ */
 function tag<T extends Omit<LibraryItem, 'kind'>>(kind: LibraryKind, rows: T[]): LibraryItem[] {
   return rows.map((row) => ({
     kind,
@@ -31,12 +35,20 @@ function tag<T extends Omit<LibraryItem, 'kind'>>(kind: LibraryKind, rows: T[]):
     sizeBytes: row.sizeBytes,
     createdAt: row.createdAt,
     modifiedAt: row.modifiedAt,
+    ...(row.format !== undefined ? { format: row.format } : {}),
   }));
 }
+
+/** A runestone row's format; a row from a hub before PLAN-42 has none, and is JSON. */
+const runestoneFormat = (item: LibraryItem) => asJsonFormat(item.format);
 
 const runestoneEntry: LibraryEntry = {
   kind: 'runestone',
   label: 'JSON',
+  // JSON and JSONC are one kind (PLAN-42): the same editor, API and events.
+  // The filter narrows the kind's own server query, so its total stays true.
+  formats: JSON_FORMATS.map((format) => ({ value: format, label: FORMAT_FILE[format].label })),
+  labelFor: (item) => FORMAT_FILE[runestoneFormat(item)].label,
   module: 'runestone',
   tone: 1,
   icon: <BracesIcon size={14} />,
@@ -45,7 +57,13 @@ const runestoneEntry: LibraryEntry = {
   newRoute: '/runestone',
   newLabel: 'Carve a new one',
   listPage: (query, request) =>
-    listRunestonesPage(query, request).then((page) => ({
+    listRunestonesPage(
+      {
+        ...query,
+        format: query.format === undefined ? undefined : asJsonFormat(query.format),
+      },
+      request,
+    ).then((page) => ({
       ...page,
       items: tag('runestone', page.items),
     })),
@@ -53,6 +71,7 @@ const runestoneEntry: LibraryEntry = {
   editorRoute: (item) => `/runestone/${item.slug}`,
   apiRoute: (item) => `/runestone${API_V1}/${item.slug}`,
   mimeType: 'application/json',
+  mimeTypeFor: (item) => FORMAT_FILE[runestoneFormat(item)].mimeType,
 };
 
 const eddaEntry: LibraryEntry = {

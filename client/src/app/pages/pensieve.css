@@ -246,3 +246,9 @@
       'actions actions';
   }
 }
+
+/* The listed kind's format filter (PLAN-42): under the type chips it sits
+   tight against them, so it reads as narrowing the chip above it. */
+.lib-chips + .lib-chips--formats {
+  padding-top: 0;
+}
