@@ -30,7 +30,9 @@
   min-inline-size: 0;
 }
 
-.rune-format__legend {
+/* Read by assistive technology, not drawn: the switch's legend, and the
+   reason Unescape is off in JSONC. */
+.rune-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -89,4 +91,11 @@
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* Unescape in JSONC: unavailable but focusable (aria-disabled), drawn like a
+   disabled button so it does not read as an action. */
+.rune-toolbar .btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

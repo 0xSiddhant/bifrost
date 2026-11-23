@@ -282,8 +282,15 @@ describe('RunestonePage — JSON and JSONC', () => {
     putRunestoneSeed({ title: 'Seeded', text: COMMENTED, format: 'jsonc' });
     await render();
     await settle();
-    expect(button('Unescape').disabled).toBe(true);
-    expect(button('Unescape').title).toMatch(/drop its comments/);
+    // Unavailable, but focusable and described, so the reason reaches everyone.
+    const unescape = button('Unescape');
+    expect(unescape.disabled).toBe(false);
+    expect(unescape.getAttribute('aria-disabled')).toBe('true');
+    const reason = document.getElementById(unescape.getAttribute('aria-describedby') ?? '');
+    expect(reason?.textContent).toMatch(/drop its comments/);
+    await click(unescape);
+    expect(container.textContent).toMatch(/Unescape works on strict JSON only/);
+    expect((await exported()).text).toBe(COMMENTED);
 
     await click(button('Copy as strict JSON'));
     expect(clipboard.copyText).toHaveBeenCalledWith(

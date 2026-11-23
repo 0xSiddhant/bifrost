@@ -10,7 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import { hasFeature } from '../../core/features';
 import { copyText } from '../../core/copy';
 import { log } from '../../core/log';
-import { formatJson, parseJsonValue, sortJsonKeys, validateJson } from '../../core/json';
+import { formatJson, parseJsonValue, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
 import { usePanelFont } from '../../core/panelFont';
@@ -27,6 +27,8 @@ import {
   DEFAULT_JSON_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   diffStats,
+  paneFormat,
+  sortBothSides,
   type InvalidSide,
   type TextChunkRow,
   type TextCompareResult,
@@ -343,7 +345,6 @@ export function VariantPage() {
     () => rightIssues === 0 && validateJson(debouncedRight).length === 0,
     [rightIssues, debouncedRight],
   );
-  const bothValid = leftIssues === 0 && rightIssues === 0;
 
   const parsedFor = (text: string, issues: number | null): unknown =>
     issues === 0 ? parseJsonValue(text, 'jsonc') : undefined;
@@ -464,8 +465,9 @@ export function VariantPage() {
   };
 
   // The formatter only moves whitespace, so a JSONC side keeps its comments.
+  // Judged on the live text, like Sort both: the debounced flags can lag.
   const formatBoth = () => {
-    if (!bothValid) {
+    if (!paneFormat(jsonLeftText) || !paneFormat(jsonRightText)) {
       fail('Both sides must be valid JSON or JSONC to format.');
       return;
     }
@@ -475,25 +477,20 @@ export function VariantPage() {
     ok('Formatted both sides');
   };
 
-  // Strict JSON keeps its long-standing sort; a side with comments gets the
-  // comment-safe one (PLAN-42), which refuses rather than drop a comment —
-  // and then neither side changes.
   const sortKeysBoth = () => {
-    if (!bothValid) {
-      fail('Both sides must be valid JSON or JSONC to sort keys.');
-      return;
-    }
-    const sorted = (text: string) =>
-      sortJsonKeys(text, validateJson(text).length === 0 ? 'json' : 'jsonc');
-    const leftSorted = sorted(jsonLeftText);
-    const rightSorted = sorted(jsonRightText);
-    if (leftSorted === null || rightSorted === null) {
+    const sorted = sortBothSides(jsonLeftText, jsonRightText);
+    if (!sorted.ok) {
+      if (sorted.reason === 'invalid') {
+        fail('Both sides must be valid JSON or JSONC to sort keys.');
+        return;
+      }
+      // A real refusal of the comment-safe sort: nothing changed, worth a line.
       log.warn('variant: comment-safe key sort refused a valid JSONC side', { module: 'variant' });
       fail('Keys were not sorted: not every comment could stay with its key.');
       return;
     }
-    setPane('left', (pane) => ({ ...pane, text: leftSorted }), 'json');
-    setPane('right', (pane) => ({ ...pane, text: rightSorted }), 'json');
+    setPane('left', (pane) => ({ ...pane, text: sorted.left }), 'json');
+    setPane('right', (pane) => ({ ...pane, text: sorted.right }), 'json');
     setResults(null);
     ok('Keys sorted A→Z on both sides');
   };

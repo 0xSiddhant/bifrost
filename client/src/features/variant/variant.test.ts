@@ -5,6 +5,8 @@ import {
   DEFAULT_JSON_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   diffStats,
+  paneFormat,
+  sortBothSides,
   toDiffOptions,
 } from './compare';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
@@ -225,5 +227,31 @@ describe('JSONC sides (PLAN-42)', () => {
     const [record] = result.records;
     if (!record) throw new Error('no record');
     expect(jumpTargetFor(record, LEFT, right).left).toBe(LEFT.indexOf('"port"'));
+  });
+});
+
+describe('sortBothSides (PLAN-42)', () => {
+  it('judges the live text: an invalid side is invalid, not a comment refusal', () => {
+    expect(sortBothSides('{"b": 1, "a": 2}', '{"b": 1, "a": ')).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(sortBothSides('', '{}')).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('sorts a strict side as before and a JSONC side keeping its comments', () => {
+    const result = sortBothSides('{"b": 1, "a": 2}', '{\n  "b": 1, // bee\n  "a": 2,\n}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.left).toBe(JSON.stringify({ a: 2, b: 1 }, null, 2));
+    expect(result.right).toBe('{\n  "a": 2,\n  "b": 1, // bee\n}');
+    expect(result.right.indexOf('"a"')).toBeLessThan(result.right.indexOf('"b"'));
+  });
+
+  it('names the narrowest format a pane is valid in', () => {
+    expect(paneFormat('{"a": 1}')).toBe('json');
+    expect(paneFormat('{"a": 1,}')).toBe('jsonc');
+    expect(paneFormat("{'a': 1}")).toBeNull();
+    expect(paneFormat('  ')).toBeNull();
   });
 });

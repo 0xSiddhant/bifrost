@@ -345,6 +345,22 @@ describe('PensievePage', () => {
       expect(rowNames()).toEqual(['Alpha notes', 'Gamma settings', 'Beta config', 'Delta prefs']);
     });
 
+    it('applies a type change and its format together, with no stale fetch between', async () => {
+      await open('/pensieve?type=runestone&format=jsonc');
+      mocks.calls = [];
+      // No timer advanced: the kind and the format must change in one render.
+      await act(async () => chip('All')?.click());
+      expect(mocks.calls.length).toBeGreaterThan(0);
+      expect(mocks.calls.every((call) => call.query.format === undefined)).toBe(true);
+      expect(new Set(mocks.calls.map((call) => call.kind))).toEqual(new Set(['runestone', 'edda']));
+
+      mocks.calls = [];
+      await act(async () => chip('JSON')?.click());
+      await act(async () => formatChip('JSONC')?.click());
+      expect(mocks.calls.at(-1)).toMatchObject({ kind: 'runestone', query: { format: 'jsonc' } });
+      expect(rowNames()).toEqual(['Gamma settings', 'Delta prefs']);
+    });
+
     it('ignores a format without its kind, or one the kind does not have', async () => {
       await open('/pensieve?format=jsonc');
       expect(rowNames()).toHaveLength(4);

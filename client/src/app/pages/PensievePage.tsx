@@ -138,12 +138,11 @@ export function PensievePage() {
   // Debounced so typing in the search box is one walk, not one per letter.
   // An equal query keeps the same object, so the pager (and the page it has
   // already built) survives a debounce that changed nothing.
-  const [query, setQuery] = useState<LibraryQuery>({
+  const [typedQuery, setTypedQuery] = useState<LibraryQuery>({
     q: undefined,
     author: undefined,
     sort,
     order,
-    format: activeFormat ?? undefined,
   });
   useEffect(() => {
     const next: LibraryQuery = {
@@ -151,23 +150,28 @@ export function PensievePage() {
       author: author || undefined,
       sort,
       order,
-      format: activeFormat ?? undefined,
     };
     const timer = window.setTimeout(
       () =>
-        setQuery((current) =>
+        setTypedQuery((current) =>
           current.q === next.q &&
           current.author === next.author &&
           current.sort === next.sort &&
-          current.order === next.order &&
-          current.format === next.format
+          current.order === next.order
             ? current
             : next,
         ),
       REFRESH_DEBOUNCE_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [q, author, sort, order, activeFormat]);
+  }, [q, author, sort, order]);
+  // The format comes from the URL, like the type chip, so it joins the query
+  // in the same render as the kinds it narrows — never 200 ms later, which
+  // would build (and paint) a pager for the new kinds with the old format.
+  const query = useMemo<LibraryQuery>(
+    () => (activeFormat ? { ...typedQuery, format: activeFormat } : typedQuery),
+    [typedQuery, activeFormat],
+  );
 
   // One pager per kind set and query: it owns the boundary cache for exactly
   // that list, so a new filter can never reuse another list's offsets.

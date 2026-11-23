@@ -346,7 +346,11 @@ export function RunestonePage() {
   };
 
   const applyUnescape = () => {
-    if (format === 'jsonc') return;
+    // Off in JSONC, but still reachable, so a click (or Enter) says why.
+    if (format === 'jsonc') {
+      fail(`${UNESCAPE_JSONC_REASON}.`);
+      return;
+    }
     const inner = unescapeEmbedded(text.trim());
     if (inner === null) {
       fail('No embedded JSON found in this document.');
@@ -630,7 +634,7 @@ export function RunestonePage() {
         <Card>
           <div className="rune-toolbar" role="toolbar" aria-label="Document actions">
             <fieldset className="rune-toolbar__group rune-format">
-              <legend className="rune-format__legend">Document format</legend>
+              <legend className="rune-visually-hidden">Document format</legend>
               {JSON_FORMATS.map((option) => (
                 <label key={option} className="rune-format__option">
                   <input
@@ -655,15 +659,25 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applySortKeys}>
                 Sort keys
               </Button>
+              {/* In JSONC it is aria-disabled, not disabled: a disabled button
+                  cannot be focused, so its reason would reach no keyboard,
+                  screen-reader or touch user. */}
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={empty || format === 'jsonc'}
+                disabled={format === 'json' && empty}
+                aria-disabled={format === 'jsonc' || undefined}
+                aria-describedby={format === 'jsonc' ? 'rune-unescape-reason' : undefined}
                 title={format === 'jsonc' ? UNESCAPE_JSONC_REASON : undefined}
                 onClick={applyUnescape}
               >
                 Unescape
               </Button>
+              {format === 'jsonc' && (
+                <span id="rune-unescape-reason" className="rune-visually-hidden">
+                  {UNESCAPE_JSONC_REASON}
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="ghost"

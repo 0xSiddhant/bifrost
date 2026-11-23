@@ -1,6 +1,6 @@
 import { Text } from '@codemirror/state';
 import { Chunk } from '@codemirror/merge';
-import { parseJsonValue, validateJson } from '../../core/json';
+import { parseJsonValue, sortJsonKeys, validateJson, type JsonFormat } from '../../core/json';
 import { diffJson, type DiffOptions, type DiffRecord } from '../../core/json/diff';
 import { normalizeText, type TextNormalizeOptions } from '../../core/textNormalize';
 import type { DiffHighlight } from '../../core/ui/JsonEditor';
@@ -103,6 +103,32 @@ export function compareJson(
     toDiffOptions(options),
   );
   return { ok: true, records };
+}
+
+/** The narrowest format a pane's text is valid in, or null when it is in neither. */
+export function paneFormat(text: string): JsonFormat | null {
+  if (text.trim() === '' || validateJson(text, 'jsonc').length > 0) return null;
+  return validateJson(text).length === 0 ? 'json' : 'jsonc';
+}
+
+export type SortBothOutcome =
+  | { ok: true; left: string; right: string }
+  | { ok: false; reason: 'invalid' | 'refused' };
+
+/**
+ * Sort both panes' keys, judged on the text as it is now — never on the
+ * debounced copy the toolbar reads, which can be a keystroke behind. A strict
+ * side keeps strict JSON's sort; a JSONC side gets the comment-safe one, and
+ * if that refuses, neither side changes.
+ */
+export function sortBothSides(leftText: string, rightText: string): SortBothOutcome {
+  const leftFormat = paneFormat(leftText);
+  const rightFormat = paneFormat(rightText);
+  if (!leftFormat || !rightFormat) return { ok: false, reason: 'invalid' };
+  const left = sortJsonKeys(leftText, leftFormat);
+  const right = sortJsonKeys(rightText, rightFormat);
+  if (left === null || right === null) return { ok: false, reason: 'refused' };
+  return { ok: true, left, right };
 }
 
 export interface DiffStats {
