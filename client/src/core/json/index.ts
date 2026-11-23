@@ -10,6 +10,19 @@ import {
   type ParseError,
 } from 'jsonc-parser';
 
+import { PARSE_OPTIONS, minifyJsonc, sortJsoncKeys, toStrictJson, type JsonFormat } from './jsonc';
+import { sortKeysDeep } from './sortKeys';
+
+export { sortKeysDeep } from './sortKeys';
+export {
+  FORMAT_FILE,
+  JSON_FORMATS,
+  asJsonFormat,
+  minifyJsonc,
+  toStrictJson,
+  type JsonFormat,
+} from './jsonc';
+
 // jsonc-parser publishes ScanError/SyntaxKind as ambient const enums, which
 // isolatedModules cannot import — these are their published numeric values.
 const SCAN_ERROR_NONE = 0; // ScanError.None
@@ -22,10 +35,10 @@ const SYNTAX_KIND_EOF = 17; // SyntaxKind.EOF
  * Built on jsonc-parser (VS Code's error-tolerant parser) so format/minify
  * preserve the document's raw tokens — key order and number precision survive
  * untouched, unlike a JSON.parse/stringify round-trip.
+ *
+ * Every reader takes a `format` (PLAN-42) and defaults to strict JSON, so a
+ * caller that names none behaves exactly as before JSONC existed.
  */
-
-/** Strict-JSON parse options: comments and trailing commas are errors here. */
-const STRICT = { disallowComments: true, allowTrailingComma: false, allowEmptyContent: false };
 
 export interface JsonIssue {
   offset: number;
@@ -54,9 +67,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 /** Every syntax error in the document (not just the first, unlike JSON.parse). */
-export function validateJson(text: string): JsonIssue[] {
+export function validateJson(text: string, format: JsonFormat = 'json'): JsonIssue[] {
   const errors: ParseError[] = [];
-  parseTree(text, errors, STRICT);
+  parseTree(text, errors, PARSE_OPTIONS[format]);
   return errors.map((error) => {
     const code = printParseErrorCode(error.error);
     return {
@@ -67,7 +80,11 @@ export function validateJson(text: string): JsonIssue[] {
   });
 }
 
-/** Pretty-print, preserving key order and raw number tokens. */
+/**
+ * Pretty-print, preserving key order and raw number tokens. jsonc-parser's
+ * formatter only edits the whitespace between tokens, so in JSONC every
+ * comment and trailing comma stays where it was.
+ */
 export function formatJson(text: string, indent = 2): string {
   const edits = format(text, undefined, {
     insertSpaces: true,
@@ -78,8 +95,12 @@ export function formatJson(text: string, indent = 2): string {
   return applyEdits(text, edits);
 }
 
-/** Strip inter-token whitespace, preserving every raw token exactly. */
-export function minifyJson(text: string): string {
+/**
+ * Strip inter-token whitespace, preserving every raw token exactly. JSONC keeps
+ * its comments (`minifyJsonc`); strict JSON has none to keep.
+ */
+export function minifyJson(text: string, format: JsonFormat = 'json'): string {
+  if (format === 'jsonc') return minifyJsonc(text);
   const scanner = createScanner(text, /* ignoreTrivia */ true);
   let out = '';
   for (;;) {
@@ -92,21 +113,6 @@ export function minifyJson(text: string): string {
     );
   }
   return out;
-}
-
-/**
- * Recursively sort object keys A→Z (code-unit order — deterministic and
- * idempotent; property-tested). Arrays keep their element order. Shared with
- * PLAN-08: sorting both sides before diffing kills key-ordering noise.
- */
-export function sortKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeysDeep);
-  if (value !== null && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
-    entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    return Object.fromEntries(entries.map(([key, child]) => [key, sortKeysDeep(child)]));
-  }
-  return value;
 }
 
 /**
@@ -146,9 +152,9 @@ export interface JsonStats {
   valid: boolean;
 }
 
-export function jsonStats(text: string): JsonStats {
+export function jsonStats(text: string, format: JsonFormat = 'json'): JsonStats {
   const errors: ParseError[] = [];
-  const tree = parseTree(text, errors, STRICT);
+  const tree = parseTree(text, errors, PARSE_OPTIONS[format]);
   const bytes = new TextEncoder().encode(text).length;
   const lines = text.length === 0 ? 0 : text.split('\n').length;
   if (!tree) return { bytes, lines, nodes: 0, depth: 0, valid: false };
@@ -214,8 +220,8 @@ export interface DocRanges {
  * thousands of diff records onto editor decorations — re-parsing per path
  * would be quadratic in document size).
  */
-export function docRanges(text: string): DocRanges {
-  const tree = parseTree(text, undefined, STRICT);
+export function docRanges(text: string, format: JsonFormat = 'json'): DocRanges {
+  const tree = parseTree(text, undefined, PARSE_OPTIONS[format]);
   return {
     rangeAt(path, withKey = false) {
       if (!tree) return null;
@@ -232,6 +238,40 @@ export function rangeAtPath(
   text: string,
   path: readonly (string | number)[],
   withKey = false,
+  format: JsonFormat = 'json',
 ): TextRange | null {
-  return docRanges(text).rangeAt(path, withKey);
+  return docRanges(text, format).rangeAt(path, withKey);
+}
+
+/**
+ * The document's value, for the readers that need one (Tree view, Copy as JS,
+ * Variant's compare). JSONC goes through `toStrictJson` first, so both formats
+ * get exactly `JSON.parse`'s semantics — the same numbers, the same handling of
+ * duplicate and `__proto__` keys — and the source text is never touched.
+ * Undefined when the text is not valid in its format.
+ */
+export function parseJsonValue(text: string, format: JsonFormat = 'json'): unknown {
+  const strict = format === 'jsonc' ? toStrictJson(text) : text;
+  if (strict === null) return undefined;
+  try {
+    return JSON.parse(strict) as unknown;
+  } catch {
+    // Ordinary control flow: invalid text simply has no value to show.
+    return undefined;
+  }
+}
+
+/**
+ * Sort keys A→Z in the document's format. Strict JSON keeps its long-standing
+ * parse → sort → `JSON.stringify` path; JSONC uses the comment-safe sort,
+ * which answers null when it cannot keep every comment with its member.
+ */
+export function sortJsonKeys(text: string, format: JsonFormat = 'json'): string | null {
+  if (format === 'jsonc') return sortJsoncKeys(text, (sorted) => formatJson(sorted));
+  try {
+    return JSON.stringify(sortKeysDeep(JSON.parse(text)), null, 2);
+  } catch {
+    // Ordinary control flow: sorting needs a valid document.
+    return null;
+  }
 }
