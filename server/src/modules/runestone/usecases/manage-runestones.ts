@@ -3,7 +3,9 @@ import type { RunestoneSummary } from '../../../core/bus/events.js';
 import { AppError } from '../../../core/http/index.js';
 import { pageLimit, type DocumentListPage, type PagingConfig } from '../../../core/paging.js';
 import { uniqueRelicTitle } from '../../../core/relics/index.js';
+import { isValidDocument } from '../format.js';
 import type {
+  RunestoneFormat,
   RunestoneListFilter,
   RunestoneRecord,
   RunestoneRepository,
@@ -30,19 +32,26 @@ function summaryOf(record: RunestoneRecord): RunestoneSummary {
     sizeBytes: record.sizeBytes,
     createdAt: record.createdAt,
     modifiedAt: record.modifiedAt,
+    format: record.format,
   };
 }
 
-/** 422 for broken JSON, 413 past the cap — the same cap the editor shows. */
-function checkContent(content: string, maxDocBytes: number): number {
+/**
+ * 413 past the cap — the same cap the editor shows — then 422 for content that
+ * is not valid in its format. One error code for both formats, so a client
+ * that knows only strict JSON reads a JSONC refusal the way it always has.
+ */
+function checkContent(content: string, format: RunestoneFormat, maxDocBytes: number): number {
   const sizeBytes = Buffer.byteLength(content, 'utf8');
   if (sizeBytes > maxDocBytes) {
     throw new AppError('document exceeds the size limit', 413, 'PAYLOAD_TOO_LARGE');
   }
-  try {
-    JSON.parse(content);
-  } catch {
-    throw new AppError('document is not valid JSON', 422, 'INVALID_JSON');
+  if (!isValidDocument(content, format)) {
+    throw new AppError(
+      format === 'jsonc' ? 'document is not valid JSONC' : 'document is not valid JSON',
+      422,
+      'INVALID_JSON',
+    );
   }
   return sizeBytes;
 }
@@ -50,6 +59,8 @@ function checkContent(content: string, maxDocBytes: number): number {
 export interface SaveRunestoneInput {
   name?: string;
   content: string;
+  /** Absent means strict JSON — what every client before PLAN-42 saved. */
+  format?: RunestoneFormat;
   authorDeviceId: string | null;
 }
 
@@ -61,7 +72,8 @@ export class SaveRunestoneUseCase {
     const now = this.deps.now ?? Date.now;
     const rng = this.deps.rng ?? Math.random;
 
-    const sizeBytes = checkContent(input.content, maxDocBytes);
+    const format = input.format ?? 'json';
+    const sizeBytes = checkContent(input.content, format, maxDocBytes);
     const name =
       input.name?.trim().slice(0, NAME_MAX) || uniqueRelicTitle(new Set(repo.listNames()), rng);
 
@@ -78,6 +90,7 @@ export class SaveRunestoneUseCase {
       sizeBytes,
       createdAt: at,
       modifiedAt: at,
+      format,
     };
     repo.insert(record);
     bus.emit('runestone.saved', { runestone: summaryOf(record) });
@@ -89,6 +102,8 @@ export interface UpdateRunestoneInput {
   id: string;
   name?: string;
   content?: string;
+  /** Absent keeps the stored format; a change is validated like new content. */
+  format?: RunestoneFormat;
 }
 
 export class UpdateRunestoneUseCase {
@@ -102,8 +117,13 @@ export class UpdateRunestoneUseCase {
     if (!existing) throw new AppError('runestone not found', 404, 'NOT_FOUND');
 
     const content = input.content ?? existing.content;
+    const format = input.format ?? existing.format;
+    // The content is checked whenever it or the format it must be valid in
+    // changes: switching a commented document to strict JSON is refused.
     const sizeBytes =
-      input.content !== undefined ? checkContent(input.content, maxDocBytes) : existing.sizeBytes;
+      input.content !== undefined || format !== existing.format
+        ? checkContent(content, format, maxDocBytes)
+        : existing.sizeBytes;
 
     const name = input.name?.trim().slice(0, NAME_MAX) || existing.name;
     // Rename regenerates the slug; the id inside it stays, so old links resolve.
@@ -116,6 +136,7 @@ export class UpdateRunestoneUseCase {
       content,
       sizeBytes,
       modifiedAt: now(),
+      format,
     };
     repo.update(record);
     bus.emit('runestone.saved', { runestone: summaryOf(record) });
@@ -147,6 +168,7 @@ export class GetRunestoneUseCase {
 export interface ListRunestonesInput {
   q?: string;
   author?: string;
+  format?: string;
   sort?: string;
   order?: string;
   limit?: number;
@@ -195,6 +217,7 @@ export class ListRunestonesUseCase {
     return {
       q: input.q?.trim() || undefined,
       authorDeviceId: input.author || undefined,
+      format: input.format === 'json' || input.format === 'jsonc' ? input.format : undefined,
       sort,
       order,
       limit,

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bifrost",
-    "version": "1.4.0",
+    "version": "2.2.0",
     "description": "**\"Try it out\" sends real requests to this hub; writes change real data.** Every operation\nbelow is live: saved documents, uploads, go-links and settings are the household's own.\n\n- **Admin operations** (the padlock) need the Heimdall session cookie. Try\n  `POST /api/v1/heimdall/login` with `{\"pin\": \"…\"}` here first: it sets `bifrost_admin` on\n  this origin, and the admin operations then work from this page, as they do in the app.\n  `POST /api/v1/heimdall/logout` ends it.\n- **Every API is versioned in its path.** This describes v1: `/api/v1/…`, and each public\n  raw document at `/<kind>/api/v1/{slug}`. `/go/{slug}` and `/metrics` are not APIs and are\n  never versioned.\n- **The paths from before versions existed still mean v1.** `/api/<rest>` answers exactly as\n  `/api/v1/<rest>`, and `/<kind>/api/{slug}` as `/<kind>/api/v1/{slug}`: the same route, so the\n  same body, status, limits and guards. Their responses add `Deprecation: true` and a\n  `Link: <v1 path>; rel=\"successor-version\"` header. They are listed here only once, as v1.\n- **Versioning policy.** v1 only ever grows: no operation is removed and no response field\n  disappears. A breaking change gets a new version for the affected module alone\n  (`/api/v2/<module>/…`), and its v1 keeps answering.\n- **One document path, two keys.** Each document kind reads a record by its slug and writes\n  or deletes it by its id, at the same path: `/api/v1/<kind>/{key}`. Each operation says\n  which one its `key` is.\n- **Request validation follows Fastify's defaults.** Properties a request schema does not\n  declare are stripped rather than refused, and scalar values are coerced to the declared\n  type (`\"7\"` for an integer is accepted as `7`).\n- **Errors** share one envelope, `{\"error\": \"<CODE>\", \"message\": \"<why>\"}`, under every 4xx.",
     "license": {
       "name": "MIT",
@@ -4145,7 +4145,7 @@
         "tags": [
           "runestone"
         ],
-        "description": "Filter by name (`q`) or author device (`author`) and sort. `paged=true` opts into the offset envelope (PLAN-31); without it the response is the legacy bare array.",
+        "description": "Filter by name (`q`), author device (`author`) or format (`format`) and sort. `paged=true` opts into the offset envelope (PLAN-31); without it the response is the legacy bare array. Every filter applies to the page and its `total` alike.",
         "parameters": [
           {
             "schema": {
@@ -4164,6 +4164,18 @@
             "in": "query",
             "name": "author",
             "required": false
+          },
+          {
+            "schema": {
+              "enum": [
+                "json",
+                "jsonc"
+              ]
+            },
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "description": "Only documents in this format; absent lists both"
           },
           {
             "schema": {
@@ -4236,7 +4248,8 @@
                           "authorDeviceId",
                           "sizeBytes",
                           "createdAt",
-                          "modifiedAt"
+                          "modifiedAt",
+                          "format"
                         ],
                         "properties": {
                           "id": {
@@ -4267,6 +4280,13 @@
                           "modifiedAt": {
                             "type": "integer",
                             "description": "Unix epoch milliseconds"
+                          },
+                          "format": {
+                            "enum": [
+                              "json",
+                              "jsonc"
+                            ],
+                            "description": "`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas (and nothing else from JSON5)"
                           }
                         }
                       }
@@ -4292,7 +4312,8 @@
                               "authorDeviceId",
                               "sizeBytes",
                               "createdAt",
-                              "modifiedAt"
+                              "modifiedAt",
+                              "format"
                             ],
                             "properties": {
                               "id": {
@@ -4323,6 +4344,13 @@
                               "modifiedAt": {
                                 "type": "integer",
                                 "description": "Unix epoch milliseconds"
+                              },
+                              "format": {
+                                "enum": [
+                                  "json",
+                                  "jsonc"
+                                ],
+                                "description": "`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas (and nothing else from JSON5)"
                               }
                             }
                           }
@@ -4361,7 +4389,8 @@
                           "authorDeviceId": "mac-studio",
                           "sizeBytes": 1234,
                           "createdAt": 1,
-                          "modifiedAt": 1
+                          "modifiedAt": 1,
+                          "format": "json"
                         }
                       ],
                       "total": 42,
@@ -4417,7 +4446,7 @@
         "tags": [
           "runestone"
         ],
-        "description": "An omitted or blank name gets a generated, collision-free one.",
+        "description": "An omitted or blank name gets a generated, collision-free one. An omitted `format` saves strict JSON.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4436,6 +4465,13 @@
                   "content": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "format": {
+                    "enum": [
+                      "json",
+                      "jsonc"
+                    ],
+                    "description": "Absent means `json`; the content is validated in it"
                   }
                 }
               }
@@ -4457,6 +4493,7 @@
                     "sizeBytes",
                     "createdAt",
                     "modifiedAt",
+                    "format",
                     "content"
                   ],
                   "properties": {
@@ -4492,6 +4529,13 @@
                     "modifiedAt": {
                       "type": "integer",
                       "description": "Unix epoch milliseconds"
+                    },
+                    "format": {
+                      "enum": [
+                        "json",
+                        "jsonc"
+                      ],
+                      "description": "`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas (and nothing else from JSON5)"
                     }
                   }
                 }
@@ -4633,7 +4677,7 @@
         "tags": [
           "runestone"
         ],
-        "description": "Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL for other tools.",
+        "description": "Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL for other tools. Served as `application/json` for a strict JSON document and `application/jsonc` for a JSONC one.",
         "parameters": [
           {
             "schema": {
@@ -4648,7 +4692,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The stored text, byte for byte",
+            "description": "The stored text, byte for byte: `application/json` for a strict JSON document, `application/jsonc` for a JSONC one",
             "headers": {
               "access-control-allow-origin": {
                 "schema": {
@@ -4666,6 +4710,13 @@
                   "name": "bifrost",
                   "replicas": 2
                 }
+              },
+              "application/jsonc": {
+                "schema": {
+                  "type": "string",
+                  "description": "JSON with comments and trailing commas, as written"
+                },
+                "example": "{\n  // where the bridge listens\n  \"port\": 4646,\n}\n"
               }
             }
           },
@@ -4789,6 +4840,7 @@
                     "sizeBytes",
                     "createdAt",
                     "modifiedAt",
+                    "format",
                     "content"
                   ],
                   "properties": {
@@ -4824,6 +4876,13 @@
                     "modifiedAt": {
                       "type": "integer",
                       "description": "Unix epoch milliseconds"
+                    },
+                    "format": {
+                      "enum": [
+                        "json",
+                        "jsonc"
+                      ],
+                      "description": "`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas (and nothing else from JSON5)"
                     }
                   }
                 }
@@ -4914,7 +4973,7 @@
         "tags": [
           "runestone"
         ],
-        "description": "A rename regenerates the slug; links to the old one keep resolving.",
+        "description": "A rename regenerates the slug; links to the old one keep resolving. An omitted `format` keeps the stored one; a changed format is validated like new content.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4932,6 +4991,13 @@
                   "content": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "format": {
+                    "enum": [
+                      "json",
+                      "jsonc"
+                    ],
+                    "description": "Absent keeps the stored format; the content is validated in the new one"
                   }
                 }
               }
@@ -4966,6 +5032,7 @@
                     "sizeBytes",
                     "createdAt",
                     "modifiedAt",
+                    "format",
                     "content"
                   ],
                   "properties": {
@@ -5001,6 +5068,13 @@
                     "modifiedAt": {
                       "type": "integer",
                       "description": "Unix epoch milliseconds"
+                    },
+                    "format": {
+                      "enum": [
+                        "json",
+                        "jsonc"
+                      ],
+                      "description": "`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas (and nothing else from JSON5)"
                     }
                   }
                 }

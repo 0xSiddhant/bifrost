@@ -160,7 +160,12 @@ export interface RunestoneSummary {
   sizeBytes: number;
   createdAt: number;
   modifiedAt: number;
+  /** Strict JSON or JSONC (PLAN-42) — the mode the content is valid in. */
+  format: RunestoneFormat;
 }
+
+/** A Runestone's document format (PLAN-42). */
+export type RunestoneFormat = 'json' | 'jsonc';
 
 /** A saved Markdown document as the Edda library lists it (PLAN-11). */
 export interface EddaSummary {

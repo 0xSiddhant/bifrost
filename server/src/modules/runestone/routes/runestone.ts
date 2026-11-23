@@ -9,6 +9,8 @@ import {
   redirect,
 } from '../../../core/http/schemas.js';
 import { documentListPageSchema, pagedQueryProperties } from '../../../core/paging.js';
+import { RAW_MEDIA_TYPE } from '../format.js';
+import type { RunestoneFormat } from '../ports.js';
 import type {
   DeleteRunestoneUseCase,
   GetRunestoneUseCase,
@@ -26,12 +28,20 @@ export interface RunestoneRoutesDeps {
   remove: DeleteRunestoneUseCase;
 }
 
+const formatSchema = {
+  enum: ['json', 'jsonc'],
+  description:
+    '`json` is strict JSON; `jsonc` also allows `//` and `/* */` comments and trailing commas ' +
+    '(and nothing else from JSON5)',
+} as const;
+
 const listQuerySchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
     q: { type: 'string', maxLength: 120 },
     author: { type: 'string', maxLength: 64 },
+    format: { ...formatSchema, description: 'Only documents in this format; absent lists both' },
     sort: { enum: ['name', 'created', 'modified', 'size'] },
     order: { enum: ['asc', 'desc'] },
     limit: { type: 'integer', minimum: 1, maximum: 500 },
@@ -47,6 +57,7 @@ const saveBodySchema = {
   properties: {
     name: { type: 'string', maxLength: 80 },
     content: { type: 'string', minLength: 1 },
+    format: { ...formatSchema, description: 'Absent means `json`; the content is validated in it' },
   },
 } as const;
 
@@ -57,6 +68,10 @@ const updateBodySchema = {
   properties: {
     name: { type: 'string', minLength: 1, maxLength: 80 },
     content: { type: 'string', minLength: 1 },
+    format: {
+      ...formatSchema,
+      description: 'Absent keeps the stored format; the content is validated in the new one',
+    },
   },
 } as const;
 
@@ -89,11 +104,21 @@ const summaryProperties = {
   sizeBytes: { type: 'integer', description: 'UTF-8 bytes of the content' },
   createdAt: { type: 'integer', description: 'Unix epoch milliseconds' },
   modifiedAt: { type: 'integer', description: 'Unix epoch milliseconds' },
+  format: formatSchema,
 } as const;
 
 const summarySchema = {
   type: 'object',
-  required: ['id', 'name', 'slug', 'authorDeviceId', 'sizeBytes', 'createdAt', 'modifiedAt'],
+  required: [
+    'id',
+    'name',
+    'slug',
+    'authorDeviceId',
+    'sizeBytes',
+    'createdAt',
+    'modifiedAt',
+    'format',
+  ],
   properties: summaryProperties,
 } as const;
 
@@ -109,6 +134,7 @@ const recordSchema = {
     sizeBytes: summaryProperties.sizeBytes,
     createdAt: summaryProperties.createdAt,
     modifiedAt: summaryProperties.modifiedAt,
+    format: summaryProperties.format,
   },
 } as const;
 
@@ -124,6 +150,7 @@ const TAGS = ['runestone'];
 interface ListQuery {
   q?: string;
   author?: string;
+  format?: RunestoneFormat;
   sort?: string;
   order?: string;
   limit?: number;
@@ -143,8 +170,9 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
         tags: TAGS,
         summary: 'List saved JSON documents',
         description:
-          'Filter by name (`q`) or author device (`author`) and sort. `paged=true` opts into the ' +
-          'offset envelope (PLAN-31); without it the response is the legacy bare array.',
+          'Filter by name (`q`), author device (`author`) or format (`format`) and sort. ' +
+          '`paged=true` opts into the offset envelope (PLAN-31); without it the response is the ' +
+          'legacy bare array. Every filter applies to the page and its `total` alike.',
         operationId: 'listRunestones',
         querystring: listQuerySchema,
         response: { 200: listResponseSchema, ...errorResponses(400) },
@@ -156,7 +184,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       request.query.paged ? deps.list.executePage(request.query) : deps.list.execute(request.query),
   );
 
-  app.post<{ Body: { name?: string; content: string } }>(
+  app.post<{ Body: { name?: string; content: string; format?: RunestoneFormat } }>(
     '/api/v1/runestone',
     {
       bodyLimit,
@@ -164,7 +192,9 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       schema: {
         tags: TAGS,
         summary: 'Save a new JSON document',
-        description: 'An omitted or blank name gets a generated, collision-free one.',
+        description:
+          'An omitted or blank name gets a generated, collision-free one. An omitted `format` ' +
+          'saves strict JSON.',
         operationId: 'createRunestone',
         body: saveBodySchema,
         response: { 201: recordSchema, ...errorResponses(400, 413, 415, 422) },
@@ -174,6 +204,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       const record = deps.save.execute({
         name: request.body.name,
         content: request.body.content,
+        format: request.body.format,
         authorDeviceId: deviceIdOf(request),
       });
       return reply.code(201).send(record);
@@ -193,11 +224,26 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
         summary: 'The raw document text, as a public data URL',
         description:
           'Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL ' +
-          'for other tools.',
+          'for other tools. Served as `application/json` for a strict JSON document and ' +
+          '`application/jsonc` for a JSONC one.',
         operationId: 'getRunestoneRaw',
         params: slugParamsSchema,
         response: {
-          200: rawBody('application/json', 'The stored text, byte for byte', rawHeaders),
+          200: {
+            description:
+              'The stored text, byte for byte: `application/json` for a strict JSON document, ' +
+              '`application/jsonc` for a JSONC one',
+            content: {
+              ...rawBody('application/json', '').content,
+              'application/jsonc': {
+                schema: {
+                  type: 'string',
+                  description: 'JSON with comments and trailing commas, as written',
+                },
+              },
+            },
+            headers: rawHeaders,
+          },
           301: {
             ...redirect('A stale slug: the canonical raw URL'),
             headers: { ...redirect('').headers, ...corsHeader },
@@ -212,9 +258,10 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       if (!canonical) {
         return reply.redirect(`/runestone/api/v1/${encodeURIComponent(record.slug)}`, 301);
       }
-      // Raw stored text, not a re-serialization — formatting and number
-      // precision survive exactly as carved.
-      return reply.type('application/json; charset=utf-8').send(record.content);
+      // Raw stored text, not a re-serialization — formatting, comments and
+      // number precision survive exactly as carved. The media type follows the
+      // document's format, so a strict JSON consumer can tell a JSONC one.
+      return reply.type(`${RAW_MEDIA_TYPE[record.format]}; charset=utf-8`).send(record.content);
     },
   );
 
@@ -244,7 +291,10 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
     },
   );
 
-  app.put<{ Params: { id: string }; Body: { name?: string; content?: string } }>(
+  app.put<{
+    Params: { id: string };
+    Body: { name?: string; content?: string; format?: RunestoneFormat };
+  }>(
     '/api/v1/runestone/:id',
     {
       bodyLimit,
@@ -252,7 +302,9 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
       schema: {
         tags: TAGS,
         summary: 'Rename a JSON document or replace its content',
-        description: 'A rename regenerates the slug; links to the old one keep resolving.',
+        description:
+          'A rename regenerates the slug; links to the old one keep resolving. An omitted ' +
+          '`format` keeps the stored one; a changed format is validated like new content.',
         operationId: 'updateRunestone',
         params: idParamsSchema,
         body: updateBodySchema,
@@ -264,6 +316,7 @@ export function registerRunestoneRoutes(app: FastifyInstance, deps: RunestoneRou
         id: request.params.id,
         name: request.body.name,
         content: request.body.content,
+        format: request.body.format,
       }),
   );
 
