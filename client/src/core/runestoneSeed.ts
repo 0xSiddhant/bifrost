@@ -7,11 +7,18 @@
  * to `/runestone`, and Runestone reads it once on mount. No cross-feature import.
  */
 
+import { asJsonFormat, type JsonFormat } from './json';
+
 const SEED_KEY = 'bifrost.runestone.seed';
 
 export interface RunestoneSeed {
   title: string;
   text: string;
+  /**
+   * The format to open it in (PLAN-42). Optional for the senders that only
+   * ever hand over strict JSON (Groot's conversion); absent reads as JSON.
+   */
+  format?: JsonFormat;
 }
 
 export function putRunestoneSeed(seed: RunestoneSeed): void {
@@ -30,7 +37,11 @@ export function takeRunestoneSeed(): RunestoneSeed | null {
     sessionStorage.removeItem(SEED_KEY);
     const parsed = JSON.parse(raw) as Partial<RunestoneSeed>;
     if (typeof parsed.text !== 'string') return null;
-    return { title: typeof parsed.title === 'string' ? parsed.title : '', text: parsed.text };
+    return {
+      title: typeof parsed.title === 'string' ? parsed.title : '',
+      text: parsed.text,
+      format: asJsonFormat(parsed.format),
+    };
   } catch {
     return null;
   }
