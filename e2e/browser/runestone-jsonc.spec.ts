@@ -81,6 +81,13 @@ test.describe('runestone jsonc', () => {
       expect(file.suggestedFilename()).toBe(`${title}.jsonc`);
       expect((await downloadBytes(file)).toString('utf8')).toBe(SETTINGS);
 
+      // Opened in the browser, as the Pensieve's API link does, the raw URL
+      // shows the document: no browser renders application/jsonc, so a page
+      // navigation is answered as text/plain (a download would fail goto).
+      const shown = await page.goto(`/runestone/api/v1/${slug}`);
+      expect(shown?.headers()['content-type']).toBe('text/plain; charset=utf-8');
+      await expect(page.locator('body')).toContainText('// where the bridge listens');
+
       // A strict JSON document and a second JSONC one, beside it.
       const strictName = `E2E strict ${stamp}`;
       const strict = await page.request.post(`${server.baseUrl}/api/v1/runestone`, {
