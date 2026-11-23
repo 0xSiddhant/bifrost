@@ -297,6 +297,27 @@ describe('Runestone formats (PLAN-42)', () => {
     );
   });
 
+  it('switches the format of a document saved under a larger cap, unchanged', () => {
+    const { repo, bus } = harness();
+    const big = JSON.stringify({ pad: 'x'.repeat(100) });
+    const saved = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 1024 }).execute({
+      content: big,
+      authorDeviceId: null,
+    });
+    // The cap is lowered below the stored size, as by a changed .env.
+    const update = new UpdateRunestoneUseCase({ repo, bus, maxDocBytes: 16 });
+    expect(update.execute({ id: saved.id, name: 'Renamed' }).name).toBe('Renamed');
+    const switched = update.execute({ id: saved.id, format: 'jsonc' });
+    expect(switched).toMatchObject({ format: 'jsonc', content: big, sizeBytes: saved.sizeBytes });
+    // New content still meets the cap.
+    try {
+      update.execute({ id: saved.id, content: big });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as AppError).statusCode).toBe(413);
+    }
+  });
+
   it('passes a format filter to the repository and ignores an unknown one', () => {
     const { repo } = harness();
     const list = new ListRunestonesUseCase(repo, PAGING);

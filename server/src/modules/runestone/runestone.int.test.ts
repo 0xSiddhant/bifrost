@@ -270,7 +270,29 @@ describe('runestone module', () => {
       expect(raw.statusCode).toBe(200);
       expect(raw.headers['content-type']).toBe('application/jsonc; charset=utf-8');
       expect(raw.headers['access-control-allow-origin']).toBe('*');
+      expect(raw.headers.vary).toBe('Accept');
       expect(raw.body).toBe(COMMENTED);
+
+      // A browser navigation gets text it can show, not a download; anything
+      // that asks for JSONC, or for anything, still gets JSONC.
+      const browser = await inject({
+        method: 'GET',
+        url: `/runestone/api/v1/${created.slug}`,
+        headers: {
+          accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      expect(browser.headers['content-type']).toBe('text/plain; charset=utf-8');
+      expect(browser.headers['x-content-type-options']).toBe('nosniff');
+      expect(browser.body).toBe(COMMENTED);
+      for (const accept of ['application/jsonc', '*/*', 'text/html, application/jsonc;q=0.9']) {
+        const asked = await inject({
+          method: 'GET',
+          url: `/runestone/api/v1/${created.slug}`,
+          headers: { accept },
+        });
+        expect(asked.headers['content-type'], accept).toBe('application/jsonc; charset=utf-8');
+      }
 
       const rename = await inject({
         method: 'PUT',
@@ -292,6 +314,13 @@ describe('runestone module', () => {
         url: `/runestone/api/v1/${strict.json().slug}`,
       });
       expect(json.headers['content-type']).toBe('application/json; charset=utf-8');
+      const jsonInBrowser = await inject({
+        method: 'GET',
+        url: `/runestone/api/v1/${strict.json().slug}`,
+        headers: { accept: 'text/html,*/*;q=0.8' },
+      });
+      // Strict JSON stays application/json: browsers already render it.
+      expect(jsonInBrowser.headers['content-type']).toBe('application/json; charset=utf-8');
       await inject({ method: 'DELETE', url: `/api/v1/runestone/${created.id}` });
     });
 

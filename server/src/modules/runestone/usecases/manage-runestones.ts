@@ -36,6 +36,17 @@ function summaryOf(record: RunestoneRecord): RunestoneSummary {
   };
 }
 
+/** 422 for content that is not valid in its format, in either format's words. */
+function checkFormat(content: string, format: RunestoneFormat): void {
+  if (!isValidDocument(content, format)) {
+    throw new AppError(
+      format === 'jsonc' ? 'document is not valid JSONC' : 'document is not valid JSON',
+      422,
+      'INVALID_JSON',
+    );
+  }
+}
+
 /**
  * 413 past the cap — the same cap the editor shows — then 422 for content that
  * is not valid in its format. One error code for both formats, so a client
@@ -46,13 +57,7 @@ function checkContent(content: string, format: RunestoneFormat, maxDocBytes: num
   if (sizeBytes > maxDocBytes) {
     throw new AppError('document exceeds the size limit', 413, 'PAYLOAD_TOO_LARGE');
   }
-  if (!isValidDocument(content, format)) {
-    throw new AppError(
-      format === 'jsonc' ? 'document is not valid JSONC' : 'document is not valid JSON',
-      422,
-      'INVALID_JSON',
-    );
-  }
+  checkFormat(content, format);
   return sizeBytes;
 }
 
@@ -118,12 +123,14 @@ export class UpdateRunestoneUseCase {
 
     const content = input.content ?? existing.content;
     const format = input.format ?? existing.format;
-    // The content is checked whenever it or the format it must be valid in
-    // changes: switching a commented document to strict JSON is refused.
-    const sizeBytes =
-      input.content !== undefined || format !== existing.format
-        ? checkContent(content, format, maxDocBytes)
-        : existing.sizeBytes;
+    // New content is checked in full. A format change alone re-checks the
+    // stored content in the new format (switching a commented document to
+    // strict JSON is refused) but not its size: those bytes are not new, and a
+    // cap lowered since they were saved must not lock their format, when a
+    // rename of the same document still goes through.
+    let sizeBytes = existing.sizeBytes;
+    if (input.content !== undefined) sizeBytes = checkContent(content, format, maxDocBytes);
+    else if (format !== existing.format) checkFormat(content, format);
 
     const name = input.name?.trim().slice(0, NAME_MAX) || existing.name;
     // Rename regenerates the slug; the id inside it stays, so old links resolve.

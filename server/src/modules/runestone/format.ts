@@ -34,3 +34,20 @@ export const RAW_MEDIA_TYPE: Record<RunestoneFormat, string> = {
   json: 'application/json',
   jsonc: 'application/jsonc',
 };
+
+/**
+ * What the raw URL sends a document as. Strict JSON is always
+ * `application/json`, which browsers render. JSONC is `application/jsonc` for
+ * every client that asks for it or takes anything (curl, the CLI, fetch), but
+ * no browser renders that type: a page navigation — an `Accept` that names
+ * `text/html` and not `application/jsonc` — gets the same bytes as
+ * `text/plain`, so the Pensieve's API link and `bifrost preview` show the
+ * document instead of downloading it.
+ */
+export function rawMediaType(format: RunestoneFormat, accept: string | undefined): string {
+  if (format === 'json') return RAW_MEDIA_TYPE.json;
+  const wanted = (accept ?? '').toLowerCase();
+  if (wanted.includes('text/html') && !wanted.includes('application/jsonc')) return 'text/plain';
+  return RAW_MEDIA_TYPE.jsonc;
+}
+

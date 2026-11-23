@@ -119,7 +119,9 @@ export async function resolveDocument(
  * Only `edda` has a rendered read-only page today (`/edda/preview/:slug`, a real
  * client route). The other three get their raw content URL, which a browser
  * already renders readably — Chrome's JSON viewer, highlighted text for YAML and
- * XML. That is the honest closest thing, not a rendered page pretending; the day
+ * XML, and a JSONC runestone as plain text (the hub answers a page navigation
+ * with `text/plain` for it, since no browser renders `application/jsonc`;
+ * PLAN-42). That is the honest closest thing, not a rendered page pretending; the day
  * one of them gains a read route, it is one entry here and nothing else changes.
  */
 export function previewUrl(

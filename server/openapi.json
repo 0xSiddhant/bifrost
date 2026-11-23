@@ -4677,7 +4677,7 @@
         "tags": [
           "runestone"
         ],
-        "description": "Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL for other tools. Served as `application/json` for a strict JSON document and `application/jsonc` for a JSONC one.",
+        "description": "Outside `/api/` on purpose, with CORS open: a saved document doubles as a stable URL for other tools. Served as `application/json` for a strict JSON document and `application/jsonc` for a JSONC one, except to a browser navigation (an `Accept` naming `text/html` but not `application/jsonc`), which gets the JSONC as `text/plain` to show rather than download.",
         "parameters": [
           {
             "schema": {
@@ -4692,7 +4692,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The stored text, byte for byte: `application/json` for a strict JSON document, `application/jsonc` for a JSONC one",
+            "description": "The stored text, byte for byte: `application/json` for a strict JSON document, `application/jsonc` for a JSONC one (`text/plain` to a browser navigation)",
             "headers": {
               "access-control-allow-origin": {
                 "schema": {
@@ -4717,6 +4717,12 @@
                   "description": "JSON with comments and trailing commas, as written"
                 },
                 "example": "{\n  // where the bridge listens\n  \"port\": 4646,\n}\n"
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "description": "A JSONC document, to a browser navigation, so it shows inline"
+                }
               }
             }
           },
