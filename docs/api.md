@@ -59,6 +59,13 @@ device. The description at the top of the page says so too.
   (OpenAPI forbids two paths that differ only in a parameter's name).
 - **Examples** where a shape is not obvious: the error envelope, one page of each
   paged listing, and each raw document.
+- **Runestone formats** (PLAN-42): a runestone is `json` or `jsonc` (JSON plus
+  `//` and `/* */` comments and trailing commas, nothing from JSON5). The field is
+  on every summary and record; `POST` without it saves `json`, a `PUT` without it
+  keeps the stored one, and `GET /api/v1/runestone?format=jsonc` filters the list
+  and its `total`. The raw URL `/runestone/api/v1/{slug}` sends `application/json`
+  for a JSON document and `application/jsonc` for a JSONC one, so ask for either:
+  `curl -H 'Accept: application/jsonc' …`.
 - **Deep links**: `http://127.0.0.1:4647/docs#/runestone/listRunestones` opens that
   operation.
 

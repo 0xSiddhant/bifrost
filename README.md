@@ -46,14 +46,14 @@ The app is organized into three category tabs, plus a few things that work every
 
 ### 🪄 Ollivanders — dev tools ("the tool chooses the maker")
 
-- 🧿 **Runestone** — JSON viewer/editor with in-editor find and tree collapse-all
-- ⚖️ **Variant** — structural JSON diff (key order & formatting are noise) with a raw-text fallback and cross-pane reveal; export as an RFC 6902 JSON Patch or a git-shaped unified `.patch`
+- 🧿 **Runestone** — JSON and JSONC viewer/editor (a per-document JSON/JSONC switch: comments and trailing commas survive format, minify and a comment-safe key sort) with in-editor find and tree collapse-all
+- ⚖️ **Variant** — structural JSON and JSONC diff (key order, formatting & comments are noise) with a raw-text fallback and cross-pane reveal; export as an RFC 6902 JSON Patch or a git-shaped unified `.patch`
 - 📖 **Edda** — Markdown editor with live preview (Mermaid diagrams render inline); share as a rendered page, raw `text/markdown`, or a printable HTML/PDF export
 - 🃏 **Loki** — JavaScript workbench: transforms, a regex tester, and a sandboxed Web-Worker runner
 - 🌳 **Groot** — YAML workspace: folding, comment-preserving formatting, a tree view, YAML ⇄ JSON, and an advisory rail for the traps YAML hides in plain sight (`country: no` is a string here and `false` to a YAML 1.1 reader)
 - 🌐 **Atlas** — XML workspace: format, minify, fold; an Apple property list also opens as an editable, Xcode-shaped table
 - 🗜 **Brotli** — compress text or a file, or decompress a `.br`, with a live gzip comparison and a one-click hand-off into whichever editor above the result fits
-- 🗃 **Pensieve** — one saved-document library across Runestone, Edda, Groot and Atlas; every saved doc doubles as a public data URL
+- 🗃 **Pensieve** — one saved-document library across Runestone, Edda, Groot and Atlas, with a JSON/JSONC format filter; every saved doc doubles as a public data URL (a JSONC Runestone is served as `application/jsonc`)
 - 💡 A header bulb opens a **guide panel** — a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
 
 ### 🎪 Diagon Alley — utilities

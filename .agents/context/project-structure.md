@@ -114,7 +114,8 @@ bifrost/
 │       │                      #   ErrorBoundary (app-wide crash net), ChunkBoundary (PLAN-40 — Suspense plus a
 │       │                      #   failed-chunk net for the lazy shell pieces: Guide panel, Join card, the sky's
 │       │                      #   relics: SkyRelics lazily loads RelicScatter, PLAN-41; whenIdle.ts), JsonEditor (one `mode`
-│       │                      #   prop: json|markdown|javascript|yaml|xml|plain, PLAN-23)
+│       │                      #   prop: json|jsonc|markdown|javascript|yaml|xml|plain, PLAN-23/42;
+│       │                      #   the language sits in a compartment, so a mode change keeps history)
 │       │                      #   +replaceRange for table-originated transactions (PLAN-23),
 │       │                      #   PlistTable (PLAN-23 — the editable Xcode-shaped Key/Type/Value
 │       │                      #     table; it lives here, not in features/atlas, because it is not
@@ -124,7 +125,9 @@ bifrost/
 │       │                      #     both were at theirs),
 │       │                      #   +in-editor search, TreeView +bulk collapse +alias annotation),
 │       │                      #   json/ (parse/format/diff + jsonPatch.ts, PLAN-26's RFC 6902
-│       │                      #     mapping over the same diff records, and the replay that proves one),
+│       │                      #     mapping over the same diff records, and the replay that proves one;
+│       │                      #     jsonc.ts, PLAN-42's JSONC: strict copy, comment-keeping minify,
+│       │                      #     the comment-safe key sort; every reader takes a format),
 │       │                      #   markdown/ (renderMarkdown/outline/stats/commands + PLAN-20's
 │       │                      #     mermaid.ts + useMermaid.ts — the async diagram pass sits BESIDE
 │       │                      #     the pure renderer, and in core so features/previews/ can reach it),
