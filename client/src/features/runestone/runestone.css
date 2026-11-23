@@ -22,7 +22,7 @@
 .rune-format {
   display: inline-flex;
   gap: 0;
-  margin: 0;
+  margin: 0 var(--space-2) 0 0;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);

@@ -633,23 +633,26 @@ export function RunestonePage() {
 
         <Card>
           <div className="rune-toolbar" role="toolbar" aria-label="Document actions">
-            <fieldset className="rune-toolbar__group rune-format">
-              <legend className="rune-visually-hidden">Document format</legend>
-              {JSON_FORMATS.map((option) => (
-                <label key={option} className="rune-format__option">
-                  <input
-                    className="rune-format__input"
-                    type="radio"
-                    name="rune-format"
-                    value={option}
-                    checked={format === option}
-                    onChange={() => changeFormat(option)}
-                  />
-                  <span className="rune-format__label">{FORMAT_FILE[option].label}</span>
-                </label>
-              ))}
-            </fieldset>
+            {/* The switch opens the first group rather than being a group of
+                its own: on a phone a group is a row, and that extra row pushed
+                the Code/Tree toggle under the fixed bottom nav. */}
             <div className="rune-toolbar__group">
+              <fieldset className="rune-format">
+                <legend className="rune-visually-hidden">Document format</legend>
+                {JSON_FORMATS.map((option) => (
+                  <label key={option} className="rune-format__option">
+                    <input
+                      className="rune-format__input"
+                      type="radio"
+                      name="rune-format"
+                      value={option}
+                      checked={format === option}
+                      onChange={() => changeFormat(option)}
+                    />
+                    <span className="rune-format__label">{FORMAT_FILE[option].label}</span>
+                  </label>
+                ))}
+              </fieldset>
               <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applyFormat}>
                 Format
               </Button>
