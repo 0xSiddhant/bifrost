@@ -817,8 +817,8 @@ export function VariantPage() {
           <span className="eyebrow eyebrow--violet">the variant · two stones, one truth</span>
           <h2>Variant</h2>
           <p>
-            Compare JSON structurally — key order and formatting are noise — or fall back to raw
-            text for anything else.
+            Compare JSON or JSONC structurally — key order, formatting and comments are noise —
+            or fall back to raw text for anything else.
           </p>
         </div>
         <PanelFontControl font={font} />
