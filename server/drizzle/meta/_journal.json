@@ -99,6 +99,13 @@
       "when": 1791404532005,
       "tag": "0013_drop_themes_disabled",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1795426357362,
+      "tag": "0014_runestone_format",
+      "breakpoints": true
     }
   ]
 }

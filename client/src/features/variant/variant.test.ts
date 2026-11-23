@@ -5,6 +5,8 @@ import {
   DEFAULT_JSON_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   diffStats,
+  paneFormat,
+  sortBothSides,
   toDiffOptions,
 } from './compare';
 import { jumpTargetFor, recordsToHighlights } from './highlights';
@@ -186,5 +188,70 @@ describe('jumpTargetFor (drawer click-to-jump)', () => {
       left: null,
       right: right.indexOf('"born"'),
     });
+  });
+});
+
+describe('JSONC sides (PLAN-42)', () => {
+  const LEFT = '{\n  // the port\n  "port": 4646,\n  "tags": ["a", "b",],\n}';
+
+  it('compares JSONC structurally: a comment-only change makes no record', () => {
+    const right =
+      '{\n  /* a different comment */\n  "port": 4646, // and one more\n  "tags": ["a", "b"]\n}';
+    expect(compareJson(LEFT, right, DEFAULT_JSON_OPTIONS)).toEqual({ ok: true, records: [] });
+  });
+
+  it('compares JSONC against strict JSON, value for value', () => {
+    const result = compareJson(LEFT, '{"port": 8080, "tags": ["a", "b"]}', DEFAULT_JSON_OPTIONS);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]).toMatchObject({ op: 'change', leftPath: ['port'] });
+  });
+
+  it('still refuses JSON5 and leaves strict JSON comparisons as they were', () => {
+    expect(compareJson("{'a': 1}", '{}', DEFAULT_JSON_OPTIONS)).toEqual({
+      ok: false,
+      invalid: 'left',
+    });
+    const strict = compareJson('{"a": 1}', '{"a": 2}', DEFAULT_JSON_OPTIONS);
+    expect(strict.ok && strict.records.length).toBe(1);
+  });
+
+  it('maps records onto the commented text', () => {
+    const right = '{"port": 8080, "tags": ["a", "b"]}';
+    const result = compareJson(LEFT, right, DEFAULT_JSON_OPTIONS);
+    if (!result.ok) throw new Error('compare failed');
+    const marks = recordsToHighlights(result.records, LEFT, right);
+    const leftLine = marks.left.find((mark) => mark.level === 'line');
+    expect(leftLine && LEFT.slice(leftLine.from, leftLine.to)).toContain('"port": 4646');
+    const [record] = result.records;
+    if (!record) throw new Error('no record');
+    expect(jumpTargetFor(record, LEFT, right).left).toBe(LEFT.indexOf('"port"'));
+  });
+});
+
+describe('sortBothSides (PLAN-42)', () => {
+  it('judges the live text: an invalid side is invalid, not a comment refusal', () => {
+    expect(sortBothSides('{"b": 1, "a": 2}', '{"b": 1, "a": ')).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(sortBothSides('', '{}')).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('sorts a strict side as before and a JSONC side keeping its comments', () => {
+    const result = sortBothSides('{"b": 1, "a": 2}', '{\n  "b": 1, // bee\n  "a": 2,\n}');
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.left).toBe(JSON.stringify({ a: 2, b: 1 }, null, 2));
+    expect(result.right).toBe('{\n  "a": 2,\n  "b": 1, // bee\n}');
+    expect(result.right.indexOf('"a"')).toBeLessThan(result.right.indexOf('"b"'));
+  });
+
+  it('names the narrowest format a pane is valid in', () => {
+    expect(paneFormat('{"a": 1}')).toBe('json');
+    expect(paneFormat('{"a": 1,}')).toBe('jsonc');
+    expect(paneFormat("{'a': 1}")).toBeNull();
+    expect(paneFormat('  ')).toBeNull();
   });
 });

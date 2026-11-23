@@ -27,6 +27,11 @@ export interface LibraryItem {
   sizeBytes: number;
   createdAt: number;
   modifiedAt: number;
+  /**
+   * The document's format within its kind, for a kind that has more than one
+   * (PLAN-42: a runestone is `json` or `jsonc`). Absent for the others.
+   */
+  format?: string;
 }
 
 export type LibrarySort = 'name' | 'created' | 'modified' | 'size';
@@ -39,6 +44,18 @@ export interface LibraryQuery {
   author?: string;
   sort: LibrarySort;
   order: LibraryOrder;
+  /**
+   * One of the active kind's `formats` (PLAN-42). The page sets it only while
+   * a single kind with formats is listed, so it reaches that kind's server
+   * query and its total; a kind without formats ignores it.
+   */
+  format?: string;
+}
+
+/** One of a kind's formats, as the format filter offers it. */
+export interface LibraryFormat {
+  value: string;
+  label: string;
 }
 
 /**
@@ -51,6 +68,14 @@ export interface LibraryEntry {
   /** Chip label. The **format**, not the tool: a person scanning the list is
    *  looking for "the YAML one", and the tool's name is on the row's link. */
   label: string;
+  /**
+   * The formats one kind's documents come in, when there is more than one
+   * (PLAN-42: Runestone's JSON and JSONC). The Pensieve offers them as a filter
+   * while this kind is the one listed; they stay one kind, one stream.
+   */
+  formats?: readonly LibraryFormat[];
+  /** A row's own badge label, when its format is more specific than `label`. */
+  labelFor?(item: LibraryItem): string;
   /** Capability module that must be loaded for this kind to exist at all. */
   module: string;
   /**
@@ -87,6 +112,11 @@ export interface LibraryEntry {
    * `curl` command for the raw data URL.
    */
   mimeType?: string;
+  /**
+   * A row's own media type, when the kind serves more than one (PLAN-42: a
+   * JSONC runestone is `application/jsonc`). Falls back to `mimeType`.
+   */
+  mimeTypeFor?(item: LibraryItem): string;
   /** A rendered read-only view, if the tool has one (Edda's preview page). */
   readRoute?(item: LibraryItem): string;
   /**

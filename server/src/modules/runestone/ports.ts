@@ -1,4 +1,6 @@
-import type { RunestoneSummary } from '../../core/bus/events.js';
+import type { RunestoneFormat, RunestoneSummary } from '../../core/bus/events.js';
+
+export type { RunestoneFormat };
 
 /** A full stored document — the listing summary plus its JSON text. */
 export interface RunestoneRecord extends RunestoneSummary {
@@ -12,6 +14,8 @@ export interface RunestoneListFilter {
   q?: string;
   /** Exact device id (client maps a picked author name to its id). */
   authorDeviceId?: string;
+  /** Only documents in this format (PLAN-42); absent means both. */
+  format?: RunestoneFormat;
   sort: RunestoneSort;
   order: 'asc' | 'desc';
   limit: number;
@@ -32,8 +36,8 @@ export interface RunestoneRepository {
    * `list` keeps its `asc(id)` tiebreak for the legacy array response.
    */
   listPage(filter: RunestoneListFilter): RunestoneSummary[];
-  /** Rows matching `q`/`authorDeviceId`, ignoring sort and paging. */
-  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): number;
+  /** Rows matching `q`/`authorDeviceId`/`format`, ignoring sort and paging. */
+  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId' | 'format'>): number;
   /** Every distinct author over the whole table, unfiltered — the dropdown's options. */
   listAuthors(): string[];
   /** Removes one document; returns it (for the deleted event) or null. */

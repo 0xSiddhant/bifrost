@@ -20,13 +20,21 @@ import { API_V1 } from './client.js';
 export const DOCUMENT_KINDS = ['runestone', 'edda', 'groot', 'atlas'] as const;
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
 
-/** The media type each kind's raw endpoint really sends, read from its route. */
-const CONTENT_TYPE: Record<DocumentKind, string> = {
-  runestone: 'application/json',
-  edda: 'text/markdown',
-  groot: 'application/yaml',
-  atlas: 'application/xml',
+/**
+ * The media types each kind's raw endpoint really sends, read from its route.
+ * A runestone is strict JSON or, since PLAN-42, JSONC (`application/jsonc`).
+ */
+const CONTENT_TYPES: Record<DocumentKind, readonly string[]> = {
+  runestone: ['application/json', 'application/jsonc'],
+  edda: ['text/markdown'],
+  groot: ['application/yaml'],
+  atlas: ['application/xml'],
 };
+
+/** `application/jsonc; charset=utf-8` → `application/jsonc`. */
+function mediaTypeOf(contentType: string): string {
+  return (contentType.split(';')[0] ?? '').trim().toLowerCase();
+}
 
 export function isDocumentKind(value: string): value is DocumentKind {
   return (DOCUMENT_KINDS as readonly string[]).includes(value);
@@ -55,7 +63,7 @@ async function tryKind(
     return null;
   }
   const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.toLowerCase().startsWith(CONTENT_TYPE[kind])) {
+  if (!CONTENT_TYPES[kind].includes(mediaTypeOf(contentType))) {
     // The SPA fallback answering, or a proxy in the way. Not this kind.
     await response.arrayBuffer();
     return null;
@@ -111,7 +119,9 @@ export async function resolveDocument(
  * Only `edda` has a rendered read-only page today (`/edda/preview/:slug`, a real
  * client route). The other three get their raw content URL, which a browser
  * already renders readably — Chrome's JSON viewer, highlighted text for YAML and
- * XML. That is the honest closest thing, not a rendered page pretending; the day
+ * XML, and a JSONC runestone as plain text (the hub answers a page navigation
+ * with `text/plain` for it, since no browser renders `application/jsonc`;
+ * PLAN-42). That is the honest closest thing, not a rendered page pretending; the day
  * one of them gains a read route, it is one entry here and nothing else changes.
  */
 export function previewUrl(

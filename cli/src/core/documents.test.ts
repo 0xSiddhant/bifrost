@@ -52,6 +52,44 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('resolveDocument media types', () => {
+  it('accepts a JSONC runestone, served as application/jsonc (PLAN-42)', async () => {
+    const body = '{\n  // the port\n  "port": 4646,\n}';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/v1/health')) return Promise.resolve(Response.json({ ok: true }));
+        return Promise.resolve(
+          new Response(body, {
+            status: 200,
+            headers: { 'content-type': 'application/jsonc; charset=utf-8' },
+          }),
+        );
+      }),
+    );
+    const document = await resolveDocument(client(), 'settings-a1b2c3', 'runestone');
+    expect(document).toMatchObject({ kind: 'runestone', body });
+  });
+
+  it('still refuses the SPA shell and look-alike media types', async () => {
+    for (const type of ['text/html; charset=utf-8', 'application/json-patch+json']) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: string | URL) => {
+          const url = String(input);
+          if (url.endsWith('/api/v1/health')) return Promise.resolve(Response.json({ ok: true }));
+          return Promise.resolve(
+            new Response('<!doctype html>', { status: 200, headers: { 'content-type': type } }),
+          );
+        }),
+      );
+      const error = await failure(resolveDocument(client(), 'shell', 'runestone'));
+      expect(error.exitCode, type).toBe(EXIT.notFound);
+    }
+  });
+});
+
 describe('resolveDocument without --type', () => {
   it('asks all four kinds and uses the one that answered', async () => {
     const call = fakeFetch({ groot: 'name: bifrost\n' });

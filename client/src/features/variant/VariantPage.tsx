@@ -10,7 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import { hasFeature } from '../../core/features';
 import { copyText } from '../../core/copy';
 import { log } from '../../core/log';
-import { formatJson, sortKeysDeep, validateJson } from '../../core/json';
+import { formatJson, parseJsonValue, validateJson } from '../../core/json';
 import type { DiffRecord } from '../../core/json/diff';
 import { fetchRunestone, type RunestoneDoc } from '../../core/runestone';
 import { usePanelFont } from '../../core/panelFont';
@@ -27,6 +27,8 @@ import {
   DEFAULT_JSON_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   diffStats,
+  paneFormat,
+  sortBothSides,
   type InvalidSide,
   type TextChunkRow,
   type TextCompareResult,
@@ -77,8 +79,8 @@ function useDebounced<T>(value: T, delayMs: number): T {
 const startsMobile = () => window.innerWidth < 768;
 
 function invalidMessage(side: InvalidSide): string {
-  if (side === 'both') return 'Neither side is valid JSON.';
-  return `The ${side} side isn't valid JSON.`;
+  if (side === 'both') return 'Neither side is valid JSON or JSONC.';
+  return `The ${side} side isn't valid JSON or JSONC.`;
 }
 
 interface PaneState {
@@ -325,24 +327,27 @@ export function VariantPage() {
   // ── per-side validity (JSON workspace only — drives Compare + return) ─────
   const debouncedLeft = useDebounced(jsonLeftText, 300);
   const debouncedRight = useDebounced(jsonRightText, 300);
+  // Each side is strict JSON or JSONC (PLAN-42): checked as JSONC, which is
+  // the superset, and labelled with the narrower format it is valid in.
   const leftIssues = useMemo(
-    () => (debouncedLeft.trim() === '' ? null : validateJson(debouncedLeft).length),
+    () => (debouncedLeft.trim() === '' ? null : validateJson(debouncedLeft, 'jsonc').length),
     [debouncedLeft],
   );
   const rightIssues = useMemo(
-    () => (debouncedRight.trim() === '' ? null : validateJson(debouncedRight).length),
+    () => (debouncedRight.trim() === '' ? null : validateJson(debouncedRight, 'jsonc').length),
     [debouncedRight],
   );
-  const bothValid = leftIssues === 0 && rightIssues === 0;
+  const leftStrict = useMemo(
+    () => leftIssues === 0 && validateJson(debouncedLeft).length === 0,
+    [leftIssues, debouncedLeft],
+  );
+  const rightStrict = useMemo(
+    () => rightIssues === 0 && validateJson(debouncedRight).length === 0,
+    [rightIssues, debouncedRight],
+  );
 
-  const parsedFor = (text: string, issues: number | null): unknown => {
-    if (issues !== 0) return undefined;
-    try {
-      return JSON.parse(text) as unknown;
-    } catch {
-      return undefined;
-    }
-  };
+  const parsedFor = (text: string, issues: number | null): unknown =>
+    issues === 0 ? parseJsonValue(text, 'jsonc') : undefined;
   const leftParsed = useMemo(
     () => (mode === 'json' && view === 'tree' ? parsedFor(debouncedLeft, leftIssues) : undefined),
     [mode, view, debouncedLeft, leftIssues],
@@ -459,9 +464,11 @@ export function VariantPage() {
     dropResults();
   };
 
+  // The formatter only moves whitespace, so a JSONC side keeps its comments.
+  // Judged on the live text, like Sort both: the debounced flags can lag.
   const formatBoth = () => {
-    if (!bothValid) {
-      fail('Both sides must be valid JSON to format.');
+    if (!paneFormat(jsonLeftText) || !paneFormat(jsonRightText)) {
+      fail('Both sides must be valid JSON or JSONC to format.');
       return;
     }
     setPane('left', (pane) => ({ ...pane, text: formatJson(pane.text) }), 'json');
@@ -471,14 +478,19 @@ export function VariantPage() {
   };
 
   const sortKeysBoth = () => {
-    if (!bothValid) {
-      fail('Both sides must be valid JSON to sort keys.');
+    const sorted = sortBothSides(jsonLeftText, jsonRightText);
+    if (!sorted.ok) {
+      if (sorted.reason === 'invalid') {
+        fail('Both sides must be valid JSON or JSONC to sort keys.');
+        return;
+      }
+      // A real refusal of the comment-safe sort: nothing changed, worth a line.
+      log.warn('variant: comment-safe key sort refused a valid JSONC side', { module: 'variant' });
+      fail('Keys were not sorted: not every comment could stay with its key.');
       return;
     }
-    const sorted = (text: string) =>
-      JSON.stringify(sortKeysDeep(JSON.parse(text)), null, 2);
-    setPane('left', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
-    setPane('right', (pane) => ({ ...pane, text: sorted(pane.text) }), 'json');
+    setPane('left', (pane) => ({ ...pane, text: sorted.left }), 'json');
+    setPane('right', (pane) => ({ ...pane, text: sorted.right }), 'json');
     setResults(null);
     ok('Keys sorted A→Z on both sides');
   };
@@ -595,7 +607,7 @@ export function VariantPage() {
         <Button size="sm" variant="ghost" onClick={() => importInto(side)}>
           Import
         </Button>
-        {/* Runestones are JSON documents — the picker has no business in text mode. */}
+        {/* Runestones are JSON or JSONC documents — the picker has no business in text mode. */}
         {mode === 'json' && canPickFromLibrary && (
           <Button size="sm" variant="ghost" onClick={() => setPickerSide(side)}>
             Pensieve
@@ -605,7 +617,7 @@ export function VariantPage() {
     </div>
   );
 
-  const paneStatus = (issues: number | null, text: string) => (
+  const paneStatus = (issues: number | null, text: string, strict: boolean) => (
     <div className="variant-pane__status caption" aria-live="polite">
       {text.trim() === '' ? (
         <span>Empty</span>
@@ -613,7 +625,7 @@ export function VariantPage() {
         <span>…</span>
       ) : issues === 0 ? (
         <span className="variant-pane__ok">
-          <CheckIcon size={12} /> Valid JSON
+          <CheckIcon size={12} /> Valid {strict ? 'JSON' : 'JSONC'}
         </span>
       ) : (
         <span className="variant-pane__bad">
@@ -629,6 +641,7 @@ export function VariantPage() {
     editorRef: React.RefObject<JsonEditorHandle | null>,
     parsed: unknown,
     issues: number | null,
+    strict: boolean,
   ) => {
     return (
       <section className={`variant-pane variant-pane--${side}`}>
@@ -638,6 +651,7 @@ export function VariantPage() {
           <JsonEditor
             ref={editorRef}
             value={pane.text}
+            mode="jsonc"
             onChange={onPaneEdit(side)}
             onSearchMatch={(text) => revealAcross(side, text)}
             height={EDITOR_HEIGHT}
@@ -661,7 +675,7 @@ export function VariantPage() {
             The tree appears once this side parses.
           </p>
         )}
-        {paneStatus(issues, pane.text)}
+        {paneStatus(issues, pane.text, strict)}
       </section>
     );
   };
@@ -800,8 +814,8 @@ export function VariantPage() {
           <span className="eyebrow eyebrow--violet">the variant · two stones, one truth</span>
           <h2>Variant</h2>
           <p>
-            Compare JSON structurally — key order and formatting are noise — or fall back to raw
-            text for anything else.
+            Compare JSON or JSONC structurally — key order, formatting and comments are noise —
+            or fall back to raw text for anything else.
           </p>
         </div>
         <PanelFontControl font={font} />
@@ -813,9 +827,9 @@ export function VariantPage() {
       >
         {mode === 'json' ? (
           <div className="variant-grid">
-            {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues)}
+            {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues, leftStrict)}
             {rail}
-            {jsonPane('right', right, rightEditorRef, rightParsed, rightIssues)}
+            {jsonPane('right', right, rightEditorRef, rightParsed, rightIssues, rightStrict)}
           </div>
         ) : (
           <div className="variant-textgrid">

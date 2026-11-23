@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -12,18 +13,25 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { copyText } from '../../core/copy';
 import { formatBytes } from '../../core/format';
 import {
+  FORMAT_FILE,
+  JSON_FORMATS,
+  asJsonFormat,
   formatJson,
   jsonStats,
   minifyJson,
+  parseJsonValue,
   pathAt,
-  sortKeysDeep,
+  sortJsonKeys,
+  toStrictJson,
   unescapeEmbedded,
   validateJson,
+  type JsonFormat,
   type JsonIssue,
 } from '../../core/json';
+import { log } from '../../core/log';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
-import { useDraftCache, showsRestore } from '../../core/draftCache';
+import { useDraftCache, showsRestore, type ScratchDraft } from '../../core/draftCache';
 import { takeLeftOpen } from '../../core/draftReturn';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
@@ -46,7 +54,18 @@ import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
 import './runestone.css';
 
-const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json file to carve it…';
+const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .json or .jsonc file to carve it…';
+
+/** Why Unescape is off in JSONC: it rebuilds the text and would lose the comments. */
+const UNESCAPE_JSONC_REASON =
+  'Unescape works on strict JSON only: it rebuilds the document and would drop its comments';
+
+/** The format a file's name or type says it is, or null when it says neither. */
+function formatOfFile(name: string, type: string): JsonFormat | null {
+  if (/\.jsonc$/i.test(name) || type === 'application/jsonc') return 'jsonc';
+  if (/\.json$/i.test(name) || type === 'application/json') return 'json';
+  return null;
+}
 
 /** Identifies this editor's buffer to `core/draftReturn`. */
 const DRAFT_ID = 'runestone';
@@ -74,10 +93,10 @@ function lineColAt(text: string, offset: number): { line: number; col: number } 
 }
 
 /** Title → export filename: strip path separators and other unsafe characters. */
-function exportFilename(title: string): string {
+function exportFilename(title: string, format: JsonFormat): string {
   // eslint-disable-next-line no-control-regex
   const safe = title.replace(/[/\\:*?"<>|\u0000-\u001f]/g, '').trim();
-  return `${safe || 'runestone'}.json`;
+  return `${safe || 'runestone'}${FORMAT_FILE[format].extension}`;
 }
 
 /** "gleaming-gungnir-abc123" → "Gleaming Gungnir" (drops an id-shaped tail). */
@@ -98,7 +117,14 @@ export function RunestonePage() {
   const [docId, setDocId] = useState<string | null>(null);
   const [title, setTitle] = useState(() => relicTitle());
   const [text, setText] = useState('');
-  const [snapshot, setSnapshot] = useState<{ title: string; text: string } | null>(null);
+  // Strict JSON or JSONC (PLAN-42). A mode, never a transform: switching it
+  // changes how the buffer is read and checked, and never the buffer itself.
+  const [format, setFormat] = useState<JsonFormat>('json');
+  const [snapshot, setSnapshot] = useState<{
+    title: string;
+    text: string;
+    format: JsonFormat;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [view, setView] = useState<'code' | 'tree'>(() =>
     window.innerWidth < 768 ? 'tree' : 'code',
@@ -128,10 +154,12 @@ export function RunestonePage() {
           setPhase('notfound');
           return;
         }
+        const docFormat = asJsonFormat(doc.format);
         setDocId(doc.id);
         setTitle(doc.name);
         setText(doc.content);
-        setSnapshot({ title: doc.name, text: doc.content });
+        setFormat(docFormat);
+        setSnapshot({ title: doc.name, text: doc.content, format: docFormat });
         setPhase('saved');
         // The API 301s stale slugs; fix the address bar to the canonical one.
         if (doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
@@ -163,6 +191,7 @@ export function RunestonePage() {
     const seed = takeRunestoneSeed();
     if (seed) {
       setText(seed.text);
+      setFormat(seed.format ?? 'json');
       if (seed.title) setTitle(seed.title);
       setView('code');
       setRestorable(null);
@@ -173,6 +202,7 @@ export function RunestonePage() {
     if (takeLeftOpen(DRAFT_ID)) {
       setTitle((current) => draft.title || current);
       setText(draft.text);
+      setFormat(draft.format);
     } else {
       setRestorable(draft);
     }
@@ -183,13 +213,19 @@ export function RunestonePage() {
   // Saving clears the draft deliberately and flips `isScratch` before leaving,
   // so a saved document cannot resurrect it.
   const blank = text.trim() === '';
+  // The cache knows title and text; the format rides along with them. An
+  // earlier visit's draft that is re-written while on offer keeps its own.
+  const saveFormatDraft = useCallback(
+    (draft: ScratchDraft) => saveDraft({ format, ...draft }),
+    [format],
+  );
   useDraftCache({
     isScratch,
     title,
     text,
     blank,
     offered: restorable,
-    save: saveDraft,
+    save: saveFormatDraft,
     clear: clearDraft,
     returnId: DRAFT_ID,
   });
@@ -202,20 +238,26 @@ export function RunestonePage() {
 
   const debouncedText = useDebounced(text, 300);
   const issues: JsonIssue[] = useMemo(
-    () => (debouncedText.trim() === '' ? [] : validateJson(debouncedText)),
-    [debouncedText],
+    () => (debouncedText.trim() === '' ? [] : validateJson(debouncedText, format)),
+    [debouncedText, format],
   );
-  const stats = useMemo(() => jsonStats(debouncedText), [debouncedText]);
+  const stats = useMemo(() => jsonStats(debouncedText, format), [debouncedText, format]);
   const empty = debouncedText.trim() === '';
   const valid = !empty && issues.length === 0;
-  const parsed: unknown = useMemo(() => {
-    if (view !== 'tree' || !valid) return undefined;
-    try {
-      return JSON.parse(debouncedText) as unknown;
-    } catch {
-      return undefined;
-    }
-  }, [view, valid, debouncedText]);
+  // Strict JSON that is only broken by comments or trailing commas: say so,
+  // and offer the switch, rather than leave a wall of "Comments are not valid".
+  const validAsJsonc = useMemo(
+    () =>
+      format === 'json' &&
+      !empty &&
+      issues.length > 0 &&
+      validateJson(debouncedText, 'jsonc').length === 0,
+    [format, empty, issues, debouncedText],
+  );
+  const parsed: unknown = useMemo(
+    () => (view === 'tree' && valid ? parseJsonValue(debouncedText, format) : undefined),
+    [view, valid, debouncedText, format],
+  );
 
   const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
@@ -226,8 +268,17 @@ export function RunestonePage() {
     return pathAt(debouncedText, Math.min(debouncedCursor, debouncedText.length));
   }, [view, empty, debouncedText, debouncedCursor]);
 
-  const dirty = snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
-  const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
+  const dirty =
+    snapshot === null
+      ? text.trim() !== ''
+      : snapshot.title !== title || snapshot.text !== text || snapshot.format !== format;
+  // The size cap is about the text. A saved document whose text has not
+  // changed can still be renamed or switched between JSON and JSONC even past
+  // a cap lowered since it was saved: the update then carries no content, and
+  // the server checks the stored text in the new format, not its size.
+  const textChanged = snapshot === null || snapshot.text !== text;
+  const canSave =
+    valid && (!overCap || !textChanged) && !saving && (snapshot === null || dirty);
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
@@ -237,19 +288,27 @@ export function RunestonePage() {
     setSaving(true);
     try {
       if (docId === null) {
-        const doc = await saveRunestone({ name: title, content: text });
+        const doc = await saveRunestone({ name: title, content: text, format });
+        const savedFormat = asJsonFormat(doc.format);
         setDocId(doc.id);
         setTitle(doc.name);
-        setSnapshot({ title: doc.name, text: doc.content });
+        setFormat(savedFormat);
+        setSnapshot({ title: doc.name, text: doc.content, format: savedFormat });
         setPhase('saved');
         clearDraft();
         setRestorable(null);
         navigate(`/runestone/${doc.slug}`, { replace: true });
         ok('Runestone carved');
       } else {
-        const doc = await updateRunestone(docId, { name: title, content: text });
+        const doc = await updateRunestone(docId, {
+          name: title,
+          ...(textChanged ? { content: text } : {}),
+          format,
+        });
+        const savedFormat = asJsonFormat(doc.format);
         setTitle(doc.name);
-        setSnapshot({ title: doc.name, text: doc.content });
+        setFormat(savedFormat);
+        setSnapshot({ title: doc.name, text: doc.content, format: savedFormat });
         if (slug && doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
         ok('Saved');
       }
@@ -273,20 +332,35 @@ export function RunestonePage() {
     }
   };
 
+  // Format keeps every comment (the formatter only moves whitespace); Minify
+  // keeps them in JSONC, with a line break after a line comment.
   const applyFormat = () => setText((current) => formatJson(current));
-  const applyMinify = () => setText((current) => minifyJson(current));
+  const applyMinify = () => setText((current) => minifyJson(current, format));
 
   const applySortKeys = () => {
-    try {
-      const sorted = sortKeysDeep(JSON.parse(text));
-      setText(JSON.stringify(sorted, null, 2));
+    const sorted = sortJsonKeys(text, format);
+    if (sorted !== null) {
+      setText(sorted);
       ok('Keys sorted A→Z');
-    } catch {
-      fail('Fix the errors first — sorting needs valid JSON.');
+    } else if (format === 'jsonc' && validateJson(text, 'jsonc').length === 0) {
+      // The comment-safe sort refused its own output: nothing is changed. It
+      // should not happen, and when it does the document is the clue.
+      log.warn(
+        `runestone: comment-safe key sort refused a valid JSONC document (${text.length} chars)`,
+        { module: 'runestone' },
+      );
+      fail('Keys were not sorted: not every comment could stay with its key.');
+    } else {
+      fail(`Fix the errors first — sorting needs valid ${FORMAT_FILE[format].label}.`);
     }
   };
 
   const applyUnescape = () => {
+    // Off in JSONC, but still reachable, so a click (or Enter) says why.
+    if (format === 'jsonc') {
+      fail(`${UNESCAPE_JSONC_REASON}.`);
+      return;
+    }
     const inner = unescapeEmbedded(text.trim());
     if (inner === null) {
       fail('No embedded JSON found in this document.');
@@ -303,15 +377,38 @@ export function RunestonePage() {
 
   // Loki's jsonToJs (PLAN-12): valid JSON → a JS object literal (identifier
   // keys unquoted, single-quoted strings), copied to the clipboard. Enabled
-  // only on Valid JSON ✓, so it's safe by construction.
+  // only on Valid JSON ✓, so it's safe by construction. A JSONC document is
+  // read through its strict form; the buffer is never touched.
   const copyAsJs = async () => {
     try {
-      const js = jsonToJs(text);
+      const strict = format === 'jsonc' ? toStrictJson(text) : text;
+      if (strict === null) throw new Error('not valid JSONC');
+      const js = jsonToJs(strict);
       if (await copyText(js)) ok('Copied as a JS object literal');
       else fail('Copy was blocked by the browser.');
     } catch {
-      fail('Fix the errors first — Copy as JS needs valid JSON.');
+      fail(`Fix the errors first — Copy as JS needs valid ${FORMAT_FILE[format].label}.`);
     }
+  };
+
+  // JSONC → strict JSON for a consumer that rejects comments (PLAN-42): the
+  // comments and trailing commas go, every value token stays as written, and
+  // it is a copy — the buffer keeps its comments.
+  const copyAsStrictJson = async () => {
+    const strict = toStrictJson(text);
+    if (strict === null) {
+      fail('Fix the errors first — this needs valid JSONC.');
+      return;
+    }
+    if (await copyText(strict)) ok('Copied as strict JSON, without the comments');
+    else fail('Copy was blocked by the browser.');
+  };
+
+  // The switch (PLAN-42). Only the mode changes: the editor's language and
+  // lint, the checks and the save. The buffer is left exactly as it is.
+  const changeFormat = (next: JsonFormat) => {
+    if (next === format) return;
+    setFormat(next);
   };
 
 
@@ -368,41 +465,48 @@ export function RunestonePage() {
     if (target) gotoIssue(target);
   };
 
-  const importText = async (name: string, content: string, sizeBytes: number) => {
+  // The file says which format it is: `.jsonc` opens as JSONC even when its
+  // contents happen to be strict JSON, and `.json` as JSON. A file that says
+  // neither keeps the current mode.
+  const importText = async (name: string, type: string, content: string, sizeBytes: number) => {
     const maxBytes = config.maxDocKb * 1024;
     if (maxBytes !== null && sizeBytes > maxBytes) {
       fail(`That file is over the ${formatBytes(maxBytes)} limit.`);
       return;
     }
+    const fileFormat = formatOfFile(name, type);
     setText(content);
-    const base = name.replace(/\.json$/i, '').trim();
+    if (fileFormat) setFormat(fileFormat);
+    const base = name.replace(/\.jsonc?$/i, '').trim();
     if (base) setTitle(base);
-    ok(`Imported ${name}`);
+    ok(`Imported ${name}${fileFormat ? ` as ${FORMAT_FILE[fileFormat].label}` : ''}`);
   };
 
   const onPickFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
-    if (file) await importText(file.name, await file.text(), file.size);
+    if (file) await importText(file.name, file.type, await file.text(), file.size);
   };
 
   const onDrop = async (event: DragEvent) => {
     event.preventDefault();
     const file = event.dataTransfer.files?.[0];
     if (!file) return;
-    if (!/\.json$/i.test(file.name) && file.type !== 'application/json') {
-      fail('Only .json files can be dropped here.');
+    if (formatOfFile(file.name, file.type) === null) {
+      fail('Only .json and .jsonc files can be dropped here.');
       return;
     }
-    await importText(file.name, await file.text(), file.size);
+    await importText(file.name, file.type, await file.text(), file.size);
   };
 
-  const exportDocument = () => saveText(text, exportFilename(title), 'application/json');
+  const exportDocument = () =>
+    saveText(text, exportFilename(title, format), FORMAT_FILE[format].mimeType);
 
   const restoreDraft = () => {
     if (!restorable) return;
     setTitle(restorable.title || title);
     setText(restorable.text);
+    setFormat(restorable.format);
     setRestorable(null);
     setView('code');
   };
@@ -417,6 +521,7 @@ export function RunestonePage() {
     setDocId(null);
     setSnapshot(null);
     setText('');
+    setFormat('json');
     setTitle(slug ? titleFromSlug(slug) || relicTitle() : relicTitle());
     navigate('/runestone', { replace: true });
   };
@@ -434,6 +539,7 @@ export function RunestonePage() {
     setDocId(null);
     setSnapshot(null);
     setText('');
+    setFormat('json');
     setTitle(relicTitle());
     setNotice(null);
     // The cached draft backs up the buffer being left behind, so keeping it
@@ -490,7 +596,7 @@ export function RunestonePage() {
               onChange={(event) => setTitle(event.target.value)}
             />
           </h2>
-          <p>Validate, explore, and shape JSON. The title names your export.</p>
+          <p>Validate, explore, and shape JSON or JSONC. The title names your export.</p>
         </div>
         <div className="rune-head-actions">
           <Button
@@ -531,13 +637,32 @@ export function RunestonePage() {
         {overCap && maxBytes !== null && (
           <Toast kind="danger">
             This document is {formatBytes(stats.bytes)} — past the {formatBytes(maxBytes)} limit.
-            Editing still works, but it cannot be saved and may feel slow.
+            Editing still works, but changes to its text cannot be saved and may feel slow.
           </Toast>
         )}
 
         <Card>
           <div className="rune-toolbar" role="toolbar" aria-label="Document actions">
+            {/* The switch opens the first group rather than being a group of
+                its own: on a phone a group is a row, and that extra row pushed
+                the Code/Tree toggle under the fixed bottom nav. */}
             <div className="rune-toolbar__group">
+              <fieldset className="rune-format">
+                <legend className="rune-visually-hidden">Document format</legend>
+                {JSON_FORMATS.map((option) => (
+                  <label key={option} className="rune-format__option">
+                    <input
+                      className="rune-format__input"
+                      type="radio"
+                      name="rune-format"
+                      value={option}
+                      checked={format === option}
+                      onChange={() => changeFormat(option)}
+                    />
+                    <span className="rune-format__label">{FORMAT_FILE[option].label}</span>
+                  </label>
+                ))}
+              </fieldset>
               <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applyFormat}>
                 Format
               </Button>
@@ -547,9 +672,25 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={!canTransform} onClick={applySortKeys}>
                 Sort keys
               </Button>
-              <Button size="sm" variant="ghost" disabled={empty} onClick={applyUnescape}>
+              {/* In JSONC it is aria-disabled, not disabled: a disabled button
+                  cannot be focused, so its reason would reach no keyboard,
+                  screen-reader or touch user. */}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={format === 'json' && empty}
+                aria-disabled={format === 'jsonc' || undefined}
+                aria-describedby={format === 'jsonc' ? 'rune-unescape-reason' : undefined}
+                title={format === 'jsonc' ? UNESCAPE_JSONC_REASON : undefined}
+                onClick={applyUnescape}
+              >
                 Unescape
               </Button>
+              {format === 'jsonc' && (
+                <span id="rune-unescape-reason" className="rune-visually-hidden">
+                  {UNESCAPE_JSONC_REASON}
+                </span>
+              )}
               <Button
                 size="sm"
                 variant="ghost"
@@ -559,6 +700,17 @@ export function RunestonePage() {
               >
                 Copy as JS
               </Button>
+              {format === 'jsonc' && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!canTransform}
+                  title="Copy without the comments and trailing commas; the document keeps them"
+                  onClick={() => void copyAsStrictJson()}
+                >
+                  Copy as strict JSON
+                </Button>
+              )}
             </div>
             <div className="rune-toolbar__group">
               <Button
@@ -660,6 +812,7 @@ export function RunestonePage() {
               <JsonEditor
                 ref={editorRef}
                 value={text}
+                mode={format}
                 onChange={setText}
                 onCursor={setCursor}
                 height="var(--rune-editor-h, 60vh)"
@@ -667,7 +820,7 @@ export function RunestonePage() {
               />
             ) : empty ? (
               <p className="rune-tree-empty caption">
-                Nothing carved yet — switch to Code and paste some JSON.
+                Nothing carved yet — switch to Code and paste some {FORMAT_FILE[format].label}.
               </p>
             ) : valid && parsed !== undefined ? (
               <TreeView
@@ -677,7 +830,7 @@ export function RunestonePage() {
               />
             ) : (
               <p className="rune-tree-empty caption">
-                The tree appears once the JSON is valid — {issues.length}{' '}
+                The tree appears once the {FORMAT_FILE[format].label} is valid — {issues.length}{' '}
                 {issues.length === 1 ? 'error remains' : 'errors remain'}.
               </p>
             )}
@@ -685,14 +838,30 @@ export function RunestonePage() {
 
           <div className="rune-status" aria-live="polite">
             {empty ? (
-              <span className="rune-status__state caption">Empty — paste or import JSON</span>
+              <span className="rune-status__state caption">
+                Empty — paste or import {FORMAT_FILE[format].label}
+              </span>
             ) : valid ? (
               <span className="rune-status__state rune-status__state--ok">
-                <CheckIcon size={14} /> Valid JSON
+                <CheckIcon size={14} /> Valid {FORMAT_FILE[format].label}
               </span>
             ) : (
               <span className="rune-status__state rune-status__state--bad">
-                <AlertIcon size={14} /> {issues.length} {issues.length === 1 ? 'error' : 'errors'}
+                <AlertIcon size={14} /> {issues.length} {issues.length === 1 ? 'error' : 'errors'}{' '}
+                in {FORMAT_FILE[format].label}
+              </span>
+            )}
+            {validAsJsonc && (
+              <span className="rune-status__hint caption">
+                Valid as JSONC —{' '}
+                <button
+                  type="button"
+                  className="rune-status__switch"
+                  onClick={() => changeFormat('jsonc')}
+                >
+                  switch to JSONC
+                </button>{' '}
+                to keep its comments
               </span>
             )}
             {docId !== null && (
@@ -751,7 +920,7 @@ export function RunestonePage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".json,application/json"
+        accept=".json,.jsonc,application/json,application/jsonc"
         hidden
         onChange={(event) => void onPickFile(event)}
       />

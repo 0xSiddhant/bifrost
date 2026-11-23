@@ -1,6 +1,6 @@
 import { Text } from '@codemirror/state';
 import { Chunk } from '@codemirror/merge';
-import { validateJson } from '../../core/json';
+import { parseJsonValue, sortJsonKeys, validateJson, type JsonFormat } from '../../core/json';
 import { diffJson, type DiffOptions, type DiffRecord } from '../../core/json/diff';
 import { normalizeText, type TextNormalizeOptions } from '../../core/textNormalize';
 import type { DiffHighlight } from '../../core/ui/JsonEditor';
@@ -82,23 +82,53 @@ export type CompareOutcome =
  * Run a structural compare, or report which side keeps it from running — the
  * page turns that into the "switched to Text" fallback banner (never a dead
  * end). An empty document counts as invalid JSON for comparing purposes.
+ *
+ * Each side may be strict JSON or JSONC (PLAN-42). Both are read as JSONC —
+ * strict JSON is a subset and parses to the same value — so comments are not
+ * data and a comment-only change makes no record; the pane text is untouched.
  */
 export function compareJson(
   leftText: string,
   rightText: string,
   options: VariantJsonOptions,
 ): CompareOutcome {
-  const leftBad = leftText.trim() === '' || validateJson(leftText).length > 0;
-  const rightBad = rightText.trim() === '' || validateJson(rightText).length > 0;
+  const leftBad = leftText.trim() === '' || validateJson(leftText, 'jsonc').length > 0;
+  const rightBad = rightText.trim() === '' || validateJson(rightText, 'jsonc').length > 0;
   if (leftBad || rightBad) {
     return { ok: false, invalid: leftBad && rightBad ? 'both' : leftBad ? 'left' : 'right' };
   }
   const records = diffJson(
-    JSON.parse(leftText) as unknown,
-    JSON.parse(rightText) as unknown,
+    parseJsonValue(leftText, 'jsonc'),
+    parseJsonValue(rightText, 'jsonc'),
     toDiffOptions(options),
   );
   return { ok: true, records };
+}
+
+/** The narrowest format a pane's text is valid in, or null when it is in neither. */
+export function paneFormat(text: string): JsonFormat | null {
+  if (text.trim() === '' || validateJson(text, 'jsonc').length > 0) return null;
+  return validateJson(text).length === 0 ? 'json' : 'jsonc';
+}
+
+export type SortBothOutcome =
+  | { ok: true; left: string; right: string }
+  | { ok: false; reason: 'invalid' | 'refused' };
+
+/**
+ * Sort both panes' keys, judged on the text as it is now — never on the
+ * debounced copy the toolbar reads, which can be a keystroke behind. A strict
+ * side keeps strict JSON's sort; a JSONC side gets the comment-safe one, and
+ * if that refuses, neither side changes.
+ */
+export function sortBothSides(leftText: string, rightText: string): SortBothOutcome {
+  const leftFormat = paneFormat(leftText);
+  const rightFormat = paneFormat(rightText);
+  if (!leftFormat || !rightFormat) return { ok: false, reason: 'invalid' };
+  const left = sortJsonKeys(leftText, leftFormat);
+  const right = sortJsonKeys(rightText, rightFormat);
+  if (left === null || right === null) return { ok: false, reason: 'refused' };
+  return { ok: true, left, right };
 }
 
 export interface DiffStats {

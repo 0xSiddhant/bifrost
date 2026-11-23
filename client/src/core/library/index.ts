@@ -1,5 +1,6 @@
 export type {
   LibraryEntry,
+  LibraryFormat,
   LibraryItem,
   LibraryKind,
   LibraryOrder,

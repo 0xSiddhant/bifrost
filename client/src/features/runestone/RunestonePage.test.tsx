@@ -130,7 +130,12 @@ describe('RunestonePage — New', () => {
   });
 
   it('drops the cached draft, so the restore prompt does not offer it back', async () => {
-    saveDraft({ title: 'Older scratch', text: '{"old":true}', savedAt: Date.now() });
+    saveDraft({
+      title: 'Older scratch',
+      text: '{"old":true}',
+      format: 'json',
+      savedAt: Date.now(),
+    });
 
     await render();
     await click(button('New'));

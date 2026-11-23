@@ -1,3 +1,4 @@
+import type { JsonFormat } from './json';
 import {
   API_V1,
   ApiError,
@@ -33,6 +34,8 @@ export interface RunestoneSummary {
   sizeBytes: number;
   createdAt: number;
   modifiedAt: number;
+  /** Strict JSON or JSONC (PLAN-42). */
+  format: JsonFormat;
 }
 
 export interface RunestoneDoc extends RunestoneSummary {
@@ -45,6 +48,8 @@ export interface RunestoneListQuery {
   q?: string;
   /** Exact deviceId — the UI maps a picked author name back to its id. */
   author?: string;
+  /** Only documents in this format (PLAN-42); absent lists both. */
+  format?: JsonFormat;
   sort?: RunestoneSort;
   order?: 'asc' | 'desc';
 }
@@ -53,6 +58,7 @@ function listParams(query: RunestoneListQuery): URLSearchParams {
   const params = new URLSearchParams();
   if (query.q) params.set('q', query.q);
   if (query.author) params.set('author', query.author);
+  if (query.format) params.set('format', query.format);
   if (query.sort) params.set('sort', query.sort);
   if (query.order) params.set('order', query.order);
   return params;
@@ -87,12 +93,15 @@ async function hubFetchRunestone(slug: string): Promise<RunestoneDoc | null> {
   }
 }
 
-const hubSaveRunestone = (input: { name?: string; content: string }): Promise<RunestoneDoc> =>
-  apiSend<RunestoneDoc>('POST', `${API_V1}/runestone`, input);
+const hubSaveRunestone = (input: {
+  name?: string;
+  content: string;
+  format?: JsonFormat;
+}): Promise<RunestoneDoc> => apiSend<RunestoneDoc>('POST', `${API_V1}/runestone`, input);
 
 const hubUpdateRunestone = (
   id: string,
-  input: { name?: string; content?: string },
+  input: { name?: string; content?: string; format?: JsonFormat },
 ): Promise<RunestoneDoc> => apiSend<RunestoneDoc>('PUT', `${API_V1}/runestone/${id}`, input);
 
 const hubDeleteRunestone = (id: string): Promise<null> =>

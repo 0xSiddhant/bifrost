@@ -1,4 +1,5 @@
 import { createTwoFilesPatch } from 'diff';
+import { parseJsonValue } from '../../core/json';
 import { diffJson, type DiffRecord } from '../../core/json/diff';
 import { applyJsonPatch, toJsonPatch } from '../../core/json/jsonPatch';
 import { toDiffOptions, type VariantJsonOptions } from './compare';
@@ -62,16 +63,15 @@ export function exportJsonPatch(input: JsonPatchExportInput): ExportResult {
     };
   }
 
-  let left: unknown;
-  let right: unknown;
-  try {
-    left = JSON.parse(input.leftText) as unknown;
-    right = JSON.parse(input.rightText) as unknown;
-  } catch {
+  // Either side may be JSONC (PLAN-42): read as values, comments are not
+  // data, and the patch itself stays a strict JSON document.
+  const left = parseJsonValue(input.leftText, 'jsonc');
+  const right = parseJsonValue(input.rightText, 'jsonc');
+  if (left === undefined || right === undefined) {
     // Unreachable through the UI — a compare only produces records once both
     // sides parsed — but a stale-results race must not hand over an
     // unverified file.
-    return { ok: false, reason: 'Both sides must be valid JSON to export a patch.' };
+    return { ok: false, reason: 'Both sides must be valid JSON or JSONC to export a patch.' };
   }
 
   try {

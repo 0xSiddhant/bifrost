@@ -15,3 +15,87 @@
 .rune-status__path:hover {
   color: var(--accent-text);
 }
+
+/* The JSON/JSONC switch (PLAN-42): two native radios, so arrow keys move
+   between them and a screen reader announces "Document format, JSON, 1 of 2".
+   They look like the Code/Tree toggle; the inputs stay focusable, just unseen. */
+.rune-format {
+  display: inline-flex;
+  gap: 0;
+  margin: 0 var(--space-2) 0 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  min-inline-size: 0;
+}
+
+/* Read by assistive technology, not drawn: the switch's legend, and the
+   reason Unescape is off in JSONC. */
+.rune-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rune-format__option {
+  position: relative;
+  display: inline-flex;
+}
+
+.rune-format__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rune-format__label {
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-3);
+  transition:
+    background var(--dur-1) var(--ease),
+    color var(--dur-1) var(--ease);
+}
+
+.rune-format__input:checked + .rune-format__label {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.rune-format__input:focus-visible + .rune-format__label {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.rune-status__hint {
+  color: var(--text-muted);
+}
+
+.rune-status__switch {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--accent-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Unescape in JSONC: unavailable but focusable (aria-disabled), drawn like a
+   disabled button so it does not read as an action. */
+.rune-toolbar .btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

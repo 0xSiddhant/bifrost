@@ -62,6 +62,8 @@ export const devices = sqliteTable('devices', {
  * `slug` is `<kebab-name>-<id>` and regenerates on rename (stale slugs with a
  * valid id still resolve). `author_device_id` is the PLAN-06 device id —
  * display names resolve client-side, never from presence's tables.
+ * `format` (PLAN-42) is `json` or `jsonc` — the mode the content is validated
+ * and served in; every row from before it existed is strict JSON.
  */
 export const runestones = sqliteTable('runestones', {
   id: text('id').primaryKey(),
@@ -72,6 +74,9 @@ export const runestones = sqliteTable('runestones', {
   sizeBytes: integer('size_bytes').notNull(),
   createdAt: integer('created_at').notNull(),
   modifiedAt: integer('modified_at').notNull(),
+  format: text('format', { enum: ['json', 'jsonc'] })
+    .notNull()
+    .default('json'),
 });
 
 /**

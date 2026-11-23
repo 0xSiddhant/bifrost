@@ -59,6 +59,38 @@ describe('detectFormat', () => {
     expect(kindOf('# Notes\n\n- first\n- second\n')).toBe('yaml');
   });
 
+  it('reads JSON with comments or trailing commas as JSONC (PLAN-42)', () => {
+    expect(kindOf('{\n  // the port\n  "port": 4646\n}')).toBe('jsonc');
+    expect(kindOf('[1, 2, 3,]')).toBe('jsonc');
+    expect(kindOf('/* settings */ {"a": {"b": 1,},}')).toBe('jsonc');
+    // Strict JSON is still JSON: content alone cannot see a .jsonc filename.
+    expect(kindOf('{"a": 1}')).toBe('json');
+  });
+
+  it('checks JSONC before YAML, which would also take a trailing comma', () => {
+    const flow = '{"a": 1, "b": [2, 3,],}';
+    expect(CONTENT_FORMATS.find((entry) => entry.kind === 'yaml')?.test(flow)).toBe(true);
+    expect(kindOf(flow)).toBe('jsonc');
+  });
+
+  it('refuses JSON5 and a commented scalar', () => {
+    expect(['json', 'jsonc']).not.toContain(kindOf("{'a': 1} // single quotes"));
+    expect(['json', 'jsonc']).not.toContain(kindOf('// just a number\n42'));
+  });
+
+  it('seeds Runestone in the detected format', () => {
+    detectFormat('[1, 2,]')?.seed('[1, 2,]');
+    expect(JSON.parse(sessionStorage.getItem('bifrost.runestone.seed') ?? '{}')).toEqual({
+      title: '',
+      text: '[1, 2,]',
+      format: 'jsonc',
+    });
+    detectFormat('[1, 2]')?.seed('[1, 2]');
+    expect(JSON.parse(sessionStorage.getItem('bifrost.runestone.seed') ?? '{}').format).toBe(
+      'json',
+    );
+  });
+
   it('seeds the matched tool, so no feature imports another', () => {
     const entry = detectFormat('{"a": 1}');
     entry?.seed('{"a": 1}');
@@ -71,6 +103,6 @@ describe('availableFormats', () => {
   it('drops the formats this profile does not serve', () => {
     const loaded = new Set(['runestone', 'edda']);
     const offered = availableFormats(CONTENT_FORMATS, (module) => loaded.has(module));
-    expect(offered.map((entry) => entry.kind)).toEqual(['json', 'markdown']);
+    expect(offered.map((entry) => entry.kind)).toEqual(['json', 'jsonc', 'markdown']);
   });
 });

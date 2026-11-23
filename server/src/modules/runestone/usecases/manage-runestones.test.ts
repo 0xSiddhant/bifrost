@@ -207,3 +207,127 @@ describe('DeleteRunestoneUseCase', () => {
     expect(() => remove.execute(record.id)).toThrowError(AppError);
   });
 });
+
+describe('Runestone formats (PLAN-42)', () => {
+  const COMMENTED = '{\n  // the port\n  "port": 4646,\n}';
+
+  it('saves strict JSON when no format is named, as every older client does', () => {
+    const { repo, bus, events } = harness();
+    const save = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 1024 });
+    const record = save.execute({ content: '{"a":1}', authorDeviceId: null });
+    expect(record.format).toBe('json');
+    expect(repo.findById(record.id)?.format).toBe('json');
+    expect(events[0]?.payload).toMatchObject({ runestone: { format: 'json' } });
+    expect(() => save.execute({ content: COMMENTED, authorDeviceId: null })).toThrow(
+      'document is not valid JSON',
+    );
+  });
+
+  it('saves JSONC with comments and trailing commas, byte for byte', () => {
+    const { repo, bus, events } = harness();
+    const save = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 1024 });
+    const record = save.execute({ content: COMMENTED, format: 'jsonc', authorDeviceId: null });
+    expect(record).toMatchObject({ format: 'jsonc', content: COMMENTED });
+    expect(events[0]?.payload).toMatchObject({ runestone: { format: 'jsonc' } });
+  });
+
+  it('refuses JSON5-only syntax in JSONC with the same 422 code', () => {
+    const { repo, bus } = harness();
+    const save = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 1024 });
+    for (const content of ["{'a': 1}", '{a: 1}', '{"a": NaN}', '{"a": 0x1F}', '// only']) {
+      try {
+        save.execute({ content, format: 'jsonc', authorDeviceId: null });
+        expect.unreachable(content);
+      } catch (error) {
+        expect(error).toBeInstanceOf(AppError);
+        expect((error as AppError).statusCode).toBe(422);
+        expect((error as AppError).code).toBe('INVALID_JSON');
+        expect((error as AppError).message).toBe('document is not valid JSONC');
+      }
+    }
+  });
+
+  it('applies the size cap to JSONC before parsing it', () => {
+    const { repo, bus } = harness();
+    const save = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 16 });
+    try {
+      save.execute({ content: `// ${'x'.repeat(40)}\n{}`, format: 'jsonc', authorDeviceId: null });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as AppError).statusCode).toBe(413);
+    }
+  });
+
+  it('keeps the stored format when an update names none', () => {
+    const { repo, bus } = harness();
+    const deps = { repo, bus, maxDocBytes: 1024 };
+    const saved = new SaveRunestoneUseCase(deps).execute({
+      content: COMMENTED,
+      format: 'jsonc',
+      authorDeviceId: null,
+    });
+    const update = new UpdateRunestoneUseCase(deps);
+    expect(update.execute({ id: saved.id, name: 'Renamed' }).format).toBe('jsonc');
+    const edited = update.execute({ id: saved.id, content: '{ /* still */ "port": 1, }' });
+    expect(edited.format).toBe('jsonc');
+    expect(repo.findById(saved.id)?.format).toBe('jsonc');
+  });
+
+  it('changes the format on request, validating the content in the new one', () => {
+    const { repo, bus, events } = harness();
+    const deps = { repo, bus, maxDocBytes: 1024 };
+    const saved = new SaveRunestoneUseCase(deps).execute({
+      content: '{"a": 1}',
+      authorDeviceId: null,
+    });
+    const update = new UpdateRunestoneUseCase(deps);
+    // A mode change alone is a change worth saving.
+    const toJsonc = update.execute({ id: saved.id, format: 'jsonc' });
+    expect(toJsonc).toMatchObject({ format: 'jsonc', content: '{"a": 1}' });
+    expect(events.at(-1)?.payload).toMatchObject({ runestone: { format: 'jsonc' } });
+    update.execute({ id: saved.id, content: COMMENTED });
+    // Comments cannot be switched back to strict JSON: refused, nothing written.
+    expect(() => update.execute({ id: saved.id, format: 'json' })).toThrow(
+      'document is not valid JSON',
+    );
+    expect(repo.findById(saved.id)).toMatchObject({ format: 'jsonc', content: COMMENTED });
+    // Strict content may go back.
+    expect(update.execute({ id: saved.id, content: '{"b": 2}', format: 'json' }).format).toBe(
+      'json',
+    );
+  });
+
+  it('switches the format of a document saved under a larger cap, unchanged', () => {
+    const { repo, bus } = harness();
+    const big = JSON.stringify({ pad: 'x'.repeat(100) });
+    const saved = new SaveRunestoneUseCase({ repo, bus, maxDocBytes: 1024 }).execute({
+      content: big,
+      authorDeviceId: null,
+    });
+    // The cap is lowered below the stored size, as by a changed .env.
+    const update = new UpdateRunestoneUseCase({ repo, bus, maxDocBytes: 16 });
+    expect(update.execute({ id: saved.id, name: 'Renamed' }).name).toBe('Renamed');
+    const switched = update.execute({ id: saved.id, format: 'jsonc' });
+    expect(switched).toMatchObject({ format: 'jsonc', content: big, sizeBytes: saved.sizeBytes });
+    // New content still meets the cap.
+    try {
+      update.execute({ id: saved.id, content: big });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as AppError).statusCode).toBe(413);
+    }
+  });
+
+  it('passes a format filter to the repository and ignores an unknown one', () => {
+    const { repo } = harness();
+    const list = new ListRunestonesUseCase(repo, PAGING);
+    list.execute({ format: 'jsonc' });
+    expect(repo.lastFilter?.format).toBe('jsonc');
+    list.executePage({ format: 'json' });
+    expect(repo.lastFilter?.format).toBe('json');
+    list.execute({ format: 'yaml' });
+    expect(repo.lastFilter?.format).toBeUndefined();
+    list.execute({});
+    expect(repo.lastFilter?.format).toBeUndefined();
+  });
+});

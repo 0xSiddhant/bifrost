@@ -16,11 +16,13 @@ interface Summary {
   sizeBytes: number;
   createdAt: number;
   modifiedAt: number;
+  format?: string;
 }
 
 interface PageQuery {
   q?: string;
   author?: string;
+  format?: string;
   sort: 'name' | 'created' | 'modified' | 'size';
   order: 'asc' | 'desc';
 }
@@ -58,6 +60,7 @@ function servePage(kind: 'runestone' | 'edda') {
     const rows = mocks.data[kind]
       .filter((row) => !query.q || row.name.toLowerCase().includes(query.q.toLowerCase()))
       .filter((row) => !query.author || row.authorDeviceId === query.author)
+      .filter((row) => !query.format || (row.format ?? 'json') === query.format)
       .sort((a, b) => {
         const ka = keyOf(a);
         const kb = keyOf(b);
@@ -257,6 +260,133 @@ describe('PensievePage', () => {
     expect(chip('All')?.getAttribute('aria-pressed')).toBe('true');
   });
 
+  describe('Runestone formats (PLAN-42)', () => {
+    beforeEach(() => {
+      mocks.pageSize = 30;
+      mocks.data = {
+        runestone: [
+          summary('r1', 'Beta config', 50),
+          { ...summary('r2', 'Gamma settings', 60), format: 'jsonc' },
+          { ...summary('r3', 'Delta prefs', 40), format: 'jsonc' },
+        ],
+        edda: [summary('e1', 'Alpha notes', 70)],
+      };
+    });
+
+    const formatChip = (label: string) =>
+      [...container.querySelectorAll<HTMLButtonElement>('.lib-chips--formats .lib-chip')].find(
+        (node) => node.textContent?.trim() === label,
+      );
+
+    it('badges each runestone JSON or JSONC, inside one kind', async () => {
+      await open();
+      const badges = [...container.querySelectorAll('.lib-row')].map((row) => [
+        row.querySelector('.lib-row__name')?.textContent,
+        row.querySelector('.lib-badge__label')?.textContent,
+      ]);
+      expect(badges).toEqual([
+        ['Alpha notes', 'Markdown'],
+        ['Gamma settings', 'JSONC'],
+        ['Beta config', 'JSON'],
+        ['Delta prefs', 'JSONC'],
+      ]);
+      // One kind, one stream: no JSONC type chip.
+      expect(chip('JSONC')).toBeUndefined();
+    });
+
+    it('offers the format filter only while Runestone is the kind listed', async () => {
+      await open();
+      expect(container.querySelector('.lib-chips--formats')).toBeNull();
+      await act(async () => chip('Markdown')?.click());
+      expect(container.querySelector('.lib-chips--formats')).toBeNull();
+      await act(async () => chip('JSON')?.click());
+      expect(formatChip('Any format')?.getAttribute('aria-pressed')).toBe('true');
+      expect(formatChip('JSONC')).toBeTruthy();
+    });
+
+    it('filters on the server through the URL, totals and page reset included', async () => {
+      await open('/pensieve?type=runestone&page=2');
+      await act(async () => formatChip('JSONC')?.click());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(location).toBe('/pensieve?type=runestone&format=jsonc');
+      expect(rowNames()).toEqual(['Gamma settings', 'Delta prefs']);
+      expect(container.textContent).toContain('Showing 1–2 of 2');
+      expect(mocks.calls.at(-1)).toMatchObject({ kind: 'runestone', query: { format: 'jsonc' } });
+
+      // Search and the format filter narrow together.
+      act(() => type('delta'));
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(rowNames()).toEqual(['Delta prefs']);
+      expect(mocks.calls.at(-1)?.query).toMatchObject({ q: 'delta', format: 'jsonc' });
+
+      await act(async () => formatChip('Any format')?.click());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(location).toBe('/pensieve?type=runestone');
+      expect(rowNames()).toEqual(['Delta prefs']);
+      expect(mocks.calls.at(-1)?.query.format).toBeUndefined();
+    });
+
+    it('deep-links a format, and drops it with the kind', async () => {
+      await open('/pensieve?type=runestone&format=json');
+      expect(rowNames()).toEqual(['Beta config']);
+      expect(formatChip('JSON')?.getAttribute('aria-pressed')).toBe('true');
+
+      await act(async () => chip('All')?.click());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(location).toBe('/pensieve');
+      expect(rowNames()).toEqual(['Alpha notes', 'Gamma settings', 'Beta config', 'Delta prefs']);
+    });
+
+    it('applies a type change and its format together, with no stale fetch between', async () => {
+      await open('/pensieve?type=runestone&format=jsonc');
+      mocks.calls = [];
+      // No timer advanced: the kind and the format must change in one render.
+      await act(async () => chip('All')?.click());
+      expect(mocks.calls.length).toBeGreaterThan(0);
+      expect(mocks.calls.every((call) => call.query.format === undefined)).toBe(true);
+      expect(new Set(mocks.calls.map((call) => call.kind))).toEqual(new Set(['runestone', 'edda']));
+
+      mocks.calls = [];
+      await act(async () => chip('JSON')?.click());
+      await act(async () => formatChip('JSONC')?.click());
+      expect(mocks.calls.at(-1)).toMatchObject({ kind: 'runestone', query: { format: 'jsonc' } });
+      expect(rowNames()).toEqual(['Gamma settings', 'Delta prefs']);
+    });
+
+    it('ignores a format without its kind, or one the kind does not have', async () => {
+      await open('/pensieve?format=jsonc');
+      expect(rowNames()).toHaveLength(4);
+      expect(mocks.calls.every((call) => call.query.format === undefined)).toBe(true);
+
+      act(() => root.unmount());
+      root = createRoot(container);
+      mocks.calls = [];
+      await open('/pensieve?type=runestone&format=json5');
+      expect(rowNames()).toHaveLength(3);
+      expect(mocks.calls.every((call) => call.query.format === undefined)).toBe(true);
+    });
+
+    it('keeps the format on a live refresh of page 1', async () => {
+      await open('/pensieve?type=runestone&format=jsonc');
+      mocks.data.runestone.push({ ...summary('r4', 'Epsilon', 90), format: 'jsonc' });
+      mocks.calls = [];
+      await act(async () => {
+        emit('runestone.saved', { runestone: { id: 'r4' } });
+        await vi.advanceTimersByTimeAsync(300);
+      });
+      expect(rowNames()).toEqual(['Epsilon', 'Gamma settings', 'Delta prefs']);
+      expect(mocks.calls.every((call) => call.query.format === 'jsonc')).toBe(true);
+    });
+  });
+
   it('confirms before deleting, and does not fire when refused', async () => {
     await open();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -322,8 +452,10 @@ describe('PensievePage', () => {
 
     expect(mocks.calls.some((call) => call.kind === 'edda')).toBe(false);
     expect(mocks.subscriptions).toEqual(['runestone.saved', 'runestone.deleted']);
-    // One kind means no chip row at all — a filter with one option is decoration.
-    expect(container.querySelector('.lib-chips')).toBeNull();
+    // One kind means no type chips — a filter with one option is decoration.
+    // Its own formats (PLAN-42) are still a real choice, so that row stays.
+    expect(container.querySelector('.lib-chips:not(.lib-chips--formats)')).toBeNull();
+    expect(container.querySelector('.lib-chips--formats')).not.toBeNull();
     expect(rowNames()).toEqual(['Beta config']);
   });
 

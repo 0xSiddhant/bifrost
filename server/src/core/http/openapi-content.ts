@@ -135,6 +135,7 @@ const ERROR_EXAMPLES: Record<string, { error: string; message: string }> = {
 
 const RAW_EXAMPLES: Record<string, unknown> = {
   'application/json': { name: 'bifrost', replicas: 2 },
+  'application/jsonc': '{\n  // where the bridge listens\n  "port": 4646,\n}\n',
   'text/markdown': '# Trip notes\n\n- Pack the charger\n',
   'application/yaml': 'kind: Deployment\nspec:\n  replicas: 2\n',
   'application/xml':
@@ -143,6 +144,8 @@ const RAW_EXAMPLES: Record<string, unknown> = {
 
 /** A plausible value for a property, by its name and type. */
 function sample(name: string, schema: Json): unknown {
+  // An enum's own first value is the only plausible one (Runestone's `format`).
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
   const types = [schema.type].flat().filter((type) => type !== 'null');
   const type = types[0];
   if (type === 'array') {

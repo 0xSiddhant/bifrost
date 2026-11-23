@@ -12,6 +12,7 @@ const SUMMARY_COLUMNS = {
   sizeBytes: runestones.sizeBytes,
   createdAt: runestones.createdAt,
   modifiedAt: runestones.modifiedAt,
+  format: runestones.format,
 };
 
 /** `%`/`_` are LIKE wildcards — a search for "100%" must not match everything. */
@@ -20,13 +21,18 @@ function likePattern(q: string): string {
 }
 
 /** The filters every read shares — the list, its paged form, and the count. */
-function whereFor(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): SQL | undefined {
+function whereFor(
+  filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId' | 'format'>,
+): SQL | undefined {
   const conditions: SQL[] = [];
   if (filter.q) {
     conditions.push(sql`${runestones.name} LIKE ${likePattern(filter.q)} ESCAPE '\\'`);
   }
   if (filter.authorDeviceId) {
     conditions.push(eq(runestones.authorDeviceId, filter.authorDeviceId));
+  }
+  if (filter.format) {
+    conditions.push(eq(runestones.format, filter.format));
   }
   return conditions.length > 0 ? and(...conditions) : undefined;
 }
@@ -51,6 +57,7 @@ export class DbRunestoneRepository implements RunestoneRepository {
         content: record.content,
         sizeBytes: record.sizeBytes,
         modifiedAt: record.modifiedAt,
+        format: record.format,
       })
       .where(eq(runestones.id, record.id))
       .run();
@@ -73,7 +80,7 @@ export class DbRunestoneRepository implements RunestoneRepository {
     return this.select(filter, direction(runestones.id));
   }
 
-  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId'>): number {
+  count(filter: Pick<RunestoneListFilter, 'q' | 'authorDeviceId' | 'format'>): number {
     const row = this.db
       .select({ n: sql<number>`count(*)` })
       .from(runestones)
