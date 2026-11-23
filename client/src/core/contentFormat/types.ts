@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 /** The formats the app has an editor for. One more is one more registry entry. */
-export type ContentFormatKind = 'json' | 'xml' | 'yaml' | 'markdown';
+export type ContentFormatKind = 'json' | 'jsonc' | 'xml' | 'yaml' | 'markdown';
 
 export interface ContentFormatEntry {
   kind: ContentFormatKind;

@@ -1,3 +1,4 @@
+import { parseJsonValue, validateJson } from '../json';
 import { validateYaml, parseDocuments } from '../yaml';
 import { parseXml } from '../xml';
 import { putAtlasSeed } from '../atlasSeed';
@@ -37,7 +38,30 @@ const jsonEntry: ContentFormatEntry = {
       return false;
     }
   },
-  seed: (text) => putRunestoneSeed({ title: '', text }),
+  seed: (text) => putRunestoneSeed({ title: '', text, format: 'json' }),
+};
+
+/**
+ * JSONC (PLAN-42): only text that comments or trailing commas keep from being
+ * strict JSON. Content alone cannot see a `.jsonc` filename, so strict JSON
+ * stays JSON here; Runestone's own importer is what reads the extension.
+ * Checked before YAML for the reason JSON is: a commented JSON object is often
+ * valid YAML too (`#` is not its comment, but `{"a": 1,}` is a flow mapping).
+ */
+const jsoncEntry: ContentFormatEntry = {
+  kind: 'jsonc',
+  label: 'JSONC',
+  toolName: 'Runestone',
+  module: 'runestone',
+  route: '/runestone',
+  icon: <BracesIcon size={14} />,
+  test: (text) => {
+    if (validateJson(text, 'jsonc').length > 0 || validateJson(text).length === 0) return false;
+    // A container root, as for JSON: a commented scalar is nothing to open.
+    const value = parseJsonValue(text, 'jsonc');
+    return typeof value === 'object' && value !== null;
+  },
+  seed: (text) => putRunestoneSeed({ title: '', text, format: 'jsonc' }),
 };
 
 const xmlEntry: ContentFormatEntry = {
@@ -94,7 +118,8 @@ const markdownEntry: ContentFormatEntry = {
  * relying on a heuristic:
  *
  * - JSON is valid YAML 1.2, so JSON-shaped content passes the YAML test too.
- *   Checking JSON first offers it to Runestone (the specific, correct read).
+ *   Checking JSON first offers it to Runestone (the specific, correct read),
+ *   and JSONC (PLAN-42) right after it, for the same reason.
  * - A Markdown document of nothing but a heading and a bullet list is *also* a
  *   valid YAML sequence with a comment on top, so it is offered to Groot. Real
  *   Markdown reaches its own entry anyway: a prose paragraph makes the YAML
@@ -103,6 +128,7 @@ const markdownEntry: ContentFormatEntry = {
  */
 export const CONTENT_FORMATS: readonly ContentFormatEntry[] = [
   jsonEntry,
+  jsoncEntry,
   xmlEntry,
   yamlEntry,
   markdownEntry,

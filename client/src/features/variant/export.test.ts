@@ -255,3 +255,29 @@ describe('exportUnifiedDiff', () => {
     if (result.ok) expect(result.filename).toBe('original-to-..etc.patch');
   });
 });
+
+describe('exportJsonPatch over JSONC sides (PLAN-42)', () => {
+  it('exports a strict JSON Patch that replays, comments never in it', async () => {
+    const { compareJson } = await import('./compare');
+    const leftText = '{\n  // the port\n  "port": 4646,\n  "tags": ["a",],\n}';
+    const rightText = '{"port": 8080, "tags": ["a", "b"]}';
+    const compared = compareJson(leftText, rightText, DEFAULT_JSON_OPTIONS);
+    if (!compared.ok) throw new Error('compare failed');
+    const result = exportJsonPatch({
+      records: compared.records,
+      leftText,
+      rightText,
+      options: DEFAULT_JSON_OPTIONS,
+      leftLabel: 'left',
+      rightLabel: 'right',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.content).not.toContain('//');
+    const ops = JSON.parse(result.content) as JsonPatchOp[];
+    expect(applyJsonPatch({ port: 4646, tags: ['a'] }, ops)).toEqual({
+      port: 8080,
+      tags: ['a', 'b'],
+    });
+  });
+});

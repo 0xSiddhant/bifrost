@@ -1,4 +1,6 @@
 import { docRanges } from '../../core/json';
+
+// Both panes are read as JSONC (PLAN-42), so a path resolves past comments.
 import type { DiffRecord } from '../../core/json/diff';
 import type { DiffHighlight } from '../../core/ui/JsonEditor';
 
@@ -47,8 +49,8 @@ export function recordsToHighlights(
   leftText: string,
   rightText: string,
 ): PaneHighlights {
-  const leftDoc = docRanges(leftText);
-  const rightDoc = docRanges(rightText);
+  const leftDoc = docRanges(leftText, 'jsonc');
+  const rightDoc = docRanges(rightText, 'jsonc');
   const left: DiffHighlight[] = [];
   const right: DiffHighlight[] = [];
   const budget = records.slice(0, MAX_DECORATED_RECORDS);
@@ -83,7 +85,7 @@ export function jumpTargetFor(
   leftText: string,
   rightText: string,
 ): JumpTarget {
-  const left = record.leftPath ? docRanges(leftText).rangeAt(record.leftPath, true) : null;
-  const right = record.rightPath ? docRanges(rightText).rangeAt(record.rightPath, true) : null;
+  const left = record.leftPath ? docRanges(leftText, 'jsonc').rangeAt(record.leftPath, true) : null;
+  const right = record.rightPath ? docRanges(rightText, 'jsonc').rangeAt(record.rightPath, true) : null;
   return { left: left ? left.offset : null, right: right ? right.offset : null };
 }

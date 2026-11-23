@@ -110,6 +110,7 @@ export function LibraryPicker({ open, side, onPick, onClose }: LibraryPickerProp
                     {doc.authorDeviceId ? (deviceName(doc.authorDeviceId) ?? 'departed device') : 'unknown carver'}
                     {' · '}
                     {formatBytes(doc.sizeBytes)} · {formatTimeAgo(doc.modifiedAt)}
+                    {doc.format === 'jsonc' && ' · JSONC'}
                     {busySlug === doc.slug && ' · loading…'}
                   </span>
                 </button>

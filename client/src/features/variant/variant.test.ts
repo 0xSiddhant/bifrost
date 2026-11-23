@@ -188,3 +188,42 @@ describe('jumpTargetFor (drawer click-to-jump)', () => {
     });
   });
 });
+
+describe('JSONC sides (PLAN-42)', () => {
+  const LEFT = '{\n  // the port\n  "port": 4646,\n  "tags": ["a", "b",],\n}';
+
+  it('compares JSONC structurally: a comment-only change makes no record', () => {
+    const right =
+      '{\n  /* a different comment */\n  "port": 4646, // and one more\n  "tags": ["a", "b"]\n}';
+    expect(compareJson(LEFT, right, DEFAULT_JSON_OPTIONS)).toEqual({ ok: true, records: [] });
+  });
+
+  it('compares JSONC against strict JSON, value for value', () => {
+    const result = compareJson(LEFT, '{"port": 8080, "tags": ["a", "b"]}', DEFAULT_JSON_OPTIONS);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0]).toMatchObject({ op: 'change', leftPath: ['port'] });
+  });
+
+  it('still refuses JSON5 and leaves strict JSON comparisons as they were', () => {
+    expect(compareJson("{'a': 1}", '{}', DEFAULT_JSON_OPTIONS)).toEqual({
+      ok: false,
+      invalid: 'left',
+    });
+    const strict = compareJson('{"a": 1}', '{"a": 2}', DEFAULT_JSON_OPTIONS);
+    expect(strict.ok && strict.records.length).toBe(1);
+  });
+
+  it('maps records onto the commented text', () => {
+    const right = '{"port": 8080, "tags": ["a", "b"]}';
+    const result = compareJson(LEFT, right, DEFAULT_JSON_OPTIONS);
+    if (!result.ok) throw new Error('compare failed');
+    const marks = recordsToHighlights(result.records, LEFT, right);
+    const leftLine = marks.left.find((mark) => mark.level === 'line');
+    expect(leftLine && LEFT.slice(leftLine.from, leftLine.to)).toContain('"port": 4646');
+    const [record] = result.records;
+    if (!record) throw new Error('no record');
+    expect(jumpTargetFor(record, LEFT, right).left).toBe(LEFT.indexOf('"port"'));
+  });
+});
