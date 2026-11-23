@@ -32,6 +32,7 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "@lezer/highlight": "^1.2.3",
+    "@shopify/lang-jsonc": "^1.0.1",
     "acorn": "^8.17.0",
     "diff": "^9.0.0",
     "dompurify": "^3.4.12",
