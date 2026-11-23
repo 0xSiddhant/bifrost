@@ -272,7 +272,13 @@ export function RunestonePage() {
     snapshot === null
       ? text.trim() !== ''
       : snapshot.title !== title || snapshot.text !== text || snapshot.format !== format;
-  const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
+  // The size cap is about the text. A saved document whose text has not
+  // changed can still be renamed or switched between JSON and JSONC even past
+  // a cap lowered since it was saved: the update then carries no content, and
+  // the server checks the stored text in the new format, not its size.
+  const textChanged = snapshot === null || snapshot.text !== text;
+  const canSave =
+    valid && (!overCap || !textChanged) && !saving && (snapshot === null || dirty);
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
@@ -294,7 +300,11 @@ export function RunestonePage() {
         navigate(`/runestone/${doc.slug}`, { replace: true });
         ok('Runestone carved');
       } else {
-        const doc = await updateRunestone(docId, { name: title, content: text, format });
+        const doc = await updateRunestone(docId, {
+          name: title,
+          ...(textChanged ? { content: text } : {}),
+          format,
+        });
         const savedFormat = asJsonFormat(doc.format);
         setTitle(doc.name);
         setFormat(savedFormat);
@@ -627,7 +637,7 @@ export function RunestonePage() {
         {overCap && maxBytes !== null && (
           <Toast kind="danger">
             This document is {formatBytes(stats.bytes)} — past the {formatBytes(maxBytes)} limit.
-            Editing still works, but it cannot be saved and may feel slow.
+            Editing still works, but changes to its text cannot be saved and may feel slow.
           </Toast>
         )}
 

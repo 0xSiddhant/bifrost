@@ -210,9 +210,9 @@ describe('RunestonePage — JSON and JSONC', () => {
     expect(container.textContent).toContain('Unsaved changes');
     wire.updateRunestone.mockResolvedValue({ ...SAVED, format: 'jsonc' });
     await click(button('Save'));
+    // The text did not change, so the update carries none (the format-only path).
     expect(wire.updateRunestone).toHaveBeenCalledWith('doc-1', {
       name: SAVED.name,
-      content: SAVED.content,
       format: 'jsonc',
     });
     expect(button('Saved')).toBeTruthy();
@@ -220,6 +220,43 @@ describe('RunestonePage — JSON and JSONC', () => {
     // Switching back is a change again.
     await click(radio('json'));
     expect(button('Save').disabled).toBe(false);
+  });
+
+  it('switches the format of a document past a lowered size cap, sending no content', async () => {
+    params.slug = SAVED.slug;
+    wire.fetchRunestone.mockResolvedValue(SAVED);
+    const cap = wire.RUNESTONE_CONFIG.maxDocKb;
+    // 5 bytes: the saved 7-byte document is now over the cap.
+    wire.RUNESTONE_CONFIG.maxDocKb = 5 / 1024;
+    try {
+      await render();
+      await settle();
+      expect(container.textContent).toContain('past the');
+      await click(radio('jsonc'));
+      await settle();
+      expect(button('Save').disabled).toBe(false);
+      wire.updateRunestone.mockResolvedValue({ ...SAVED, format: 'jsonc' });
+      await click(button('Save'));
+      expect(wire.updateRunestone).toHaveBeenCalledWith('doc-1', {
+        name: SAVED.name,
+        format: 'jsonc',
+      });
+    } finally {
+      wire.RUNESTONE_CONFIG.maxDocKb = cap;
+    }
+  });
+
+  it('still refuses to save new text past the cap', async () => {
+    const cap = wire.RUNESTONE_CONFIG.maxDocKb;
+    wire.RUNESTONE_CONFIG.maxDocKb = 5 / 1024;
+    try {
+      putRunestoneSeed({ title: 'Too big', text: '{"too": "big"}' });
+      await render();
+      await settle();
+      expect(button('Save to Pensieve').disabled).toBe(true);
+    } finally {
+      wire.RUNESTONE_CONFIG.maxDocKb = cap;
+    }
   });
 
   it('mirrors the format into the scratch draft and brings it back on return', async () => {
