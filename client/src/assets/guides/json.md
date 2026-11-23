@@ -44,10 +44,10 @@ Everything else is still JSON's rule. **JSON5 is not JSONC**: unquoted keys, sin
 
 - **Every document has a format**, set by the **JSON / JSONC** switch at the start of the toolbar. New documents are JSON; a `.jsonc` file you import or drop opens as JSONC, even when its contents happen to be strict JSON.
 - **The switch changes how the text is read, never the text.** Switch a commented document to JSON and the comments stay, marked as errors, and it cannot be saved until you switch back or remove them. The status line says when the text would be valid as JSONC.
-- **Saving keeps the format.** It comes back with the document, in the Pensieve (a **JSONC** badge, and a format filter under the JSON chip) and on its raw URL, served as `application/jsonc` instead of `application/json`.
+- **Saving keeps the format.** It comes back with the document, in the Pensieve (a **JSONC** badge, and a format filter under the JSON chip) and on its raw URL, served as `application/jsonc` instead of `application/json` (a browser that opens the link gets the same text as `text/plain`, so it shows it instead of downloading it).
 - **Format and Minify keep every comment.** Minify keeps a line break after a `//` comment, so it cannot swallow the next value.
-- **Sort keys keeps each comment with its key**: a comment on the lines above a key, or after its value on the same line, moves with it; one on the `{` line stays at the top, one after the last key stays at the bottom. If that cannot be done safely, nothing is changed.
-- **Unescape is off in JSONC**: it rebuilds the document and would drop the comments.
+- **Sort keys keeps each comment with its key**, and orders keys exactly as it does for JSON (number-like keys such as `"9"` and `"10"` first, by number): a comment on the lines above a key, or after its value on the same line, moves with it; one on the `{` line stays at the top, one after the last key stays at the bottom. If that cannot be done safely, nothing is changed.
+- **Unescape is off in JSONC**: it rebuilds the document and would drop the comments. Pressing it says so.
 - **Copy as strict JSON** copies the document without its comments and trailing commas, every value exactly as written, and leaves the editor alone. Use it for a tool that only reads JSON.
 - **Tree view, paths and Copy as JS** read the values and ignore the comments.
 - **Variant** compares JSONC by value: a change that only touches comments is no difference at all.

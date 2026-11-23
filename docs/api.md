@@ -65,7 +65,11 @@ device. The description at the top of the page says so too.
   keeps the stored one, and `GET /api/v1/runestone?format=jsonc` filters the list
   and its `total`. The raw URL `/runestone/api/v1/{slug}` sends `application/json`
   for a JSON document and `application/jsonc` for a JSONC one, so ask for either:
-  `curl -H 'Accept: application/jsonc' …`.
+  `curl -H 'Accept: application/jsonc' …`. A browser opening a JSONC document's
+  URL (an `Accept` with `text/html` and without `application/jsonc`) gets the same
+  bytes as `text/plain`, with `Vary: Accept`, because no browser renders
+  `application/jsonc`. A `PUT` that changes only `format` re-checks the stored
+  content in the new format, not its size.
 - **Deep links**: `http://127.0.0.1:4647/docs#/runestone/listRunestones` opens that
   operation.
 
