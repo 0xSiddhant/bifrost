@@ -108,6 +108,19 @@ describe('reading JSONC values', () => {
     expect(Object.prototype.hasOwnProperty.call(value, '__proto__')).toBe(true);
   });
 
+  it('reads strict JSON in JSONC without the token walk, to the same value', () => {
+    const doc = JSON.stringify({ rows: Array.from({ length: 20000 }, (_, i) => ({ i, s: `v${i}` })) });
+    const start = performance.now();
+    const value = parseJsonValue(doc, 'jsonc');
+    const elapsed = performance.now() - start;
+    expect(value).toEqual(JSON.parse(doc));
+    // JSON.parse alone; the JSONC walk over the same text takes many times longer.
+    const walkStart = performance.now();
+    toStrictJson(doc);
+    const walk = performance.now() - walkStart;
+    expect(elapsed).toBeLessThan(walk);
+  });
+
   it('is undefined for invalid text in either format', () => {
     expect(parseJsonValue('{"a": 1,}')).toBeUndefined();
     expect(parseJsonValue('{"a": }', 'jsonc')).toBeUndefined();
@@ -192,6 +205,14 @@ describe('toStrictJson', () => {
     expect(toStrictJson('{"a": 1 /* x */, "b": [ /* y */ 2 ]}')).toBe('{"a": 1, "b": [ 2 ]}');
   });
 
+  it('removes a line of several comments whole, and the spaces a removal leaves', () => {
+    expect(toStrictJson('{\n  /* a */ /* b */\n  "x": 1\n}')).toBe('{\n  "x": 1\n}');
+    expect(toStrictJson('{\n  "x": 1 /* a */ // b\n}')).toBe('{\n  "x": 1\n}');
+    expect(toStrictJson('[1, 2, ]')).toBe('[1, 2]');
+    expect(toStrictJson('{"a" /* key */ : 1}')).toBe('{"a": 1}');
+    expect(toStrictJson('{\n  /* spans\n     lines */\n  "x": 1\n}')).toBe('{\n  "x": 1\n}');
+  });
+
   it('passes strict JSON through byte for byte', () => {
     const doc = '{\n  "a": [1, 2.50, "x\\u0041"],\n  "b": null\n}';
     expect(toStrictJson(doc)).toBe(doc);
@@ -256,6 +277,16 @@ describe('sortJsonKeys', () => {
     ]);
     expect(commentsOf(sorted)).toEqual(['/* first */', '// second']);
     expect(sorted.trimEnd().endsWith(',\n]')).toBe(true);
+  });
+
+  it('orders index-like keys as the strict sort does: by number, first', () => {
+    const doc = '{"b": 1, "10": 2,\n  /* nine */ "9": 3, "a": {"2": 0, "1": 0, "z": 0}}';
+    const strict = sortJsonKeys(doc.replace('/* nine */', ''), 'json') ?? '';
+    const jsonc = sortJsonKeys(doc, 'jsonc') ?? '';
+    const keyOrder = (text: string) => [...text.matchAll(/"([^"]+)":/g)].map((match) => match[1]);
+    expect(keyOrder(jsonc)).toEqual(['9', '10', 'a', '1', '2', 'z', 'b']);
+    expect(keyOrder(jsonc)).toEqual(keyOrder(strict));
+    expect(jsonc).toContain('/* nine */ "9": 3');
   });
 
   it('handles empty containers and comment-only objects', () => {

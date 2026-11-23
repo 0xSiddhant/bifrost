@@ -45,6 +45,7 @@ export const PARSE_OPTIONS: Record<
 const CLOSE_BRACE = 2;
 const CLOSE_BRACKET = 4;
 const COMMA = 5;
+const COLON = 6;
 const NULL_KEYWORD = 7;
 const TRUE_KEYWORD = 8;
 const FALSE_KEYWORD = 9;
@@ -116,33 +117,52 @@ export function toStrictJson(text: string): string | null {
   };
 
   tokens.forEach((token, index) => {
-    if (token.kind === COMMA) {
-      const next = nextSignificant(index + 1);
-      if (next && (next.kind === CLOSE_BRACE || next.kind === CLOSE_BRACKET)) drop[index] = true;
-      return;
-    }
-    if (!isComment(token.kind)) return;
-    drop[index] = true;
-    const before = tokens[index - 1];
-    const spaceBefore = before?.kind === WHITESPACE ? index - 1 : null;
-    const lineOpener = tokens[(spaceBefore ?? index) - 1];
-    const startsLine = lineOpener === undefined || lineOpener.kind === LINE_BREAK;
-    let after = index + 1;
-    if (tokens[after]?.kind === WHITESPACE) after += 1;
-    const endsLine = after >= tokens.length || tokens[after]?.kind === LINE_BREAK;
-    if (!endsLine) {
-      // An inline comment: keep one of the spaces around it, not both.
-      const spaceAfter = tokens[index + 1]?.kind === WHITESPACE;
-      if (spaceAfter && (spaceBefore !== null || startsLine)) drop[index + 1] = true;
-      else if (!spaceAfter && spaceBefore !== null) drop[spaceBefore] = true;
-      return;
-    }
-    // A trailing comment: the spaces between the value and it go too.
-    if (spaceBefore !== null) drop[spaceBefore] = true;
-    for (let i = index + 1; i < after; i += 1) drop[i] = true;
-    // A comment on a line of its own: the line goes with it.
-    if (startsLine && after < tokens.length) drop[after] = true;
+    if (isComment(token.kind)) drop[index] = true;
+    if (token.kind !== COMMA) return;
+    const next = nextSignificant(index + 1);
+    if (next && (next.kind === CLOSE_BRACE || next.kind === CLOSE_BRACKET)) drop[index] = true;
   });
+
+  // Then the whitespace the removals leave behind, one line at a time (a line
+  // is the tokens up to and including its line break), so comments that share
+  // a line are judged together:
+  // - a line whose only content was removed goes, line break and all;
+  // - two runs of whitespace left side by side keep the first (the indent);
+  // - whitespace that touched a removed token goes at the end of the line or
+  //   before `,` `:` `]` `}` — `1 /* x */,` becomes `1,`, not `1 ,`.
+  const closesTight = (kind: number | undefined): boolean =>
+    kind === COMMA || kind === COLON || kind === CLOSE_BRACE || kind === CLOSE_BRACKET;
+  let lineStart = 0;
+  while (lineStart < tokens.length) {
+    let lineEnd = lineStart;
+    while (lineEnd < tokens.length && tokens[lineEnd]?.kind !== LINE_BREAK) lineEnd += 1;
+    // [lineStart, lineEnd) is the line's tokens; lineEnd is its line break, if any.
+    const line: number[] = [];
+    for (let i = lineStart; i < lineEnd; i += 1) line.push(i);
+    const content = line.filter((i) => tokens[i]?.kind !== WHITESPACE);
+    const removed = content.filter((i) => drop[i]);
+    if (removed.length > 0 && removed.length === content.length) {
+      for (const i of line) drop[i] = true;
+      if (lineEnd < tokens.length) drop[lineEnd] = true;
+    } else if (removed.length > 0) {
+      const kept = line.filter((i) => !drop[i]);
+      const touched = (i: number): boolean => Boolean(drop[i - 1] || drop[i + 1]);
+      kept.forEach((i, at) => {
+        if (tokens[i]?.kind !== WHITESPACE || !touched(i)) return;
+        const previous = kept[at - 1];
+        // The next thing left on the line that is not itself whitespace.
+        const next = kept.slice(at + 1).find((j) => tokens[j]?.kind !== WHITESPACE);
+        if (
+          (previous !== undefined && tokens[previous]?.kind === WHITESPACE && !drop[previous]) ||
+          next === undefined ||
+          closesTight(tokens[next]?.kind)
+        ) {
+          drop[i] = true;
+        }
+      });
+    }
+    lineStart = lineEnd + 1;
+  }
 
   let out = '';
   tokens.forEach((token, index) => {
@@ -181,8 +201,28 @@ function renderComment(comment: CommentPiece): string {
   return `${comment.text}${comment.breakAfter ? '\n' : ' '}`;
 }
 
+/** An array-index key ("0", "9", "10"): a JS object lists these first, by number. */
+function isIndexKey(key: string): boolean {
+  return /^(?:0|[1-9]\d*)$/.test(key) && Number(key) < 4294967295;
+}
+
 /**
- * Sort every object's keys A→Z (the same code-unit order as `sortKeysDeep`)
+ * The key order strict JSON's Sort keys produces: `JSON.stringify` over an
+ * object built by `sortKeysDeep`, where JavaScript puts array-index keys first
+ * in numeric order and the rest in code-unit order. JSONC's sort uses the same
+ * order, so a strict side and a JSONC side of one document sort alike.
+ */
+function compareKeys(a: string, b: string): number {
+  const aIndex = isIndexKey(a);
+  const bIndex = isIndexKey(b);
+  if (aIndex && bIndex) return Number(a) - Number(b);
+  if (aIndex !== bIndex) return aIndex ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Sort every object's keys A→Z (the order strict JSON's Sort keys gives, see
+ * `compareKeys`)
  * while keeping each comment with the member it belongs to:
  *
  * - a comment between a member's value and its comma, or after the comma on
@@ -338,9 +378,7 @@ export function sortJsoncKeys(text: string, format: (text: string) => string): s
 
     const sorted = members
       .map((member, index) => ({ member, index }))
-      .sort((a, b) =>
-        a.member.key < b.member.key ? -1 : a.member.key > b.member.key ? 1 : a.index - b.index,
-      )
+      .sort((a, b) => compareKeys(a.member.key, b.member.key) || a.index - b.index)
       .map(({ member }) => member);
 
     let out = '{';
@@ -396,8 +434,34 @@ function sortedIsFaithful(original: string, sorted: string): boolean {
   const strictBefore = toStrictJson(original);
   const strictAfter = toStrictJson(sorted);
   if (strictBefore === null || strictAfter === null) return false;
-  return (
-    JSON.stringify(sortKeysDeep(JSON.parse(strictBefore))) ===
+  if (
+    JSON.stringify(sortKeysDeep(JSON.parse(strictBefore))) !==
     JSON.stringify(JSON.parse(strictAfter))
-  );
+  ) {
+    return false;
+  }
+  // JSON.parse puts index keys first whatever the text says, so the value check
+  // cannot see the order the keys are written in: read it from the text itself.
+  return keysWrittenInOrder(sorted);
+}
+
+/** Every object's keys, as written, are in `compareKeys` order. */
+function keysWrittenInOrder(text: string): boolean {
+  const root = parseTree(text, undefined, PARSE_OPTIONS.jsonc);
+  if (!root) return false;
+  const walk = (node: Node): boolean => {
+    const children = node.children ?? [];
+    if (node.type === 'object') {
+      const keys = children.map((property) => String(property.children?.[0]?.value));
+      for (let i = 1; i < keys.length; i += 1) {
+        if (compareKeys(keys[i - 1] ?? '', keys[i] ?? '') > 0) return false;
+      }
+      return children.every((property) => {
+        const value = property.children?.[1];
+        return value === undefined || walk(value);
+      });
+    }
+    return children.every(walk);
+  };
+  return walk(root);
 }

@@ -251,12 +251,21 @@ export function rangeAtPath(
  * Undefined when the text is not valid in its format.
  */
 export function parseJsonValue(text: string, format: JsonFormat = 'json'): unknown {
-  const strict = format === 'jsonc' ? toStrictJson(text) : text;
+  // Strict JSON first, in either format: text `JSON.parse` accepts has no
+  // comment or trailing comma to remove, so the token walk is only paid for
+  // a document that really has them (Variant reads every pane as JSONC).
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    // Ordinary control flow: not strict JSON, which in JSONC is the next try.
+  }
+  if (format !== 'jsonc') return undefined;
+  const strict = toStrictJson(text);
   if (strict === null) return undefined;
   try {
     return JSON.parse(strict) as unknown;
   } catch {
-    // Ordinary control flow: invalid text simply has no value to show.
+    // Unreachable: toStrictJson only answers text that is valid strict JSON.
     return undefined;
   }
 }
