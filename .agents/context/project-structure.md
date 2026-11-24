@@ -225,7 +225,8 @@ bifrost/
 │   │                          #   fixtures.ts + guards.ts (no-silent-errors), api.ts, ui.ts,
 │   │                          #   journey.ts (routes() tags + App.tsx route scan), cli-install.ts,
 │   │                          #   pty.ts, sink.ts, pdf.ts, files.ts, guard-fixture.ts,
-│   │                          #   static-server.ts + standalone-fixtures.ts (PLAN-35)
+│   │                          #   static-server.ts + standalone-fixtures.ts (PLAN-35),
+│   │                          #   season.ts (the season's switchable decorations, off in journeys)
 │   ├── browser/               #   journeys 1–18, cross-surface, bridge-closed, routes.spec.ts, guard.spec.ts
 │   ├── standalone/            #   the standalone site, from a static server with the nginx rules (PLAN-35)
 │   ├── cli/                   #   the packed, temp-prefix-installed CLI (Vitest)
