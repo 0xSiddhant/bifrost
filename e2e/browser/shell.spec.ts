@@ -23,16 +23,25 @@ test.describe('shell', () => {
   // PLAN-40: the sky and the bridge strip run for as long as a tab is open, so
   // they may animate only what the compositor moves without layout or paint.
   // Whatever season is installed adds its own animations: they are held to
-  // the same rule here, and named in that season's journey.
-  test('every animation on the home page runs on the compositor', routes('/'), async ({ page }) => {
-    await page.goto('/');
-    await waitForSkyAndSlots(page);
-    const animations = await runningAnimations(page);
-    const names = new Set(animations.map((animation) => animation.name));
-    for (const name of ['aurora-drift', 'bridge-flow', 'relic-float']) {
-      expect(names, name).toContain(name);
-    }
-    expectCompositorOnly(animations);
+  // the same rule here, all of them on (support/season.ts), and named in that
+  // season's journey.
+  test.describe('with the season on', () => {
+    test.use({ seasonDecorations: true });
+
+    test(
+      'every animation on the home page runs on the compositor',
+      routes('/'),
+      async ({ page }) => {
+        await page.goto('/');
+        await waitForSkyAndSlots(page);
+        const animations = await runningAnimations(page);
+        const names = new Set(animations.map((animation) => animation.name));
+        for (const name of ['aurora-drift', 'bridge-flow', 'relic-float']) {
+          expect(names, name).toContain(name);
+        }
+        expectCompositorOnly(animations);
+      },
+    );
   });
 
   test(
