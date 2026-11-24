@@ -108,16 +108,20 @@ function scratchDir(prefix: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
+/**
+ * Resolves once `baseUrl` answers its health check; rejects as soon as the
+ * process dies, or at the deadline. The message names which; `bootFailure`
+ * adds what the server left behind.
+ */
 export async function waitForHealth(
   baseUrl: string,
   isAlive: () => boolean,
-  output: () => string,
   timeoutMs = 60_000,
   healthPath = '/api/v1/health',
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    if (!isAlive()) throw new Error(`server exited before it was healthy:\n${output()}`);
+    if (!isAlive()) throw new Error(`server exited before it was healthy (${baseUrl})`);
     try {
       const response = await fetch(`${baseUrl}${healthPath}`, {
         signal: AbortSignal.timeout(1_000),
@@ -128,7 +132,7 @@ export async function waitForHealth(
       // Not listening yet: boot runs migrations first, so a refused connection
       // is the expected state for the first second or two, not a failure.
     }
-    if (Date.now() > deadline) throw new Error(`server never became healthy:\n${output()}`);
+    if (Date.now() > deadline) throw new Error(`server never became healthy (${baseUrl})`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 }
@@ -137,6 +141,8 @@ interface Proc {
   pid: number | null;
   alive(): boolean;
   exitStatus(): ExitStatus | null;
+  /** Resolves once the process has exited and its stdout and stderr are drained. */
+  closed: Promise<void>;
   /** SIGTERM, then SIGKILL after 15 s; resolves once it has exited. */
   halt(): Promise<void>;
 }
@@ -156,6 +162,7 @@ function spawnProc(
   child.once('exit', (code, signal) => {
     exit = { code, signal };
   });
+  const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
   child.stdout?.on('data', append);
   child.stderr?.on('data', append);
   const alive = () => child.exitCode === null && child.signalCode === null;
@@ -163,6 +170,7 @@ function spawnProc(
     pid: child.pid ?? null,
     alive,
     exitStatus: () => exit,
+    closed,
     async halt() {
       if (!alive()) return;
       const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
@@ -175,6 +183,52 @@ function spawnProc(
       }
     },
   };
+}
+
+/** The last `lines` lines of a text file, or a note saying why there are none. */
+export function fileTail(file: string, lines: number): string {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    return `(no log: ${(error as NodeJS.ErrnoException).code ?? String(error)})`;
+  }
+  return text.trimEnd().split('\n').slice(-lines).join('\n');
+}
+
+/**
+ * The error a test sees when a server it was starting is not up: why
+ * (`waitForHealth`'s message), how each process ended, everything they wrote,
+ * and the tail of the API's log file. The API logs a fatal error (an address
+ * already in use, a failed migration) to that file, not to stdout, so without
+ * the tail a dead server reports nothing at all. A dead process's output is
+ * read once its pipes have drained.
+ */
+async function bootFailure(
+  cause: unknown,
+  procs: Record<string, Proc | null>,
+  output: () => string,
+  logFile: string,
+): Promise<Error> {
+  const live = Object.values(procs).filter((proc): proc is Proc => proc !== null);
+  const drained = Promise.all(live.filter((proc) => !proc.alive()).map((proc) => proc.closed));
+  await Promise.race([drained, new Promise((resolve) => setTimeout(resolve, 2_000).unref())]);
+  const exits = Object.entries(procs)
+    .filter((entry): entry is [string, Proc] => entry[1] !== null)
+    .map(([name, proc]) => {
+      const status = proc.exitStatus();
+      return `${name}: ${status ? `exited (code ${status.code}, signal ${status.signal})` : 'running'}`;
+    });
+  const reason = cause instanceof Error ? cause.message : String(cause);
+  return new Error(
+    [
+      reason,
+      ...exits,
+      `output:\n${output() || '(none)'}`,
+      `log (${logFile}), last 40 lines:\n${fileTail(logFile, 40)}`,
+    ].join('\n'),
+    { cause },
+  );
 }
 
 export async function startServer(options: StartServerOptions = {}): Promise<E2EServer> {
@@ -261,12 +315,13 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     await web?.halt();
     await api.halt();
   };
+  const logFile = path.join(storageRoot, 'logs', 'current.log');
   try {
-    await waitForHealth(apiUrl, api.alive, () => output);
-    if (web) await waitForHealth(baseUrl, bothAlive, () => output, 30_000, '/healthz');
+    await waitForHealth(apiUrl, api.alive);
+    if (web) await waitForHealth(baseUrl, bothAlive, 30_000, '/healthz');
   } catch (error) {
     await haltBoth();
-    throw error;
+    throw await bootFailure(error, { api, web }, () => output, logFile);
   }
 
   return {
@@ -280,7 +335,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     pin: E2E_PIN,
     profile,
     canary,
-    logFile: path.join(storageRoot, 'logs', 'current.log'),
+    logFile,
     output: () => output,
     exitStatus: () => api.exitStatus(),
     webExitStatus: () => web?.exitStatus() ?? null,
@@ -289,7 +344,12 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     async restartApi() {
       if (api.alive()) return;
       api = startApi();
-      await waitForHealth(apiUrl, api.alive, () => output);
+      try {
+        await waitForHealth(apiUrl, api.alive);
+      } catch (error) {
+        await api.halt();
+        throw await bootFailure(error, { api }, () => output, logFile);
+      }
     },
     haltWeb: async () => {
       await web?.halt();
