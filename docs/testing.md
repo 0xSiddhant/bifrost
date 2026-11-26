@@ -136,6 +136,38 @@ When the fix lands, the pin or workaround comes out in the same PR. The test the
 
 All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
 
+### Multi-tab draft recovery (PLAN-43)
+
+`browser/drafts.spec.ts` drives the editors' per-tab drafts with several **pages of one browser context**: pages of a context share `localStorage` and each keeps its own `sessionStorage`, which is what tabs of one browser do. What it covers, on every project:
+
+- two tabs of each editor keep separate drafts, and a reload brings back only the reloading tab's own, silently;
+- a closed tab's draft is offered to a blank tab after the 10-second grace, survives a Dismiss, and goes to exactly one of two tabs that press Restore together;
+- a tab opened with `window.open` (which copies `sessionStorage`, as "Duplicate tab" does) gets an id of its own and none of its original's draft;
+- the single-slot draft saved before PLAN-43 is offered until taken, then consumed once;
+- a saved document's unsaved edits come back after a reload as unsaved edits, and a server change made meanwhile asks Keep local / Use server first;
+- Variant restores both workspaces, without compare results;
+- closing all tabs but one prunes the closed tabs' drafts once the open one has its own, and two tabs closing together leave the newest draft;
+- IndexedDB read/write transactions exclude each other across tabs in this engine, the guarantee the drafts' lock rests on.
+
+How the journeys do it:
+
+- **Close a tab with `page.close({ runBeforeUnload: true })`, and wait for its `close` event.** Unload handlers then run, so the tab records leaving; without the wait the next step can hit a page still closing.
+- **Offers wait out the grace in real time** (up to 25 s); a reload must not look like a close, so there is no shortcut.
+- **Pruning takes 10 minutes, so those journeys fast-forward `page.clock`.** The clock is the context's: every tab's time jumps together. Wait for the sky's lazy chunks first (`waitForSkyAndSlots`), or the jump fires their 8 s chunk timeout at once.
+- **Read state from storage, not only the screen.** A tab's records are `bifrost.drafts.v1.r.<editor>.<tab>.<workspace>` in `localStorage`; its id is `bifrost.tab.id` in its `sessionStorage`.
+
+The protocol's races and failures (quota and blocked storage, a claim that cannot commit, a tab killed mid-transfer, a legacy value rewritten by an older tab) are unit tests in `client/src/core/drafts/protocol.test.ts`, which interleave two simulated tabs over one in-memory coordinator.
+
+**Browser lifecycle limitations** (measured in the PLAN-43 spike, Chromium 1243 headless; WebKit runs in CI only):
+
+- A close, a reload and a navigation to another site all fire the same `pagehide` with `persisted === false`; nothing tells them apart at that moment. A tab is therefore known closed only after it left a departure marker, the IndexedDB registry still names the same page lifetime (a reload, a Back navigation or a reopened tab registers a new one as it starts) and the grace has passed. **A tab that leaves the app and returns later than the grace may find its draft moved to another tab (after 10 s) or pruned (after 10 minutes)**; the owner accepted this on 2026-11-26.
+- A tab that is frozen, discarded, killed with the browser or kept in the back/forward cache writes no marker, so its drafts are never offered or pruned; they come back only if that tab does (a restored session, "reopen closed tab").
+- Headless Chromium uses no back/forward cache even without Playwright's `--disable-back-forward-cache`, and `Page.setWebLifecycleState` fires no `freeze`/`resume` events there: those paths are covered by reasoning and unit tests, not journeys.
+- `navigator.locks` exists only in a secure context: present at `http://127.0.0.1`, missing at `http://<LAN address>`, which is how the hub is reached. IndexedDB and `BroadcastChannel` exist on both, so the lock is an IndexedDB transaction.
+- Under that lock a tab can still read another tab's `localStorage` write a moment stale (0–2 lost updates per 1,000 in the spike), so everything that must agree across tabs lives in IndexedDB.
+
+**By hand, on the real devices** (not automatable here): duplicate a tab with the browser's own "Duplicate tab" in Chrome and Safari and check each tab keeps its own draft; close a tab and reopen it with ⌘⇧T within ten minutes; on an iPhone or iPad, let Safari unload a background tab, come back, and check the draft is restored without an offer.
+
 ## The black-box API suite (PLAN-33)
 
 `e2e/api/` treats the built server as a stranger would: the production entry on a real port, over HTTP, knowing nothing but the committed `server/openapi.json` (read as a file). It runs with `API_CONTRACT_CHECK=strict`, so a response a schema would rewrite is a 500 here. `npm run test:e2e:api -w e2e` runs it, then the **coverage report**: every operation in the spec must have produced a success somewhere in the run, or the step fails.

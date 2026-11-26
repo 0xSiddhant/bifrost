@@ -153,6 +153,16 @@ bifrost/
 │       │                      #     text + media type; one `<a download>` mechanism under both),
 │       │                      #   textNormalize, runestone + edda + groot + atlas + accio clients,
 │       │                      #   runestoneSeed + variantSeed (one-shot cross-tool handoffs), relicNames name-bank
+│       │                      #   drafts/ (PLAN-43 — per-tab drafts: basics.ts, the only part in the first
+│       │                      #     load (keys, graces, departure marker); identity.ts (sessionStorage tab id
+│       │                      #     + BroadcastChannel duplicate-tab handshake); records.ts (keys, versioned
+│       │                      #     envelopes, hash); storage.ts; coordinator.ts (an IndexedDB read/write
+│       │                      #     transaction as the cross-tab lock, + an in-memory one for tests);
+│       │                      #     protocol.ts (known-closed, offer/transfer once, newest-wins sweep,
+│       │                      #     legacy single-slot journal); session.ts (one tab's session, started
+│       │                      #     from main.tsx); documents.ts (text drafts + server baselines);
+│       │                      #     testing.ts), draftCache.ts (useWorkspaceDraft mirror + useDraftOffer),
+│       │                      #     documentDrafts.ts (the four text editors' shared flow), ui/DraftNotices
 │       │                      #   (client-logs has no feature slice — core/log.ts IS its client half)
 │       └── features/          # mirrors server modules; route-level code splitting; each lazy page imports
 │                              #   its own <name>.css (PLAN-41: app.css/ui.css keep the shell and what pages
