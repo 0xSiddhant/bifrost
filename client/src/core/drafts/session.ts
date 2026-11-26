@@ -1,0 +1,291 @@
+import { log } from '../log';
+import { idbBackend, type CoordBackend } from './coordinator';
+import { TabIdentity, CHANNEL_NAME, type ChannelLike, type IdentityEvent } from './identity';
+import {
+  PRUNE_GRACE_MS,
+  registerLifetime,
+  sweep,
+  writeDeparture,
+  type Me,
+  type ProtocolContext,
+  type SweepFeature,
+} from './protocol';
+import { LEFT_PREFIX, leftKey, randomId, type DraftFeature } from './records';
+import {
+  browserLocalStorage,
+  browserSessionStorage,
+  storageErrorReason,
+  type DraftStorage,
+} from './storage';
+
+/**
+ * One tab's draft session (PLAN-43): its identity, its page lifetime in the
+ * IndexedDB registry, the flushes that run when the page is hidden or left,
+ * the departure marker written last when it is left for good, and the sweep
+ * that prunes closed tabs' drafts.
+ */
+
+export interface SessionDeps {
+  local: DraftStorage;
+  session: DraftStorage | null;
+  openChannel: () => ChannelLike | null;
+  backend: CoordBackend | null;
+  now: () => number;
+  newId: () => string;
+  setTimer: (fn: () => void, ms: number) => unknown;
+  clearTimer: (handle: unknown) => void;
+  /** Window/document events; null where there is no window (tests that drive them by hand). */
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'> | null;
+  doc: Pick<Document, 'addEventListener' | 'removeEventListener' | 'visibilityState'> | null;
+}
+
+/** Sweep shortly after something changed, not on every keystroke. */
+const SWEEP_DEBOUNCE_MS = 2_000;
+
+export type FlushReason = 'hidden' | 'pagehide' | 'identity';
+
+export class DraftSession {
+  readonly identity: TabIdentity;
+  private started = false;
+  private readonly flushers = new Set<(reason: FlushReason) => void>();
+  private readonly subscribers = new Set<() => void>();
+  private readonly protectedKeys = new Map<string, number>();
+  private readonly sweepFeatures: Partial<Record<DraftFeature, SweepFeature>> = {};
+  private coordination: Promise<ProtocolContext | null> | null = null;
+  private sweepTimer: unknown = null;
+  private warned = new Set<string>();
+  private detach: () => void = () => undefined;
+
+  constructor(private readonly deps: SessionDeps) {
+    this.identity = new TabIdentity({
+      session: deps.session,
+      openChannel: deps.openChannel,
+      newId: deps.newId,
+      setTimer: deps.setTimer,
+    });
+  }
+
+  start(): void {
+    if (this.started) return;
+    this.started = true;
+    this.identity.on((event) => this.onIdentity(event));
+    this.identity.start();
+    const onPageHide = (event: Event) => this.onPageHide(event as PageTransitionEvent);
+    const onPageShow = (event: Event) => {
+      // Back from the back/forward cache: this lifetime goes on, but a twin
+      // may have taken the id meanwhile, so ask again.
+      if ((event as PageTransitionEvent).persisted) this.identity.probe();
+    };
+    const onStorage = (event: Event) => {
+      const { key, newValue } = event as StorageEvent;
+      // Another tab left: once its draft can be pruned, look again.
+      if (key?.startsWith(LEFT_PREFIX) && newValue) this.requestSweep(PRUNE_GRACE_MS + 1_000);
+    };
+    const onVisibility = () => {
+      // A hidden tab can be discarded without another event: keep what is typed.
+      if (this.deps.doc?.visibilityState === 'hidden') this.flush('hidden');
+    };
+    const { target, doc } = this.deps;
+    target?.addEventListener('pagehide', onPageHide);
+    target?.addEventListener('pageshow', onPageShow);
+    target?.addEventListener('storage', onStorage);
+    doc?.addEventListener('visibilitychange', onVisibility);
+    this.detach = () => {
+      target?.removeEventListener('pagehide', onPageHide);
+      target?.removeEventListener('pageshow', onPageShow);
+      target?.removeEventListener('storage', onStorage);
+      doc?.removeEventListener('visibilitychange', onVisibility);
+    };
+  }
+
+  /** Detach every listener (tests; a page never stops its session). */
+  stop(): void {
+    this.detach();
+    this.detach = () => undefined;
+    if (this.sweepTimer !== null) this.deps.clearTimer(this.sweepTimer);
+    this.sweepTimer = null;
+    this.identity.close();
+  }
+
+  get ready(): boolean {
+    return this.identity.ready;
+  }
+
+  me(): Me | null {
+    return this.identity.ready ? { tab: this.identity.tab, instance: this.identity.instance } : null;
+  }
+
+  get local(): DraftStorage {
+    return this.deps.local;
+  }
+
+  now(): number {
+    return this.deps.now();
+  }
+
+  /** For `useSyncExternalStore`: readiness and identity changes. */
+  subscribe = (listener: () => void): (() => void) => {
+    this.subscribers.add(listener);
+    return () => this.subscribers.delete(listener);
+  };
+
+  registerFlusher(flusher: (reason: FlushReason) => void): () => void {
+    this.flushers.add(flusher);
+    return () => this.flushers.delete(flusher);
+  }
+
+  flush(reason: FlushReason): void {
+    for (const flusher of [...this.flushers]) {
+      try {
+        flusher(reason);
+      } catch (error) {
+        log.reportError('drafts: a flush failed', error, { module: 'drafts' });
+      }
+    }
+  }
+
+  /** The protocol context once this lifetime is registered, or null when coordination is unavailable. */
+  coordinated(): Promise<ProtocolContext | null> {
+    if (!this.coordination) return Promise.resolve(null);
+    return this.coordination;
+  }
+
+  /** Teach the sweep how to validate an editor's records (its codec). */
+  registerFeature(feature: DraftFeature, spec: SweepFeature): void {
+    this.sweepFeatures[feature] = spec;
+  }
+
+  /** A record this tab is offering right now: its own sweep leaves it alone. */
+  protect(key: string): () => void {
+    this.protectedKeys.set(key, (this.protectedKeys.get(key) ?? 0) + 1);
+    return () => {
+      const count = (this.protectedKeys.get(key) ?? 1) - 1;
+      if (count <= 0) this.protectedKeys.delete(key);
+      else this.protectedKeys.set(key, count);
+    };
+  }
+
+  requestSweep(delayMs = SWEEP_DEBOUNCE_MS): void {
+    if (this.sweepTimer !== null) this.deps.clearTimer(this.sweepTimer);
+    this.sweepTimer = this.deps.setTimer(() => {
+      this.sweepTimer = null;
+      void this.sweepNow();
+    }, delayMs);
+  }
+
+  async sweepNow(): Promise<number> {
+    const ctx = await this.coordinated();
+    const me = this.me();
+    if (!ctx || !me) return 0;
+    try {
+      return await sweep(ctx, me, this.sweepFeatures, new Set(this.protectedKeys.keys()));
+    } catch (error) {
+      this.warnOnce('sweep', `drafts: pruning closed tabs' drafts failed (${storageErrorReason(error)})`);
+      return 0;
+    }
+  }
+
+  warnOnce(topic: string, message: string): void {
+    if (this.warned.has(topic)) return;
+    this.warned.add(topic);
+    log.warn(message, { module: 'drafts' });
+  }
+
+  private onIdentity(event: IdentityEvent): void {
+    if (event === 'reflush') {
+      this.flush('identity');
+      return;
+    }
+    if (event === 'changed') {
+      // Our drafts move to the new id on this flush; the old id's records
+      // belong to the twin that kept it.
+      this.flush('identity');
+    }
+    // Ready or changed: this tab's earlier departure (a reload) no longer
+    // counts, even where IndexedDB is missing and nothing is registered.
+    const me = this.me();
+    if (!me) return;
+    try {
+      this.deps.local.remove(leftKey(me.tab));
+    } catch {
+      // Reported by the hook's own reads and writes, which hit the same storage.
+    }
+    this.coordination = this.register(me);
+    for (const subscriber of [...this.subscribers]) subscriber();
+  }
+
+  private async register(me: Me): Promise<ProtocolContext | null> {
+    const backend = this.deps.backend;
+    if (!backend) {
+      this.warnOnce('no-idb', 'drafts: no IndexedDB here, so cross-tab draft recovery is off');
+      return null;
+    }
+    const ctx: ProtocolContext = { local: this.deps.local, backend, now: this.deps.now };
+    try {
+      await registerLifetime(ctx, me);
+    } catch (error) {
+      this.warnOnce(
+        'register',
+        `drafts: could not register this tab (${storageErrorReason(error)}), so cross-tab draft recovery is off`,
+      );
+      return null;
+    }
+    this.requestSweep();
+    return ctx;
+  }
+
+  private onPageHide(event: PageTransitionEvent): void {
+    this.flush('pagehide');
+    // Kept in the back/forward cache: not leaving, so no departure.
+    if (event.persisted) return;
+    const me = this.me();
+    if (!me) return;
+    try {
+      writeDeparture(this.deps.local, me, this.deps.now());
+    } catch (error) {
+      // Without a marker this tab is never known closed: its drafts stay put.
+      this.warnOnce('departure', `drafts: could not record this tab leaving (${storageErrorReason(error)})`);
+    }
+  }
+}
+
+function openBroadcastChannel(): ChannelLike | null {
+  if (typeof BroadcastChannel === 'undefined') return null;
+  return new BroadcastChannel(CHANNEL_NAME) as unknown as ChannelLike;
+}
+
+export function browserSessionDeps(): SessionDeps {
+  return {
+    local: browserLocalStorage(),
+    session: browserSessionStorage(),
+    openChannel: openBroadcastChannel,
+    backend: idbBackend(),
+    now: () => Date.now(),
+    newId: randomId,
+    setTimer: (fn, ms) => window.setTimeout(fn, ms),
+    clearTimer: (handle) => window.clearTimeout(handle as number),
+    target: window,
+    doc: document,
+  };
+}
+
+let current: DraftSession | null = null;
+
+/** This tab's session, started on first use. */
+export function draftSession(): DraftSession {
+  if (!current) {
+    current = new DraftSession(browserSessionDeps());
+    current.start();
+  }
+  return current;
+}
+
+/** Start early (from `main.tsx`), so the duplicate-tab handshake overlaps the page's own load. */
+export function startDraftSession(): void {
+  draftSession();
+}
+
+/** Tests: install a session of their own (or clear it to get a fresh browser one). */
+export function setDraftSessionForTests(session: DraftSession | null): void {
+  current = session;
+}
