@@ -12,6 +12,9 @@ import {
  * Delete this journey with the season (client/src/seasons/README.md).
  */
 test.describe('the winter season', () => {
+  // Every other journey runs with the snowfall switched off (support/season.ts).
+  test.use({ seasonDecorations: true });
+
   test(
     'Yule shows snow, lights and a snowy footer, all on the compositor',
     routes('/'),
