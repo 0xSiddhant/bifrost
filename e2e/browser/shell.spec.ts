@@ -156,6 +156,12 @@ test.describe('shell', () => {
       for (const [from, to] of redirects) {
         await page.goto(from);
         await expect(page, `${from} should redirect`).toHaveURL(to);
+        // Let the page it landed on arrive (its lazy chunk, and the live
+        // stream) before the next goto: WebKit cancelling all of that inside
+        // a new navigation once failed the goto itself with "WebKit
+        // encountered an internal error" (CI run 45463344700).
+        await expect(page.locator('.page-loading')).toHaveCount(0);
+        await waitForLive(page);
       }
     },
   );
