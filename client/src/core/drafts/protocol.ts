@@ -1,7 +1,10 @@
 import type { CoordBackend, CoordTx } from './coordinator';
 import {
   LEFT_PREFIX,
+  OFFER_GRACE_MS,
+  PRUNE_GRACE_MS,
   RECORD_PREFIX,
+  departureValue,
   hashText,
   leftKey,
   makeEnvelope,
@@ -36,10 +39,7 @@ import { storageErrorReason, type DraftStorage } from './storage';
  * draft moved to another tab (after 10 s) or pruned (after 10 minutes).
  */
 
-/** A departed tab's draft can be offered to another tab after this long. */
-export const OFFER_GRACE_MS = 10_000;
-/** …and pruned (when a newer draft for the same editor exists) after this long. */
-export const PRUNE_GRACE_MS = 10 * 60_000;
+export { OFFER_GRACE_MS, PRUNE_GRACE_MS } from './records';
 /**
  * A claim older than this is assumed abandoned (its tab died mid-transfer) and
  * is reconciled: completed if its destination verifies, released if not. A
@@ -200,7 +200,7 @@ export async function registerLifetime(ctx: ProtocolContext, me: Me): Promise<vo
 
 /** Written last at `pagehide` (not persisted): synchronous, after every flush. */
 export function writeDeparture(local: DraftStorage, me: Me, at: number): void {
-  local.set(leftKey(me.tab), JSON.stringify({ instance: me.instance, at } satisfies Departure));
+  local.set(leftKey(me.tab), departureValue(me.instance, at));
 }
 
 export interface FoundOffer<P> {

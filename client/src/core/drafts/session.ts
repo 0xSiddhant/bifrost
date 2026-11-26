@@ -1,16 +1,15 @@
 import { log } from '../log';
-import { idbBackend, type CoordBackend } from './coordinator';
+import type { CoordBackend } from './coordinator';
 import { TabIdentity, CHANNEL_NAME, type ChannelLike, type IdentityEvent } from './identity';
+import type { Me, ProtocolContext, SweepFeature } from './protocol';
 import {
+  LEFT_PREFIX,
   PRUNE_GRACE_MS,
-  registerLifetime,
-  sweep,
-  writeDeparture,
-  type Me,
-  type ProtocolContext,
-  type SweepFeature,
-} from './protocol';
-import { LEFT_PREFIX, leftKey, randomId, type DraftFeature } from './records';
+  departureValue,
+  leftKey,
+  randomId,
+  type DraftFeature,
+} from './basics';
 import {
   browserLocalStorage,
   browserSessionStorage,
@@ -29,7 +28,12 @@ export interface SessionDeps {
   local: DraftStorage;
   session: DraftStorage | null;
   openChannel: () => ChannelLike | null;
-  backend: CoordBackend | null;
+  /**
+   * The coordination store, or a loader for it: the browser's is loaded on
+   * demand, so the first page load carries only the identity and the
+   * departure marker, not the transfer and pruning code.
+   */
+  backend: CoordBackend | null | (() => Promise<CoordBackend | null>);
   now: () => number;
   newId: () => string;
   setTimer: (fn: () => void, ms: number) => unknown;
@@ -178,6 +182,7 @@ export class DraftSession {
     const me = this.me();
     if (!ctx || !me) return 0;
     try {
+      const { sweep } = await import('./protocol');
       return await sweep(ctx, me, this.sweepFeatures, new Set(this.protectedKeys.keys()));
     } catch (error) {
       this.warnOnce('sweep', `drafts: pruning closed tabs' drafts failed (${storageErrorReason(error)})`);
@@ -215,13 +220,24 @@ export class DraftSession {
   }
 
   private async register(me: Me): Promise<ProtocolContext | null> {
-    const backend = this.deps.backend;
+    let backend: CoordBackend | null;
+    try {
+      backend =
+        typeof this.deps.backend === 'function' ? await this.deps.backend() : this.deps.backend;
+    } catch (error) {
+      this.warnOnce(
+        'load',
+        `drafts: could not load cross-tab draft recovery (${storageErrorReason(error)})`,
+      );
+      return null;
+    }
     if (!backend) {
       this.warnOnce('no-idb', 'drafts: no IndexedDB here, so cross-tab draft recovery is off');
       return null;
     }
     const ctx: ProtocolContext = { local: this.deps.local, backend, now: this.deps.now };
     try {
+      const { registerLifetime } = await import('./protocol');
       await registerLifetime(ctx, me);
     } catch (error) {
       this.warnOnce(
@@ -241,7 +257,7 @@ export class DraftSession {
     const me = this.me();
     if (!me) return;
     try {
-      writeDeparture(this.deps.local, me, this.deps.now());
+      this.deps.local.set(leftKey(me.tab), departureValue(me.instance, this.deps.now()));
     } catch (error) {
       // Without a marker this tab is never known closed: its drafts stay put.
       this.warnOnce('departure', `drafts: could not record this tab leaving (${storageErrorReason(error)})`);
@@ -259,7 +275,7 @@ export function browserSessionDeps(): SessionDeps {
     local: browserLocalStorage(),
     session: browserSessionStorage(),
     openChannel: openBroadcastChannel,
-    backend: idbBackend(),
+    backend: async () => (await import('./coordinator')).idbBackend(),
     now: () => Date.now(),
     newId: randomId,
     setTimer: (fn, ms) => window.setTimeout(fn, ms),

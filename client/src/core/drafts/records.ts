@@ -10,7 +10,24 @@
  * tab's `localStorage` write a moment stale, even under a lock.
  */
 
-export type DraftFeature = 'runestone' | 'edda' | 'groot' | 'atlas' | 'variant';
+import {
+  RECORD_PREFIX,
+  encodeKeyPart,
+  type Departure,
+  type DraftFeature,
+} from './basics';
+
+export {
+  LEFT_PREFIX,
+  OFFER_GRACE_MS,
+  PRUNE_GRACE_MS,
+  RECORD_PREFIX,
+  departureValue,
+  leftKey,
+  randomId,
+  type Departure,
+  type DraftFeature,
+} from './basics';
 
 export const DRAFT_FEATURES: readonly DraftFeature[] = [
   'runestone',
@@ -30,13 +47,9 @@ export function docWorkspace(id: string): string {
   return `doc:${id}`;
 }
 
-export const RECORD_PREFIX = 'bifrost.drafts.v1.r.';
-export const LEFT_PREFIX = 'bifrost.drafts.v1.left.';
-
-const encode = (part: string): string => encodeURIComponent(part).replace(/\./g, '%2E');
 
 export function recordKey(feature: DraftFeature, tab: string, workspace: string): string {
-  return `${RECORD_PREFIX}${feature}.${encode(tab)}.${encode(workspace)}`;
+  return `${RECORD_PREFIX}${feature}.${encodeKeyPart(tab)}.${encodeKeyPart(workspace)}`;
 }
 
 export interface RecordKeyParts {
@@ -63,9 +76,6 @@ export function parseRecordKey(key: string): RecordKeyParts | null {
   }
 }
 
-export function leftKey(tab: string): string {
-  return `${LEFT_PREFIX}${encode(tab)}`;
-}
 
 /** Validates a stored payload; null rejects it (the record is then ignored, never deleted). */
 export type DraftCodec<P> = (raw: unknown) => P | null;
@@ -120,11 +130,6 @@ export function parseEnvelope<P>(
   return { v: 1, tab: expect.tab, feature: expect.feature, workspace: expect.workspace, savedAt: record.savedAt, payload };
 }
 
-/** What a closing tab leaves behind: which page lifetime left, and when. */
-export interface Departure {
-  instance: string;
-  at: number;
-}
 
 export function parseDeparture(raw: string | null): Departure | null {
   if (raw === null) return null;
@@ -153,16 +158,4 @@ export function hashText(text: string): string {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
-}
-
-/** A random id, from `getRandomValues` (not gated on a secure context, unlike `randomUUID`). */
-export function randomId(): string {
-  try {
-    const bytes = new Uint8Array(10);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
-  } catch {
-    // Deliberately silent: a browser without `crypto` still gets a usable id.
-    return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
-  }
 }
