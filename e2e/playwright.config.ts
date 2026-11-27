@@ -28,7 +28,9 @@ export default defineConfig<object, WorkerOptions>({
   forbidOnly: Boolean(process.env.CI),
   // A failure is a client break caught before merge, not a flake to retry.
   retries: 0,
-  workers: process.env.CI ? 4 : undefined,
+  // Two keeps the production app and browser responsive while each worker
+  // boots its own server; four workers exhausted the route-chunk timeout.
+  workers: 2,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
