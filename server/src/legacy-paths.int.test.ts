@@ -46,6 +46,15 @@ const STREAMS = new Set(['GET /api/v1/events']);
  */
 const VOLATILE: Record<string, { fields: string[]; reason: string }> = {
   'GET /api/v1/health': { fields: ['uptime'], reason: 'seconds since boot, read at each call' },
+  // Same clock: the two calls straddling a second made them differ (#122's CI).
+  'GET /api/v1/heimdall/stats': {
+    fields: ['uptimeSeconds'],
+    reason: 'whole seconds since boot, read at each call',
+  },
+  'GET /api/v1/heimdall/about': {
+    fields: ['uptimeSeconds'],
+    reason: 'whole seconds since boot, read at each call',
+  },
 };
 
 /** Calls that end the admin session: sent without one, so both answer 401. */
