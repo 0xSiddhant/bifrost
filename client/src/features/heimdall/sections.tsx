@@ -1,4 +1,12 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  lazy,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ComponentType,
+  type ReactNode,
+} from 'react';
+import { withChunkTimeout } from '../../core/chunkError';
 import { ApiError } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceLabel, deviceName } from '../../core/devices';
@@ -90,7 +98,8 @@ export interface HeimdallSection {
   group: string;
   icon: ReactNode;
   blurb: string;
-  Component: (props: SectionProps) => ReactNode;
+  Component: ComponentType<SectionProps>;
+  createComponent?: () => ComponentType<SectionProps>;
   manifest: SectionManifestItem[];
 }
 
@@ -1342,6 +1351,17 @@ function OfflineModeSection() {
  * Every section, with the builds it exists in (PLAN-35). Standalone keeps only
  * what lives in this browser: Settings, Sky Relics, Loki, Screensaver, About.
  */
+const createDownloadsSection = __HUB__
+  ? () =>
+      lazy(() =>
+        withChunkTimeout(
+          import('./DownloadsSection').then(({ HeimdallDownloadsSection }) => ({
+            default: HeimdallDownloadsSection,
+          })),
+        ),
+      )
+  : undefined;
+
 const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
   {
     id: 'overview',
@@ -1487,6 +1507,23 @@ const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
     Component: UploadsSection,
     manifest: [
       { controlId: 'uploads-list', label: 'Staged files', keywords: ['files', 'sent', 'uploads'] },
+    ],
+  },
+  {
+    id: 'downloads',
+    hubOnly: true,
+    label: 'Downloads',
+    group: 'Vault',
+    icon: <DownloadIcon size={16} />,
+    blurb: 'Preview, browse or delete files and folders in storage/downloads.',
+    Component: createDownloadsSection ? createDownloadsSection() : () => null,
+    createComponent: createDownloadsSection,
+    manifest: [
+      {
+        controlId: 'downloads-list',
+        label: 'Download files',
+        keywords: ['files', 'folders', 'preview', 'delete', 'search', 'storage'],
+      },
     ],
   },
   {

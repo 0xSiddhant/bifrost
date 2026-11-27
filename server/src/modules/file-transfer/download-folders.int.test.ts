@@ -36,9 +36,24 @@ interface Entry {
   id: string;
   name: string;
   size: number;
+  mtime: number;
   ext: string;
   type: 'file' | 'folder';
   parent: string | null;
+}
+
+function deleteSnapshot(entry: Entry, children: Entry[] = []) {
+  return {
+    snapshot: {
+      name: entry.name,
+      parent: entry.parent,
+      ext: entry.ext,
+      type: entry.type,
+      size: entry.size,
+      mtime: entry.mtime,
+      children: children.map(({ name, size, mtime }) => ({ name, size, mtime })),
+    },
+  };
 }
 
 /** Central-directory file names, read straight off the zip's own end record. */
@@ -60,6 +75,18 @@ describe('download folders over HTTP', () => {
 
   const listing = async (): Promise<Entry[]> =>
     (await app.fastify.inject({ method: 'GET', url: '/api/downloads' })).json();
+
+  async function adminCookie(): Promise<string> {
+    const response = await app.fastify.inject({
+      method: 'POST',
+      url: '/api/v1/heimdall/login',
+      payload: { pin: '4321' },
+    });
+    expect(response.statusCode).toBe(200);
+    const raw = response.headers['set-cookie'];
+    const header = Array.isArray(raw) ? raw[0] : raw;
+    return header?.split(';')[0] ?? '';
+  }
 
   /** The watcher only sees a folder after chokidar's awaitWriteFinish debounce. */
   async function waitForEntry(match: (entry: Entry) => boolean): Promise<Entry> {
@@ -293,4 +320,101 @@ describe('download folders over HTTP', () => {
     // Criterion 1: still in uploads/, still needing a Move.
     expect(fs.readdirSync(path.join(storageRoot, 'uploads'))).toEqual(['staged.txt']);
   });
+
+  it('requires an admin session and deletes one file or a folder with its contents', async () => {
+    const entries = await listing();
+    const file = entries.find((entry) => entry.name === 'a-1.jpg' && entry.parent === 'Trip photos');
+    const folder = entries.find((entry) => entry.name === 'Trip photos' && entry.type === 'folder');
+    expect(file).toBeDefined();
+    expect(folder).toBeDefined();
+    if (!file || !folder) throw new Error('test downloads were not indexed');
+
+    const anonymous = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${file.id}`,
+      payload: deleteSnapshot(file),
+    });
+    expect(anonymous.statusCode).toBe(401);
+
+    const cookie = await adminCookie();
+    const removedFile = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${file.id}`,
+      headers: { cookie },
+      payload: deleteSnapshot(file),
+    });
+    expect(removedFile.statusCode).toBe(204);
+    expect(fs.existsSync(path.join(storageRoot, 'downloads', 'Trip photos', 'a-1.jpg'))).toBe(false);
+    expect((await listing()).some((entry) => entry.id === file.id)).toBe(false);
+
+    const remaining = await listing();
+    const currentFolder = remaining.find((entry) => entry.id === folder.id);
+    expect(currentFolder).toBeDefined();
+    if (!currentFolder) throw new Error('test folder disappeared before deletion');
+    const currentChildren = remaining.filter(
+      (entry) => entry.type === 'file' && entry.parent === currentFolder.name,
+    );
+    const removedFolder = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${folder.id}`,
+      headers: { cookie },
+      payload: deleteSnapshot(currentFolder, currentChildren),
+    });
+    expect(removedFolder.statusCode).toBe(204);
+    expect(fs.existsSync(path.join(storageRoot, 'downloads', 'Trip photos'))).toBe(false);
+    expect((await listing()).some((entry) => entry.id === folder.id)).toBe(false);
+    expect((await listing()).some((entry) => entry.parent === 'Trip photos')).toBe(false);
+
+    const unknown = await app.fastify.inject({
+      method: 'DELETE',
+      url: '/api/v1/downloads/AAAAAAAAAAAAAAAA',
+      headers: { cookie },
+      payload: deleteSnapshot(folder),
+    });
+    expect(unknown.statusCode).toBe(404);
+  });
+
+  it('refuses folder deletion when unlisted nested or newly added entries exist', async () => {
+    const cookie = await adminCookie();
+    const deepFolder = path.join(storageRoot, 'downloads', 'Has deeper content');
+    fs.mkdirSync(deepFolder);
+    fs.writeFileSync(path.join(deepFolder, 'visible.txt'), 'visible');
+    const folder = await waitForEntry(
+      (entry) => entry.name === 'Has deeper content' && entry.type === 'folder',
+    );
+    const visible = await waitForEntry(
+      (entry) => entry.name === 'visible.txt' && entry.parent === folder.name,
+    );
+    fs.mkdirSync(path.join(deepFolder, 'hidden-subfolder'));
+    fs.writeFileSync(path.join(deepFolder, 'hidden-subfolder', 'buried.txt'), 'buried');
+
+    const nested = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${folder.id}`,
+      headers: { cookie },
+      payload: deleteSnapshot(folder, [visible]),
+    });
+    expect(nested.statusCode).toBe(409);
+    expect(fs.existsSync(path.join(deepFolder, 'hidden-subfolder', 'buried.txt'))).toBe(true);
+
+    const staleFolderPath = path.join(storageRoot, 'downloads', 'Stale content');
+    fs.mkdirSync(staleFolderPath);
+    fs.writeFileSync(path.join(staleFolderPath, 'visible.txt'), 'visible');
+    const staleFolder = await waitForEntry(
+      (entry) => entry.name === 'Stale content' && entry.type === 'folder',
+    );
+    const staleChild = await waitForEntry(
+      (entry) => entry.name === 'visible.txt' && entry.parent === staleFolder.name,
+    );
+    fs.writeFileSync(path.join(staleFolderPath, 'added-after-listing.txt'), 'new');
+
+    const stale = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${staleFolder.id}`,
+      headers: { cookie },
+      payload: deleteSnapshot(staleFolder, [staleChild]),
+    });
+    expect(stale.statusCode).toBe(409);
+    expect(fs.existsSync(path.join(staleFolderPath, 'added-after-listing.txt'))).toBe(true);
+  }, 30_000);
 });

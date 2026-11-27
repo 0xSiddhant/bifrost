@@ -39,11 +39,13 @@ function build(
   const registry: DownloadRegistry = {
     list: () => list,
     resolveEntry: (id) => list.find((e) => e.id === id) ?? null,
+    removeEntry: () => {},
   };
   const reader: DownloadReader = {
     stat: vi.fn(),
     open: vi.fn(),
     confineFolder: overrides.confineFolder ?? vi.fn(async (name: string) => `/safe/${name}`),
+    remove: vi.fn(),
   };
   const archiver: FolderArchiver = { stream: vi.fn(() => Readable.from(['zip'])) };
   return { usecase: new ArchiveFolderUseCase(registry, reader, archiver, log), reader, archiver };

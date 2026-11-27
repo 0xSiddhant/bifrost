@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../../core/api';
+import { log } from '../../core/log';
 import { Button } from '../../core/ui/Button';
 import { Input } from '../../core/ui/Field';
+import { ChunkBoundary } from '../../core/ui/ChunkBoundary';
 import { CloseIcon, SearchIcon, ShieldIcon } from '../../core/ui/icons';
 import { login, logout } from './api';
 import { ctlId, SECTION_GROUPS, SECTIONS } from './sections';
@@ -92,6 +94,8 @@ export function HeimdallModal({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false); // iPad-portrait collapsible panel
+  const [sectionEpoch, setSectionEpoch] = useState(0);
+  const [sectionChunkError, setSectionChunkError] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -170,13 +174,32 @@ export function HeimdallModal({ onClose }: { onClose: () => void }) {
 
   const goTo = (sectionId: string, controlId?: string) => {
     setActiveId(sectionId);
+    setSectionChunkError(false);
     setQuery('');
     setPanelOpen(false);
     contentRef.current?.scrollTo({ top: 0 });
     setHighlight(controlId ?? null);
   };
 
-  const Section = active?.Component ?? (() => null);
+  const Section = useMemo(
+    () => (active?.createComponent ? active.createComponent() : active?.Component ?? (() => null)),
+    [active, sectionEpoch],
+  );
+
+  const onSectionChunkError = useCallback(
+    (error: Error) => {
+      setSectionChunkError(true);
+      log.warn(`Heimdall: could not load ${active?.label ?? 'section'}: ${error.message}`, {
+        module: 'heimdall',
+      });
+    },
+    [active?.label],
+  );
+
+  const retrySection = () => {
+    setSectionChunkError(false);
+    setSectionEpoch((epoch) => epoch + 1);
+  };
 
   return (
     <div className="modal-scrim heimdall-scrim" onMouseDown={close}>
@@ -279,7 +302,28 @@ export function HeimdallModal({ onClose }: { onClose: () => void }) {
                 </div>
               </header>
               <div className="heimdall-content__body">
-                <Section onLock={close} />
+                <ChunkBoundary
+                  key={`${activeId}:${sectionEpoch}`}
+                  onChunkError={onSectionChunkError}
+                >
+                  <Suspense
+                    fallback={
+                      <p className="caption" role="status">
+                        Loading {active?.label ?? 'section'}…
+                      </p>
+                    }
+                  >
+                    <Section onLock={close} />
+                  </Suspense>
+                </ChunkBoundary>
+                {sectionChunkError && (
+                  <div className="row" role="alert">
+                    <p className="caption">Could not load {active?.label ?? 'section'}.</p>
+                    <Button size="sm" variant="ghost" onClick={retrySection}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
               </div>
             </section>
           </>

@@ -513,6 +513,282 @@
         "security": []
       }
     },
+    "/api/v1/downloads/{id}": {
+      "delete": {
+        "operationId": "deleteDownload",
+        "summary": "Delete one download or an entire folder",
+        "tags": [
+          "file-transfer"
+        ],
+        "description": "Requires a Heimdall admin session and the listing snapshot being confirmed. The target path is checked against its id so a stale watcher entry does not block deletion. Folder deletion is refused if hidden, nested, or changed contents are present.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "snapshot"
+                ],
+                "properties": {
+                  "snapshot": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "parent",
+                      "ext",
+                      "type",
+                      "size",
+                      "mtime",
+                      "children"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      },
+                      "parent": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 255
+                      },
+                      "ext": {
+                        "type": "string",
+                        "maxLength": 32
+                      },
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "file",
+                          "folder"
+                        ]
+                      },
+                      "size": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "mtime": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "children": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "name",
+                            "size",
+                            "mtime"
+                          ],
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 255
+                            },
+                            "size": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "mtime": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{16}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No admin session, or it was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No admin session, or it was revoked",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with something that already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflicts with something that already exists",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Error",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/downloads/{id}/content": {
       "get": {
         "operationId": "getDownloadContent",
@@ -719,6 +995,7 @@
         "tags": [
           "file-transfer"
         ],
+        "description": "The response is aborted if an indexed file disappears while the archive is being streamed, rather than returning an incomplete zip as a successful download.",
         "parameters": [
           {
             "schema": {

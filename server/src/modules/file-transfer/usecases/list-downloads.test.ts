@@ -26,7 +26,11 @@ describe('ListDownloadsUseCase', () => {
       entry({ id: 'f', name: 'Trip photos', type: 'folder', size: 0, mtime: 20 }),
       entry({ id: 'r', name: 'loose.txt', mtime: 10 }),
     ];
-    const registry: DownloadRegistry = { list: () => list, resolveEntry: () => null };
+    const registry: DownloadRegistry = {
+      list: () => list,
+      resolveEntry: () => null,
+      removeEntry: () => {},
+    };
 
     const result = new ListDownloadsUseCase(registry).execute();
 
@@ -40,7 +44,11 @@ describe('ListDownloadsUseCase', () => {
 
   it('does not mutate the registry’s own array while sorting', () => {
     const list = [entry({ id: 'a', name: 'a', mtime: 1 }), entry({ id: 'b', name: 'b', mtime: 9 })];
-    const registry: DownloadRegistry = { list: () => list, resolveEntry: () => null };
+    const registry: DownloadRegistry = {
+      list: () => list,
+      resolveEntry: () => null,
+      removeEntry: () => {},
+    };
 
     new ListDownloadsUseCase(registry).execute();
 

@@ -6,12 +6,14 @@ import { registerFileRoutes } from './routes/files.js';
 import { registerUploadRoutes } from './routes/uploads.js';
 import { DownloadWatcherService } from './services/download-watcher.js';
 import { FsDownloadReader } from './services/fs-download-reader.js';
+import { DownloadFolderLock } from './services/download-folder-lock.js';
 import { FsFileStorageRepository } from './services/fs-file-storage.js';
 import { FsFolderArchiver } from './services/fs-folder-archiver.js';
 import { FsFolderPublisher } from './services/fs-folder-publisher.js';
 import { FsUploadsStore } from './services/fs-uploads-store.js';
 import { sweepPublishedDuplicates } from './services/place-file.js';
 import { ArchiveFolderUseCase } from './usecases/archive-folder.js';
+import { DeleteDownloadUseCase } from './usecases/delete-download.js';
 import { GetDownloadStreamUseCase } from './usecases/get-download-stream.js';
 import { ListDownloadsUseCase } from './usecases/list-downloads.js';
 import { ManageUploadsUseCase } from './usecases/manage-uploads.js';
@@ -24,7 +26,8 @@ export const fileTransferModule: FeatureModule = {
     const maxUploadBytes = config.maxUploadSizeMb * 1024 * 1024;
 
     const storage = new FsFileStorageRepository(config.storage.tmp, config.storage.uploads);
-    const reader = new FsDownloadReader(config.storage.downloads);
+    const folderLock = new DownloadFolderLock();
+    const reader = new FsDownloadReader(config.storage.downloads, folderLock);
     const watcher = new DownloadWatcherService(config.storage.downloads, bus, log);
 
     const uploadFiles = new UploadFilesUseCase({
@@ -33,7 +36,7 @@ export const fileTransferModule: FeatureModule = {
       log,
       maxBytes: maxUploadBytes,
       blockedExtensions: config.uploadExtBlocklist,
-      folderPublisher: new FsFolderPublisher(config.storage.downloads),
+      folderPublisher: new FsFolderPublisher(config.storage.downloads, folderLock),
     });
     const listDownloads = new ListDownloadsUseCase(watcher);
     const getDownloadStream = new GetDownloadStreamUseCase(watcher, reader, log);
@@ -43,6 +46,7 @@ export const fileTransferModule: FeatureModule = {
       new FsFolderArchiver(log),
       log,
     );
+    const deleteDownload = new DeleteDownloadUseCase(watcher, reader, log);
     const manageUploads = new ManageUploadsUseCase({
       store: new FsUploadsStore(config.storage.uploads, config.storage.downloads, log),
       bus,
@@ -80,7 +84,7 @@ export const fileTransferModule: FeatureModule = {
       blockedExtensions: config.uploadExtBlocklist,
       rateLimitPerMinute: config.uploadRateLimitPerMin,
     });
-    registerDownloadRoutes(app, { listDownloads, getDownloadStream, archiveFolder });
+    registerDownloadRoutes(app, { listDownloads, getDownloadStream, archiveFolder, deleteDownload });
     registerUploadRoutes(app, { manageUploads });
 
     // A move is link-then-unlink, so a crash between the two leaves the file

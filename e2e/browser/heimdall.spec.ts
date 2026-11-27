@@ -68,6 +68,9 @@ test(
     await expect(dialog.getByRole('heading', { name: 'Changelog' })).toBeVisible();
     await section(page, 'Storage').click();
     await expect(dialog.locator('.heimdall-content__body')).not.toContainText('Measuring storage…');
+    await section(page, 'Downloads').click();
+    await expect(dialog.getByLabel('Search Downloads')).toBeVisible();
+    await expect(dialog.getByLabel('Sort downloads')).toBeVisible();
 
     // Policies: each one lands on the server.
     await section(page, 'Loki').click();
