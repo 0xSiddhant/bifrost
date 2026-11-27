@@ -10,12 +10,7 @@
  * tab's `localStorage` write a moment stale, even under a lock.
  */
 
-import {
-  RECORD_PREFIX,
-  encodeKeyPart,
-  type Departure,
-  type DraftFeature,
-} from './basics';
+import { RECORD_PREFIX, encodeKeyPart, type Departure, type DraftFeature } from './basics';
 
 export {
   LEFT_PREFIX,
@@ -47,7 +42,6 @@ export function docWorkspace(id: string): string {
   return `doc:${id}`;
 }
 
-
 export function recordKey(feature: DraftFeature, tab: string, workspace: string): string {
   return `${RECORD_PREFIX}${feature}.${encodeKeyPart(tab)}.${encodeKeyPart(workspace)}`;
 }
@@ -76,7 +70,6 @@ export function parseRecordKey(key: string): RecordKeyParts | null {
   }
 }
 
-
 /** Validates a stored payload; null rejects it (the record is then ignored, never deleted). */
 export type DraftCodec<P> = (raw: unknown) => P | null;
 
@@ -94,7 +87,14 @@ export function makeEnvelope<P>(
   payload: P,
   savedAt: number,
 ): DraftEnvelope<P> {
-  return { v: 1, tab: parts.tab, feature: parts.feature, workspace: parts.workspace, savedAt, payload };
+  return {
+    v: 1,
+    tab: parts.tab,
+    feature: parts.feature,
+    workspace: parts.workspace,
+    savedAt,
+    payload,
+  };
 }
 
 /**
@@ -127,9 +127,15 @@ export function parseEnvelope<P>(
   }
   const payload = codec(record.payload);
   if (payload === null) return null;
-  return { v: 1, tab: expect.tab, feature: expect.feature, workspace: expect.workspace, savedAt: record.savedAt, payload };
+  return {
+    v: 1,
+    tab: expect.tab,
+    feature: expect.feature,
+    workspace: expect.workspace,
+    savedAt: record.savedAt,
+    payload,
+  };
 }
-
 
 export function parseDeparture(raw: string | null): Departure | null {
   if (raw === null) return null;

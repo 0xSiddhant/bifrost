@@ -76,7 +76,8 @@ export function legacyTextParse(blank: (text: string) => boolean) {
       }
       if (typeof value !== 'object' || value === null) return null;
       const old = value as { title?: unknown; text?: unknown; format?: unknown; savedAt?: unknown };
-      if (typeof old.title !== 'string' || typeof old.text !== 'string' || blank(old.text)) return null;
+      if (typeof old.title !== 'string' || typeof old.text !== 'string' || blank(old.text))
+        return null;
       return {
         payload: {
           title: old.title,

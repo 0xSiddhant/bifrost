@@ -7,9 +7,12 @@ import {
   PRUNE_GRACE_MS,
   acceptLegacy,
   acceptOffer,
+  dismissLegacy,
+  dismissOffer,
   findLegacy,
   findOffer,
   registerLifetime,
+  releaseLifetime,
   sweep,
   writeDeparture,
   type Me,
@@ -32,7 +35,13 @@ describe('draft protocol (PLAN-43)', () => {
   let backend: ReturnType<typeof memoryBackend>;
   let ctx: ProtocolContext;
 
-  const put = (me: Me, text: string, workspace = SCRATCH, feature: DraftFeature = 'runestone', savedAt = clock) =>
+  const put = (
+    me: Me,
+    text: string,
+    workspace = SCRATCH,
+    feature: DraftFeature = 'runestone',
+    savedAt = clock,
+  ) =>
     local.set(
       recordKey(feature, me.tab, workspace),
       JSON.stringify(makeEnvelope({ feature, tab: me.tab, workspace }, draft(text), savedAt)),
@@ -75,6 +84,28 @@ describe('draft protocol (PLAN-43)', () => {
       put(A, 'live work');
       clock += OFFER_GRACE_MS * 10;
       expect((await offerFor(B)).offer).toBeNull();
+    });
+
+    it('offers the newest closed draft, not the first in key order', async () => {
+      // tab-b sorts before tab-c; tab-c left later, with newer work.
+      put(B, 'older');
+      leave(B);
+      clock += 1000;
+      put(C, 'newer');
+      leave(C);
+      clock += OFFER_GRACE_MS;
+      expect((await offerFor(A)).offer?.envelope.payload.text).toBe('newer');
+    });
+
+    it('offers nothing older while the newest departure is still within the grace', async () => {
+      put(B, 'older');
+      leave(B);
+      clock += OFFER_GRACE_MS;
+      put(C, 'newer');
+      leave(C);
+      const early = await offerFor(A);
+      expect(early.offer).toBeNull();
+      expect(early.recheckAt).toBe(clock + OFFER_GRACE_MS);
     });
 
     it('waits out the grace after a departure, saying when to look again', async () => {
@@ -149,6 +180,51 @@ describe('draft protocol (PLAN-43)', () => {
       expect(read(B)).toBeNull();
       expect((await offerFor(C)).offer).toBeNull();
       expect(await acceptOffer(ctx, C, key, textDraftCodec)).toEqual({ status: 'gone' });
+    });
+
+    it('never overwrites a draft this tab already holds for the workspace', async () => {
+      const key = recordKey('runestone', B.tab, SCRATCH);
+      put(A, 'typed here meanwhile');
+      expect(await acceptOffer(ctx, A, key, textDraftCodec)).toEqual({ status: 'own' });
+      expect(textOf(A)).toBe('typed here meanwhile');
+      expect(textOf(B)).toBe('closed work');
+      expect(backend.entries.has(`gone:${key}`)).toBe(false);
+    });
+
+    it('counts a transfer another tab completed for it during a stall as done, keeping the copy', async () => {
+      const key = recordKey('runestone', B.tab, SCRATCH);
+      const runestone = { runestone: { codec: textDraftCodec as (raw: unknown) => unknown } };
+      let calls = 0;
+      backend.delay = async () => {
+        calls += 1;
+        // Before this tab marks its claim done, it stalls past the lease and
+        // another tab's sweep reconciles the claim from the verified copy.
+        if (calls === 2) {
+          clock += CLAIM_LEASE_MS + 1;
+          await sweep(ctx, C, runestone);
+        }
+      };
+      const result = await acceptOffer(ctx, A, key, textDraftCodec);
+      backend.delay = () => Promise.resolve();
+      expect(result).toMatchObject({ status: 'ok', payload: { text: 'closed work' } });
+      expect(textOf(A)).toBe('closed work');
+      expect(read(B)).toBeNull();
+    });
+
+    it('does not offer a dismissed draft again, in any tab, while its tab stays closed', async () => {
+      const found = (await offerFor(A)).offer;
+      expect(found?.envelope.payload.text).toBe('closed work');
+      await dismissOffer(ctx, found!.key, found!.srcInstance);
+      expect((await offerFor(A)).offer).toBeNull();
+      expect((await offerFor(C)).offer).toBeNull();
+      // Dismissed, not deleted: the draft stays where it is.
+      expect(textOf(B)).toBe('closed work');
+      // The tab comes back and closes again: its draft counts afresh.
+      const again: Me = { tab: B.tab, instance: 'b2' };
+      await registerLifetime(ctx, again);
+      writeDeparture(local, again, clock);
+      clock += OFFER_GRACE_MS;
+      expect((await offerFor(A)).offer?.envelope.payload.text).toBe('closed work');
     });
 
     it('lets exactly one of two racing tabs take it', async () => {
@@ -253,7 +329,7 @@ describe('draft protocol (PLAN-43)', () => {
     const runestone = { runestone: { codec: textDraftCodec as (raw: unknown) => unknown } };
 
     it('prunes a closed tab’s draft once this tab has one of its own, after the prune grace', async () => {
-      put(A, 'mine');
+      put(A, 'mine', 'doc:1');
       put(B, 'closed', 'doc:1');
       leave(B);
       clock += PRUNE_GRACE_MS - 1;
@@ -261,7 +337,22 @@ describe('draft protocol (PLAN-43)', () => {
       clock += 1;
       expect(await sweep(ctx, A, runestone)).toBe(1);
       expect(read(B, 'doc:1')).toBeNull();
-      expect(textOf(A)).toBe('mine');
+      expect(textOf(A, 'doc:1')).toBe('mine');
+    });
+
+    it('decides per workspace: a scratch draft never costs a saved document’s edits', async () => {
+      put(A, 'my scratch');
+      put(B, 'closed scratch');
+      put(B, 'closed doc edits', 'doc:1');
+      put(C, 'other doc edits', 'doc:2');
+      leave(B);
+      leave(C);
+      clock += PRUNE_GRACE_MS;
+      // Only B's scratch draft has a newer one (this tab's) in its workspace.
+      expect(await sweep(ctx, A, runestone)).toBe(1);
+      expect(read(B)).toBeNull();
+      expect(textOf(B, 'doc:1')).toBe('closed doc edits');
+      expect(textOf(C, 'doc:2')).toBe('other doc edits');
     });
 
     it('keeps the newest closed draft when this tab has none, pruning the older', async () => {
@@ -328,13 +419,48 @@ describe('draft protocol (PLAN-43)', () => {
 
     it('offers a pre-update draft with something in it, and nothing for a blank one', async () => {
       local.set(LEGACY_KEY, old('{"kept":1}'));
-      expect(await findLegacy(ctx, 'runestone', LEGACY)).toEqual({
+      expect(await findLegacy(ctx, 'runestone', LEGACY)).toMatchObject({
         payload: { title: 'Old', text: '{"kept":1}', baseline: null },
         savedAt: 5,
       });
       local.set(LEGACY_KEY, old('  '));
       expect(await findLegacy(ctx, 'runestone', LEGACY)).toBeNull();
       expect(await findLegacy(ctx, 'variant', LEGACY)).toBeNull();
+    });
+
+    it('is not offered again once dismissed, while the old key holds that value', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      const found = await findLegacy(ctx, 'runestone', LEGACY);
+      await dismissLegacy(ctx, 'runestone', found!.hash);
+      expect(await findLegacy(ctx, 'runestone', LEGACY)).toBeNull();
+      // Kept, not deleted; a different value is offered on its own merits.
+      expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+      local.set(LEGACY_KEY, old('{"other":2}'));
+      expect((await findLegacy(ctx, 'runestone', LEGACY))?.payload.text).toBe('{"other":2}');
+    });
+
+    it('never overwrites this tab’s own scratch draft with it', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      put(A, 'typed here meanwhile');
+      expect(await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY)).toEqual({ status: 'own' });
+      expect(textOf(A)).toBe('typed here meanwhile');
+      expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+    });
+
+    it('counts a transfer another tab completed for it during a stall as done', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      let calls = 0;
+      backend.delay = async () => {
+        calls += 1;
+        if (calls === 2) {
+          clock += CLAIM_LEASE_MS + 1;
+          await findLegacy(ctx, 'runestone', LEGACY);
+        }
+      };
+      const result = await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY);
+      backend.delay = () => Promise.resolve();
+      expect(result).toMatchObject({ status: 'ok', payload: { text: '{"kept":1}' } });
+      expect(textOf(A)).toBe('{"kept":1}');
     });
 
     it('moves it into one tab, once, and removes the old key only after the copy verifies', async () => {
@@ -418,11 +544,25 @@ describe('draft protocol (PLAN-43)', () => {
         // An old-version tab, still open, writes the slot mid-transfer.
         if (calls === 2) local.set(LEGACY_KEY, old('{"later":2}'));
       };
-      expect(await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY)).toMatchObject({ status: 'ok' });
+      expect(await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY)).toMatchObject({
+        status: 'ok',
+      });
       backend.delay = () => Promise.resolve();
       expect(local.get(LEGACY_KEY)).toBe(old('{"later":2}'));
       expect((await findLegacy(ctx, 'runestone', LEGACY))?.payload.text).toBe('{"later":2}');
     });
+  });
+
+  it('registers nothing for a page that yielded its id meanwhile, and releases only its own entry', async () => {
+    // A page that gave its id up to a live twin before its registration ran.
+    expect(await registerLifetime(ctx, { tab: B.tab, instance: 'late' }, () => false)).toBe(false);
+    expect(backend.entries.get(`tab:${B.tab}`)).toMatchObject({ instance: B.instance });
+    // One that registered first, then yielded: its entry goes, a twin's stays.
+    await registerLifetime(ctx, { tab: C.tab, instance: 'yielder' });
+    await releaseLifetime(ctx, { tab: C.tab, instance: 'yielder' });
+    expect(backend.entries.has(`tab:${C.tab}`)).toBe(false);
+    await releaseLifetime(ctx, { tab: B.tab, instance: 'someone else' });
+    expect(backend.entries.get(`tab:${B.tab}`)).toMatchObject({ instance: B.instance });
   });
 
   it('a new lifetime clears its own departure and earlier decisions about its records', async () => {

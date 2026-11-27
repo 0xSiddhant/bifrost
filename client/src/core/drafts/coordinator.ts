@@ -78,7 +78,8 @@ export function idbBackend(): CoordBackend | null {
     (opening ??= new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, 1);
       request.onupgradeneeded = () => {
-        if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE);
+        if (!request.result.objectStoreNames.contains(STORE))
+          request.result.createObjectStore(STORE);
       };
       request.onsuccess = () => {
         const db = request.result;

@@ -90,6 +90,33 @@ interface LegacyJournal {
 const tabEntryKey = (tab: string) => `tab:${tab}`;
 const goneKey = (key: string) => `gone:${key}`;
 const legacyJournalKey = (feature: DraftFeature) => `legacy:${feature}`;
+/** A closed tab's draft someone dismissed: not offered again, in any tab. */
+const dismissedKey = (key: string) => `dismissed:${key}`;
+/** The pre-update draft someone dismissed, by the hash of its raw value. */
+const legacyDismissedKey = (feature: DraftFeature) => `dismissed-legacy:${feature}`;
+
+interface Dismissal {
+  /** The source tab's page lifetime (a tab draft), or the raw value's hash (legacy). */
+  about: string;
+  at: number;
+}
+
+function asDismissal(value: unknown): Dismissal | null {
+  const entry = value as Partial<Dismissal> | undefined;
+  return entry && typeof entry.about === 'string' ? (entry as Dismissal) : null;
+}
+
+interface Candidate {
+  record: StoredRecord;
+  departure: Departure;
+  savedAt: number;
+}
+
+/** Newest first: the latest departure, then the latest save, then key order. */
+const newestFirst = (a: Candidate, b: Candidate): number =>
+  b.departure.at - a.departure.at ||
+  b.savedAt - a.savedAt ||
+  (a.record.key < b.record.key ? -1 : a.record.key > b.record.key ? 1 : 0);
 
 /** Any stored payload, for verifying a destination by hash. */
 const anyPayload: DraftCodec<unknown> = (raw) => (raw === undefined ? null : raw);
@@ -101,7 +128,9 @@ function asTabEntry(value: unknown): TabEntry | null {
 }
 function asGone(value: unknown): GoneEntry | null {
   const entry = value as Partial<GoneEntry> | undefined;
-  return entry && (entry.phase === 'claimed' || entry.phase === 'done') ? (entry as GoneEntry) : null;
+  return entry && (entry.phase === 'claimed' || entry.phase === 'done')
+    ? (entry as GoneEntry)
+    : null;
 }
 function asJournal(value: unknown): LegacyJournal | null {
   const entry = value as Partial<LegacyJournal> | undefined;
@@ -184,9 +213,18 @@ function reconcileClaims(tx: CoordTx, local: DraftStorage, now: number): void {
   }
 }
 
-/** Start of a page lifetime: from now on this tab's earlier departure means nothing. */
-export async function registerLifetime(ctx: ProtocolContext, me: Me): Promise<void> {
-  await ctx.backend.run((tx) => {
+/**
+ * Start of a page lifetime: from now on this tab's earlier departure means
+ * nothing. `stillCurrent` is asked inside the transaction: a tab that gave its
+ * id up to a live twin while this waited must not write the twin's entry.
+ */
+export async function registerLifetime(
+  ctx: ProtocolContext,
+  me: Me,
+  stillCurrent: () => boolean = () => true,
+): Promise<boolean> {
+  return ctx.backend.run((tx) => {
+    if (!stillCurrent()) return false;
     tx.put(tabEntryKey(me.tab), { instance: me.instance, at: ctx.now() } satisfies TabEntry);
     // Decisions about this tab's records were about an earlier lifetime.
     for (const key of tx.keys()) {
@@ -195,6 +233,19 @@ export async function registerLifetime(ctx: ProtocolContext, me: Me): Promise<vo
       if (parts?.tab === me.tab) tx.del(key);
     }
     tryRemove(ctx.local, leftKey(me.tab));
+    return true;
+  });
+}
+
+/**
+ * This page gave up a tab id it had registered (a live twin kept it): remove
+ * the entry if it still names this page, so the twin's lifetime is the one on
+ * record. The twin re-registers itself as well; whichever lands last is right.
+ */
+export async function releaseLifetime(ctx: ProtocolContext, former: Me): Promise<void> {
+  await ctx.backend.run((tx) => {
+    if (asTabEntry(tx.get(tabEntryKey(former.tab)))?.instance === former.instance)
+      tx.del(tabEntryKey(former.tab));
   });
 }
 
@@ -206,6 +257,8 @@ export function writeDeparture(local: DraftStorage, me: Me, at: number): void {
 export interface FoundOffer<P> {
   key: string;
   envelope: DraftEnvelope<P>;
+  /** The closed tab's page lifetime, for `dismissOffer`. */
+  srcInstance: string;
 }
 
 export interface OfferSearch<P> {
@@ -216,7 +269,10 @@ export interface OfferSearch<P> {
 
 /**
  * The one draft a blank tab may be offered for this editor and workspace: the
- * first, in key order, whose tab is known closed and which nobody has claimed.
+ * newest (latest departure, then latest save) whose tab is known closed, which
+ * nobody has claimed and nobody has dismissed. While the newest is still inside
+ * the grace (its tab may be reloading), nothing older is offered meanwhile:
+ * `recheckAt` says when to look again.
  */
 export async function findOffer<P>(
   ctx: ProtocolContext,
@@ -230,29 +286,61 @@ export async function findOffer<P>(
     const now = ctx.now();
     reconcileClaims(tx, ctx.local, now);
     const departed = confirmedDepartures(tx, ctx.local);
-    let recheckAt: number | null = null;
+    const candidates: (Candidate & { envelope: DraftEnvelope<P> })[] = [];
     for (const record of listRecords(ctx.local)) {
       const { parts } = record;
-      if (parts.feature !== feature || parts.workspace !== workspace || parts.tab === me.tab) continue;
+      if (parts.feature !== feature || parts.workspace !== workspace || parts.tab === me.tab)
+        continue;
       const departure = departed.get(parts.tab);
       if (!departure || tx.get(goneKey(record.key)) !== undefined) continue;
+      if (asDismissal(tx.get(dismissedKey(record.key)))?.about === departure.instance) continue;
       const envelope = parseEnvelope(ctx.local.get(record.key), codec, parts);
       if (!envelope || !worth(envelope.payload)) continue;
-      if (now - departure.at < OFFER_GRACE_MS) {
-        const due = departure.at + OFFER_GRACE_MS;
-        recheckAt = recheckAt === null ? due : Math.min(recheckAt, due);
-        continue;
-      }
-      return { offer: { key: record.key, envelope }, recheckAt: null };
+      candidates.push({ record, departure, savedAt: envelope.savedAt, envelope });
     }
-    return { offer: null, recheckAt };
+    const newest = candidates.sort(newestFirst)[0];
+    if (!newest) return { offer: null, recheckAt: null };
+    if (now - newest.departure.at < OFFER_GRACE_MS) {
+      return { offer: null, recheckAt: newest.departure.at + OFFER_GRACE_MS };
+    }
+    return {
+      offer: {
+        key: newest.record.key,
+        envelope: newest.envelope,
+        srcInstance: newest.departure.instance,
+      },
+      recheckAt: null,
+    };
+  });
+}
+
+/**
+ * Not this one: a closed tab's draft the person dismissed is not offered
+ * again, in this tab or any other, while that tab stays closed. The draft
+ * itself stays where it is (pruned by the usual rules); a tab that comes back
+ * starts a new lifetime, and its drafts count afresh.
+ */
+export async function dismissOffer(
+  ctx: ProtocolContext,
+  sourceKey: string,
+  srcInstance: string,
+): Promise<void> {
+  await ctx.backend.run((tx) => {
+    tx.put(dismissedKey(sourceKey), { about: srcInstance, at: ctx.now() } satisfies Dismissal);
   });
 }
 
 export type AcceptResult<P> =
   | { status: 'ok'; payload: P; savedAt: number; warning?: string }
   | { status: 'gone' }
+  /** This tab already holds a draft for the workspace: never overwritten, the offer stays put. */
+  | { status: 'own' }
   | { status: 'failed'; reason: string };
+
+/** True when this tab already holds a readable record at `dest`. */
+function holdsOwn(local: DraftStorage, dest: string, parts: RecordKeyParts): boolean {
+  return parseEnvelope(local.get(dest), anyPayload, parts) !== null;
+}
 
 /** Write `payload` as this tab's record and read it back; null on success, else why not. */
 function writeVerified(local: DraftStorage, key: string, raw: string): string | null {
@@ -283,11 +371,14 @@ export async function acceptOffer<P>(
   const destParts: RecordKeyParts = { ...source, tab: me.tab };
   const dest = recordKey(source.feature, me.tab, source.workspace);
 
-  let claimed: DraftEnvelope<P> | null;
+  let claimed: DraftEnvelope<P> | 'own' | null;
   try {
     claimed = await ctx.backend.run((tx) => {
       const now = ctx.now();
       reconcileClaims(tx, ctx.local, now);
+      // This tab's own draft for the workspace is never overwritten: it was
+      // typed after the offer appeared, and is newer work than the offer.
+      if (holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
       const departure = confirmedDepartures(tx, ctx.local).get(source.tab);
       if (!departure || now - departure.at < OFFER_GRACE_MS) return null;
       if (tx.get(goneKey(sourceKey)) !== undefined) return null;
@@ -308,6 +399,7 @@ export async function acceptOffer<P>(
   } catch (error) {
     return { status: 'failed', reason: `draft coordination failed (${storageErrorReason(error)})` };
   }
+  if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
 
   const raw = JSON.stringify(makeEnvelope(destParts, claimed.payload, claimed.savedAt));
@@ -329,6 +421,10 @@ export async function acceptOffer<P>(
   try {
     outcome = await ctx.backend.run((tx) => {
       const gone = asGone(tx.get(goneKey(sourceKey)));
+      // Stalled past the lease, another tab's reconciliation found this tab's
+      // copy verified and completed the transfer for it: that is success.
+      if (gone?.phase === 'done' && gone.instance === me.instance && gone.dest === dest)
+        return 'ok';
       if (!gone || gone.phase !== 'claimed' || gone.instance !== me.instance) return 'lost';
       tx.put(goneKey(sourceKey), { ...gone, phase: 'done', at: ctx.now() } satisfies GoneEntry);
       if (!notReclaimed(tx, source.tab, gone.srcInstance)) return 'ok';
@@ -364,9 +460,11 @@ export interface SweepFeature {
 
 /**
  * Prune closed tabs' drafts, newest first (owner, 2026-11-26). For each
- * editor: when this tab holds a valid draft of its own, every closed tab's
- * draft past the prune grace goes; otherwise the newest closed draft stays
- * and the older ones go. Only this tab's own records count as "a newer draft
+ * editor and workspace (the scratch editor, each saved document, Variant's
+ * workbench), since that is what an offer is made for: when this tab holds a
+ * valid draft of its own there, every closed tab's draft past the prune grace
+ * goes; otherwise the newest closed draft stays and the older ones go. A
+ * scratch draft never costs a saved document's unsaved edits, or the reverse. Only this tab's own records count as "a newer draft
  * exists" among live tabs, because another live tab's record could be cleared
  * by its owner at any moment and this tab might read it stale. A record
  * another tab is being offered right now (`protect`) is left alone, as are
@@ -386,59 +484,66 @@ export async function sweep(
     let pruned = 0;
 
     for (const [feature, spec] of Object.entries(features) as [DraftFeature, SweepFeature][]) {
-      const ofFeature = records.filter((record) => record.parts.feature === feature);
-      const own = ofFeature.filter(
-        (record) =>
-          record.parts.tab === me.tab &&
-          parseEnvelope(ctx.local.get(record.key), spec.codec, record.parts) !== null,
-      );
-      const closed = ofFeature
-        .map((record) => {
-          const departure = departed.get(record.parts.tab);
-          if (!departure || now - departure.at < OFFER_GRACE_MS) return null;
-          if (tx.get(goneKey(record.key)) !== undefined) return null;
-          const envelope = parseEnvelope(ctx.local.get(record.key), spec.codec, record.parts);
-          return envelope ? { record, departure, savedAt: envelope.savedAt } : null;
-        })
-        .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
-        .sort(
-          (a, b) =>
-            b.departure.at - a.departure.at ||
-            b.savedAt - a.savedAt ||
-            (a.record.key < b.record.key ? -1 : 1),
+      const byWorkspace = new Map<string, StoredRecord[]>();
+      for (const record of records) {
+        if (record.parts.feature !== feature) continue;
+        const group = byWorkspace.get(record.parts.workspace) ?? [];
+        group.push(record);
+        byWorkspace.set(record.parts.workspace, group);
+      }
+      for (const group of byWorkspace.values()) {
+        const own = group.filter(
+          (record) =>
+            record.parts.tab === me.tab &&
+            parseEnvelope(ctx.local.get(record.key), spec.codec, record.parts) !== null,
         );
-      const keep = own.length === 0 ? closed[0] : undefined;
-      for (const entry of closed) {
-        if (entry === keep || protect.has(entry.record.key)) continue;
-        if (now - entry.departure.at < PRUNE_GRACE_MS) continue;
-        tx.put(goneKey(entry.record.key), {
-          phase: 'done',
-          reason: 'pruned',
-          srcInstance: entry.departure.instance,
-          at: now,
-        } satisfies GoneEntry);
-        tryRemove(ctx.local, entry.record.key);
-        pruned += 1;
+        const closed = group
+          .map((record): Candidate | null => {
+            const departure = departed.get(record.parts.tab);
+            if (!departure || now - departure.at < OFFER_GRACE_MS) return null;
+            if (tx.get(goneKey(record.key)) !== undefined) return null;
+            const envelope = parseEnvelope(ctx.local.get(record.key), spec.codec, record.parts);
+            return envelope ? { record, departure, savedAt: envelope.savedAt } : null;
+          })
+          .filter((entry): entry is Candidate => entry !== null)
+          .sort(newestFirst);
+        const keep = own.length === 0 ? closed[0] : undefined;
+        for (const entry of closed) {
+          if (entry === keep || protect.has(entry.record.key)) continue;
+          if (now - entry.departure.at < PRUNE_GRACE_MS) continue;
+          tx.put(goneKey(entry.record.key), {
+            phase: 'done',
+            reason: 'pruned',
+            srcInstance: entry.departure.instance,
+            at: now,
+          } satisfies GoneEntry);
+          tryRemove(ctx.local, entry.record.key);
+          pruned += 1;
+        }
       }
     }
 
-    // Housekeeping: tombstones whose record is gone, and departed tabs with
-    // nothing left to decide about.
+    // Housekeeping: tombstones and dismissals whose record is gone, and
+    // departed tabs with nothing left to decide about.
     const present = new Set(listRecords(ctx.local).map((record) => record.key));
+    for (const key of tx.keys()) {
+      if (key.startsWith('dismissed:') && !present.has(key.slice('dismissed:'.length))) tx.del(key);
+    }
     for (const key of tx.keys()) {
       if (!key.startsWith('gone:')) continue;
       const gone = asGone(tx.get(key));
       const source = key.slice('gone:'.length);
       if (!gone || gone.phase !== 'done') continue;
-      if (!present.has(source)) {
-        tx.del(key);
+      if (present.has(source)) {
+        const parts = parseRecordKey(source);
+        if (parts && notReclaimed(tx, parts.tab, gone.srcInstance) && tryRemove(ctx.local, source))
+          present.delete(source);
         continue;
       }
-      const parts = parseRecordKey(source);
-      if (parts && notReclaimed(tx, parts.tab, gone.srcInstance) && tryRemove(ctx.local, source)) {
-        tx.del(key);
-        present.delete(source);
-      }
+      // The record is gone. The decision is kept a while longer: a claimant
+      // that stalled past its lease, whose transfer another tab completed,
+      // must still find it marked done (not lost) and keep its copy.
+      if (now - gone.at > PRUNE_GRACE_MS) tx.del(key);
     }
     for (const [tab, departure] of departed) {
       if (now - departure.at < OFFER_GRACE_MS) continue;
@@ -470,6 +575,8 @@ export interface LegacyParse<P> {
 export interface LegacyOffer<P> {
   payload: P;
   savedAt: number;
+  /** Hash of the old key's raw value, for `dismissLegacy`. */
+  hash: string;
 }
 
 function reconcileLegacy(
@@ -493,7 +600,11 @@ function reconcileLegacy(
   const destParts = parseRecordKey(journal.dest);
   const dest = destParts ? parseEnvelope(local.get(journal.dest), anyPayload, destParts) : null;
   if (dest && payloadHash(dest.payload) === journal.payloadHash) {
-    tx.put(legacyJournalKey(feature), { ...journal, phase: 'consumed', at: now } satisfies LegacyJournal);
+    tx.put(legacyJournalKey(feature), {
+      ...journal,
+      phase: 'consumed',
+      at: now,
+    } satisfies LegacyJournal);
     if (raw !== null && hashText(raw) === journal.hash) tryRemove(local, legacyKey);
   } else {
     tx.del(legacyJournalKey(feature));
@@ -511,13 +622,34 @@ export async function findLegacy<P>(
   return ctx.backend.run((tx) => {
     reconcileLegacy(tx, ctx.local, feature, legacyKey, ctx.now());
     const raw = ctx.local.get(legacyKey);
-    if (raw === null) return null;
+    if (raw === null) {
+      tx.del(legacyDismissedKey(feature));
+      return null;
+    }
     const parsed = legacy.parse(raw);
     if (!parsed) return null;
+    const hash = hashText(raw);
     const journal = asJournal(tx.get(legacyJournalKey(feature)));
     if (journal?.phase === 'claimed') return null;
-    if (journal?.phase === 'consumed' && journal.hash === hashText(raw)) return null;
-    return parsed;
+    if (journal?.phase === 'consumed' && journal.hash === hash) return null;
+    if (asDismissal(tx.get(legacyDismissedKey(feature)))?.about === hash) return null;
+    return { ...parsed, hash };
+  });
+}
+
+/**
+ * Not this one: the pre-update draft the person dismissed is not offered
+ * again, in any tab, while the old key holds the same value. The value itself
+ * stays (an older build may still read it); a different value is offered on
+ * its own merits.
+ */
+export async function dismissLegacy(
+  ctx: ProtocolContext,
+  feature: DraftFeature,
+  hash: string,
+): Promise<void> {
+  await ctx.backend.run((tx) => {
+    tx.put(legacyDismissedKey(feature), { about: hash, at: ctx.now() } satisfies Dismissal);
   });
 }
 
@@ -539,11 +671,12 @@ export async function acceptLegacy<P>(
   const destParts: RecordKeyParts = { feature, tab: me.tab, workspace };
   const dest = recordKey(feature, me.tab, workspace);
 
-  let claimed: { payload: P; savedAt: number } | null;
+  let claimed: { payload: P; savedAt: number } | 'own' | null;
   try {
     claimed = await ctx.backend.run((tx) => {
       const now = ctx.now();
       reconcileLegacy(tx, ctx.local, feature, legacyKey, now);
+      if (holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
       const raw = ctx.local.get(legacyKey);
       if (raw === null) return null;
       const parsed = legacy.parse(raw);
@@ -566,6 +699,7 @@ export async function acceptLegacy<P>(
   } catch (error) {
     return { status: 'failed', reason: `draft coordination failed (${storageErrorReason(error)})` };
   }
+  if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
 
   const raw = JSON.stringify(makeEnvelope(destParts, claimed.payload, claimed.savedAt));
@@ -588,8 +722,21 @@ export async function acceptLegacy<P>(
   try {
     outcome = await ctx.backend.run((tx) => {
       const journal = asJournal(tx.get(legacyJournalKey(feature)));
-      if (!journal || journal.phase !== 'claimed' || journal.instance !== me.instance) return 'lost';
-      tx.put(legacyJournalKey(feature), { ...journal, phase: 'consumed', at: ctx.now() } satisfies LegacyJournal);
+      // Stalled past the lease, another tab's reconciliation completed this
+      // tab's verified copy: that is success.
+      if (
+        journal?.phase === 'consumed' &&
+        journal.instance === me.instance &&
+        journal.dest === dest
+      )
+        return 'ok';
+      if (!journal || journal.phase !== 'claimed' || journal.instance !== me.instance)
+        return 'lost';
+      tx.put(legacyJournalKey(feature), {
+        ...journal,
+        phase: 'consumed',
+        at: ctx.now(),
+      } satisfies LegacyJournal);
       const current = ctx.local.get(legacyKey);
       if (current === null || hashText(current) !== journal.hash) return 'ok';
       return tryRemove(ctx.local, legacyKey) ? 'ok' : 'kept-source';
