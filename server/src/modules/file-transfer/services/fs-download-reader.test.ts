@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type { DownloadDeleteSnapshot } from '../ports.js';
+import { DownloadChangedError, type DownloadDeleteSnapshot } from '../ports.js';
 import { FsDownloadReader } from './fs-download-reader.js';
 
 function fileSnapshot(downloads: string, name: string): DownloadDeleteSnapshot {
@@ -159,6 +160,31 @@ describe('FsDownloadReader.confineFolder', () => {
     await expect(reader.remove('Trip photos', 'folder', snapshot)).rejects.toThrow('changed');
     expect(fs.existsSync(path.join(folder, 'a.jpg'))).toBe(true);
     expect(fs.existsSync(path.join(folder, 'new.jpg'))).toBe(true);
+  });
+
+  it('treats a child disappearing during folder validation as a changed listing', async () => {
+    const folder = path.join(downloads, 'Trip photos');
+    fs.mkdirSync(folder);
+    fs.writeFileSync(path.join(folder, 'a.jpg'), 'first');
+    fs.writeFileSync(path.join(folder, 'b.jpg'), 'second');
+    const snapshot = folderSnapshot(downloads, 'Trip photos', ['a.jpg', 'b.jpg']);
+    const disappearingChild = path.join(folder, 'a.jpg');
+    const realLstat = fsp.lstat.bind(fsp);
+    const lstat = vi.spyOn(fsp, 'lstat').mockImplementation(async (filePath) => {
+      if (String(filePath) === disappearingChild) fs.unlinkSync(disappearingChild);
+      return realLstat(filePath);
+    });
+
+    try {
+      await expect(reader.remove('Trip photos', 'folder', snapshot)).rejects.toBeInstanceOf(
+        DownloadChangedError,
+      );
+      expect(fs.existsSync(folder)).toBe(true);
+      expect(fs.existsSync(disappearingChild)).toBe(false);
+      expect(fs.readFileSync(path.join(folder, 'b.jpg'), 'utf8')).toBe('second');
+    } finally {
+      lstat.mockRestore();
+    }
   });
 
   it('refuses to delete a symlink or an entry whose type changed', async () => {

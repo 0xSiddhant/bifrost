@@ -188,6 +188,17 @@ describe('DeleteDownloadUseCase', () => {
     });
   });
 
+  it('keeps a folder and its registry entries when a child changes during validation', async () => {
+    const { usecase, reader, registry } = subject();
+    vi.mocked(reader.remove).mockRejectedValueOnce(new DownloadChangedError());
+
+    await expect(usecase.execute(folder.id, folderSnapshot)).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'DOWNLOAD_CHANGED',
+    });
+    expect(registry.removeEntry).not.toHaveBeenCalled();
+  });
+
   it('maps a folder that becomes non-empty during removal to 409', async () => {
     const { usecase, reader } = subject();
     vi.mocked(reader.remove).mockRejectedValueOnce(

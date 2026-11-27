@@ -154,7 +154,22 @@ export class FsDownloadReader implements DownloadReader {
 
     const actual: DownloadDeleteSnapshot['children'] = [];
     for (const child of children) {
-      const stat = await fsp.lstat(path.join(folderPath, child.name));
+      let stat: Stats;
+      try {
+        stat = await fsp.lstat(path.join(folderPath, child.name));
+      } catch (error) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'ENOENT'
+        ) {
+          throw new DownloadChangedError(
+            'folder contents changed after listing; refresh the listing',
+          );
+        }
+        throw error;
+      }
       if (stat.isSymbolicLink() || !stat.isFile()) {
         throw new DownloadUnsafeEntryError('folder contains a symbolic link or non-file entry');
       }
