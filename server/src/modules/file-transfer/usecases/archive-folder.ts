@@ -18,6 +18,23 @@ export interface FolderArchive {
  * mid-zip simply isn't in it, and one deleted mid-zip is logged and skipped by
  * the archiver — ordinary eventual consistency, not a race to guard against.
  */
+
+/**
+ * Unicode code-point order, as the API documents for a folder zip. JavaScript's
+ * `<` compares UTF-16 code units instead, which puts a name with an emoji or
+ * another character above U+FFFF before one with, say, U+FF5E.
+ */
+export function byCodePoint(a: string, b: string): number {
+  const left = [...a];
+  const right = [...b];
+  const shared = Math.min(left.length, right.length);
+  for (let i = 0; i < shared; i += 1) {
+    const difference = (left[i]?.codePointAt(0) ?? 0) - (right[i]?.codePointAt(0) ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return left.length - right.length;
+}
+
 export class ArchiveFolderUseCase {
   constructor(
     private readonly registry: DownloadRegistry,
@@ -57,7 +74,7 @@ export class ArchiveFolderUseCase {
       // insertion order, which follows chokidar's boot scan — so without
       // this the same folder zipped differently after a restart (found by
       // PLAN-32a's API diff).
-      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      .sort(byCodePoint);
 
     this.log.info({ folder: entry.name, files: files.length }, 'streaming a folder archive');
     // Zero children is a valid, empty zip rather than an error — nothing to

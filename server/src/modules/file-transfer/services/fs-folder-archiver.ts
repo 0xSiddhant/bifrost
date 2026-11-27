@@ -20,7 +20,7 @@ export class FsFolderArchiver implements FolderArchiver {
   stream(folderPath: string, files: string[]): Readable {
     const archive = new ZipArchive({
       zlib: { level: 6 },
-      // Keep the use case's code-point order in the final archive.
+      // Keep the use case's code-point name order in the final archive.
       statConcurrency: 1,
     });
 
