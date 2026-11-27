@@ -24,19 +24,58 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# `changes` reads the list of changed files from the API; nothing else here
+# uses the token.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  # A change to documentation only (Markdown, docs/, .agents/, .claude/) builds
+  # and tests nothing (owner, 2026-11-27): every other job waits for this one
+  # and is skipped when it says `code=false`. scripts/ci-changes.sh decides,
+  # and runs everything whenever the list cannot be had.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci-changes.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Classify the changed files
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          files=''
+          if [ -n "$PR" ]; then
+            # The API lists at most 3,000 files; a longer list is not trusted.
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename') || files=''
+            [ "$(printf '%s\n' "$files" | wc -l)" -lt 3000 ] || files=''
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            # A push: compare lists at most 300 files.
+            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[].filename') || files=''
+            [ "$(printf '%s\n' "$files" | wc -l)" -lt 300 ] || files=''
+          fi
+          printf '%s\n' "$files"
+          printf '%s\n' "$files" | sh scripts/ci-changes.sh | tee -a "$GITHUB_OUTPUT"
+
   checks:
-    name: checks (audit, lint, typecheck, unit)
+    name: checks (audit, lint, typecheck, backup)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # PLAN-37: server/src/openapi-compat.test.ts diffs the spec against
-      # develop's, so develop must be here; the test fails rather than skips
-      # in CI when it is not.
-      - name: Fetch develop
-        run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
-
       - uses: ./.github/actions/setup
 
       # A known vulnerability at any severity fails the PR (.agents/rules/
@@ -51,9 +90,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
-
       - name: Backup smoke test
         env:
           HEIMDALL_PIN: ci-smoke-pin
@@ -62,11 +98,52 @@ jobs:
           npm run backup -- --out "$RUNNER_TEMP/backups"   # VACUUM INTO + zip storage/
           ls "$RUNNER_TEMP"/backups/bifrost-backup-*.zip
 
+  # `npm test` split over two machines: the server's suite is about half of it.
+  # Together the two run every workspace's tests and scripts/ (scripts/ci.test.ts
+  # holds them to that).
+  unit:
+    name: unit (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server
+            workspaces: server
+          - name: client, cli, web, e2e, scripts
+            workspaces: client cli web e2e
+            scripts: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # PLAN-37: server/src/openapi-compat.test.ts diffs the spec against
+      # develop's, so develop must be here; the test fails rather than skips
+      # in CI when it is not.
+      - name: Fetch develop
+        if: contains(matrix.workspaces, 'server')
+        run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
+
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        run: |
+          for workspace in ${{ matrix.workspaces }}; do
+            npm test -w "$workspace"
+          done
+
+      - name: Test scripts/
+        if: matrix.scripts
+        run: npx vitest run --dir scripts
+
   # PLAN-32a/33: the out-of-process suites, against the build: the packed CLI
   # installed into a temporary prefix, and the black-box API suite with its
   # coverage report. No browser.
   e2e-cli-api:
     name: e2e (installed CLI + black-box API)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,11 +160,15 @@ jobs:
       - name: Black-box API
         run: npm run test:e2e:api -w e2e
 
-  # PLAN-32a: the browser journeys against the build, split so no job runs
-  # more than ~a quarter of them. WebKit (the household's iOS devices) takes
-  # twice Chromium's time per test, so it gets two shards.
+  # PLAN-32a: the browser journeys against the build, two shards per Chromium
+  # device so no job runs more than about a minute of journeys. WebKit is not
+  # run here (owner, 2026-11-27): in this container, with no GPU, it failed
+  # journeys for reasons a real iPhone does not have. It runs by hand before a
+  # release (`./bifrost test e2e webkit`).
   e2e-ui:
     name: e2e (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     # Microsoft's Playwright image already holds every browser and its system
     # libraries. Installing them on the runner meant `playwright install-deps`,
@@ -100,26 +181,26 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --user 1001 --ipc=host
-    # A shard takes 3–5 minutes with the image pull. Nothing left in it waits
-    # on a mirror, so anything still running at 15 is stuck, not slow.
-    timeout-minutes: 15
+    # A shard takes 2–3 minutes with the image pull. Nothing left in it waits
+    # on a mirror, so anything still running at 10 is stuck, not slow.
+    timeout-minutes: 10
     strategy:
       # Every shard reports: a failure in one says nothing about the others.
       fail-fast: false
       matrix:
         include:
-          - name: chromium desktop + standalone
-            id: chromium-desktop
-            args: --project=chromium-desktop --project=standalone
-          - name: chromium mobile
-            id: chromium-mobile
-            args: --project=chromium-mobile
-          - name: webkit 1/2
-            id: webkit-1
-            args: --project=webkit-mobile --shard=1/2
-          - name: webkit 2/2
-            id: webkit-2
-            args: --project=webkit-mobile --shard=2/2
+          - name: chromium desktop + standalone 1/2
+            id: chromium-desktop-1
+            args: --project=chromium-desktop --project=standalone --shard=1/2
+          - name: chromium desktop + standalone 2/2
+            id: chromium-desktop-2
+            args: --project=chromium-desktop --project=standalone --shard=2/2
+          - name: chromium mobile 1/2
+            id: chromium-mobile-1
+            args: --project=chromium-mobile --shard=1/2
+          - name: chromium mobile 2/2
+            id: chromium-mobile-2
+            args: --project=chromium-mobile --shard=2/2
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -141,6 +222,8 @@ jobs:
           retention-days: 7
 
   docker:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

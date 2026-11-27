@@ -19,6 +19,12 @@ const chromiumLaunch = chromiumExecutable
   ? { launchOptions: { executablePath: chromiumExecutable } }
   : {};
 
+// WebKit runs by hand only (owner, 2026-11-27): `./bifrost test e2e webkit`
+// sets this. CI's WebKit, in a container with no GPU, failed journeys for
+// reasons a real iPhone does not have, so it is no longer a gate; run it
+// before a release, beside a look on a real iPhone or iPad.
+const withWebkit = process.env.E2E_WEBKIT === '1';
+
 export default defineConfig<object, WorkerOptions>({
   testDir: '.',
   testMatch: ['browser/**/*.spec.ts', 'standalone/**/*.spec.ts'],
@@ -55,18 +61,25 @@ export default defineConfig<object, WorkerOptions>({
       testMatch: 'browser/**/*.spec.ts',
       use: {
         ...devices['Pixel 7'],
-        viewport: { width: 390, height: 844 },
+        // An iPhone 14's visible page in Safari, the size the WebKit project
+        // uses, so the CI gate still sees the household's phone layout (a
+        // control under the bottom nav showed only at this height, PR #119).
+        viewport: devices['iPhone 14'].viewport,
         ...chromiumLaunch,
       },
     },
-    {
-      // The household's iPads and iPhones are WebKit, and this project has
-      // shipped Safari-only bugs before (AbortSignal.any, the plain-http
-      // clipboard fallback).
-      name: 'webkit-mobile',
-      testMatch: 'browser/**/*.spec.ts',
-      use: { ...devices['iPhone 14'] },
-    },
+    ...(withWebkit
+      ? [
+          {
+            // The household's iPads and iPhones are WebKit, and this project
+            // has shipped Safari-only bugs before (AbortSignal.any, the
+            // plain-http clipboard fallback, a reload's tab id in PLAN-43).
+            name: 'webkit-mobile',
+            testMatch: 'browser/**/*.spec.ts',
+            use: { ...devices['iPhone 14'] },
+          },
+        ]
+      : []),
     {
       // The standalone site (PLAN-35): dist-standalone/ from a static server
       // with the container's nginx rules, and no Bifrost server at all. The
