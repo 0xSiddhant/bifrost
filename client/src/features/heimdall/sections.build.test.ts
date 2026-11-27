@@ -28,6 +28,7 @@ describe('Heimdall sections per build', () => {
       'offline-mode',
       'storage',
       'uploads',
+      'downloads',
       'network',
       'about',
     ]);

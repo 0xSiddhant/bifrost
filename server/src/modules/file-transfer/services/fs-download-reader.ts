@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
-import type { DownloadContent, DownloadReader } from '../ports.js';
+import { DownloadTypeChangedError, type DownloadContent, type DownloadReader } from '../ports.js';
 
 /**
  * Streams files out of downloads/ — after proving, via realpath, that the
@@ -41,6 +41,25 @@ export class FsDownloadReader implements DownloadReader {
     const stat = await fsp.stat(resolved);
     if (!stat.isDirectory()) throw new Error('not a directory');
     return resolved;
+  }
+
+  async remove(name: string, type: 'file' | 'folder'): Promise<void> {
+    const resolved = await this.confine(name);
+    const root = await fsp.realpath(this.downloadsDir);
+    if (resolved === root) throw new Error('cannot remove downloads root');
+
+    const target = path.join(this.downloadsDir, name);
+    const stat = await fsp.lstat(target);
+    if (stat.isSymbolicLink()) throw new Error('cannot remove a symbolic link');
+    if ((type === 'file' && !stat.isFile()) || (type === 'folder' && !stat.isDirectory())) {
+      throw new DownloadTypeChangedError('download type changed after listing');
+    }
+
+    if (type === 'folder') {
+      await fsp.rm(resolved, { recursive: true });
+    } else {
+      await fsp.unlink(resolved);
+    }
   }
 
   private async confine(name: string): Promise<string> {

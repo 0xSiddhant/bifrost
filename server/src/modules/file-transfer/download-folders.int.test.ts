@@ -61,6 +61,18 @@ describe('download folders over HTTP', () => {
   const listing = async (): Promise<Entry[]> =>
     (await app.fastify.inject({ method: 'GET', url: '/api/downloads' })).json();
 
+  async function adminCookie(): Promise<string> {
+    const response = await app.fastify.inject({
+      method: 'POST',
+      url: '/api/v1/heimdall/login',
+      payload: { pin: '4321' },
+    });
+    expect(response.statusCode).toBe(200);
+    const raw = response.headers['set-cookie'];
+    const header = Array.isArray(raw) ? raw[0] : raw;
+    return header?.split(';')[0] ?? '';
+  }
+
   /** The watcher only sees a folder after chokidar's awaitWriteFinish debounce. */
   async function waitForEntry(match: (entry: Entry) => boolean): Promise<Entry> {
     const deadline = Date.now() + 15_000;
@@ -292,5 +304,44 @@ describe('download folders over HTTP', () => {
     });
     // Criterion 1: still in uploads/, still needing a Move.
     expect(fs.readdirSync(path.join(storageRoot, 'uploads'))).toEqual(['staged.txt']);
+  });
+
+  it('requires an admin session and deletes one file or a folder with its contents', async () => {
+    const entries = await listing();
+    const file = entries.find((entry) => entry.name === 'a-1.jpg' && entry.parent === 'Trip photos');
+    const folder = entries.find((entry) => entry.name === 'Trip photos' && entry.type === 'folder');
+    expect(file).toBeDefined();
+    expect(folder).toBeDefined();
+    if (!file || !folder) throw new Error('test downloads were not indexed');
+
+    const anonymous = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${file.id}`,
+    });
+    expect(anonymous.statusCode).toBe(401);
+
+    const cookie = await adminCookie();
+    const removedFile = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${file.id}`,
+      headers: { cookie },
+    });
+    expect(removedFile.statusCode).toBe(204);
+    expect(fs.existsSync(path.join(storageRoot, 'downloads', 'Trip photos', 'a-1.jpg'))).toBe(false);
+
+    const removedFolder = await app.fastify.inject({
+      method: 'DELETE',
+      url: `/api/v1/downloads/${folder.id}`,
+      headers: { cookie },
+    });
+    expect(removedFolder.statusCode).toBe(204);
+    expect(fs.existsSync(path.join(storageRoot, 'downloads', 'Trip photos'))).toBe(false);
+
+    const unknown = await app.fastify.inject({
+      method: 'DELETE',
+      url: '/api/v1/downloads/AAAAAAAAAAAAAAAA',
+      headers: { cookie },
+    });
+    expect(unknown.statusCode).toBe(404);
   });
 });

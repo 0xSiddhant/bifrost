@@ -4,13 +4,16 @@ import { errorResponses, rawBody } from '../../../core/http/schemas.js';
 import { dispositionFilename, respondWithFile } from './file-response.js';
 import { TAGS, downloadEntrySchema, fileContentResponses } from './schemas.js';
 import type { ArchiveFolderUseCase } from '../usecases/archive-folder.js';
+import type { DeleteDownloadUseCase } from '../usecases/delete-download.js';
 import type { GetDownloadStreamUseCase } from '../usecases/get-download-stream.js';
 import type { ListDownloadsUseCase } from '../usecases/list-downloads.js';
+import { adminSecurity, noContent } from '../../../core/http/schemas.js';
 
 export interface DownloadRoutesDeps {
   listDownloads: ListDownloadsUseCase;
   getDownloadStream: GetDownloadStreamUseCase;
   archiveFolder: ArchiveFolderUseCase;
+  deleteDownload: DeleteDownloadUseCase;
 }
 
 const idParamsSchema = {
@@ -45,6 +48,27 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
       },
     },
     () => deps.listDownloads.execute(),
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/api/v1/downloads/:id',
+    {
+      preHandler: app.requireAdmin,
+      schema: {
+        tags: TAGS,
+        summary: 'Delete one download or an entire folder',
+        description:
+          'Requires a Heimdall admin session. Deleting a folder removes its contents recursively.',
+        operationId: 'deleteDownload',
+        security: adminSecurity,
+        params: idParamsSchema,
+        response: { 204: noContent, ...errorResponses(400, 401, 404, 409) },
+      },
+    },
+    async (request, reply) => {
+      await deps.deleteDownload.execute(request.params.id);
+      return reply.code(204).send();
+    },
   );
 
   app.get<{ Params: { id: string }; Querystring: { inline?: string } }>(

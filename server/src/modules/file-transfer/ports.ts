@@ -126,6 +126,12 @@ export interface DownloadReader {
    * this is how the archiver gets a path it is allowed to read.
    */
   confineFolder(name: string): Promise<string>;
+  /** Remove one indexed file, or a folder and its contents, after confinement. */
+  remove(name: string, type: DownloadEntry['type']): Promise<void>;
+}
+
+export class DownloadTypeChangedError extends Error {
+  override name = 'DownloadTypeChangedError';
 }
 
 /** Zips a folder's files into a stream. Owns the `archiver` dependency. */

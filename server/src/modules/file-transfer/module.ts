@@ -12,6 +12,7 @@ import { FsFolderPublisher } from './services/fs-folder-publisher.js';
 import { FsUploadsStore } from './services/fs-uploads-store.js';
 import { sweepPublishedDuplicates } from './services/place-file.js';
 import { ArchiveFolderUseCase } from './usecases/archive-folder.js';
+import { DeleteDownloadUseCase } from './usecases/delete-download.js';
 import { GetDownloadStreamUseCase } from './usecases/get-download-stream.js';
 import { ListDownloadsUseCase } from './usecases/list-downloads.js';
 import { ManageUploadsUseCase } from './usecases/manage-uploads.js';
@@ -43,6 +44,7 @@ export const fileTransferModule: FeatureModule = {
       new FsFolderArchiver(log),
       log,
     );
+    const deleteDownload = new DeleteDownloadUseCase(watcher, reader, log);
     const manageUploads = new ManageUploadsUseCase({
       store: new FsUploadsStore(config.storage.uploads, config.storage.downloads, log),
       bus,
@@ -80,7 +82,7 @@ export const fileTransferModule: FeatureModule = {
       blockedExtensions: config.uploadExtBlocklist,
       rateLimitPerMinute: config.uploadRateLimitPerMin,
     });
-    registerDownloadRoutes(app, { listDownloads, getDownloadStream, archiveFolder });
+    registerDownloadRoutes(app, { listDownloads, getDownloadStream, archiveFolder, deleteDownload });
     registerUploadRoutes(app, { manageUploads });
 
     // A move is link-then-unlink, so a crash between the two leaves the file

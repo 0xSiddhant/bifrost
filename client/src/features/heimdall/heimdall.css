@@ -285,6 +285,31 @@
 .about-links a:hover {
   text-decoration: underline;
 }
+.heimdall-downloads__controls {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(9rem, 0.6fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+.heimdall-downloads__folder + .heimdall-downloads__folder {
+  border-top: 1px solid var(--border);
+}
+.heimdall-downloads__contents {
+  margin-left: var(--space-5);
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border);
+}
+.heimdall-downloads__toggle {
+  margin: 0 0 var(--space-2) var(--space-5);
+}
+@media (max-width: 42rem) {
+  .heimdall-downloads__controls {
+    grid-template-columns: 1fr 1fr;
+  }
+  .heimdall-downloads__controls > :first-child {
+    grid-column: 1 / -1;
+  }
+}
 .changelog {
   margin: 0;
   max-height: 24rem;

@@ -513,6 +513,165 @@
         "security": []
       }
     },
+    "/api/v1/downloads/{id}": {
+      "delete": {
+        "operationId": "deleteDownload",
+        "summary": "Delete one download or an entire folder",
+        "tags": [
+          "file-transfer"
+        ],
+        "description": "Requires a Heimdall admin session. Deleting a folder removes its contents recursively.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]{16}$"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminSession": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "400": {
+            "description": "The request failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The request failed validation",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "BAD_REQUEST",
+                  "message": "body must have required property 'content'"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No admin session, or it was revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "No admin session, or it was revoked",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "UNAUTHORIZED",
+                  "message": "admin session required"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Not found",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "NOT_FOUND",
+                  "message": "not found"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicts with something that already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflicts with something that already exists",
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "message"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "description": "Machine-readable code, e.g. NOT_FOUND"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "example": {
+                  "error": "CONFLICT",
+                  "message": "that name is taken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/downloads/{id}/content": {
       "get": {
         "operationId": "getDownloadContent",

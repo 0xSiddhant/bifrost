@@ -86,6 +86,7 @@ describe('contract journeys', () => {
     await status(api.post('/api/v1/files/contract-b.txt/publish'), 200);
     await status(api.upload([{ name: 'contract-c.txt', content: 'c\n' }]), 201);
     await status(api.delete('/api/v1/files/contract-c.txt'), 204);
+    await status(admin.delete(`/api/v1/downloads/${seeds.downloadFolder}`), 204);
   });
 
   it('clipboard, accio and portkey: add, change, delete', async () => {

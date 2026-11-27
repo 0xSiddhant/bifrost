@@ -1,4 +1,5 @@
 import { API_V1, apiGet, apiSend, hubOnly } from '../../core/api';
+import type { DownloadEntry } from '../../core/api';
 
 export interface HeimdallSettings {
   shortcut: string;
@@ -65,6 +66,12 @@ const hubFetchStats = (): Promise<Stats> => apiGet<Stats>(`${API_V1}/heimdall/st
 
 const hubFetchUploads = (): Promise<UploadFilesPage> =>
   apiGet<UploadFilesPage>(`${API_V1}/heimdall/uploads`);
+
+const hubFetchDownloads = (): Promise<DownloadEntry[]> =>
+  apiGet<DownloadEntry[]>(`${API_V1}/downloads`);
+
+const hubDeleteDownload = (id: string): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/downloads/${encodeURIComponent(id)}`);
 
 const hubPublishUpload = (name: string): Promise<PublishedUpload> =>
   apiSend<PublishedUpload>('POST', `${API_V1}/files/${encodeURIComponent(name)}/publish`);
@@ -137,6 +144,12 @@ export const fetchSettings: typeof hubFetchSettings = __HUB__ ? hubFetchSettings
 export const updateSettings: typeof hubUpdateSettings = __HUB__ ? hubUpdateSettings : hubOnly('updateSettings');
 export const fetchStats: typeof hubFetchStats = __HUB__ ? hubFetchStats : hubOnly('fetchStats');
 export const fetchUploads: typeof hubFetchUploads = __HUB__ ? hubFetchUploads : hubOnly('fetchUploads');
+export const fetchDownloads: typeof hubFetchDownloads = __HUB__
+  ? hubFetchDownloads
+  : hubOnly('fetchDownloads');
+export const deleteDownload: typeof hubDeleteDownload = __HUB__
+  ? hubDeleteDownload
+  : hubOnly('deleteDownload');
 export const publishUpload: typeof hubPublishUpload = __HUB__
   ? hubPublishUpload
   : hubOnly('publishUpload');

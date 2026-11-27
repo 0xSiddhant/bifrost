@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { lazy, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ApiError } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { deviceLabel, deviceName } from '../../core/devices';
@@ -1487,6 +1487,28 @@ const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
     Component: UploadsSection,
     manifest: [
       { controlId: 'uploads-list', label: 'Staged files', keywords: ['files', 'sent', 'uploads'] },
+    ],
+  },
+  {
+    id: 'downloads',
+    hubOnly: true,
+    label: 'Downloads',
+    group: 'Vault',
+    icon: <DownloadIcon size={16} />,
+    blurb: 'Preview, browse or delete files and folders in storage/downloads.',
+    Component: __HUB__
+      ? lazy(() =>
+          import('./DownloadsSection').then(({ HeimdallDownloadsSection }) => ({
+            default: HeimdallDownloadsSection,
+          })),
+        )
+      : () => null,
+    manifest: [
+      {
+        controlId: 'downloads-list',
+        label: 'Download files',
+        keywords: ['files', 'folders', 'preview', 'delete', 'search', 'storage'],
+      },
     ],
   },
   {
