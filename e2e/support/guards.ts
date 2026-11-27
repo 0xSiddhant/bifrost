@@ -112,8 +112,10 @@ export const API_OUTAGE: AllowEntry = {
  * away. Chromium drops such a request silently; WebKit rejects its `fetch`
  * (or dynamic `import()`) promise in the old document first, which surfaces as
  * a page error ("Fetch API cannot load … due to access control checks") or a
- * console line ("Importing a module script failed"). For a loopback URL that
- * text cannot be a real CORS failure: every request here is same-origin.
+ * console line ("Importing a module script failed"). The live events stream
+ * cut off while it is still connecting says the same of itself ("EventSource
+ * cannot load … due to access control checks"). For a loopback URL that text
+ * cannot be a real CORS failure: every request here is same-origin.
  * A lazy page's stylesheet (PLAN-41) is cut off the same way: WebKit fires
  * the `<link>`'s error event, Vite's preload helper rejects the import with
  * "Unable to preload CSS for <url>", and React logs the boundary's catch.
@@ -123,15 +125,15 @@ export const API_OUTAGE: AllowEntry = {
  * when the same page starts a navigation (or closes) within
  * `NAVIGATION_CANCEL_WINDOW_MS` of it.
  */
-const LOOPBACK_FETCH_CANCEL =
-  /Fetch API cannot load https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/].* due to access control checks/;
+const LOOPBACK_REQUEST_CANCEL =
+  /(Fetch API|EventSource) cannot load https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/].* due to access control checks/;
 const LOOPBACK_CSS_CANCEL =
   /^Error: Unable to preload CSS for https?:\s?\/*(127\.0\.0\.1|localhost|\[::1\])[:/]\S*\.css$/;
 
 export function isNavigationCancelShaped(violation: Violation): boolean {
   if (violation.kind !== 'pageerror' && violation.kind !== 'console.error') return false;
   return (
-    LOOPBACK_FETCH_CANCEL.test(violation.detail) ||
+    LOOPBACK_REQUEST_CANCEL.test(violation.detail) ||
     LOOPBACK_CSS_CANCEL.test(violation.detail) ||
     /^TypeError: Importing a module script failed\.$/.test(violation.detail)
   );

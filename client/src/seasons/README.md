@@ -25,7 +25,9 @@ relics are not seasons: they stay.
    '../seasons/winter';`) and set `export const SEASON: Season | null = null;`
    (or import the next season and set it instead).
 2. Delete its folder, e.g. `seasons/winter/`, and its journey,
-   `e2e/browser/season-winter.spec.ts`.
+   `e2e/browser/season-winter.spec.ts`, and drop its ids from
+   `SWITCHABLE_DECORATIONS` in `e2e/support/season.ts` (left in, they are
+   ignored).
 3. Optionally drop its `--decor-*` tokens from the themes that set them
    (`assets/themes/yule.json`); left in, they are simply unused.
 
@@ -38,7 +40,12 @@ Typecheck, lint and the build then confirm nothing else named the season.
    mapping ids to components; `index.ts` exporting the `Season` manifest.
 2. Point `app/season.ts` at it.
 3. Turn its decorations on in a theme: `"--decor-<id>": "1"`, plus its styling tokens.
-4. A journey in `e2e/browser/season-<name>.spec.ts`.
+4. A journey in `e2e/browser/season-<name>.spec.ts`, with
+   `test.use({ seasonDecorations: true })`: every other journey runs as a
+   device with the season's switchable decorations off, listed by id in
+   `e2e/support/season.ts` (add yours there). A decoration that moves many
+   layers for as long as a tab is open should be `switchable`, or CI's
+   GPU-less WebKit pays for it in every journey (`docs/testing.md`).
 
 ## Rules a decoration keeps
 

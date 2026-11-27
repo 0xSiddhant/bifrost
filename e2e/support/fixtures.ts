@@ -6,6 +6,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { attachGuard, useGuard, type GuardState } from './guard-fixture.js';
+import { switchOffSeasonDecorations } from './season.js';
 import { startServer, type E2EServer, type StartServerOptions } from './server.js';
 
 /**
@@ -20,6 +21,8 @@ import { startServer, type E2EServer, type StartServerOptions } from './server.j
  * - Every browser context a test touches — the default one and every
  *   `newDevice()` — is guarded (see guards.ts); a test fails at teardown on any
  *   unallowed violation, even when every assertion passed.
+ * - Every such context is a device with the season's snowfall switched off
+ *   (season.ts), unless the test opts in with `seasonDecorations`.
  */
 
 /** The worker option a project sets (`cloud` boots a `DEPLOY_PROFILE=cloud` server). */
@@ -32,6 +35,12 @@ interface WorkerFixtures extends WorkerOptions {
 }
 
 interface TestFixtures {
+  /**
+   * Whether the installed season's switchable decorations show (winter's
+   * snowfall). Off by default; a journey about the season sets
+   * `test.use({ seasonDecorations: true })`.
+   */
+  seasonDecorations: boolean;
   guard: GuardState;
   /** A second (third, …) device: a separate browser context, so a separate deviceId. */
   newDevice: (options?: { baseURL?: string }) => Promise<Page>;
@@ -62,6 +71,8 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     { scope: 'worker', timeout: 90_000 },
   ],
 
+  seasonDecorations: [false, { option: true }],
+
   baseURL: async ({ server }, use) => {
     await use(server.baseUrl);
   },
@@ -70,12 +81,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await useGuard(use, testInfo);
   },
 
-  context: async ({ context, guard }, use) => {
+  context: async ({ context, guard, seasonDecorations }, use) => {
     attachGuard(context, guard);
+    if (!seasonDecorations) await switchOffSeasonDecorations(context);
     await use(context);
   },
 
-  newDevice: async ({ browser, guard, baseURL }, use, testInfo) => {
+  newDevice: async ({ browser, guard, baseURL, seasonDecorations }, use, testInfo) => {
     const contexts: BrowserContext[] = [];
     const projectUse = testInfo.project.use as BrowserContextOptions;
     await use(async (options = {}) => {
@@ -86,6 +98,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       }
       const context = await browser.newContext(contextOptions);
       attachGuard(context, guard);
+      if (!seasonDecorations) await switchOffSeasonDecorations(context);
       contexts.push(context);
       return context.newPage();
     });

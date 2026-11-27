@@ -117,9 +117,19 @@ The exceptions are an explicit allowlist, each with its reason:
 - the browser's own console line for a 4xx answer;
 - connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose;
 - the web host's `502` (`503` for `/go`) and the browser's lines for them, but only after a test calls `guard.allowApiOutage()` because it stopped the API on purpose (PLAN-36). A 5xx from anything else still fails.
-- WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
+- WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, the live events stream's `EventSource cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
 
 `browser/guard.spec.ts` proves the guard still fires for each kind.
+
+### The season's decorations in the journeys
+
+Every browser context a hub journey touches is a device with the installed season's **switchable** decorations switched off (winter's snowfall: `bifrost.decor.off`, as Heimdall → Sky Relics stores it), unless the journey opts in with `test.use({ seasonDecorations: true })`. The season's own journey (`season-winter.spec.ts`) and the shell's "every animation runs on the compositor" check opt in; nothing else does. The ids are listed in `e2e/support/season.ts`, since e2e never imports product source; a new season adds its switchable ids there (`client/src/seasons/README.md`).
+
+Why: the snow moves dozens of layers for as long as a tab is open, and CI's WebKit, in a container with no GPU, composites them in software. With four workers on the runner it delivered animation frames slowly enough that Playwright's taps, which wait for their target to hold still across frames, timed out (Runestone's and Groot's Code toggle above all), on most runs from the Yule merge on. Chromium composites on its own thread and never showed it. Real iPhones and iPads composite on the GPU.
+
+### A server that will not start
+
+When a journey's server (or a restarted one) dies before its health check answers, the error names how each process exited, everything they wrote, and the last 40 lines of the API's log file (`storage/logs/current.log` under the server's scratch root): the API logs a fatal error there, not on stdout, so the output alone is usually empty.
 
 ### Coverage cannot rot
 

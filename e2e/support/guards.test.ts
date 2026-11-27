@@ -158,6 +158,14 @@ describe('navigation cancels (WebKit)', () => {
     page: 'http://127.0.0.1:36455/pensieve?type=runestone',
     detail: 'TypeError: Importing a module script failed.',
   };
+  // The live events stream, cut off by a reload while it was still connecting
+  // (CI run 45458232399, the winter season's theme switch).
+  const eventSourceCancel: Violation = {
+    kind: 'pageerror',
+    page: 'http://127.0.0.1:43751/',
+    detail:
+      'EventSource cannot load http: /127.0.0.1:43751/api/v1/events?deviceId=67561865-0b5d-4b98-b1a6-088d3bda4579 due to access control checks.',
+  };
   // A lazy page's stylesheet, cut off by the next `page.goto` (PLAN-41).
   const cssCancel: Violation = {
     kind: 'console.error',
@@ -166,8 +174,9 @@ describe('navigation cancels (WebKit)', () => {
       'Error: Unable to preload CSS for http://127.0.0.1:44511/assets/PensievePage-ClnSFGIP.css',
   };
 
-  it('recognises only the three WebKit shapes, and only for loopback requests', () => {
+  it('recognises only the WebKit shapes, and only for loopback requests', () => {
     expect(isNavigationCancelShaped(fetchCancel)).toBe(true);
+    expect(isNavigationCancelShaped(eventSourceCancel)).toBe(true);
     expect(isNavigationCancelShaped(importCancel)).toBe(true);
     expect(isNavigationCancelShaped(cssCancel)).toBe(true);
     expect(
@@ -180,6 +189,12 @@ describe('navigation cancels (WebKit)', () => {
       isNavigationCancelShaped({
         ...fetchCancel,
         detail: 'Fetch API cannot load https://example.com/x due to access control checks.',
+      }),
+    ).toBe(false);
+    expect(
+      isNavigationCancelShaped({
+        ...eventSourceCancel,
+        detail: 'EventSource cannot load https://example.com/events due to access control checks.',
       }),
     ).toBe(false);
     expect(isNavigationCancelShaped({ ...importCancel, kind: 'http5xx' })).toBe(false);
