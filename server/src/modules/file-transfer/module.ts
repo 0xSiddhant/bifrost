@@ -6,6 +6,7 @@ import { registerFileRoutes } from './routes/files.js';
 import { registerUploadRoutes } from './routes/uploads.js';
 import { DownloadWatcherService } from './services/download-watcher.js';
 import { FsDownloadReader } from './services/fs-download-reader.js';
+import { DownloadFolderLock } from './services/download-folder-lock.js';
 import { FsFileStorageRepository } from './services/fs-file-storage.js';
 import { FsFolderArchiver } from './services/fs-folder-archiver.js';
 import { FsFolderPublisher } from './services/fs-folder-publisher.js';
@@ -25,7 +26,8 @@ export const fileTransferModule: FeatureModule = {
     const maxUploadBytes = config.maxUploadSizeMb * 1024 * 1024;
 
     const storage = new FsFileStorageRepository(config.storage.tmp, config.storage.uploads);
-    const reader = new FsDownloadReader(config.storage.downloads);
+    const folderLock = new DownloadFolderLock();
+    const reader = new FsDownloadReader(config.storage.downloads, folderLock);
     const watcher = new DownloadWatcherService(config.storage.downloads, bus, log);
 
     const uploadFiles = new UploadFilesUseCase({
@@ -34,7 +36,7 @@ export const fileTransferModule: FeatureModule = {
       log,
       maxBytes: maxUploadBytes,
       blockedExtensions: config.uploadExtBlocklist,
-      folderPublisher: new FsFolderPublisher(config.storage.downloads),
+      folderPublisher: new FsFolderPublisher(config.storage.downloads, folderLock),
     });
     const listDownloads = new ListDownloadsUseCase(watcher);
     const getDownloadStream = new GetDownloadStreamUseCase(watcher, reader, log);

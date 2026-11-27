@@ -58,17 +58,18 @@ export class DownloadWatcherService implements DownloadRegistry {
       ignoreInitial: false,
       alwaysStat: true,
       depth: 1,
+      followSymlinks: false,
       ignored: (target) => this.isHidden(target),
     });
 
     this.watcher.on('add', (file, stats) => this.upsert(file, stats, 'download.added'));
     this.watcher.on('change', (file, stats) => this.upsert(file, stats, 'download.changed'));
-    this.watcher.on('unlink', (file) => this.remove(this.relative(file)));
+    this.watcher.on('unlink', (file) => this.removePath(this.relative(file)));
     this.watcher.on('addDir', (dir, stats) => this.upsertFolder(dir, stats));
     // chokidar fires a per-file `unlink` for a removed directory's contents as
     // well, so the children clean themselves up through the handler above —
     // no cascade logic here, in whatever order the events land.
-    this.watcher.on('unlinkDir', (dir) => this.remove(this.relative(dir)));
+    this.watcher.on('unlinkDir', (dir) => this.removePath(this.relative(dir)));
     this.watcher.on('error', (error) => this.log.error({ err: error }, 'downloads watcher error'));
 
     return new Promise((resolve) => {
@@ -95,6 +96,18 @@ export class DownloadWatcherService implements DownloadRegistry {
     return this.entries.get(id) ?? null;
   }
 
+  removeEntry(id: string, fallback?: DownloadEntry): void {
+    const entry = this.entries.get(id) ?? fallback;
+    if (!entry) return;
+    if (entry.type === 'folder') {
+      for (const child of this.entries.values()) {
+        if (child.type === 'file' && child.parent === entry.name) this.removeById(child.id);
+      }
+    }
+    if (this.entries.has(id)) this.removeById(id);
+    else if (this.ready) this.bus.emit('download.removed', entry);
+  }
+
   /**
    * Dot-prefixed names are hidden on every level — a `.trash` folder as much
    * as a `.DS_Store` file, and `placeFile`'s `.bifrost-inflight-*` staging
@@ -115,6 +128,7 @@ export class DownloadWatcherService implements DownloadRegistry {
     stats: Stats | undefined,
     event: 'download.added' | 'download.changed',
   ): void {
+    if (stats?.isSymbolicLink()) return;
     const relative = this.relative(file);
     const dirname = path.dirname(relative);
     const name = path.basename(relative);
@@ -194,6 +208,7 @@ export class DownloadWatcherService implements DownloadRegistry {
   }
 
   private upsertFolder(dir: string, stats: Stats | undefined): void {
+    if (stats?.isSymbolicLink()) return;
     const relative = this.relative(dir);
     // chokidar announces the watched root itself; that is not a folder row.
     // It also announces the *directories inside* a first-level folder — it
@@ -218,10 +233,14 @@ export class DownloadWatcherService implements DownloadRegistry {
     this.scheduleRescan(dir);
   }
 
-  private remove(relative: string): void {
-    const entry = this.entries.get(idFor(relative.split(path.sep).join('/')));
+  private removePath(relative: string): void {
+    this.removeEntry(idFor(relative.split(path.sep).join('/')));
+  }
+
+  private removeById(id: string): void {
+    const entry = this.entries.get(id);
     if (!entry) return;
-    this.entries.delete(entry.id);
+    this.entries.delete(id);
     if (this.ready) this.bus.emit('download.removed', entry);
   }
 }

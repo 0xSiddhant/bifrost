@@ -24,10 +24,11 @@ export class FsFolderArchiver implements FolderArchiver {
       statConcurrency: 1,
     });
 
-    // A file deleted between the listing and its read arrives here (ENOENT).
-    // The rest of the archive is still worth having, so this logs and carries
-    // on rather than failing the whole download.
     archive.on('warning', (error: ArchiverError) => {
+      if (error.code === 'ENOENT') {
+        archive.destroy(error);
+        return;
+      }
       this.log.warn({ err: error, folder: folderPath }, 'skipped an entry while zipping a folder');
     });
     // The archive IS the response stream, so its own 'error' event already

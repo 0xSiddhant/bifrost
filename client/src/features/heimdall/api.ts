@@ -45,6 +45,16 @@ export interface PublishedUpload {
   renamed: boolean;
 }
 
+export interface DownloadDeleteSnapshot {
+  name: DownloadEntry['name'];
+  parent: DownloadEntry['parent'];
+  ext: DownloadEntry['ext'];
+  type: DownloadEntry['type'];
+  size: number;
+  mtime: number;
+  children: Pick<DownloadEntry, 'name' | 'size' | 'mtime'>[];
+}
+
 const hubLogin = (pin: string): Promise<{ ok: true }> =>
   apiSend<{ ok: true }>('POST', `${API_V1}/heimdall/login`, { pin });
 
@@ -70,8 +80,8 @@ const hubFetchUploads = (): Promise<UploadFilesPage> =>
 const hubFetchDownloads = (): Promise<DownloadEntry[]> =>
   apiGet<DownloadEntry[]>(`${API_V1}/downloads`);
 
-const hubDeleteDownload = (id: string): Promise<null> =>
-  apiSend<null>('DELETE', `${API_V1}/downloads/${encodeURIComponent(id)}`);
+const hubDeleteDownload = (id: string, snapshot: DownloadDeleteSnapshot): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/downloads/${encodeURIComponent(id)}`, { snapshot });
 
 const hubPublishUpload = (name: string): Promise<PublishedUpload> =>
   apiSend<PublishedUpload>('POST', `${API_V1}/files/${encodeURIComponent(name)}/publish`);

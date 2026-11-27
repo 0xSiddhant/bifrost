@@ -66,6 +66,17 @@ const SESSION_ENDING = new Set(['POST /api/v1/heimdall/logout', 'POST /api/v1/he
  */
 const GUARD_BODIES: Record<string, Json> = {
   'PATCH /api/v1/offline-mode/settings': { id: 'loki', enabled: false },
+  'DELETE /api/v1/downloads/{id}': {
+    snapshot: {
+      name: 'legacy.txt',
+      parent: null,
+      ext: '.txt',
+      type: 'file',
+      size: 0,
+      mtime: 0,
+      children: [],
+    },
+  },
 };
 
 const operations: Operation[] = Object.entries(spec.paths).flatMap(([template, item]) =>

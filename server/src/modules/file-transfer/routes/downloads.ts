@@ -8,6 +8,7 @@ import type { DeleteDownloadUseCase } from '../usecases/delete-download.js';
 import type { GetDownloadStreamUseCase } from '../usecases/get-download-stream.js';
 import type { ListDownloadsUseCase } from '../usecases/list-downloads.js';
 import { adminSecurity, noContent } from '../../../core/http/schemas.js';
+import type { DownloadDeleteSnapshot } from '../ports.js';
 
 export interface DownloadRoutesDeps {
   listDownloads: ListDownloadsUseCase;
@@ -35,6 +36,33 @@ const contentSchema = {
   },
 } as const;
 
+const deleteSnapshotSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'parent', 'ext', 'type', 'size', 'mtime', 'children'],
+  properties: {
+    name: { type: 'string', minLength: 1, maxLength: 255 },
+    parent: { type: ['string', 'null'], maxLength: 255 },
+    ext: { type: 'string', maxLength: 32 },
+    type: { type: 'string', enum: ['file', 'folder'] },
+    size: { type: 'integer', minimum: 0 },
+    mtime: { type: 'integer', minimum: 0 },
+    children: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['name', 'size', 'mtime'],
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 255 },
+          size: { type: 'integer', minimum: 0 },
+          mtime: { type: 'integer', minimum: 0 },
+        },
+      },
+    },
+  },
+} as const;
+
 export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoutesDeps): void {
   app.get(
     '/api/v1/downloads',
@@ -50,7 +78,7 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
     () => deps.listDownloads.execute(),
   );
 
-  app.delete<{ Params: { id: string } }>(
+  app.delete<{ Params: { id: string }; Body: { snapshot: DownloadDeleteSnapshot } }>(
     '/api/v1/downloads/:id',
     {
       preHandler: app.requireAdmin,
@@ -58,15 +86,21 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
         tags: TAGS,
         summary: 'Delete one download or an entire folder',
         description:
-          'Requires a Heimdall admin session. Deleting a folder removes its contents recursively.',
+          'Requires a Heimdall admin session and the listing snapshot being confirmed. The target path is checked against its id so a stale watcher entry does not block deletion. Folder deletion is refused if hidden, nested, or changed contents are present.',
         operationId: 'deleteDownload',
         security: adminSecurity,
         params: idParamsSchema,
-        response: { 204: noContent, ...errorResponses(400, 401, 404, 409) },
+        body: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['snapshot'],
+          properties: { snapshot: deleteSnapshotSchema },
+        },
+        response: { 204: noContent, ...errorResponses(400, 401, 404, 409, 500) },
       },
     },
     async (request, reply) => {
-      await deps.deleteDownload.execute(request.params.id);
+      await deps.deleteDownload.execute(request.params.id, request.body.snapshot);
       return reply.code(204).send();
     },
   );
@@ -102,6 +136,8 @@ export function registerDownloadRoutes(app: FastifyInstance, deps: DownloadRoute
       schema: {
         tags: TAGS,
         summary: "A folder's files as a zip, streamed",
+        description:
+          'The response is aborted if an indexed file disappears while the archive is being streamed, rather than returning an incomplete zip as a successful download.',
         operationId: 'getDownloadArchive',
         params: idParamsSchema,
         response: {

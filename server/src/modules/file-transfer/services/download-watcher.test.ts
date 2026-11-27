@@ -91,6 +91,25 @@ describe('DownloadWatcherService at depth 1', () => {
     expect(entries.map((entry) => entry.name).sort()).toEqual(['Trip photos', 'keep.jpg']);
   });
 
+  it('does not index symbolic links to files or folders', async () => {
+    write('real.txt', 'safe');
+    fs.symlinkSync(path.join(downloads, 'real.txt'), path.join(downloads, 'linked.txt'));
+    fs.mkdirSync(path.join(downloads, 'real-folder'));
+    fs.writeFileSync(path.join(downloads, 'real-folder', 'inside.txt'), 'safe');
+    fs.symlinkSync(path.join(downloads, 'real-folder'), path.join(downloads, 'linked-folder'));
+
+    const entries = await scan();
+
+    expect(entries.map((entry) => entry.name).sort()).toEqual([
+      'inside.txt',
+      'real-folder',
+      'real.txt',
+    ]);
+    expect(entries.map((entry) => entry.name)).not.toContain('linked.txt');
+    expect(entries.map((entry) => entry.name)).not.toContain('linked-folder');
+    expect(entries.map((entry) => entry.parent)).not.toContain('linked-folder');
+  });
+
   /**
    * Ids hash the path *relative to downloads/*, which is what lets the previews
    * module re-derive the same id from its own independent scan.
@@ -128,6 +147,45 @@ describe('DownloadWatcherService at depth 1', () => {
     );
     expect(watcher.list()).toEqual([]);
   }, 15_000);
+
+  it('removes a deleted folder and indexed children immediately', async () => {
+    write('Trip photos/a.jpg');
+    const bus = new EventBus();
+    const removed = vi.fn();
+    watcher = new DownloadWatcherService(downloads, bus, log);
+    await watcher.start();
+    bus.on('download.removed', removed);
+
+    watcher.removeEntry(downloadIdFor('Trip photos'));
+
+    expect(watcher.list()).toEqual([]);
+    expect(removed.mock.calls.map(([entry]) => (entry as DownloadEntry).name).sort()).toEqual([
+      'Trip photos',
+      'a.jpg',
+    ]);
+  });
+
+  it('broadcasts removal for a stale id that is no longer indexed', async () => {
+    const bus = new EventBus();
+    const removed = vi.fn();
+    watcher = new DownloadWatcherService(downloads, bus, log);
+    await watcher.start();
+    bus.on('download.removed', removed);
+    const stale: DownloadEntry = {
+      id: downloadIdFor('IMG_0622.mov'),
+      name: 'IMG_0622.mov',
+      size: 12,
+      mtime: 1,
+      ext: '.mov',
+      type: 'file',
+      parent: null,
+    };
+
+    watcher.removeEntry(stale.id, stale);
+
+    expect(watcher.list()).toEqual([]);
+    expect(removed).toHaveBeenCalledWith(stale);
+  });
 });
 
 /**

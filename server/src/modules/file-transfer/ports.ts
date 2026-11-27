@@ -101,6 +101,28 @@ export interface DownloadRegistry {
    * `parent` (which folder a nested file lives in) as well as the name.
    */
   resolveEntry(id: string): DownloadEntry | null;
+  /**
+   * Remove a deleted entry and its indexed children, emitting a fallback event
+   * if the watch missed it.
+   */
+  removeEntry(id: string, fallback?: DownloadEntry): void;
+}
+
+export interface DownloadChildSnapshot {
+  name: string;
+  size: number;
+  mtime: number;
+}
+
+/** Listing state the administrator confirmed immediately before deletion. */
+export interface DownloadDeleteSnapshot {
+  name: DownloadEntry['name'];
+  parent: DownloadEntry['parent'];
+  ext: DownloadEntry['ext'];
+  type: DownloadEntry['type'];
+  size: number;
+  mtime: number;
+  children: DownloadChildSnapshot[];
 }
 
 export interface DownloadContent {
@@ -126,12 +148,27 @@ export interface DownloadReader {
    * this is how the archiver gets a path it is allowed to read.
    */
   confineFolder(name: string): Promise<string>;
-  /** Remove one indexed file, or a folder and its contents, after confinement. */
-  remove(name: string, type: DownloadEntry['type']): Promise<void>;
+  /**
+   * Remove one indexed entry after checking that its filesystem state still
+   * matches the listing the administrator confirmed.
+   */
+  remove(
+    name: string,
+    type: DownloadEntry['type'],
+    snapshot: DownloadDeleteSnapshot,
+  ): Promise<void>;
 }
 
-export class DownloadTypeChangedError extends Error {
+export class DownloadChangedError extends Error {
+  override name = 'DownloadChangedError';
+}
+
+export class DownloadTypeChangedError extends DownloadChangedError {
   override name = 'DownloadTypeChangedError';
+}
+
+export class DownloadUnsafeEntryError extends DownloadChangedError {
+  override name = 'DownloadUnsafeEntryError';
 }
 
 /** Zips a folder's files into a stream. Owns the `archiver` dependency. */

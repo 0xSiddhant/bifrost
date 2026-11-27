@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, downloadUrl, type DownloadEntry } from '../../core/api';
 import { formatBytes, formatTimeAgo } from '../../core/format';
 import { log } from '../../core/log';
@@ -9,7 +9,7 @@ import { EmptyState } from '../../core/ui/EmptyState';
 import { Input, Select } from '../../core/ui/Field';
 import { FileRow } from '../../core/ui/FileRow';
 import { DownloadIcon, EyeIcon, FolderIcon } from '../../core/ui/icons';
-import { deleteDownload, fetchDownloads } from './api';
+import { deleteDownload, fetchDownloads, type DownloadDeleteSnapshot } from './api';
 
 type DownloadSort = 'newest' | 'name' | 'size';
 
@@ -18,24 +18,27 @@ export function HeimdallDownloadsSection() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<DownloadSort>('newest');
   const [expandedFolder, setExpandedFolder] = useState<string | null>(null);
+  const [collapsedFolder, setCollapsedFolder] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const listRevision = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const revision = listRevision.current;
     setLoading(true);
     setLoadError(false);
     fetchDownloads()
       .then((result) => {
-        if (cancelled) return;
+        if (cancelled || revision !== listRevision.current) return;
         setDownloads(result);
         notify.dismissKey('heimdall-downloads');
       })
       .catch((error: unknown) => {
-        if (cancelled) return;
+        if (cancelled || revision !== listRevision.current) return;
         setLoadError(true);
         log.reportError('Heimdall: could not load downloads', error, { module: 'heimdall' });
         notify.error('Could not load Downloads. Try again.', {
@@ -44,12 +47,16 @@ export function HeimdallDownloadsSection() {
         });
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && revision === listRevision.current) setLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    setCollapsedFolder(null);
+  }, [query]);
 
   const folders = useMemo(() => {
     const result = new Map<string, DownloadEntry[]>();
@@ -96,7 +103,8 @@ export function HeimdallDownloadsSection() {
     setExpandedFolder((current) => (current === entry.id ? null : current));
   };
 
-  const removeDownload = async (entry: DownloadEntry) => {
+  const removeDownload = async (entry: DownloadEntry, children: DownloadEntry[] = []) => {
+    listRevision.current += 1;
     setBusyId(entry.id);
     const description =
       entry.type === 'folder'
@@ -105,7 +113,16 @@ export function HeimdallDownloadsSection() {
           ? `${entry.parent}/${entry.name}`
           : entry.name;
     try {
-      await deleteDownload(entry.id);
+      const snapshot: DownloadDeleteSnapshot = {
+        name: entry.name,
+        parent: entry.parent,
+        ext: entry.ext,
+        type: entry.type,
+        size: entry.size,
+        mtime: entry.mtime,
+        children: children.map(({ name, size, mtime }) => ({ name, size, mtime })),
+      };
+      await deleteDownload(entry.id, snapshot);
       removeFromList(entry);
       notify.dismissKey(`heimdall-download-delete:${entry.id}`);
       notify.ok(`Deleted ${description}`, { title: 'Heimdall' });
@@ -114,14 +131,26 @@ export function HeimdallDownloadsSection() {
         module: 'heimdall',
       });
       if (error instanceof ApiError && error.status === 404) removeFromList(entry);
-      notify.error(
+      if (error instanceof ApiError && error.status === 409) {
+        setRefreshKey((key) => key + 1);
+      }
+      const message =
         error instanceof ApiError && error.status === 404
           ? `${description} is no longer on the host and was removed from the list.`
-          : `Could not delete ${description}.`,
+          : error instanceof ApiError && error.status === 409
+            ? `${description} changed or contains unlisted items. The listing was refreshed; review it before trying again.`
+            : error instanceof ApiError && error.status === 401
+              ? 'The Heimdall admin session expired. Lock and unlock Heimdall to continue.'
+              : error instanceof ApiError && error.code === 'DELETE_FAILED'
+                ? `The host does not have permission to delete ${description}.`
+              : `Could not delete ${description}.`;
+      notify.error(
+        message,
         { title: 'Heimdall', dedupeKey: `heimdall-download-delete:${entry.id}` },
       );
     } finally {
       setBusyId(null);
+      setLoading(false);
     }
   };
 
@@ -135,6 +164,7 @@ export function HeimdallDownloadsSection() {
             size="sm"
             variant="danger"
             disabled={busyId !== null}
+            aria-label={`Confirm delete ${label}`}
             onClick={() => void removeDownload(entry)}
           >
             Delete
@@ -213,7 +243,12 @@ export function HeimdallDownloadsSection() {
           <option value="name">Name</option>
           <option value="size">Size</option>
         </Select>
-        <Button size="sm" variant="ghost" onClick={() => setRefreshKey((key) => key + 1)}>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busyId !== null}
+          onClick={() => setRefreshKey((key) => key + 1)}
+        >
           Refresh
         </Button>
       </div>
@@ -222,7 +257,7 @@ export function HeimdallDownloadsSection() {
         {folderCount === 1 ? 'folder' : 'folders'} · {formatBytes(totalBytes)} total
       </p>
       <Card>
-        {loading ? (
+        {loading && downloads.length === 0 ? (
           <p className="caption">Loading Downloads…</p>
         ) : loadError ? (
           <div className="row" role="alert">
@@ -243,9 +278,18 @@ export function HeimdallDownloadsSection() {
             const contents = folders.get(entry.name) ?? [];
             const bytes = contents.reduce((total, file) => total + file.size, 0);
             const needle = query.trim().toLowerCase();
+            const folderMatches = needle !== '' && entry.name.toLowerCase().includes(needle);
+            const matchingChildren = contents.filter((file) =>
+              file.name.toLowerCase().includes(needle),
+            );
+            const autoExpanded = needle !== '' && matchingChildren.length > 0;
             const expanded =
               expandedFolder === entry.id ||
-              (needle !== '' && contents.some((file) => file.name.toLowerCase().includes(needle)));
+              (autoExpanded && collapsedFolder !== entry.id);
+            const visibleContents =
+              needle === '' || folderMatches
+                ? [...contents]
+                : contents.filter((file) => file.name.toLowerCase().includes(needle));
             const isConfirming = confirmingDelete === entry.id;
             return (
               <div className="heimdall-downloads__folder" key={entry.id}>
@@ -257,12 +301,16 @@ export function HeimdallDownloadsSection() {
                   aside={
                     isConfirming ? (
                       <span className="row">
-                      <span className="caption">Delete folder and everything inside it?</span>
+                      <span className="caption">
+                        Delete {contents.length} listed {contents.length === 1 ? 'file' : 'files'}?
+                        Hidden, nested, or changed contents will prevent deletion.
+                      </span>
                         <Button
                           size="sm"
                           variant="danger"
                           disabled={busyId !== null}
-                          onClick={() => void removeDownload(entry)}
+                          aria-label={`Confirm delete folder ${entry.name}`}
+                          onClick={() => void removeDownload(entry, contents)}
                         >
                           Delete
                         </Button>
@@ -299,14 +347,9 @@ export function HeimdallDownloadsSection() {
                     )
                   }
                 />
-                {expanded && contents.length > 0 && (
+                {expanded && visibleContents.length > 0 && (
                   <div className="heimdall-downloads__contents">
-                    {contents
-                      .filter(
-                        (file) =>
-                          query.trim() === '' ||
-                          file.name.toLowerCase().includes(query.trim().toLowerCase()),
-                      )
+                    {visibleContents
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map(renderFile)}
                   </div>
@@ -317,9 +360,15 @@ export function HeimdallDownloadsSection() {
                       size="sm"
                       variant="ghost"
                       aria-expanded={expanded}
-                      onClick={() =>
-                        setExpandedFolder((current) => (current === entry.id ? null : entry.id))
-                      }
+                      onClick={() => {
+                        if (expanded) {
+                          setExpandedFolder((current) => (current === entry.id ? null : current));
+                          setCollapsedFolder(entry.id);
+                        } else {
+                          setExpandedFolder(entry.id);
+                          setCollapsedFolder(null);
+                        }
+                      }}
                     >
                       {expanded ? 'Hide files' : 'Show files'}
                     </Button>

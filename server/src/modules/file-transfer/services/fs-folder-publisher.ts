@@ -2,6 +2,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { FolderConflictError, type FolderPlacement, type FolderPublisher } from '../ports.js';
 import { placeFile } from './place-file.js';
+import { DownloadFolderLock } from './download-folder-lock.js';
 
 /**
  * A folder upload writes straight into downloads/<folder>/ (PLAN-24) — no
@@ -15,15 +16,20 @@ import { placeFile } from './place-file.js';
  * reconciliation of its own, unlike the link-then-unlink move.
  */
 export class FsFolderPublisher implements FolderPublisher {
-  constructor(private readonly downloadsDir: string) {}
+  constructor(
+    private readonly downloadsDir: string,
+    private readonly folderLock = new DownloadFolderLock(),
+  ) {}
 
   async publish(tmpPath: string, folder: string, desiredName: string): Promise<FolderPlacement> {
     try {
-      const dir = await this.ensureFolder(folder);
-      const { finalName } = await placeFile(dir, tmpPath, desiredName);
-      // The link inherits the tmp file's private 0600; downloads are 0644.
-      await fsp.chmod(path.join(dir, finalName), 0o644);
-      return { finalName, folder };
+      return await this.folderLock.run(folder, async () => {
+        const dir = await this.ensureFolder(folder);
+        const { finalName } = await placeFile(dir, tmpPath, desiredName);
+        // The link inherits the tmp file's private 0600; downloads are 0644.
+        await fsp.chmod(path.join(dir, finalName), 0o644);
+        return { finalName, folder };
+      });
     } finally {
       // Either the bytes are linked into the folder or the upload failed;
       // the tmp copy has done its job either way (FsFileStorageRepository

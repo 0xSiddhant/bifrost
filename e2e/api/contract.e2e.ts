@@ -86,7 +86,38 @@ describe('contract journeys', () => {
     await status(api.post('/api/v1/files/contract-b.txt/publish'), 200);
     await status(api.upload([{ name: 'contract-c.txt', content: 'c\n' }]), 201);
     await status(api.delete('/api/v1/files/contract-c.txt'), 204);
-    await status(admin.delete(`/api/v1/downloads/${seeds.downloadFolder}`), 204);
+    const downloads = (await admin.get('/api/v1/downloads')).json<
+      {
+        id: string;
+        name: string;
+        size: number;
+        mtime: number;
+        ext: string;
+        type: 'file' | 'folder';
+        parent: string | null;
+      }[]
+    >();
+    const folder = downloads.find((entry) => entry.id === seeds.downloadFolder);
+    if (!folder) throw new Error('seeded download folder is missing');
+    const children = downloads.filter(
+      (entry) => entry.type === 'file' && entry.parent === folder.name,
+    );
+    await status(
+      admin.delete(`/api/v1/downloads/${seeds.downloadFolder}`, {
+        json: {
+          snapshot: {
+            name: folder.name,
+            parent: folder.parent,
+            ext: folder.ext,
+            type: folder.type,
+            size: folder.size,
+            mtime: folder.mtime,
+            children: children.map(({ name, size, mtime }) => ({ name, size, mtime })),
+          },
+        },
+      }),
+      204,
+    );
   });
 
   it('clipboard, accio and portkey: add, change, delete', async () => {

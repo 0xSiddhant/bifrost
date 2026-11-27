@@ -39,6 +39,7 @@ function build(
   const registry: DownloadRegistry = {
     list: () => list,
     resolveEntry: (id) => list.find((e) => e.id === id) ?? null,
+    removeEntry: () => {},
   };
   const reader: DownloadReader = {
     stat: vi.fn(),

@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { notifications } from '../../core/notify';
-import type { DownloadEntry } from '../../core/api';
+import { ApiError, type DownloadEntry } from '../../core/api';
 import { HeimdallDownloadsSection } from './DownloadsSection';
 import * as api from './api';
 
@@ -53,6 +53,13 @@ const button = (label: string) =>
     (element) => element.getAttribute('aria-label') === label || element.textContent?.trim() === label,
   );
 
+const setSearch = (container: HTMLDivElement, value: string) => {
+  const input = container.querySelector<HTMLInputElement>('input[type="search"]');
+  if (!input) throw new Error('Downloads search input is missing');
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
 describe('Heimdall downloads', () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -100,7 +107,7 @@ describe('Heimdall downloads', () => {
 
   it('confirms folder deletion and removes the folder and its indexed contents', async () => {
     await act(async () => button('Delete folder Trip photos')?.click());
-    expect(container.textContent).toContain('Delete folder and everything inside it?');
+    expect(container.textContent).toContain('Delete 1 listed file?');
     expect(api.deleteDownload).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -114,9 +121,30 @@ describe('Heimdall downloads', () => {
       await Promise.resolve();
     });
 
-    expect(api.deleteDownload).toHaveBeenCalledWith(folder.id);
+    expect(api.deleteDownload).toHaveBeenCalledWith(folder.id, {
+      name: folder.name,
+      parent: folder.parent,
+      ext: folder.ext,
+      type: 'folder',
+      size: folder.size,
+      mtime: folder.mtime,
+      children: [{ name: file.name, size: file.size, mtime: file.mtime }],
+    });
     expect(container.querySelectorAll('.file-row__name').length).toBe(1);
     expect(container.textContent).toContain('loose.txt');
+  });
+
+  it('shows all files when the folder name matches and allows search expansion to be collapsed', async () => {
+    await act(async () => setSearch(container, 'Trip'));
+    await act(async () => button('Show files')?.click());
+    expect(container.textContent).toContain('report & final.txt');
+
+    await act(async () => setSearch(container, 'report'));
+    expect(container.textContent).toContain('report & final.txt');
+    await act(async () => button('Hide files')?.click());
+    expect(container.textContent).not.toContain('report & final.txt');
+    await act(async () => button('Show files')?.click());
+    expect(container.textContent).toContain('report & final.txt');
   });
 
   it('keeps the file visible when deletion fails', async () => {
@@ -124,10 +152,83 @@ describe('Heimdall downloads', () => {
 
     await act(async () => button('Delete loose.txt')?.click());
     await act(async () => {
-      [...container.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Delete')?.click();
+      button('Confirm delete loose.txt')?.click();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(api.deleteDownload).toHaveBeenCalledWith(rootFile.id, {
+      name: rootFile.name,
+      parent: rootFile.parent,
+      ext: rootFile.ext,
+      type: 'file',
+      size: rootFile.size,
+      mtime: rootFile.mtime,
+      children: [],
+    });
+    expect(container.textContent).toContain('loose.txt');
+  });
+
+  it('removes a stale row after a 404 response', async () => {
+    vi.mocked(api.deleteDownload).mockRejectedValueOnce(new ApiError(404, 'missing', 'NOT_FOUND'));
+
+    await act(async () => button('Delete loose.txt')?.click());
+    await act(async () => {
+      button('Confirm delete loose.txt')?.click();
       await Promise.resolve();
     });
 
+    expect(container.textContent).not.toContain('loose.txt');
+  });
+
+  it('refreshes the listing after a 409 conflict', async () => {
+    vi.mocked(api.deleteDownload).mockRejectedValueOnce(
+      new ApiError(409, 'changed', 'DOWNLOAD_CHANGED'),
+    );
+    vi.mocked(api.fetchDownloads).mockResolvedValueOnce([folder, rootFile]);
+
+    await act(async () => button('Delete loose.txt')?.click());
+    await act(async () => {
+      button('Confirm delete loose.txt')?.click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(api.fetchDownloads).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain('report & final.txt');
+  });
+
+  it('ignores a refresh response that started before a successful delete', async () => {
+    let resolveRefresh!: (entries: DownloadEntry[]) => void;
+    vi.mocked(api.fetchDownloads).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+    );
+
+    await act(async () => button('Refresh')?.click());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(api.fetchDownloads).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain('loose.txt');
+
+    await act(async () => button('Delete loose.txt')?.click());
+    await act(async () => {
+      button('Confirm delete loose.txt')?.click();
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+    expect(api.deleteDownload).toHaveBeenCalledOnce();
+    expect(container.textContent).not.toContain('loose.txt');
+
+    await act(async () => {
+      resolveRefresh([folder, file, rootFile]);
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).not.toContain('loose.txt');
+    expect(container.textContent).not.toContain('Loading Downloads…');
   });
 });
