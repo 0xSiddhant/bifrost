@@ -197,12 +197,34 @@ export function fileTail(file: string, lines: number): string {
 }
 
 /**
+ * The newest file of the web host's own log series (`app-web.<N>.log`, PLAN-36)
+ * in `logsDir`, or null when it wrote none.
+ */
+export function newestWebLog(logsDir: string): string | null {
+  let names: string[];
+  try {
+    names = fs.readdirSync(logsDir);
+  } catch {
+    // No logs folder yet: the web host never got as far as its logger.
+    return null;
+  }
+  const numbered = names
+    .map((name) => ({ name, n: /^app-web\.(\d+)\.log$/.exec(name)?.[1] }))
+    .filter((entry): entry is { name: string; n: string } => entry.n !== undefined)
+    .sort((a, b) => Number(b.n) - Number(a.n));
+  return numbered[0] ? path.join(logsDir, numbered[0].name) : null;
+}
+
+/**
  * The error a test sees when a server it was starting is not up: why
  * (`waitForHealth`'s message), how each process ended, everything they wrote,
- * and the tail of the API's log file. The API logs a fatal error (an address
- * already in use, a failed migration) to that file, not to stdout, so without
- * the tail a dead server reports nothing at all. A dead process's output is
- * read once its pipes have drained.
+ * and the tail of each process's log file. The API and the web host log a
+ * fatal error (an address already in use, a failed migration) to their files,
+ * `current.log` and `app-web.<N>.log`, not to stdout, so without the tails a
+ * dead server reports nothing at all, and the port-race retry below cannot
+ * see a web host's EADDRINUSE (#122's CI, run 46005025225: "web: exited (code
+ * 1)" and no reason). A dead process's output is read once its pipes have
+ * drained.
  */
 async function bootFailure(
   cause: unknown,
@@ -220,12 +242,20 @@ async function bootFailure(
       return `${name}: ${status ? `exited (code ${status.code}, signal ${status.signal})` : 'running'}`;
     });
   const reason = cause instanceof Error ? cause.message : String(cause);
+  const webLog = procs.web ? newestWebLog(path.dirname(logFile)) : null;
   return new Error(
     [
       reason,
       ...exits,
       `output:\n${output() || '(none)'}`,
       `log (${logFile}), last 40 lines:\n${fileTail(logFile, 40)}`,
+      ...(procs.web
+        ? [
+            webLog
+              ? `web host log (${webLog}), last 40 lines:\n${fileTail(webLog, 40)}`
+              : 'web host log: (none written)',
+          ]
+        : []),
     ].join('\n'),
     { cause },
   );
@@ -235,8 +265,8 @@ async function bootFailure(
  * How many times a server whose ports this harness picked itself is started
  * afresh when one of them was taken. `freePort()` can only say a port was free
  * a moment ago: another worker's server (four start at once in CI) can bind it
- * before this one does, and the API then dies with EADDRINUSE (CI run
- * 45961921150, webkit 2/2). New ports make that a non-event.
+ * before this one does, and the API or the web host then dies with EADDRINUSE
+ * (CI runs 45961921150 and 46005025225). New ports make that a non-event.
  */
 const PORT_RACE_ATTEMPTS = 3;
 
@@ -277,7 +307,8 @@ async function startServerOnce(options: StartServerOptions): Promise<E2EServer> 
   let apiPort = hasWebHost ? (options.apiPort ?? (await freePort())) : port;
   // Two probes can be handed the same ephemeral port in turn; the web host and
   // the API would then race for it.
-  while (hasWebHost && options.apiPort === undefined && apiPort === port) apiPort = await freePort();
+  while (hasWebHost && options.apiPort === undefined && apiPort === port)
+    apiPort = await freePort();
   let jail: string | null = null;
   let canary: Canary | null = null;
   let storageRoot: string;

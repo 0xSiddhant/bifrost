@@ -116,7 +116,7 @@ The exceptions are an explicit allowlist, each with its reason:
 - the SSE stream cancelled by a navigation;
 - a request the page aborted itself;
 - the browser's own console line for a 4xx answer;
-- connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose;
+- connection-refused noise, and a lazy chunk from this server that failed to load (the boundary around it catches that), but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose, or a test's own server (`ownServer()`) is stopped at teardown while its pages are still open;
 - the web host's `502` (`503` for `/go`) and the browser's lines for them, but only after a test calls `guard.allowApiOutage()` because it stopped the API on purpose (PLAN-36). A 5xx from anything else still fails.
 - WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, the live events stream's `EventSource cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
 

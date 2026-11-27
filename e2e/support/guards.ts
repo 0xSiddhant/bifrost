@@ -88,7 +88,16 @@ export const CONNECTION_LOSS: AllowEntry = {
       )) ||
     // Vite's own preload helper reports a lazy chunk's stylesheet it could not
     // fetch; the app catches the import failure itself (RouteBoundary).
-    (v.kind === 'console.error' && /^Error: Unable to preload CSS for /.test(v.detail)),
+    (v.kind === 'console.error' && /^Error: Unable to preload CSS for /.test(v.detail)) ||
+    // A lazy chunk asked for after the server stopped (the sky's relics load
+    // once the browser is idle, so a test that ends just after a navigation
+    // can outlive its server: #122's CI, run 46005025225). The boundary around
+    // it catches the failure (an empty sky) and React logs the catch.
+    (v.kind === 'console.error' &&
+      (/^TypeError: Failed to fetch dynamically imported module: https?:\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]\S*\.js$/.test(
+        v.detail,
+      ) ||
+        /^TypeError: Importing a module script failed\.$/.test(v.detail))),
 };
 
 /**
