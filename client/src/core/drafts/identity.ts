@@ -68,6 +68,8 @@ export class TabIdentity {
   /** How the id was settled, for tests and logs. */
   origin: 'fresh' | 'reused' | 'yielded' | 'no-channel' = 'fresh';
   private channel: ChannelLike | null = null;
+  /** Set once the page has left (`pagehide`): it no longer speaks for its id. */
+  private suspended = false;
   private readonly listeners = new Set<(event: IdentityEvent) => void>();
 
   constructor(private readonly deps: IdentityDeps) {
@@ -116,6 +118,22 @@ export class TabIdentity {
     this.deps.setTimer(() => this.settle(), HANDSHAKE_MS);
   }
 
+  /**
+   * The page is going (`pagehide`): stop answering for the id. A reload's new
+   * document asks for the same id while, in WebKit, the old one can still
+   * hear it; an answer then would make the reloaded tab give up its own id
+   * and leave its drafts under the old one (PR #122's CI, webkit-mobile).
+   */
+  suspend(): void {
+    this.suspended = true;
+  }
+
+  /** Back from the back/forward cache: speak for the id again, after asking whether a twin took it. */
+  resume(): void {
+    this.suspended = false;
+    this.probe();
+  }
+
   /** Ask again whether a live twin holds our id (after a back/forward-cache restore). */
   probe(): void {
     this.channel?.postMessage({ t: 'probe', tab: this.tab, from: this.instance } satisfies Message);
@@ -139,7 +157,7 @@ export class TabIdentity {
 
   private onMessage(data: unknown): void {
     const message = asMessage(data);
-    if (!message || message.tab !== this.tab) return;
+    if (!message || message.tab !== this.tab || this.suspended) return;
     if (message.t === 'probe') {
       if (message.from === this.instance) return;
       // A live tab keeps its id. Two tabs both still asking (opened together)

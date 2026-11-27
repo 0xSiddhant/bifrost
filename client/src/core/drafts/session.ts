@@ -78,7 +78,7 @@ export class DraftSession {
     const onPageShow = (event: Event) => {
       // Back from the back/forward cache: this lifetime goes on, but a twin
       // may have taken the id meanwhile, so ask again.
-      if ((event as PageTransitionEvent).persisted) this.identity.probe();
+      if ((event as PageTransitionEvent).persisted) this.identity.resume();
     };
     const onStorage = (event: Event) => {
       const { key, newValue } = event as StorageEvent;
@@ -252,6 +252,9 @@ export class DraftSession {
 
   private onPageHide(event: PageTransitionEvent): void {
     this.flush('pagehide');
+    // Leaving (or frozen in the back/forward cache): this page no longer
+    // answers for the id, so a reload's new document keeps it.
+    this.identity.suspend();
     // Kept in the back/forward cache: not leaving, so no departure.
     if (event.persisted) return;
     const me = this.me();

@@ -133,6 +133,35 @@ describe('TabIdentity (PLAN-43)', () => {
     expect(kept).toHaveLength(1);
   });
 
+  it('keeps its id across a reload even if the page it replaces can still hear it', () => {
+    const clock = timers();
+    const net = bus();
+    const session = memoryStorage();
+    const before = tab(session, net, clock);
+    before.identity.start();
+    // The old document has fired pagehide, but WebKit may still deliver to it.
+    before.identity.suspend();
+    const after = tab(session, net, clock);
+    after.identity.start();
+    net.deliver();
+    clock.advance(HANDSHAKE_MS);
+    expect(after.identity.tab).toBe(before.identity.tab);
+    expect(after.identity.origin).toBe('reused');
+  });
+
+  it('answers for its id again when it comes back from the back/forward cache', () => {
+    const clock = timers();
+    const net = bus();
+    const cached = tab(memoryStorage(), net, clock);
+    cached.identity.start();
+    cached.identity.suspend();
+    cached.identity.resume();
+    const twin = tab(memoryStorage({ [TAB_ID_KEY]: cached.identity.tab }), net, clock);
+    twin.identity.start();
+    net.deliver();
+    expect(twin.identity.tab).not.toBe(cached.identity.tab);
+  });
+
   it('never reuses a stored id without a channel to check it', () => {
     const clock = timers();
     const { identity } = tab(memoryStorage({ [TAB_ID_KEY]: 'maybe-copied' }), null, clock);
