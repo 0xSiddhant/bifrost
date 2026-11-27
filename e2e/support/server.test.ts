@@ -1,4 +1,6 @@
 import fs from 'node:fs';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -66,9 +68,18 @@ if (starts <= ${failures}) {
 `)});
   process.exit(1);
 }
+const apiPort = Number(process.env.API_PORT);
 require('node:http')
   .createServer((request, response) => response.end('{}'))
-  .listen(Number(process.env.API_PORT), '127.0.0.1');
+  .listen(apiPort, '127.0.0.1', () => {
+    // As the real API logs it: what tells the harness this start owns the port.
+    const logs = path.join(process.env.STORAGE_ROOT, 'logs');
+    fs.mkdirSync(logs, { recursive: true });
+    fs.appendFileSync(
+      path.join(logs, 'current.log'),
+      JSON.stringify({ msg: 'api listening on http://127.0.0.1:' + apiPort, port: apiPort }) + '\\n',
+    );
+  });
 `,
   );
   return root;
@@ -99,9 +110,17 @@ if (starts <= ${failures}) {
 `)});
   process.exit(1);
 }
+const port = Number(process.env.PORT);
 require('node:http')
   .createServer((request, response) => response.end('{}'))
-  .listen(Number(process.env.PORT), '127.0.0.1');
+  .listen(port, '127.0.0.1', () => {
+    const logs = path.join(process.env.STORAGE_ROOT, 'logs');
+    fs.mkdirSync(logs, { recursive: true });
+    fs.appendFileSync(
+      path.join(logs, 'app-web.1.log'),
+      JSON.stringify({ msg: 'web host listening on 127.0.0.1:' + port, port }) + '\\n',
+    );
+  });
 `,
   );
   return root;
@@ -175,6 +194,32 @@ describe('startServer', () => {
     await expect(failure).rejects.toThrow(/web host log \(.*app-web\.1\.log\)/);
     await expect(failure).rejects.toThrow('refusing to start: no client build');
     expect(starts(storageRoot, 'web-starts')).toBe(1);
+  });
+
+  it('does not take another process’s health answer for its own server', async () => {
+    // A stranger already answers on the port; this start's API never listens.
+    const stranger = http.createServer((_request, response) => response.end('{}'));
+    await new Promise<void>((resolve) => stranger.listen(0, '127.0.0.1', resolve));
+    const { port } = stranger.address() as AddressInfo;
+    const root = dyingBuild('unused');
+    fs.writeFileSync(
+      path.join(root, 'server', 'dist', 'bootstrap.js'),
+      'setInterval(() => {}, 1000);\n',
+    );
+    const storageRoot = tempDir('bifrost-e2e-stranger-storage-');
+    try {
+      await expect(
+        startServer({
+          buildRoot: root,
+          storageRoot,
+          keepStorage: true,
+          port,
+          listenTimeoutMs: 300,
+        }),
+      ).rejects.toThrow(/another process answered on port/);
+    } finally {
+      await new Promise((resolve) => stranger.close(resolve));
+    }
   });
 
   it('reports the exit and the log tail of an API that dies while starting', async () => {

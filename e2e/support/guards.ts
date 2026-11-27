@@ -93,11 +93,13 @@ export const CONNECTION_LOSS: AllowEntry = {
     // once the browser is idle, so a test that ends just after a navigation
     // can outlive its server: #122's CI, run 46005025225). The boundary around
     // it catches the failure (an empty sky) and React logs the catch.
+    // WebKit's form ("Importing a module script failed.") names no URL, so it
+    // cannot be tied to this server and stays a failure here; a page closed
+    // right after it is covered by the navigation-cancel window instead.
     (v.kind === 'console.error' &&
-      (/^TypeError: Failed to fetch dynamically imported module: https?:\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]\S*\.js$/.test(
+      /^TypeError: Failed to fetch dynamically imported module: https?:\/\/(127\.0\.0\.1|localhost|\[::1\])[:/]\S*\.js$/.test(
         v.detail,
-      ) ||
-        /^TypeError: Importing a module script failed\.$/.test(v.detail))),
+      )),
 };
 
 /**

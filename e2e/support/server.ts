@@ -56,6 +56,8 @@ export interface StartServerOptions {
    * response proves the escape. Ignored when `storageRoot` is given.
    */
   canary?: boolean;
+  /** How long to wait for this start's own processes to log that they listen (tests shorten it). */
+  listenTimeoutMs?: number;
 }
 
 export interface Canary {
@@ -197,6 +199,62 @@ export function fileTail(file: string, lines: number): string {
 }
 
 /**
+ * True when the JSON log file names this start's process listening on `port`:
+ * a line whose message starts with `prefix` and whose `port` field is `port`.
+ */
+function loggedListening(file: string | null, prefix: string, port: number): boolean {
+  if (!file) return false;
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    // Not written yet: the process is still starting.
+    return false;
+  }
+  return text.split('\n').some((line) => {
+    if (!line.includes(prefix)) return false;
+    try {
+      const entry = JSON.parse(line) as { msg?: unknown; port?: unknown };
+      return typeof entry.msg === 'string' && entry.msg.startsWith(prefix) && entry.port === port;
+    } catch {
+      // A line cut off mid-write; the next read sees it whole.
+      return false;
+    }
+  });
+}
+
+/**
+ * A health answer only says that *something* answers on a port. Another
+ * worker's server can bind a port this harness picked first, and then answer
+ * for this start while its own API dies with EADDRINUSE or is still
+ * migrating: the journeys would run against a stranger's storage, and nothing
+ * would fail. So this start also waits for its own processes to log, in its own
+ * storage, that they are listening on these ports.
+ */
+async function waitForOwnListen(
+  logsDir: string,
+  apiPort: number,
+  webPort: number | null,
+  isAlive: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const apiOwn = loggedListening(path.join(logsDir, 'current.log'), 'api listening on', apiPort);
+    const webOwn =
+      webPort === null || loggedListening(newestWebLog(logsDir), 'web host listening on', webPort);
+    if (apiOwn && webOwn) return;
+    if (!isAlive()) throw new Error('server exited before it was healthy (after a health answer)');
+    if (Date.now() > deadline) {
+      throw new Error(
+        `another process answered on port ${apiOwn ? webPort : apiPort}: the server this harness started never logged listening there`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/**
  * The newest file of the web host's own log series (`app-web.<N>.log`, PLAN-36)
  * in `logsDir`, or null when it wrote none.
  */
@@ -271,7 +329,9 @@ async function bootFailure(
 const PORT_RACE_ATTEMPTS = 3;
 
 const addressInUse = (error: unknown): boolean =>
-  (error instanceof Error ? error.message : String(error)).includes('EADDRINUSE');
+  /EADDRINUSE|another process answered on port/.test(
+    error instanceof Error ? error.message : String(error),
+  );
 
 export async function startServer(options: StartServerOptions = {}): Promise<E2EServer> {
   const ownPorts = options.port === undefined && options.apiPort === undefined;
@@ -376,6 +436,13 @@ async function startServerOnce(options: StartServerOptions): Promise<E2EServer> 
   try {
     await waitForHealth(apiUrl, api.alive);
     if (web) await waitForHealth(baseUrl, bothAlive, 30_000, '/healthz');
+    await waitForOwnListen(
+      path.dirname(logFile),
+      apiPort,
+      web ? port : null,
+      bothAlive,
+      options.listenTimeoutMs ?? 10_000,
+    );
   } catch (error) {
     await haltBoth();
     const failure = await bootFailure(error, { api, web }, () => output, logFile);

@@ -98,7 +98,6 @@ describe('CONNECTION_LOSS', () => {
         detail:
           'TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:44433/assets/RelicScatter-DWCBcItl.js',
       },
-      { kind: 'console.error', page: '', detail: 'TypeError: Importing a module script failed.' },
     ];
     for (const violation of allowed) expect(CONNECTION_LOSS.matches(violation)).toBe(true);
     const refused: Violation[] = [
@@ -119,6 +118,8 @@ describe('CONNECTION_LOSS', () => {
         detail:
           'TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:1/assets/x.js',
       },
+      // WebKit's form names no URL: it could be any chunk, on any server.
+      { kind: 'console.error', page: '', detail: 'TypeError: Importing a module script failed.' },
     ];
     for (const violation of refused) expect(CONNECTION_LOSS.matches(violation)).toBe(false);
     // Without the allowance, the reset and a failed chunk are still failures.
