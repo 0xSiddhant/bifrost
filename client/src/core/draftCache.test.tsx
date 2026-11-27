@@ -1,65 +1,86 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act } from 'react';
+import { StrictMode, act, useEffect, useMemo } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { showsRestore, useDraftCache, type ScratchDraft } from './draftCache';
-import { takeLeftOpen } from './draftReturn';
+import {
+  useDraftOffer,
+  useWorkspaceDraft,
+  type Hydration,
+  type OfferState,
+  type WorkspaceDraft,
+} from './draftCache';
+import { memoryBackend } from './drafts/coordinator';
+import { legacyTextParse, textDraftCodec, type TextDraft } from './drafts/documents';
+import { OFFER_GRACE_MS, registerLifetime, writeDeparture } from './drafts/protocol';
+import { SCRATCH, makeEnvelope, recordKey } from './drafts/records';
+import { browserLocalStorage } from './drafts/storage';
+import { installTestSession, uninstallTestSession } from './drafts/testing';
+import { log } from './log';
 
 declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 
-const OLD: ScratchDraft = { title: 'Older', text: '{"old":true}', savedAt: 1 };
-
 interface Props {
   text: string;
-  offered?: ScratchDraft | null;
-  isScratch?: boolean;
-  returnId?: string;
+  workspace?: string | null;
+  hydrateOn?: string | null;
+  onHydrate?: (hydration: Hydration<TextDraft>) => void;
 }
 
-describe('useDraftCache', () => {
+let api: WorkspaceDraft<TextDraft>;
+
+function Editor({ text, workspace = SCRATCH, hydrateOn = workspace, onHydrate }: Props) {
+  const payload = useMemo<TextDraft>(() => ({ title: 'Now', text, baseline: null }), [text]);
+  api = useWorkspaceDraft<TextDraft>({
+    feature: 'runestone',
+    workspace,
+    payload,
+    keep: text.trim() !== '',
+    codec: textDraftCodec,
+  });
+  const { ready, hydrate } = api;
+  useEffect(() => {
+    if (!ready || !hydrateOn) return;
+    const hydration = hydrate(hydrateOn);
+    onHydrate?.(hydration);
+  }, [ready, hydrateOn]);
+  return null;
+}
+
+describe('useWorkspaceDraft (PLAN-43)', () => {
   let container: HTMLDivElement;
   let root: Root;
-  let stored: ScratchDraft | null;
-  const save = vi.fn((draft: ScratchDraft) => {
-    stored = draft;
-  });
-  const clear = vi.fn(() => {
-    stored = null;
-  });
+  let tab: string;
 
-  function Editor({ text, offered = null, isScratch = true, returnId }: Props) {
-    useDraftCache({
-      isScratch,
-      title: 'Now',
-      text,
-      blank: text.trim() === '',
-      offered,
-      save,
-      clear,
-      returnId,
-    });
-    return null;
-  }
-
-  const render = async (props: Props) => {
+  const render = async (props: Props, strict = false) => {
     await act(async () => {
-      root.render(<Editor {...props} />);
+      root.render(strict ? <StrictMode><Editor {...props} /></StrictMode> : <Editor {...props} />);
     });
   };
-
-  const settle = async () => {
+  const settle = async (ms = 500) => {
     await act(async () => {
-      vi.advanceTimersByTime(500);
+      vi.advanceTimersByTime(ms);
     });
   };
+  const stored = (workspace = SCRATCH, owner = tab): string | null => {
+    const raw = localStorage.getItem(recordKey('runestone', owner, workspace));
+    return raw === null ? null : (JSON.parse(raw) as { payload: TextDraft }).payload.text;
+  };
+  const putOther = (owner: string, text: string, workspace = SCRATCH) =>
+    localStorage.setItem(
+      recordKey('runestone', owner, workspace),
+      JSON.stringify(
+        makeEnvelope({ feature: 'runestone', tab: owner, workspace }, { title: 'O', text, baseline: null }, 1),
+      ),
+    );
 
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     vi.useFakeTimers();
-    vi.clearAllMocks();
-    stored = OLD;
+    localStorage.clear();
+    const session = installTestSession();
+    tab = session.me()?.tab ?? '';
     container = document.createElement('div');
     document.body.append(container);
     root = createRoot(container);
@@ -68,71 +89,208 @@ describe('useDraftCache', () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    uninstallTestSession();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
-  it('caches what is typed, replacing the older draft', async () => {
-    await render({ text: '', offered: OLD });
-    await render({ text: '{"new":1}', offered: OLD });
-    await settle();
-    expect(stored?.text).toBe('{"new":1}');
+  it('mirrors the buffer into this tab’s own key after the debounce', async () => {
+    await render({ text: '' });
+    await render({ text: '{"a":1}' });
+    await settle(499);
+    expect(stored()).toBeNull();
+    await settle(1);
+    expect(stored()).toBe('{"a":1}');
   });
 
-  it('puts the offered draft back when the buffer is emptied again', async () => {
-    await render({ text: '{"new":1}', offered: OLD });
+  it('removes its own record when the buffer is emptied, and nothing else', async () => {
+    putOther('tab-other', 'theirs');
+    await render({ text: '{"a":1}' });
     await settle();
-    await render({ text: '', offered: OLD });
+    await render({ text: '  ' });
     await settle();
-    expect(stored).toEqual(OLD);
+    expect(stored()).toBeNull();
+    expect(stored(SCRATCH, 'tab-other')).toBe('theirs');
   });
 
-  it('clears the cache when the buffer is emptied and nothing is on offer', async () => {
-    await render({ text: '{"new":1}' });
+  it('flushes inside the debounce window on unmount and on pagehide, never removing', async () => {
+    await render({ text: '{"a":1}' });
     await settle();
-    await render({ text: '   ' });
-    await settle();
-    expect(stored).toBeNull();
-  });
-
-  it('flushes the buffer on leaving, inside the debounce window', async () => {
-    await render({ text: '{"last":1}', offered: OLD, returnId: 'cache-a' });
+    await render({ text: '{"last":1}' });
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+    expect(stored()).toBe('{"last":1}');
+    await render({ text: '' });
     await act(async () => root.unmount());
-    expect(stored?.text).toBe('{"last":1}');
-    expect(takeLeftOpen('cache-a')).toBe(true);
+    // Unmounted blank inside the window: the flush does not remove.
+    expect(stored()).toBe('{"last":1}');
     root = createRoot(container);
   });
 
-  it('flushes on a page unload too, without marking a return', async () => {
-    await render({ text: '{"reloaded":1}', offered: OLD, returnId: 'cache-c' });
-    window.dispatchEvent(new Event('pagehide'));
-    expect(stored?.text).toBe('{"reloaded":1}');
-    expect(takeLeftOpen('cache-c')).toBe(false);
+  it('writes nothing for a workspace until it is hydrated', async () => {
+    putOther(tab, 'restorable');
+    await render({ text: '', hydrateOn: null });
+    await settle(2000);
+    expect(stored()).toBe('restorable');
   });
 
-  it('keeps the offered draft when left blank inside the debounce window', async () => {
-    await render({ text: '{"new":1}', offered: OLD, returnId: 'cache-b' });
-    await settle();
-    await render({ text: '', offered: OLD, returnId: 'cache-b' });
-    await act(async () => root.unmount());
-    expect(stored).toEqual(OLD);
-    expect(takeLeftOpen('cache-b')).toBe(false);
-    root = createRoot(container);
+  it('hydrates once per arrival, StrictMode included, and hands back this tab’s draft', async () => {
+    putOther(tab, 'mine before reload');
+    const seen: Hydration<TextDraft>[] = [];
+    await render({ text: '', onHydrate: (hydration) => seen.push(hydration) }, true);
+    expect(seen.map((hydration) => hydration.first)).toEqual([true, false]);
+    expect(seen[0]?.own?.payload.text).toBe('mine before reload');
+    expect(stored()).toBe('mine before reload');
   });
 
-  it('touches nothing for a saved document', async () => {
-    await render({ text: '{"saved":1}', isScratch: false });
+  it('keeps each workspace under its own key when the page switches between them', async () => {
+    await render({ text: 'doc one edits', workspace: 'doc:1' });
+    // Straight to another document: the first is flushed under its own key.
+    await render({ text: 'doc one edits', workspace: 'doc:2', hydrateOn: 'doc:2' });
+    await render({ text: 'doc two edits', workspace: 'doc:2', hydrateOn: 'doc:2' });
     await settle();
-    await act(async () => root.unmount());
-    expect(save).not.toHaveBeenCalled();
-    expect(clear).not.toHaveBeenCalled();
-    root = createRoot(container);
+    expect(stored('doc:1')).toBe('doc one edits');
+    expect(stored('doc:2')).toBe('doc two edits');
+  });
+
+  it('clears only this tab’s record for the workspace, and a flush cannot bring it back', async () => {
+    putOther('tab-other', 'theirs');
+    await render({ text: 'saved now' });
+    await settle();
+    await act(async () => api.clear());
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+    expect(stored()).toBeNull();
+    expect(stored(SCRATCH, 'tab-other')).toBe('theirs');
+    await render({ text: 'typed after saving' });
+    await settle();
+    expect(stored()).toBe('typed after saving');
+  });
+
+  it('reports a write that failed, and clears the report when one succeeds', async () => {
+    const warn = vi.spyOn(log, 'warn').mockImplementation(() => undefined);
+    const quota = new DOMException('full', 'QuotaExceededError');
+    const realSet = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw quota;
+    });
+    await render({ text: 'too much' });
+    await settle();
+    expect(api.writeError).toBe('browser storage is full');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('browser storage is full'), {
+      module: 'drafts',
+    });
+    setItem.mockImplementation(function (this: Storage, key: string, value: string) {
+      realSet.call(this, key, value);
+    });
+    await render({ text: 'fits now' });
+    await settle();
+    expect(api.writeError).toBeNull();
+    expect(stored()).toBe('fits now');
   });
 });
 
-describe('showsRestore', () => {
-  it('shows only while a draft is on offer and the buffer is blank', () => {
-    expect(showsRestore(OLD, true)).toBe(true);
-    expect(showsRestore(OLD, false)).toBe(false);
-    expect(showsRestore(null, true)).toBe(false);
+describe('useDraftOffer (PLAN-43)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  let offers: OfferState<TextDraft>;
+  const backend = memoryBackend();
+  const LEGACY = legacyTextParse((text) => text.trim() === '');
+
+  function Offering({ eligible = true }: { eligible?: boolean }) {
+    offers = useDraftOffer<TextDraft>({
+      feature: 'runestone',
+      workspace: SCRATCH,
+      eligible,
+      codec: textDraftCodec,
+      worth: (draft) => draft.text.trim() !== '',
+      legacy: LEGACY,
+    });
+    return null;
+  }
+
+  const render = async (eligible = true) => {
+    await act(async () => {
+      root.render(<Offering eligible={eligible} />);
+    });
+    // The search runs over a few promise turns.
+    for (let i = 0; i < 5; i += 1) await act(async () => Promise.resolve());
+  };
+
+  const closedTab = async (text: string) => {
+    const ctx = { local: browserLocalStorage(), backend, now: () => Date.now() };
+    const other = { tab: 'tab-closed', instance: 'x1' };
+    await registerLifetime(ctx, other);
+    localStorage.setItem(
+      recordKey('runestone', other.tab, SCRATCH),
+      JSON.stringify(
+        makeEnvelope({ feature: 'runestone', tab: other.tab, workspace: SCRATCH }, { title: 'C', text, baseline: null }, 7),
+      ),
+    );
+    writeDeparture(ctx.local, other, Date.now() - OFFER_GRACE_MS);
+    return recordKey('runestone', other.tab, SCRATCH);
+  };
+
+  beforeEach(() => {
+    globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    localStorage.clear();
+    backend.entries.clear();
+    installTestSession({ backend });
+    container = document.createElement('div');
+    document.body.append(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    uninstallTestSession();
+  });
+
+  it('offers a closed tab’s draft and moves it here on Restore', async () => {
+    const source = await closedTab('left in a closed tab');
+    await render();
+    expect(offers.offer).toMatchObject({ kind: 'tab', payload: { text: 'left in a closed tab' } });
+    let restored: TextDraft | null = null;
+    await act(async () => {
+      restored = await offers.accept();
+    });
+    expect(restored).toMatchObject({ text: 'left in a closed tab' });
+    expect(localStorage.getItem(source)).toBeNull();
+    expect(offers.offer).toBeNull();
+  });
+
+  it('leaves the draft where it is when dismissed', async () => {
+    const source = await closedTab('not now');
+    await render();
+    await act(async () => offers.dismiss());
+    expect(offers.offer).toBeNull();
+    expect(localStorage.getItem(source)).not.toBeNull();
+  });
+
+  it('offers nothing when the page says not to (its own draft or a hand-off came first)', async () => {
+    await closedTab('ignored');
+    await render(false);
+    expect(offers.offer).toBeNull();
+  });
+
+  it('falls back to the draft saved before the update, only when no tab has one', async () => {
+    localStorage.setItem('bifrost.runestone.draft', JSON.stringify({ title: 'Old', text: '{"o":1}', savedAt: 3 }));
+    await render();
+    expect(offers.offer).toMatchObject({ kind: 'legacy', payload: { text: '{"o":1}' } });
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await closedTab('a closed tab first');
+    await render();
+    expect(offers.offer).toMatchObject({ kind: 'tab' });
+  });
+
+  it('says so when the draft was taken elsewhere first', async () => {
+    const source = await closedTab('raced');
+    await render();
+    localStorage.removeItem(source);
+    await act(async () => {
+      await offers.accept();
+    });
+    expect(offers.offer).toBeNull();
+    expect(offers.error).toMatch(/no longer available/);
   });
 });

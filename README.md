@@ -55,6 +55,7 @@ The app is organized into three category tabs, plus a few things that work every
 - 🗜 **Brotli** — compress text or a file, or decompress a `.br`, with a live gzip comparison and a one-click hand-off into whichever editor above the result fits
 - 🗃 **Pensieve** — one saved-document library across Runestone, Edda, Groot and Atlas, with a JSON/JSONC format filter; every saved doc doubles as a public data URL (a JSONC Runestone is served as `application/jsonc`)
 - 💡 A header bulb opens a **guide panel** — a per-page format reference (JSON, Markdown, XML, YAML, JavaScript, Brotli) with copyable code examples
+- 📝 Unsaved work in Runestone, Edda, Groot, Atlas and Variant is kept **per browser tab**: a reload brings that tab's own draft back (a saved document's edits stay unsaved until you save), two tabs never overwrite each other, and a closed tab's draft is offered once to the next blank tab
 
 ### 🎪 Diagon Alley — utilities
 
@@ -262,7 +263,7 @@ Unit tests live next to the code they test. End-to-end tests live in `e2e/` and 
 
 ## Project docs
 
-Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`.agents/plans/README.md`](.agents/plans/README.md).
+Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`CLAUDE.md`](CLAUDE.md).
 
 Operating & deploying:
 

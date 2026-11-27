@@ -456,7 +456,7 @@ function dockerPieces(shape: PlannedShape): { up: Step[]; down: Step[] } {
 // ---- the table -------------------------------------------------------------
 
 const WORKSPACES = ['server', 'client', 'cli', 'web', 'e2e', 'scripts'] as const;
-const E2E_SUITES = ['ui', 'cli', 'api'] as const;
+const E2E_SUITES = ['ui', 'cli', 'api', 'webkit'] as const;
 
 /** `test all`: the same gate CI runs, stopping at the first failure. */
 export const TEST_ALL: Step[] = [
@@ -637,7 +637,7 @@ export const COMMANDS: Command[] = [
     summary: 'Run a test suite: unit (default), e2e, load, resilience, or all',
     usage: [
       'test [unit [<workspace>]] [-- <vitest args>]',
-      'test e2e [ui|cli|api] [-- <runner args>]',
+      'test e2e [ui|cli|api|webkit] [-- <runner args>]',
       'test load [-- <load options>]',
       'test resilience [--cycles <n>]',
       'test all',
@@ -648,13 +648,14 @@ export const COMMANDS: Command[] = [
       ['test e2e ui', 'the browser journeys only'],
       ['test e2e cli', 'the installed-CLI suite only'],
       ['test e2e api', 'the black-box API suite only'],
+      ['test e2e webkit', 'the browser journeys on WebKit (iPhone), by hand: not part of CI'],
       ['test load', 'the load harness (on demand, never a gate)'],
       ['test resilience', 'restart the built API under SIGKILLs, integrity-check the db'],
       ['test all', 'the whole gate CI runs'],
     ],
     description: [
       "unit runs every workspace's Vitest suite and the scripts/ tests; name a workspace (server, client, cli, web, e2e, scripts) to run one, and filter it after --.",
-      "e2e runs the end-to-end net against the current build (run `build` first): the installed-CLI suite, the black-box API suite, then the browser journeys. Name one suite to run it alone. Playwright's browsers are needed once: `cd e2e && npx playwright install chromium webkit`.",
+      "e2e runs the end-to-end net against the current build (run `build` first): the installed-CLI suite, the black-box API suite, then the browser journeys. Name one suite to run it alone. WebKit (the iPhone engine) is not part of `e2e` or CI: `test e2e webkit` runs the journeys on it, by hand, before a release. Playwright's browsers are needed once: `cd e2e && npx playwright install chromium webkit`.",
       'load runs the load harness (on demand, never a gate); `./bifrost test load -- --help` lists its options. resilience restarts the built API 50 times, with SIGKILLs mid-write, and integrity-checks the database each time.',
       'all is the whole gate CI runs, stopping at the first failure: audit, lint, typecheck, unit, build, e2e.',
     ],
@@ -664,6 +665,7 @@ export const COMMANDS: Command[] = [
       ['test unit server -- documents', 'the server suite, files matching "documents"'],
       ['test e2e', 'the whole end-to-end net'],
       ['test e2e ui -- --grep Runestone', 'only the matching browser journeys'],
+      ['test e2e webkit', 'the browser journeys on WebKit, before a release'],
       ['test load -- --profile stress', 'a stress run'],
       ['test resilience --cycles 5', 'a quick resilience pass'],
       ['test all', 'everything, as CI runs it'],
@@ -695,7 +697,7 @@ export const COMMANDS: Command[] = [
         noMore(p.positionals, 2);
         const which = p.positionals[1];
         if (which === undefined) {
-          noRest(p, 'name a suite (ui, cli or api) to pass arguments to its runner');
+          noRest(p, 'name a suite (ui, cli, api or webkit) to pass arguments to its runner');
           return [npmRun('test:e2e')];
         }
         return [npmRun(`test:e2e:${oneOf(which, E2E_SUITES, 'the e2e suite')}`, 'e2e', p.rest)];

@@ -31,7 +31,9 @@ destroy the conventional-commit history the workflow reads).
 
 1. **Preflight** on a clean `develop`: every plan intended for this release is
    `done` in `.agents/memory/progress.md` and its merge commit exists on develop.
-   Run the `verify` skill. Confirm the repo secret **`RELEASE_TOKEN`** exists
+   Run the `verify` skill, then the browser journeys on WebKit, which CI does
+   not run (`./bifrost test e2e webkit`; owner, 2026-11-27), and ask the owner
+   for a look on a real iPhone or iPad. Confirm the repo secret **`RELEASE_TOKEN`** exists
    (fine-grained PAT, Contents + Workflows: write) — without it the workflow
    can't push. Abort on any mismatch.
 2. **Context sync** (branch `chore/context-sync-<date>` → PR → develop): run the
@@ -45,6 +47,9 @@ destroy the conventional-commit history the workflow reads).
    attached (`bifrost-vX.Y.Z.tar.gz` and `bifrost-cli-X.Y.Z.tgz`); `CHANGELOG.md` updated; `develop` fast-forwarded to `main` (carries
    the `chore(release):` commit). Report the tag URL, release URL, and
    develop==main confirmation.
+5. **Record it**: a one-line docs PR into `develop` sets the *Latest release*
+   line in `.agents/memory/progress.md` to the new tag and date, and adds it to
+   the journey if the release marks a step worth remembering.
 
 ## When it doesn't fire / needs a hand
 
