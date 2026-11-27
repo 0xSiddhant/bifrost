@@ -79,6 +79,15 @@ describe('CI', () => {
     }
   });
 
+  it("lists a renamed file's old path too, so moving code into docs/ still runs", () => {
+    // The API lists a rename under its new path alone, with the old one in
+    // `previous_filename`.
+    const changes = jobs().get('changes') ?? '';
+    expect(changes).toContain(`paths='.filename, (.previous_filename // empty)'`);
+    const queries = [...changes.matchAll(/gh api .* --jq "([^"]+)"/g)].map((m) => m[1]);
+    expect(queries).toEqual(['.[] | $paths', '.files[] | $paths']);
+  });
+
   it("runs every workspace's unit tests, and scripts/, across the unit jobs", () => {
     const unit = jobs().get('unit') ?? '';
     const listed = [...unit.matchAll(/workspaces: ([a-z0-9 ]+)/g)].flatMap((m) =>

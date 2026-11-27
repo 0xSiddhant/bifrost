@@ -59,14 +59,18 @@ jobs:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
         run: |
+          # A renamed file is listed under its new path, with the old one in
+          # `previous_filename`: both count, so moving code into docs/ runs.
+          paths='.filename, (.previous_filename // empty)'
           files=''
           if [ -n "$PR" ]; then
-            # The API lists at most 3,000 files; a longer list is not trusted.
-            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename') || files=''
+            # The API lists at most 3,000 files; a longer list is not trusted
+            # (renames' old paths count toward it, which only errs toward running).
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq ".[] | $paths") || files=''
             [ "$(printf '%s\n' "$files" | wc -l)" -lt 3000 ] || files=''
           elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
             # A push: compare lists at most 300 files.
-            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq '.files[].filename') || files=''
+            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq ".files[] | $paths") || files=''
             [ "$(printf '%s\n' "$files" | wc -l)" -lt 300 ] || files=''
           fi
           printf '%s\n' "$files"
