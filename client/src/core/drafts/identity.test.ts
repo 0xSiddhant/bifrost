@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { HANDSHAKE_MS, TAB_ID_KEY, TabIdentity, type ChannelLike, type IdentityEvent } from './identity';
+import {
+  HANDSHAKE_MS,
+  TAB_ID_KEY,
+  TabIdentity,
+  type ChannelLike,
+  type IdentityEvent,
+} from './identity';
 import { memoryStorage } from './storage';
 
 /** A BroadcastChannel stand-in: every channel on the bus hears every other one, asynchronously. */
@@ -48,7 +54,11 @@ function timers() {
 let counter = 0;
 const nextId = () => `id${(counter += 1).toString().padStart(3, '0')}`;
 
-function tab(session: ReturnType<typeof memoryStorage>, net: ReturnType<typeof bus> | null, clock: ReturnType<typeof timers>) {
+function tab(
+  session: ReturnType<typeof memoryStorage>,
+  net: ReturnType<typeof bus> | null,
+  clock: ReturnType<typeof timers>,
+) {
   const events: IdentityEvent[] = [];
   const identity = new TabIdentity({
     session,

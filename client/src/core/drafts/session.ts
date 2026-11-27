@@ -56,7 +56,13 @@ export class DraftSession {
   private readonly protectedKeys = new Map<string, number>();
   private readonly sweepFeatures: Partial<Record<DraftFeature, SweepFeature>> = {};
   private coordination: Promise<ProtocolContext | null> | null = null;
-  private sweepTimer: unknown = null;
+  /** The id and lifetime this page last registered, to release when it yields the id. */
+  private registeredAs: Me | null = null;
+  /** The debounced sweep shortly after a change. */
+  private soonTimer: unknown = null;
+  /** Sweeps due later (a departed tab's prune grace), earliest armed; none cancels another. */
+  private pruneTimer: unknown = null;
+  private pruneDue: number[] = [];
   private warned = new Set<string>();
   private detach: () => void = () => undefined;
 
@@ -85,20 +91,30 @@ export class DraftSession {
       // Another tab left: once its draft can be pruned, look again.
       if (key?.startsWith(LEFT_PREFIX) && newValue) this.requestSweep(PRUNE_GRACE_MS + 1_000);
     };
+    // Frozen, discarded-and-restored or busy past the handshake, this tab may
+    // have missed a duplicate's question and both now hold one id: ask again
+    // on waking. A twin that kept it answers, and this tab takes a new one.
+    const recheckIdentity = () => {
+      if (this.identity.ready) this.identity.probe();
+    };
     const onVisibility = () => {
       // A hidden tab can be discarded without another event: keep what is typed.
       if (this.deps.doc?.visibilityState === 'hidden') this.flush('hidden');
+      else recheckIdentity();
     };
     const { target, doc } = this.deps;
     target?.addEventListener('pagehide', onPageHide);
     target?.addEventListener('pageshow', onPageShow);
     target?.addEventListener('storage', onStorage);
     doc?.addEventListener('visibilitychange', onVisibility);
+    // Chrome's Page Lifecycle: a frozen tab thawing.
+    doc?.addEventListener('resume', recheckIdentity);
     this.detach = () => {
       target?.removeEventListener('pagehide', onPageHide);
       target?.removeEventListener('pageshow', onPageShow);
       target?.removeEventListener('storage', onStorage);
       doc?.removeEventListener('visibilitychange', onVisibility);
+      doc?.removeEventListener('resume', recheckIdentity);
     };
   }
 
@@ -106,8 +122,11 @@ export class DraftSession {
   stop(): void {
     this.detach();
     this.detach = () => undefined;
-    if (this.sweepTimer !== null) this.deps.clearTimer(this.sweepTimer);
-    this.sweepTimer = null;
+    if (this.soonTimer !== null) this.deps.clearTimer(this.soonTimer);
+    if (this.pruneTimer !== null) this.deps.clearTimer(this.pruneTimer);
+    this.soonTimer = null;
+    this.pruneTimer = null;
+    this.pruneDue = [];
     this.identity.close();
   }
 
@@ -116,7 +135,9 @@ export class DraftSession {
   }
 
   me(): Me | null {
-    return this.identity.ready ? { tab: this.identity.tab, instance: this.identity.instance } : null;
+    return this.identity.ready
+      ? { tab: this.identity.tab, instance: this.identity.instance }
+      : null;
   }
 
   get local(): DraftStorage {
@@ -169,12 +190,42 @@ export class DraftSession {
     };
   }
 
+  /**
+   * Sweep after `delayMs`. A short request is a debounce (shortly after the
+   * last change); a longer one (a departed tab's prune grace) is kept until it
+   * has run, whatever is requested meanwhile, so neither kind cancels the other.
+   */
   requestSweep(delayMs = SWEEP_DEBOUNCE_MS): void {
-    if (this.sweepTimer !== null) this.deps.clearTimer(this.sweepTimer);
-    this.sweepTimer = this.deps.setTimer(() => {
-      this.sweepTimer = null;
-      void this.sweepNow();
-    }, delayMs);
+    if (delayMs <= SWEEP_DEBOUNCE_MS) {
+      if (this.soonTimer !== null) this.deps.clearTimer(this.soonTimer);
+      this.soonTimer = this.deps.setTimer(() => {
+        this.soonTimer = null;
+        void this.sweepNow();
+      }, delayMs);
+      return;
+    }
+    const due = this.deps.now() + delayMs;
+    // Departures moments apart share one sweep.
+    if (!this.pruneDue.some((at) => Math.abs(at - due) < SWEEP_DEBOUNCE_MS))
+      this.pruneDue.push(due);
+    this.armPrune();
+  }
+
+  private armPrune(): void {
+    if (this.pruneTimer !== null) this.deps.clearTimer(this.pruneTimer);
+    this.pruneTimer = null;
+    if (this.pruneDue.length === 0) return;
+    const next = Math.min(...this.pruneDue);
+    this.pruneTimer = this.deps.setTimer(
+      () => {
+        this.pruneTimer = null;
+        const now = this.deps.now();
+        this.pruneDue = this.pruneDue.filter((at) => at > now);
+        void this.sweepNow();
+        this.armPrune();
+      },
+      Math.max(0, next - this.deps.now()),
+    );
   }
 
   async sweepNow(): Promise<number> {
@@ -185,7 +236,10 @@ export class DraftSession {
       const { sweep } = await import('./protocol');
       return await sweep(ctx, me, this.sweepFeatures, new Set(this.protectedKeys.keys()));
     } catch (error) {
-      this.warnOnce('sweep', `drafts: pruning closed tabs' drafts failed (${storageErrorReason(error)})`);
+      this.warnOnce(
+        'sweep',
+        `drafts: pruning closed tabs' drafts failed (${storageErrorReason(error)})`,
+      );
       return 0;
     }
   }
@@ -199,12 +253,27 @@ export class DraftSession {
   private onIdentity(event: IdentityEvent): void {
     if (event === 'reflush') {
       this.flush('identity');
+      // A twin that answered late may have registered its lifetime under this
+      // id first: put this page's back.
+      const me = this.me();
+      if (me && this.coordination) void this.reregister(me);
       return;
     }
     if (event === 'changed') {
       // Our drafts move to the new id on this flush; the old id's records
-      // belong to the twin that kept it.
+      // belong to the twin that kept it, and so does its registry entry.
       this.flush('identity');
+      const former = this.registeredAs;
+      const previous = this.coordination;
+      if (former && previous && former.tab !== this.identity.tab) {
+        void previous.then(async (ctx) => {
+          if (!ctx) return;
+          const { releaseLifetime } = await import('./protocol');
+          await releaseLifetime(ctx, former).catch(() => {
+            // The twin re-registers itself after it told this page to yield.
+          });
+        });
+      }
     }
     // Ready or changed: this tab's earlier departure (a reload) no longer
     // counts, even where IndexedDB is missing and nothing is registered.
@@ -238,7 +307,9 @@ export class DraftSession {
     const ctx: ProtocolContext = { local: this.deps.local, backend, now: this.deps.now };
     try {
       const { registerLifetime } = await import('./protocol');
-      await registerLifetime(ctx, me);
+      // Skipped when this page yielded the id while loading: it is the twin's.
+      if (await registerLifetime(ctx, me, () => this.identity.tab === me.tab))
+        this.registeredAs = me;
     } catch (error) {
       this.warnOnce(
         'register',
@@ -248,6 +319,21 @@ export class DraftSession {
     }
     this.requestSweep();
     return ctx;
+  }
+
+  private async reregister(me: Me): Promise<void> {
+    const ctx = await this.coordinated();
+    if (!ctx) return;
+    try {
+      const { registerLifetime } = await import('./protocol');
+      if (await registerLifetime(ctx, me, () => this.identity.tab === me.tab))
+        this.registeredAs = me;
+    } catch (error) {
+      this.warnOnce(
+        'register',
+        `drafts: could not register this tab (${storageErrorReason(error)})`,
+      );
+    }
   }
 
   private onPageHide(event: PageTransitionEvent): void {
@@ -263,7 +349,10 @@ export class DraftSession {
       this.deps.local.set(leftKey(me.tab), departureValue(me.instance, this.deps.now()));
     } catch (error) {
       // Without a marker this tab is never known closed: its drafts stay put.
-      this.warnOnce('departure', `drafts: could not record this tab leaving (${storageErrorReason(error)})`);
+      this.warnOnce(
+        'departure',
+        `drafts: could not record this tab leaving (${storageErrorReason(error)})`,
+      );
     }
   }
 }

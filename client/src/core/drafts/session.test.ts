@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { memoryBackend } from './coordinator';
-import { OFFER_GRACE_MS, findOffer } from './protocol';
+import { OFFER_GRACE_MS, PRUNE_GRACE_MS, findOffer } from './protocol';
 import { SCRATCH, leftKey, makeEnvelope, parseDeparture, recordKey } from './records';
 import { createTestSession } from './testing';
 import { memoryStorage } from './storage';
@@ -69,6 +69,62 @@ describe('DraftSession (PLAN-43)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps a departed tab’s prune sweep when a quick sweep is asked for meanwhile, and the reverse', async () => {
+    vi.useFakeTimers();
+    try {
+      let clock = 1_000_000;
+      const session = start({ now: () => clock });
+      const sweeps = vi.spyOn(session, 'sweepNow').mockResolvedValue(0);
+      // Another tab left: a sweep once its draft can be pruned...
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: leftKey('tab-gone'),
+          newValue: '{"instance":"x","at":1}',
+        }),
+      );
+      // ...then this tab writes its first draft: a sweep shortly after.
+      session.requestSweep();
+      clock += 2_000;
+      vi.advanceTimersByTime(2_000);
+      expect(sweeps).toHaveBeenCalledTimes(1);
+      // The prune sweep still runs when its grace is over.
+      clock += PRUNE_GRACE_MS;
+      vi.advanceTimersByTime(PRUNE_GRACE_MS);
+      expect(sweeps).toHaveBeenCalledTimes(2);
+      // And a quick request is not pushed out by a pending prune.
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: leftKey('tab-gone-2'),
+          newValue: '{"instance":"y","at":2}',
+        }),
+      );
+      session.requestSweep();
+      vi.advanceTimersByTime(2_000);
+      expect(sweeps).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks again whether a twin holds its id when it wakes or becomes visible', () => {
+    const sent: unknown[] = [];
+    const channel = {
+      onmessage: null,
+      postMessage: (m: unknown) => sent.push(m),
+      close: () => undefined,
+    };
+    const session = start({ openChannel: () => channel });
+    expect(session.ready).toBe(true);
+    sent.length = 0;
+    document.dispatchEvent(new Event('resume'));
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(sent).toEqual([
+      expect.objectContaining({ t: 'probe', tab: session.me()?.tab }),
+      expect.objectContaining({ t: 'probe', tab: session.me()?.tab }),
+    ]);
   });
 
   it('makes a closed tab’s draft offerable to another tab once registered and departed', async () => {

@@ -38,9 +38,7 @@ export interface IdentityDeps {
   setTimer: (fn: () => void, ms: number) => unknown;
 }
 
-type Message =
-  | { t: 'probe'; tab: string; from: string }
-  | { t: 'taken'; tab: string; to: string };
+type Message = { t: 'probe'; tab: string; from: string } | { t: 'taken'; tab: string; to: string };
 
 function asMessage(data: unknown): Message | null {
   const message = data as Partial<Message> | null;
@@ -163,7 +161,11 @@ export class TabIdentity {
       // A live tab keeps its id. Two tabs both still asking (opened together)
       // settle it by instance order, so exactly one of them yields.
       if (this.ready || this.instance < message.from) {
-        this.channel?.postMessage({ t: 'taken', tab: this.tab, to: message.from } satisfies Message);
+        this.channel?.postMessage({
+          t: 'taken',
+          tab: this.tab,
+          to: message.from,
+        } satisfies Message);
         if (this.ready) this.deps.setTimer(() => this.emit('reflush'), COLLISION_REFLUSH_MS);
       }
       return;
