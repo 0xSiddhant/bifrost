@@ -161,9 +161,10 @@ All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings
 
 How the journeys do it:
 
-- **Close a tab with `page.close({ runBeforeUnload: true })`, and wait for its `close` event.** Unload handlers then run, so the tab records leaving; without the wait the next step can hit a page still closing.
+- **Close a tab by sending it the `pagehide` a close sends, checking it recorded leaving, then `page.close()`** (`closeTab`). A browser's own close fires `pagehide` (the spike saw it in Chromium, with or without `runBeforeUnload`), but Playwright's WebKit never completes a `runBeforeUnload` close (CI on #122) and may skip unload handlers on a plain one, so the journeys send the event themselves.
 - **Offers wait out the grace in real time** (up to 25 s); a reload must not look like a close, so there is no shortcut.
-- **Pruning takes 10 minutes, so those journeys fast-forward `page.clock`.** The clock is the context's: every tab's time jumps together. Wait for the sky's lazy chunks first (`waitForSkyAndSlots`), or the jump fires their 8 s chunk timeout at once.
+- **Pruning takes 10 minutes, so those journeys fast-forward `page.clock`.** The clock is the context's: every tab's time jumps together. Wait for the sky's lazy chunks first (`waitForSkyAndSlots`), or the jump fires their 8 s chunk timeout at once. A minute of idleness also brings Nótt, whose chunk loads only then (desktops): `jumpMinutes` jumps past that minute, waits for its overlay, then jumps the rest.
+- **A reload keeps the tab's id**, and the reload journey asserts it: the page being replaced stops answering for its id at `pagehide`, because WebKit can still deliver the new document's question to it.
 - **Read state from storage, not only the screen.** A tab's records are `bifrost.drafts.v1.r.<editor>.<tab>.<workspace>` in `localStorage`; its id is `bifrost.tab.id` in its `sessionStorage`.
 
 The protocol's races and failures (quota and blocked storage, a claim that cannot commit, a tab killed mid-transfer, a legacy value rewritten by an older tab) are unit tests in `client/src/core/drafts/protocol.test.ts`, which interleave two simulated tabs over one in-memory coordinator.

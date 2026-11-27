@@ -66,11 +66,21 @@ async function typeAndKeep(page: Page, feature: string, text: string): Promise<v
 }
 
 /**
- * Close a tab the way a person does: unload handlers run, so it records
- * leaving. Waits for the close, which `runBeforeUnload` alone does not.
+ * Close a tab as a person does, where unload handlers run and the tab records
+ * leaving. A browser's own close fires `pagehide` (the PLAN-43 spike saw it in
+ * Chromium, with or without `runBeforeUnload`), but Playwright's WebKit never
+ * completes a `runBeforeUnload` close and may skip the handlers on a plain
+ * one. So the page is sent the `pagehide` a close sends, checked to have
+ * recorded leaving, then closed.
  */
 async function closeTab(page: Page): Promise<void> {
-  await Promise.all([page.waitForEvent('close'), page.close({ runBeforeUnload: true })]);
+  const left = await page.evaluate(() => {
+    window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+    const tab = sessionStorage.getItem('bifrost.tab.id');
+    return tab !== null && localStorage.getItem(`bifrost.drafts.v1.left.${tab}`) !== null;
+  });
+  expect(left, 'the closing tab recorded leaving').toBe(true);
+  await page.close();
 }
 
 /**
@@ -80,6 +90,18 @@ async function closeTab(page: Page): Promise<void> {
  */
 async function settledForClock(page: Page): Promise<void> {
   await waitForSkyAndSlots(page);
+}
+
+/**
+ * Jump the clock by `minutes`. A minute of idleness brings Nótt, the
+ * screensaver, whose chunk loads only then (desktops; phones never show it):
+ * jump just past that minute, let its overlay arrive, then jump the rest, or
+ * the long jump fires the chunk's 8 s timeout while it is still in flight.
+ */
+async function jumpMinutes(page: Page, minutes: number): Promise<void> {
+  await page.clock.fastForward('01:05');
+  if (!isMobile(page)) await expect(page.locator('.nott')).toBeVisible();
+  await page.clock.fastForward((minutes * 60 - 65) * 1000);
 }
 
 const restoreBanner = (page: Page) =>
@@ -114,13 +136,16 @@ for (const editor of Object.keys(CONTENT) as Editor[]) {
       await typeAndKeep(page, editor, first);
       await typeAndKeep(other, editor, second);
       expect(await recordKeys(page, editor)).toHaveLength(2);
+      const id = await tabId(page);
 
       await page.reload();
       await bringEditor(page);
       await expect(editorText(page)).toContainText(first.split('\n').pop() ?? first);
+      // A reload is the same tab: it keeps its id, and so its draft's key.
+      expect(await tabId(page)).toBe(id);
       // Its own draft simply comes back: nothing is offered.
       await expect(page.getByText('Restore draft')).toHaveCount(0);
-      expect(await ownScratch(page, editor)).toBe(first);
+      await expect.poll(() => ownScratch(page, editor)).toBe(first);
       expect(await ownScratch(other, editor)).toBe(second);
       await expect(editorText(other)).toContainText(second.split('\n').pop() ?? second);
     },
@@ -199,7 +224,7 @@ test(
     await closeTab(a.tab);
     await closeTab(b.tab);
     await settledForClock(page);
-    await page.clock.fastForward('09:00');
+    await jumpMinutes(page, 9);
     await page.waitForTimeout(500);
     // Not yet: a closed tab's draft is kept for ten minutes.
     expect(await stillStored(page, [a.key, b.key])).toEqual([a.key, b.key]);
@@ -221,7 +246,7 @@ test(
     await Promise.all([closeTab(a.tab), closeTab(b.tab)]);
     await settledForClock(page);
     // This tab has no draft of its own: one closed draft stays, to be offered.
-    await page.clock.fastForward('11:00');
+    await jumpMinutes(page, 11);
     await expect.poll(() => stillStored(page, [a.key, b.key]), { timeout: 10_000 }).toHaveLength(1);
     await page.clock.fastForward('30:00');
     await page.waitForTimeout(500);
