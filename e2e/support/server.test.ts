@@ -45,7 +45,66 @@ process.exit(1);
   return root;
 }
 
+/**
+ * A build root whose API counts its starts in the storage root, then dies with
+ * `fatal` on the first `failures` starts and otherwise answers the health check
+ * (no web host here, so the API runs alone on the harness's port).
+ */
+function flakyBuild(fatal: string, failures: number): string {
+  const root = dyingBuild(fatal);
+  fs.writeFileSync(
+    path.join(root, 'server', 'dist', 'bootstrap.js'),
+    `const fs = require('node:fs');
+const path = require('node:path');
+const counter = path.join(process.env.STORAGE_ROOT, 'starts');
+const starts = (fs.existsSync(counter) ? Number(fs.readFileSync(counter, 'utf8')) : 0) + 1;
+fs.writeFileSync(counter, String(starts));
+if (starts <= ${failures}) {
+  const logs = path.join(process.env.STORAGE_ROOT, 'logs');
+  fs.mkdirSync(logs, { recursive: true });
+  fs.writeFileSync(path.join(logs, 'current.log'), ${JSON.stringify(`${fatal}
+`)});
+  process.exit(1);
+}
+require('node:http')
+  .createServer((request, response) => response.end('{}'))
+  .listen(Number(process.env.API_PORT), '127.0.0.1');
+`,
+  );
+  return root;
+}
+
+const starts = (storageRoot: string): number =>
+  Number(fs.readFileSync(path.join(storageRoot, 'starts'), 'utf8'));
+
 describe('startServer', () => {
+  it('starts afresh on new ports when a port it picked was taken first', async () => {
+    const fatal = JSON.stringify({ level: 60, msg: 'listen EADDRINUSE: address already in use' });
+    const storageRoot = tempDir('bifrost-e2e-flaky-storage-');
+    const server = await startServer({ buildRoot: flakyBuild(fatal, 1), storageRoot, keepStorage: true });
+    try {
+      expect(starts(storageRoot)).toBe(2);
+    } finally {
+      await server.stop();
+    }
+  });
+
+  it('does not retry any other failure, nor ports it was given', async () => {
+    const migration = JSON.stringify({ level: 60, msg: 'fatal: migration failed' });
+    const storageRoot = tempDir('bifrost-e2e-flaky-storage-');
+    await expect(
+      startServer({ buildRoot: flakyBuild(migration, 1), storageRoot, keepStorage: true }),
+    ).rejects.toThrow(/migration failed/);
+    expect(starts(storageRoot)).toBe(1);
+
+    const inUse = JSON.stringify({ level: 60, msg: 'listen EADDRINUSE: address already in use' });
+    const pinned = tempDir('bifrost-e2e-flaky-storage-');
+    await expect(
+      startServer({ buildRoot: flakyBuild(inUse, 1), storageRoot: pinned, keepStorage: true, port: 1 }),
+    ).rejects.toThrow(/EADDRINUSE/);
+    expect(starts(pinned)).toBe(1);
+  });
+
   it('reports the exit and the log tail of an API that dies while starting', async () => {
     const fatal = JSON.stringify({ level: 60, msg: 'fatal: listen EADDRINUSE 127.0.0.1:4242' });
     const storageRoot = tempDir('bifrost-e2e-dying-storage-');

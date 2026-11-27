@@ -86,7 +86,7 @@ The old `cloud` project is gone: the client's nav comes from its build now, not 
 
 ### Isolation
 
-Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port), with:
+Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port; a port taken by another process before the server bound it, `EADDRINUSE`, means up to two fresh starts on new ports), with:
 
 - a fresh `mkdtemp` storage root;
 - every key in `.env.example` and in your own `.env` blanked to its built-in default. The server's dotenv never overrides a set key, so without this a developer's real `.env` would leak into the suite;
