@@ -79,7 +79,7 @@ Add a line only for a decision a future change could plausibly undo without know
 
 ## Testing and CI
 
-- **2026-10-04** — An `e2e/` workspace: browser journeys (Chromium desktop + mobile, WebKit, standalone), the installed CLI, a black-box API suite with fuzzing and a security sweep. It imports no product source. *Why:* test what ships.
+- **2026-10-04** — An `e2e/` workspace: browser journeys (Chromium desktop + mobile, standalone; WebKit by hand), the installed CLI, a black-box API suite with fuzzing and a security sweep. It imports no product source. *Why:* test what ships.
 - **2026-10-04** — Playwright is for UI journeys only; CLI and API suites run under Vitest. *Why:* owner.
 - **2026-10-04** — Load testing is on demand (`./bifrost test load`), never a CI gate. *Why:* results depend on the machine.
 - **2026-10-05** — A journey failure is a client break, not a flake: zero retries; an out-of-scope bug is pinned with `test.fail`. *Why:* retries hide real bugs.
@@ -87,6 +87,8 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-10-27** — CI's browser shards run in Microsoft's Playwright image; nothing installs from apt. *Why:* a slow mirror held shards for 17–32 minutes.
 - **2026-11-24** — Journeys run with the season's snowfall off; the season journey opts back in. *Why:* CI's GPU-less WebKit starved for animation frames.
 - **2026-11-27** — The e2e harness retries a server start on new ports after `EADDRINUSE`. *Why:* four workers race for free ports.
+- **2026-11-27** — WebKit journeys are not run in CI; `./bifrost test e2e webkit` runs them by hand before a release, beside a real iPhone or iPad (owner). Chromium mobile uses an iPhone 14's 390×664. *Why:* CI's GPU-less WebKit failed journeys for reasons a real iPhone does not have; the iPhone size keeps phone layout on every PR.
+- **2026-11-27** — CI skips every build and test job when a change is documentation only (`scripts/ci-changes.sh`; an unreadable file list runs everything), and splits unit tests over two machines and the Chromium journeys over four shards (owner). *Why:* no CI minutes for Markdown; the slowest job drops from about 4 minutes to 2–3.
 
 ## Operations and process
 

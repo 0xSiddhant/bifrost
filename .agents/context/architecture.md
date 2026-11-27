@@ -131,7 +131,7 @@ Unsaved work in Runestone, Edda, Groot, Atlas and Variant stays in this browser,
 ## Testing layers
 
 - **Unit and integration:** Vitest in every workspace.
-- **`e2e/` (PLAN-32a, 33):** tests what ships, from outside, and imports no product source. Browser journeys (Playwright: Chromium desktop and mobile, WebKit mobile, standalone) through the web host, with a global guard failing on any page error, `console.error`, 5xx or non-loopback request; `routes.spec.ts` fails CI for a page with no journey. The installed CLI, and a black-box API suite (boot, transport, contract against `openapi.json`, fuzzing, security sweep).
+- **`e2e/` (PLAN-32a, 33):** tests what ships, from outside, and imports no product source. Browser journeys (Playwright: Chromium desktop and mobile at iPhone size, standalone; WebKit by hand with `./bifrost test e2e webkit`, not in CI) through the web host, with a global guard failing on any page error, `console.error`, 5xx or non-loopback request; `routes.spec.ts` fails CI for a page with no journey. The installed CLI, and a black-box API suite (boot, transport, contract against `openapi.json`, fuzzing, security sweep).
 - **Load (PLAN-34):** `./bifrost test load`, on demand, never CI.
 - **Restart safety:** `./bifrost test resilience` (restarts, SIGKILL mid-write and mid-migration, `integrity_check`).
 

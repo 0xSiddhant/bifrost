@@ -32,7 +32,7 @@ Chosen tools and why. Do not swap one without a line in `memory/decisions.md`. V
 | Lint/format | ESLint 9 + eslint-plugin-boundaries + Prettier | The plugin enforces module isolation |
 | Commits | commitlint + husky, Conventional Commits | Scopes are module names |
 | Unit tests | Vitest (+ `fastify.inject`) | One tool front and back |
-| End-to-end | Playwright (UI journeys only) in `e2e/` | Chromium desktop + mobile, WebKit mobile, standalone |
+| End-to-end | Playwright (UI journeys only) in `e2e/` | Chromium desktop + mobile, standalone in CI; WebKit by hand |
 | API description | `@fastify/swagger` → committed `server/openapi.json` (3.1) | Generated from route schemas, cannot drift |
 | API docs | `@fastify/swagger-ui` on the API server; Redocly lint | Bundled assets, offline |
 | Fuzzing | `fast-check` in `e2e/` | Requests from the spec's schemas, shrinking |
