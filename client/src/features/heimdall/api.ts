@@ -39,6 +39,11 @@ export interface UploadFilesPage {
   items: UploadFileEntry[];
 }
 
+export interface PublishedUpload {
+  finalName: string;
+  renamed: boolean;
+}
+
 const hubLogin = (pin: string): Promise<{ ok: true }> =>
   apiSend<{ ok: true }>('POST', `${API_V1}/heimdall/login`, { pin });
 
@@ -60,6 +65,12 @@ const hubFetchStats = (): Promise<Stats> => apiGet<Stats>(`${API_V1}/heimdall/st
 
 const hubFetchUploads = (): Promise<UploadFilesPage> =>
   apiGet<UploadFilesPage>(`${API_V1}/heimdall/uploads`);
+
+const hubPublishUpload = (name: string): Promise<PublishedUpload> =>
+  apiSend<PublishedUpload>('POST', `${API_V1}/files/${encodeURIComponent(name)}/publish`);
+
+const hubDeleteUpload = (name: string): Promise<null> =>
+  apiSend<null>('DELETE', `${API_V1}/files/${encodeURIComponent(name)}`);
 
 export interface AuditRecord {
   id: number;
@@ -126,6 +137,10 @@ export const fetchSettings: typeof hubFetchSettings = __HUB__ ? hubFetchSettings
 export const updateSettings: typeof hubUpdateSettings = __HUB__ ? hubUpdateSettings : hubOnly('updateSettings');
 export const fetchStats: typeof hubFetchStats = __HUB__ ? hubFetchStats : hubOnly('fetchStats');
 export const fetchUploads: typeof hubFetchUploads = __HUB__ ? hubFetchUploads : hubOnly('fetchUploads');
+export const publishUpload: typeof hubPublishUpload = __HUB__
+  ? hubPublishUpload
+  : hubOnly('publishUpload');
+export const deleteUpload: typeof hubDeleteUpload = __HUB__ ? hubDeleteUpload : hubOnly('deleteUpload');
 export const fetchPresence: typeof hubFetchPresence = __HUB__ ? hubFetchPresence : hubOnly('fetchPresence');
 export const prunePresence: typeof hubPrunePresence = __HUB__ ? hubPrunePresence : hubOnly('prunePresence');
 export const fetchAudit: typeof hubFetchAudit = __HUB__ ? hubFetchAudit : hubOnly('fetchAudit');

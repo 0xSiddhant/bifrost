@@ -91,6 +91,13 @@ describe('CONNECTION_LOSS', () => {
         page: '',
         detail: 'Failed to load resource: Error receiving data: Connection reset by peer',
       },
+      // A lazy chunk asked for after the server stopped, as each engine says it.
+      {
+        kind: 'console.error',
+        page: '',
+        detail:
+          'TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:44433/assets/RelicScatter-DWCBcItl.js',
+      },
     ];
     for (const violation of allowed) expect(CONNECTION_LOSS.matches(violation)).toBe(true);
     const refused: Violation[] = [
@@ -98,10 +105,26 @@ describe('CONNECTION_LOSS', () => {
       { kind: 'pageerror', page: '', detail: 'Error receiving data: Connection reset by peer' },
       { kind: 'console.error', page: '', detail: 'Error receiving data: Connection reset by peer' },
       { kind: 'http5xx', page: '', url, detail: '500 Internal Server Error' },
+      // A chunk from anywhere but this loopback server, or thrown uncaught.
+      {
+        kind: 'console.error',
+        page: '',
+        detail:
+          'TypeError: Failed to fetch dynamically imported module: https://cdn.example/assets/x.js',
+      },
+      {
+        kind: 'pageerror',
+        page: '',
+        detail:
+          'TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:1/assets/x.js',
+      },
+      // WebKit's form names no URL: it could be any chunk, on any server.
+      { kind: 'console.error', page: '', detail: 'TypeError: Importing a module script failed.' },
     ];
     for (const violation of refused) expect(CONNECTION_LOSS.matches(violation)).toBe(false);
-    // Without the allowance, the reset is still a failure.
+    // Without the allowance, the reset and a failed chunk are still failures.
     expect(isAllowed(allowed[3]!)).toBe(false);
+    expect(isAllowed(allowed[8]!)).toBe(false);
   });
 });
 

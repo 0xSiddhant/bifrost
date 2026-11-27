@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type CSSProperties,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { hasFeature } from '../../core/features';
 import { copyText } from '../../core/copy';
@@ -42,7 +35,16 @@ import { LibraryPicker } from './LibraryPicker';
 import { OptionsPopover } from './OptionsPopover';
 import { ResultsDrawer } from './ResultsDrawer';
 import { hasActiveNormalization } from '../../core/textNormalize';
-import { takeVariantTextSeed } from '../../core/variantSeed';
+import { takeVariantTextSeed, type VariantTextSeed } from '../../core/variantSeed';
+import {
+  readOwnDraft,
+  useDraftOffer,
+  useDraftsReady,
+  useWorkspaceDraft,
+} from '../../core/draftCache';
+import { VARIANT_WORKSPACE } from '../../core/drafts/records';
+import { DraftNotices } from '../../core/ui/DraftNotices';
+import { variantDraftCodec, variantHasContent, type VariantDraft } from './draft';
 import './variant.css';
 
 /**
@@ -97,24 +99,87 @@ const emptyPane = (label: string): PaneState => ({
   slugError: null,
 });
 
+const paneOf = (pane: VariantDraft['json']['left']): PaneState => ({ ...pane, slugError: null });
+const draftPane = ({ text, label, source }: PaneState) => ({ text, label, source });
+
+/**
+ * The page waits for this tab's draft identity (PLAN-43), so its first render
+ * can already be this tab's own workbench, restored after a reload.
+ */
 export function VariantPage() {
+  const ready = useDraftsReady();
+  if (!ready) return <div className="page-loading caption">Laying out the panes…</div>;
+  return <VariantWorkbench />;
+}
+
+function VariantWorkbench() {
   const font = usePanelFont();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [mode, setMode] = useState<Mode>('json');
+  // This tab's own workbench, as it was left (PLAN-43): both workspaces and
+  // the options, never the compare results, which need a fresh Compare.
+  const [restored] = useState(
+    () => readOwnDraft('variant', VARIANT_WORKSPACE, variantDraftCodec)?.payload ?? null,
+  );
+  const [mode, setMode] = useState<Mode>(() => restored?.mode ?? 'json');
   // JSON and text mode are separate workspaces — content never carries over
   // between them (owner requirement): a mode switch keeps each side's own
   // buffers, and invalid JSON stays in the JSON workspace rather than being
   // copied into the text panes.
-  const [panes, setPanes] = useState<Record<Mode, { left: PaneState; right: PaneState }>>(() => ({
-    json: { left: emptyPane('Original'), right: emptyPane('Modified') },
-    text: { left: emptyPane('Original'), right: emptyPane('Modified') },
-  }));
+  const [panes, setPanes] = useState<Record<Mode, { left: PaneState; right: PaneState }>>(() =>
+    restored
+      ? {
+          json: { left: paneOf(restored.json.left), right: paneOf(restored.json.right) },
+          text: { left: paneOf(restored.text.left), right: paneOf(restored.text.right) },
+        }
+      : {
+          json: { left: emptyPane('Original'), right: emptyPane('Modified') },
+          text: { left: emptyPane('Original'), right: emptyPane('Modified') },
+        },
+  );
   const { left, right } = panes[mode];
   const jsonLeftText = panes.json.left.text;
   const jsonRightText = panes.json.right.text;
-  const [jsonOptions, setJsonOptions] = useState<VariantJsonOptions>(DEFAULT_JSON_OPTIONS);
-  const [textOptions, setTextOptions] = useState<VariantTextOptions>(DEFAULT_TEXT_OPTIONS);
+  const [jsonOptions, setJsonOptions] = useState<VariantJsonOptions>(
+    () => restored?.jsonOptions ?? DEFAULT_JSON_OPTIONS,
+  );
+  const [textOptions, setTextOptions] = useState<VariantTextOptions>(
+    () => restored?.textOptions ?? DEFAULT_TEXT_OPTIONS,
+  );
+
+  const draftPayload = useMemo<VariantDraft>(
+    () => ({
+      mode,
+      json: { left: draftPane(panes.json.left), right: draftPane(panes.json.right) },
+      text: { left: draftPane(panes.text.left), right: draftPane(panes.text.right) },
+      jsonOptions,
+      textOptions,
+    }),
+    [mode, panes, jsonOptions, textOptions],
+  );
+  const hasContent = variantHasContent(draftPayload);
+  const draft = useWorkspaceDraft<VariantDraft>({
+    feature: 'variant',
+    workspace: VARIANT_WORKSPACE,
+    payload: draftPayload,
+    keep: hasContent,
+    codec: variantDraftCodec,
+  });
+  // Arm the mirror; the state above was already built from what it reads.
+  useEffect(() => {
+    draft.hydrate(VARIANT_WORKSPACE);
+  }, []);
+  // Another tab's workbench may be offered only when this one arrived with
+  // nothing of its own and no hand-off (a Loki/Groot seed or Pensieve slugs).
+  const [offerEligible, setOfferEligible] = useState(false);
+  const offers = useDraftOffer<VariantDraft>({
+    feature: 'variant',
+    workspace: VARIANT_WORKSPACE,
+    eligible: offerEligible,
+    codec: variantDraftCodec,
+    worth: variantHasContent,
+    buffer: draftPayload,
+  });
   const [results, setResults] = useState<CompareResults | null>(null);
   const [textResult, setTextResult] = useState<TextCompareResult | null>(null);
   const [view, setView] = useState<'code' | 'tree'>('code');
@@ -123,7 +188,10 @@ export function VariantPage() {
   const [pickerSide, setPickerSide] = useState<Side | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [changeCursor, setChangeCursor] = useState(-1);
-  const [pendingJump, setPendingJump] = useState<{ left: number | null; right: number | null } | null>(null);
+  const [pendingJump, setPendingJump] = useState<{
+    left: number | null;
+    right: number | null;
+  } | null>(null);
 
   const leftEditorRef = useRef<JsonEditorHandle>(null);
   const rightEditorRef = useRef<JsonEditorHandle>(null);
@@ -191,11 +259,34 @@ export function VariantPage() {
   const rightParam = searchParams.get('right');
   const leftLoadedSlug = panes.json.left.source?.slug ?? null;
   const rightLoadedSlug = panes.json.right.source?.slug ?? null;
+  // The address this workbench was restored under, and which JSON panes came
+  // back with unsaved work in them (PLAN-43): those are kept rather than
+  // replaced by the address's runestones. A slug chosen later loads as usual.
+  const arrivedWith = useRef({
+    left: leftParam,
+    right: rightParam,
+    work: {
+      left: (restored?.json.left.text.trim() ?? '') !== '',
+      right: (restored?.json.right.text.trim() ?? '') !== '',
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
     const load = async (side: Side, slug: string | null, loaded: string | null) => {
       if (!slug || slug === loaded) return null;
+      const arrival = arrivedWith.current;
+      if (arrival.work[side] && arrival[side] === slug) {
+        setPane(
+          side,
+          (pane) => ({
+            ...pane,
+            slugError: `Kept this tab’s unsaved work here instead of loading “${slug}”.`,
+          }),
+          'json',
+        );
+        return null;
+      }
       try {
         const doc = await fetchRunestone(slug);
         if (cancelled) return null;
@@ -252,8 +343,12 @@ export function VariantPage() {
   // Loki hands raw before/after JS in through a sessionStorage text seed (the
   // slug params only carry runestones). Consume it once: fill the text panes,
   // switch to text mode, and compare.
+  const arrival = useRef<{ seed: VariantTextSeed | null } | null>(null);
   useEffect(() => {
-    const seed = takeVariantTextSeed();
+    // Taken once: StrictMode's second run must still see the seed it consumed.
+    arrival.current ??= { seed: takeVariantTextSeed() };
+    const seed = arrival.current.seed;
+    setOfferEligible(!restored && !seed && !leftParam && !rightParam);
     if (!seed) return;
     setMode('text');
     setPanes((prev) => ({
@@ -419,16 +514,14 @@ export function VariantPage() {
   const stepChange = (direction: 1 | -1) => {
     if (mode === 'text') {
       if (!textResult || textResult.rows.length === 0) return;
-      const next =
-        (changeCursor + direction + textResult.rows.length) % textResult.rows.length;
+      const next = (changeCursor + direction + textResult.rows.length) % textResult.rows.length;
       setChangeCursor(next);
       const row = textResult.rows[next];
       if (row) jumpToChunk(row);
       return;
     }
     if (!results || results.records.length === 0) return;
-    const next =
-      (changeCursor + direction + results.records.length) % results.records.length;
+    const next = (changeCursor + direction + results.records.length) % results.records.length;
     setChangeCursor(next);
     const record = results.records[next];
     if (record) jumpToRecord(record);
@@ -581,6 +674,23 @@ export function VariantPage() {
 
   const canPickFromLibrary = hasFeature('runestone');
 
+  // Another tab's workbench, taken into this one (once). Its compare results
+  // were never kept: Compare again to see them.
+  const restoreDraft = async () => {
+    const taken = await offers.accept();
+    if (!taken) return;
+    setMode(taken.mode);
+    setPanes({
+      json: { left: paneOf(taken.json.left), right: paneOf(taken.json.right) },
+      text: { left: paneOf(taken.text.left), right: paneOf(taken.text.right) },
+    });
+    setJsonOptions(taken.jsonOptions);
+    setTextOptions(taken.textOptions);
+    setResults(null);
+    setTextResult(null);
+    setChangeCursor(-1);
+  };
+
   const empty = left.text.trim() === '' && right.text.trim() === '';
 
   // ── render helpers ────────────────────────────────────────────────────────
@@ -671,9 +781,7 @@ export function VariantPage() {
             />
           </div>
         ) : (
-          <p className="variant-pane__treeempty caption">
-            The tree appears once this side parses.
-          </p>
+          <p className="variant-pane__treeempty caption">The tree appears once this side parses.</p>
         )}
         {paneStatus(issues, pane.text, strict)}
       </section>
@@ -699,10 +807,7 @@ export function VariantPage() {
         </button>
       </div>
 
-      <Button
-        onClick={() => (mode === 'json' ? runCompare() : runTextCompare())}
-        disabled={empty}
-      >
+      <Button onClick={() => (mode === 'json' ? runCompare() : runTextCompare())} disabled={empty}>
         Compare
       </Button>
 
@@ -814,8 +919,8 @@ export function VariantPage() {
           <span className="eyebrow eyebrow--violet">the variant · two stones, one truth</span>
           <h2>Variant</h2>
           <p>
-            Compare JSON or JSONC structurally — key order, formatting and comments are noise —
-            or fall back to raw text for anything else.
+            Compare JSON or JSONC structurally — key order, formatting and comments are noise — or
+            fall back to raw text for anything else.
           </p>
         </div>
         <PanelFontControl font={font} />
@@ -825,6 +930,18 @@ export function VariantPage() {
         className="stack variant-stack panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
+        <DraftNotices
+          offer={offers.offer}
+          blank={!hasContent}
+          busy={offers.busy}
+          onRestore={() => void restoreDraft()}
+          onDismiss={offers.dismiss}
+          offerError={offers.error}
+          conflict={false}
+          onKeepLocal={() => undefined}
+          onUseServer={() => undefined}
+          writeError={draft.writeError}
+        />
         {mode === 'json' ? (
           <div className="variant-grid">
             {jsonPane('left', left, leftEditorRef, leftParsed, leftIssues, leftStrict)}
@@ -839,9 +956,7 @@ export function VariantPage() {
               <div>{paneHeader('right', right)}</div>
             </div>
             {(left.slugError || right.slugError) && (
-              <p className="variant-pane__error caption">
-                {left.slugError ?? right.slugError}
-              </p>
+              <p className="variant-pane__error caption">{left.slugError ?? right.slugError}</p>
             )}
             {/* Always-editable panes; Compare paints decorations onto them,
                 and the first real edit removes them again (owner's model). */}

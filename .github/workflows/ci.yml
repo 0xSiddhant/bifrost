@@ -24,19 +24,65 @@ concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# `changes` reads the list of changed files from the API; nothing else here
+# uses the token.
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  # A change to documentation only (Markdown, docs/, LICENSE) builds
+  # and tests nothing (owner, 2026-11-27): every other job waits for this one
+  # and is skipped when it says `code=false`. scripts/ci-changes.sh decides,
+  # and runs everything whenever the list cannot be had. Only that explicit
+  # `false` skips: an empty output (the script missing, say, which the step's
+  # pipe through `tee` would not fail on) or a failed `changes` job runs every
+  # job, since a skipped job reads as passed.
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci-changes.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Classify the changed files
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          # A renamed file is listed under its new path, with the old one in
+          # `previous_filename`: both count, so moving code into docs/ runs.
+          paths='.filename, (.previous_filename // empty)'
+          files=''
+          if [ -n "$PR" ]; then
+            # The API lists at most 3,000 files; a longer list is not trusted
+            # (renames' old paths count toward it, which only errs toward running).
+            files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq ".[] | $paths") || files=''
+            [ "$(printf '%s\n' "$files" | wc -l)" -lt 3000 ] || files=''
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            # A push: compare lists at most 300 files.
+            files=$(gh api "repos/$REPO/compare/$BEFORE...$AFTER" --jq ".files[] | $paths") || files=''
+            [ "$(printf '%s\n' "$files" | wc -l)" -lt 300 ] || files=''
+          fi
+          printf '%s\n' "$files"
+          printf '%s\n' "$files" | sh scripts/ci-changes.sh | tee -a "$GITHUB_OUTPUT"
+
   checks:
-    name: checks (audit, lint, typecheck, unit)
+    name: checks (audit, lint, typecheck, backup)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      # PLAN-37: server/src/openapi-compat.test.ts diffs the spec against
-      # develop's, so develop must be here; the test fails rather than skips
-      # in CI when it is not.
-      - name: Fetch develop
-        run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
-
       - uses: ./.github/actions/setup
 
       # A known vulnerability at any severity fails the PR (.agents/rules/
@@ -51,9 +97,6 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm test
-
       - name: Backup smoke test
         env:
           HEIMDALL_PIN: ci-smoke-pin
@@ -62,11 +105,52 @@ jobs:
           npm run backup -- --out "$RUNNER_TEMP/backups"   # VACUUM INTO + zip storage/
           ls "$RUNNER_TEMP"/backups/bifrost-backup-*.zip
 
+  # `npm test` split over two machines: the server's suite is about half of it.
+  # Together the two run every workspace's tests and scripts/ (scripts/ci.test.ts
+  # holds them to that).
+  unit:
+    name: unit (${{ matrix.name }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server
+            workspaces: server
+          - name: client, cli, web, e2e, scripts
+            workspaces: client cli web e2e
+            scripts: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # PLAN-37: server/src/openapi-compat.test.ts diffs the spec against
+      # develop's, so develop must be here; the test fails rather than skips
+      # in CI when it is not.
+      - name: Fetch develop
+        if: contains(matrix.workspaces, 'server')
+        run: git fetch --no-tags --depth=1 origin develop:refs/remotes/origin/develop
+
+      - uses: ./.github/actions/setup
+
+      - name: Test
+        run: |
+          for workspace in ${{ matrix.workspaces }}; do
+            npm test -w "$workspace"
+          done
+
+      - name: Test scripts/
+        if: matrix.scripts
+        run: npx vitest run --dir scripts
+
   # PLAN-32a/33: the out-of-process suites, against the build: the packed CLI
   # installed into a temporary prefix, and the black-box API suite with its
   # coverage report. No browser.
   e2e-cli-api:
     name: e2e (installed CLI + black-box API)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,11 +167,15 @@ jobs:
       - name: Black-box API
         run: npm run test:e2e:api -w e2e
 
-  # PLAN-32a: the browser journeys against the build, split so no job runs
-  # more than ~a quarter of them. WebKit (the household's iOS devices) takes
-  # twice Chromium's time per test, so it gets two shards.
+  # PLAN-32a: the browser journeys against the build, two shards per Chromium
+  # device so no job runs more than about a minute of journeys. WebKit is not
+  # run here (owner, 2026-11-27): in this container, with no GPU, it failed
+  # journeys for reasons a real iPhone does not have. It runs by hand before a
+  # release (`./bifrost test e2e webkit`).
   e2e-ui:
     name: e2e (${{ matrix.name }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     # Microsoft's Playwright image already holds every browser and its system
     # libraries. Installing them on the runner meant `playwright install-deps`,
@@ -100,26 +188,26 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble
       options: --user 1001 --ipc=host
-    # A shard takes 3–5 minutes with the image pull. Nothing left in it waits
-    # on a mirror, so anything still running at 15 is stuck, not slow.
-    timeout-minutes: 15
+    # A shard takes 2–3 minutes with the image pull. Nothing left in it waits
+    # on a mirror, so anything still running at 10 is stuck, not slow.
+    timeout-minutes: 10
     strategy:
       # Every shard reports: a failure in one says nothing about the others.
       fail-fast: false
       matrix:
         include:
-          - name: chromium desktop + standalone
-            id: chromium-desktop
-            args: --project=chromium-desktop --project=standalone
-          - name: chromium mobile
-            id: chromium-mobile
-            args: --project=chromium-mobile
-          - name: webkit 1/2
-            id: webkit-1
-            args: --project=webkit-mobile --shard=1/2
-          - name: webkit 2/2
-            id: webkit-2
-            args: --project=webkit-mobile --shard=2/2
+          - name: chromium desktop + standalone 1/2
+            id: chromium-desktop-1
+            args: --project=chromium-desktop --project=standalone --shard=1/2
+          - name: chromium desktop + standalone 2/2
+            id: chromium-desktop-2
+            args: --project=chromium-desktop --project=standalone --shard=2/2
+          - name: chromium mobile 1/2
+            id: chromium-mobile-1
+            args: --project=chromium-mobile --shard=1/2
+          - name: chromium mobile 2/2
+            id: chromium-mobile-2
+            args: --project=chromium-mobile --shard=2/2
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -140,52 +228,46 @@ jobs:
             e2e/test-results
           retention-days: 7
 
+  # PLAN-39: one image per process, each built on every PR so no Dockerfile
+  # can rot, one job per image so the three build at once (the web host's,
+  # which builds both clients, takes about two minutes on a cache miss).
+  # Nothing runs the API image on the Mac (native PM2/launchd is its run mode
+  # there). The standalone job also loads its image, smoke-tests it and
+  # validates the compose files.
   docker:
+    name: docker (${{ matrix.image }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: api
+          - image: web
+          - image: standalone
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
-      # PLAN-39: one image per process, each built on every PR so no
-      # Dockerfile can rot. Nothing runs the API image on the Mac (native
-      # PM2/launchd is its run mode there).
-      - name: Build API image
+      - name: Build the ${{ matrix.image }} image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/api.Dockerfile
+          file: docker/${{ matrix.image }}.Dockerfile
           push: false
-          tags: bifrost-api:ci
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-
-      - name: Build web host image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/web.Dockerfile
-          push: false
-          tags: bifrost-web:ci
-          cache-from: type=gha,scope=web
-          cache-to: type=gha,mode=max,scope=web
-
-      # PLAN-35: the standalone site's image, built and run the way
-      # compose/standalone.yml runs it, then smoke-tested.
-      - name: Build standalone image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/standalone.Dockerfile
-          push: false
-          load: true
-          tags: bifrost-standalone:ci
-          cache-from: type=gha,scope=standalone
-          cache-to: type=gha,mode=max,scope=standalone
+          # PLAN-35: the standalone site's image is run below, the way
+          # compose/standalone.yml runs it.
+          load: ${{ matrix.image == 'standalone' }}
+          tags: bifrost-${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
 
       # Every way of combining the compose files (docs/docker-linux.md,
       # docs/docker-mac.md) must still parse, with paths that resolve.
       - name: Validate compose combinations
+        if: matrix.image == 'standalone'
         run: |
           cp .env.example .env
           docker compose config -q
@@ -198,4 +280,5 @@ jobs:
           BIFROST_DOCKER_NETWORK=proxy docker compose -f compose/standalone.yml --env-file .env config -q
 
       - name: Standalone smoke test
+        if: matrix.image == 'standalone'
         run: scripts/standalone-smoke.sh bifrost-standalone:ci

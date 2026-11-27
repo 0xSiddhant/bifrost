@@ -6,6 +6,7 @@ import { SEASON } from './app/season';
 import { installSeason } from './core/decor/registry';
 import { initTheme } from './core/theme';
 import { initClientLogging } from './core/log';
+import { startDraftSession } from './core/drafts/session';
 import { ErrorBoundary } from './core/ui/ErrorBoundary';
 import './core/fonts.css';
 import './core/tokens.css';
@@ -19,6 +20,8 @@ installSeason(SEASON);
 // Before render: a throw during the first paint is exactly the kind this is
 // here to catch, and the global handlers must already be attached (PLAN-16a).
 initClientLogging();
+// Early, so the duplicate-tab check (PLAN-43) runs while the page's own chunk loads.
+startDraftSession();
 
 const container = document.getElementById('root');
 if (!container) throw new Error('missing #root element');

@@ -1,7 +1,7 @@
 import { test, expect } from '../support/fixtures.js';
 import { downloadBytes, textFile, zipEntryNames } from '../support/files.js';
 import { routes } from '../support/journey.js';
-import { press, waitForLive } from '../support/ui.js';
+import { isMobile, press, waitForLive } from '../support/ui.js';
 
 /**
  * Journey 2 — transfer: upload → staging → preview → rename (with the
@@ -10,6 +10,64 @@ import { press, waitForLive } from '../support/ui.js';
  */
 
 test.describe('transfer', () => {
+  test(
+    'Heimdall previews, moves and deletes staged uploads',
+    routes('/upload', '/upload/:name/preview', '/downloads'),
+    async ({ page, ownServer }) => {
+      test.skip(
+        isMobile(page),
+        'Heimdall opens only at ≥768px wide, by design (PLAN-10)',
+      );
+      const server = await ownServer();
+      const movedName = `heimdall-move-${Date.now().toString(36)}.txt`;
+      const deletedName = `heimdall-delete-${Date.now().toString(36)}.txt`;
+      const body = 'previewed from Heimdall';
+
+      await page.goto(`${server.baseUrl}/upload`);
+      await waitForLive(page);
+      await page.locator('input[type="file"]').setInputFiles([
+        textFile(movedName, body),
+        textFile(deletedName, 'delete this'),
+      ]);
+      await expect(page.getByRole('button', { name: `Rename ${movedName}` })).toBeVisible();
+      await expect(page.getByRole('button', { name: `Rename ${deletedName}` })).toBeVisible();
+
+      await page.keyboard.press('Shift+Meta+Comma');
+      const heimdall = page.getByRole('dialog', { name: 'Heimdall' });
+      await heimdall.getByLabel('PIN').fill(server.pin);
+      await heimdall.getByRole('button', { name: 'Enter' }).click();
+      await expect(heimdall.getByRole('navigation', { name: 'Sections' })).toBeVisible();
+      await heimdall.getByRole('button', { name: 'Uploads', exact: true }).click();
+
+      const [previewPage] = await Promise.all([
+        page.context().waitForEvent('page'),
+        heimdall.getByRole('link', { name: `Preview ${movedName}` }).click(),
+      ]);
+      await expect(previewPage.getByRole('dialog', { name: `Preview of ${movedName}` })).toContainText(
+        body,
+      );
+      await previewPage.close();
+
+      await heimdall.getByRole('button', { name: `Move ${movedName} to Downloads` }).click();
+      await expect(heimdall.locator('.file-row__name', { hasText: movedName })).toHaveCount(0);
+
+      await heimdall.getByRole('button', { name: `Delete ${deletedName}` }).click();
+      await expect(heimdall.getByText('Delete this staged file?')).toBeVisible();
+      await heimdall.getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(heimdall.locator('.file-row__name', { hasText: deletedName })).toHaveCount(0);
+
+      await heimdall.getByRole('button', { name: 'Lock' }).click();
+      await page.goto(`${server.baseUrl}/downloads`);
+      await expect(page.getByRole('heading', { name: 'Receive files' })).toBeVisible();
+      await expect(page.getByRole('link', { name: `Download ${movedName}` })).toBeVisible();
+      expect(
+        (await page.request.get(
+          `${server.baseUrl}/api/v1/files/${encodeURIComponent(deletedName)}/preview`,
+        )).status(),
+      ).toBe(404);
+    },
+  );
+
   test(
     'a staged file is previewed, renamed, published and downloaded on another device',
     routes('/upload', '/upload/:name/preview', '/downloads', '/downloads/:id/preview'),

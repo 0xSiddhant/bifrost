@@ -18,7 +18,11 @@ export class FsFolderArchiver implements FolderArchiver {
   constructor(private readonly log: Logger) {}
 
   stream(folderPath: string, files: string[]): Readable {
-    const archive = new ZipArchive({ zlib: { level: 6 } });
+    const archive = new ZipArchive({
+      zlib: { level: 6 },
+      // Keep the use case's code-point name order in the final archive.
+      statConcurrency: 1,
+    });
 
     // A file deleted between the listing and its read arrives here (ENOENT).
     // The rest of the archive is still worth having, so this logs and carries

@@ -56,6 +56,8 @@ export interface StartServerOptions {
    * response proves the escape. Ignored when `storageRoot` is given.
    */
   canary?: boolean;
+  /** How long to wait for this start's own processes to log that they listen (tests shorten it). */
+  listenTimeoutMs?: number;
 }
 
 export interface Canary {
@@ -197,12 +199,90 @@ export function fileTail(file: string, lines: number): string {
 }
 
 /**
+ * True when the JSON log file names this start's process listening on `port`:
+ * a line whose message starts with `prefix` and whose `port` field is `port`.
+ */
+function loggedListening(file: string | null, prefix: string, port: number): boolean {
+  if (!file) return false;
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    // Not written yet: the process is still starting.
+    return false;
+  }
+  return text.split('\n').some((line) => {
+    if (!line.includes(prefix)) return false;
+    try {
+      const entry = JSON.parse(line) as { msg?: unknown; port?: unknown };
+      return typeof entry.msg === 'string' && entry.msg.startsWith(prefix) && entry.port === port;
+    } catch {
+      // A line cut off mid-write; the next read sees it whole.
+      return false;
+    }
+  });
+}
+
+/**
+ * A health answer only says that *something* answers on a port. Another
+ * worker's server can bind a port this harness picked first, and then answer
+ * for this start while its own API dies with EADDRINUSE or is still
+ * migrating: the journeys would run against a stranger's storage, and nothing
+ * would fail. So this start also waits for its own processes to log, in its own
+ * storage, that they are listening on these ports.
+ */
+async function waitForOwnListen(
+  logsDir: string,
+  apiPort: number,
+  webPort: number | null,
+  isAlive: () => boolean,
+  timeoutMs: number,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const apiOwn = loggedListening(path.join(logsDir, 'current.log'), 'api listening on', apiPort);
+    const webOwn =
+      webPort === null || loggedListening(newestWebLog(logsDir), 'web host listening on', webPort);
+    if (apiOwn && webOwn) return;
+    if (!isAlive()) throw new Error('server exited before it was healthy (after a health answer)');
+    if (Date.now() > deadline) {
+      throw new Error(
+        `another process answered on port ${apiOwn ? webPort : apiPort}: the server this harness started never logged listening there`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+/**
+ * The newest file of the web host's own log series (`app-web.<N>.log`, PLAN-36)
+ * in `logsDir`, or null when it wrote none.
+ */
+export function newestWebLog(logsDir: string): string | null {
+  let names: string[];
+  try {
+    names = fs.readdirSync(logsDir);
+  } catch {
+    // No logs folder yet: the web host never got as far as its logger.
+    return null;
+  }
+  const numbered = names
+    .map((name) => ({ name, n: /^app-web\.(\d+)\.log$/.exec(name)?.[1] }))
+    .filter((entry): entry is { name: string; n: string } => entry.n !== undefined)
+    .sort((a, b) => Number(b.n) - Number(a.n));
+  return numbered[0] ? path.join(logsDir, numbered[0].name) : null;
+}
+
+/**
  * The error a test sees when a server it was starting is not up: why
  * (`waitForHealth`'s message), how each process ended, everything they wrote,
- * and the tail of the API's log file. The API logs a fatal error (an address
- * already in use, a failed migration) to that file, not to stdout, so without
- * the tail a dead server reports nothing at all. A dead process's output is
- * read once its pipes have drained.
+ * and the tail of each process's log file. The API and the web host log a
+ * fatal error (an address already in use, a failed migration) to their files,
+ * `current.log` and `app-web.<N>.log`, not to stdout, so without the tails a
+ * dead server reports nothing at all, and the port-race retry below cannot
+ * see a web host's EADDRINUSE (#122's CI, run 46005025225: "web: exited (code
+ * 1)" and no reason). A dead process's output is read once its pipes have
+ * drained.
  */
 async function bootFailure(
   cause: unknown,
@@ -220,18 +300,51 @@ async function bootFailure(
       return `${name}: ${status ? `exited (code ${status.code}, signal ${status.signal})` : 'running'}`;
     });
   const reason = cause instanceof Error ? cause.message : String(cause);
+  const webLog = procs.web ? newestWebLog(path.dirname(logFile)) : null;
   return new Error(
     [
       reason,
       ...exits,
       `output:\n${output() || '(none)'}`,
       `log (${logFile}), last 40 lines:\n${fileTail(logFile, 40)}`,
+      ...(procs.web
+        ? [
+            webLog
+              ? `web host log (${webLog}), last 40 lines:\n${fileTail(webLog, 40)}`
+              : 'web host log: (none written)',
+          ]
+        : []),
     ].join('\n'),
     { cause },
   );
 }
 
+/**
+ * How many times a server whose ports this harness picked itself is started
+ * afresh when one of them was taken. `freePort()` can only say a port was free
+ * a moment ago: another worker's server (four start at once in CI) can bind it
+ * before this one does, and the API or the web host then dies with EADDRINUSE
+ * (CI runs 45961921150 and 46005025225). New ports make that a non-event.
+ */
+const PORT_RACE_ATTEMPTS = 3;
+
+const addressInUse = (error: unknown): boolean =>
+  /EADDRINUSE|another process answered on port/.test(
+    error instanceof Error ? error.message : String(error),
+  );
+
 export async function startServer(options: StartServerOptions = {}): Promise<E2EServer> {
+  const ownPorts = options.port === undefined && options.apiPort === undefined;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await startServerOnce(options);
+    } catch (error) {
+      if (!ownPorts || attempt >= PORT_RACE_ATTEMPTS || !addressInUse(error)) throw error;
+    }
+  }
+}
+
+async function startServerOnce(options: StartServerOptions): Promise<E2EServer> {
   const buildRoot = options.buildRoot ?? REPO_ROOT;
   const entry = path.join(buildRoot, 'server', 'dist', 'bootstrap.js');
   const otel = path.join(buildRoot, 'server', 'dist', 'otel.js');
@@ -251,7 +364,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
 
   const profile = options.profile ?? 'local';
   const port = options.port ?? (await freePort());
-  const apiPort = hasWebHost ? (options.apiPort ?? (await freePort())) : port;
+  let apiPort = hasWebHost ? (options.apiPort ?? (await freePort())) : port;
+  // Two probes can be handed the same ephemeral port in turn; the web host and
+  // the API would then race for it.
+  while (hasWebHost && options.apiPort === undefined && apiPort === port)
+    apiPort = await freePort();
   let jail: string | null = null;
   let canary: Canary | null = null;
   let storageRoot: string;
@@ -319,9 +436,20 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
   try {
     await waitForHealth(apiUrl, api.alive);
     if (web) await waitForHealth(baseUrl, bothAlive, 30_000, '/healthz');
+    await waitForOwnListen(
+      path.dirname(logFile),
+      apiPort,
+      web ? port : null,
+      bothAlive,
+      options.listenTimeoutMs ?? 10_000,
+    );
   } catch (error) {
     await haltBoth();
-    throw await bootFailure(error, { api, web }, () => output, logFile);
+    const failure = await bootFailure(error, { api, web }, () => output, logFile);
+    // Read the log first; then a scratch storage this harness made is its to remove.
+    if (!options.keepStorage && !options.storageRoot)
+      fs.rmSync(jail ?? storageRoot, { recursive: true, force: true });
+    throw failure;
   }
 
   return {

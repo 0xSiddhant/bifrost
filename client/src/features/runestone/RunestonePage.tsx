@@ -1,5 +1,4 @@
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -31,8 +30,8 @@ import {
 import { log } from '../../core/log';
 import { jsonToJs } from '../../core/js';
 import { relicTitle } from '../../core/relicNames';
-import { useDraftCache, showsRestore, type ScratchDraft } from '../../core/draftCache';
-import { takeLeftOpen } from '../../core/draftReturn';
+import { useDocumentDrafts } from '../../core/documentDrafts';
+import { legacyTextParse, type TextDraft } from '../../core/drafts/documents';
 import { takeRunestoneSeed } from '../../core/runestoneSeed';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { ApiError, HubUnavailableError, isHubClosed } from '../../core/api';
@@ -43,6 +42,7 @@ import { Card } from '../../core/ui/Card';
 import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { Toast } from '../../core/ui/Toast';
+import { DraftNotices } from '../../core/ui/DraftNotices';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchRunestone,
@@ -50,7 +50,6 @@ import {
   saveRunestone,
   updateRunestone,
 } from '../../core/runestone';
-import { clearDraft, loadDraft, saveDraft, type RunestoneDraft } from './draft';
 import { TreeView } from '../../core/ui/TreeView';
 import './runestone.css';
 
@@ -67,8 +66,9 @@ function formatOfFile(name: string, type: string): JsonFormat | null {
   return null;
 }
 
-/** Identifies this editor's buffer to `core/draftReturn`. */
-const DRAFT_ID = 'runestone';
+/** The pre-PLAN-43 single-slot draft, offered once if it holds anything. */
+const LEGACY_DRAFT = legacyTextParse((text) => text.trim() === '');
+const worthOffering = (draft: TextDraft) => draft.text.trim() !== '';
 
 /** Debounce heavy derived work (validate/stats on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -132,19 +132,52 @@ export function RunestonePage() {
   // Baked in at build time (PLAN-35): known before the first render.
   const config = RUNESTONE_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
-  const [restorable, setRestorable] = useState<RunestoneDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load (or fail to find) the document a slug URL names.
+  const isScratch = phase === 'new' && docId === null;
+  const blank = text.trim() === '';
+  const dirty =
+    snapshot === null
+      ? text.trim() !== ''
+      : snapshot.title !== title || snapshot.text !== text || snapshot.format !== format;
+  // Unsaved work kept per tab and workspace (PLAN-43): the scratch editor
+  // while it holds anything, a saved document while it has unsaved changes.
+  const drafts = useDocumentDrafts({
+    feature: 'runestone',
+    isScratch,
+    phase,
+    docId,
+    title,
+    text,
+    format,
+    blank,
+    dirty,
+    worth: worthOffering,
+    legacy: LEGACY_DRAFT,
+  });
+  const ready = drafts.ready;
+
+  // Load (or fail to find) the document a slug URL names, once this tab's
+  // draft identity is settled, so its own working copy can come back with it.
   useEffect(() => {
     if (!slug) {
+      // Leaving a saved document for the scratch editor (a nav link, Back):
+      // its text is not scratch work. Start blank; this tab's own scratch
+      // draft, a hand-off or an offer fills it next.
+      if (docId !== null || phase !== 'new') {
+        setTitle(relicTitle());
+        setText('');
+        setFormat('json');
+      }
       setPhase('new');
       setDocId(null);
       setSnapshot(null);
+      drafts.reset();
       return;
     }
+    if (!ready) return;
     let cancelled = false;
     setPhase('loading');
     fetchRunestone(slug)
@@ -155,11 +188,13 @@ export function RunestonePage() {
           return;
         }
         const docFormat = asJsonFormat(doc.format);
+        // This tab's unsaved edits to it come back as unsaved edits, never saved.
+        const own = drafts.loaded({ ...doc, format: docFormat });
         setDocId(doc.id);
-        setTitle(doc.name);
-        setText(doc.content);
-        setFormat(docFormat);
         setSnapshot({ title: doc.name, text: doc.content, format: docFormat });
+        setTitle(own ? own.title : doc.name);
+        setText(own ? own.text : doc.content);
+        setFormat(own ? asJsonFormat(own.format) : docFormat);
         setPhase('saved');
         // The API 301s stale slugs; fix the address bar to the canonical one.
         if (doc.slug !== slug) navigate(`/runestone/${doc.slug}`, { replace: true });
@@ -173,62 +208,40 @@ export function RunestonePage() {
     return () => {
       cancelled = true;
     };
-    // navigate identity churns; slug is the real dependency
-  }, [slug]);
-
-  const isScratch = phase === 'new' && docId === null;
+    // navigate identity churns; slug (and the drafts being ready) are the real dependencies
+  }, [slug, ready]);
 
   // On arriving at the scratch editor, in order of how directly the person
   // asked for it:
   //   1. a hand-off from another tool (Groot's "Open in Runestone") — a
-  //      document they just asked for, so it opens rather than offering to;
-  //   2. a buffer left open by a navigation inside this page's lifetime —
-  //      leaving to convert something in Groot and coming back is one task;
-  //   3. a draft from an earlier page load, which is still only *offered*,
-  //      because opening the tool fresh must not silently refill it.
+  //      document they just asked for, so it opens over anything else;
+  //   2. this tab's own scratch draft — a reload, or a return from another
+  //      tool, is the same piece of work, so it simply comes back;
+  //   3. otherwise another tab's draft, or the one saved before the update,
+  //      may be offered (`useDraftOffer`), never filled in unasked.
   useEffect(() => {
-    if (!isScratch) return;
+    if (!isScratch || !ready) return;
+    const arrival = drafts.enterScratch();
+    if (!arrival.first) return;
     const seed = takeRunestoneSeed();
     if (seed) {
       setText(seed.text);
       setFormat(seed.format ?? 'json');
       if (seed.title) setTitle(seed.title);
       setView('code');
-      setRestorable(null);
+      drafts.offerScratch(false);
       return;
     }
-    const draft = loadDraft();
-    if (!draft || draft.text.trim() === '') return;
-    if (takeLeftOpen(DRAFT_ID)) {
-      setTitle((current) => draft.title || current);
-      setText(draft.text);
-      setFormat(draft.format);
-    } else {
-      setRestorable(draft);
+    const own = arrival.own;
+    if (own && own.text.trim() !== '') {
+      setTitle((current) => own.title || current);
+      setText(own.text);
+      setFormat(asJsonFormat(own.format));
+      drafts.offerScratch(false);
+      return;
     }
-  }, [isScratch]);
-
-  // The cache mirrors the scratch buffer, so a refresh mid-edit loses nothing,
-  // and leaving flushes it and marks it left open for the silent return above.
-  // Saving clears the draft deliberately and flips `isScratch` before leaving,
-  // so a saved document cannot resurrect it.
-  const blank = text.trim() === '';
-  // The cache knows title and text; the format rides along with them. An
-  // earlier visit's draft that is re-written while on offer keeps its own.
-  const saveFormatDraft = useCallback(
-    (draft: ScratchDraft) => saveDraft({ format, ...draft }),
-    [format],
-  );
-  useDraftCache({
-    isScratch,
-    title,
-    text,
-    blank,
-    offered: restorable,
-    save: saveFormatDraft,
-    clear: clearDraft,
-    returnId: DRAFT_ID,
-  });
+    drafts.offerScratch(true);
+  }, [isScratch, ready]);
 
   useEffect(() => {
     if (!notice) return;
@@ -268,17 +281,19 @@ export function RunestonePage() {
     return pathAt(debouncedText, Math.min(debouncedCursor, debouncedText.length));
   }, [view, empty, debouncedText, debouncedCursor]);
 
-  const dirty =
-    snapshot === null
-      ? text.trim() !== ''
-      : snapshot.title !== title || snapshot.text !== text || snapshot.format !== format;
   // The size cap is about the text. A saved document whose text has not
   // changed can still be renamed or switched between JSON and JSONC even past
   // a cap lowered since it was saved: the update then carries no content, and
   // the server checks the stored text in the new format, not its size.
   const textChanged = snapshot === null || snapshot.text !== text;
+  // While local edits and a newer server copy disagree, nothing is saved
+  // until the person picks one: Save would overwrite the server's.
   const canSave =
-    valid && (!overCap || !textChanged) && !saving && (snapshot === null || dirty);
+    valid &&
+    (!overCap || !textChanged) &&
+    !saving &&
+    (snapshot === null || dirty) &&
+    !drafts.conflict;
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
@@ -290,13 +305,13 @@ export function RunestonePage() {
       if (docId === null) {
         const doc = await saveRunestone({ name: title, content: text, format });
         const savedFormat = asJsonFormat(doc.format);
+        // Saved: this tab's scratch draft has done its job.
+        drafts.saved({ ...doc, format: savedFormat }, 'scratch');
         setDocId(doc.id);
         setTitle(doc.name);
         setFormat(savedFormat);
         setSnapshot({ title: doc.name, text: doc.content, format: savedFormat });
         setPhase('saved');
-        clearDraft();
-        setRestorable(null);
         navigate(`/runestone/${doc.slug}`, { replace: true });
         ok('Runestone carved');
       } else {
@@ -306,6 +321,7 @@ export function RunestonePage() {
           format,
         });
         const savedFormat = asJsonFormat(doc.format);
+        drafts.saved({ ...doc, format: savedFormat }, 'doc');
         setTitle(doc.name);
         setFormat(savedFormat);
         setSnapshot({ title: doc.name, text: doc.content, format: savedFormat });
@@ -411,7 +427,6 @@ export function RunestonePage() {
     setFormat(next);
   };
 
-
   // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
   // mount and compresses it straight away, so no feature imports another. The
   // live buffer is sent, never the debounced copy the toolbar's disabled state
@@ -424,8 +439,7 @@ export function RunestonePage() {
   const clearDocument = () => {
     if (!window.confirm('Clear the document? The cached draft is removed too.')) return;
     setText('');
-    clearDraft();
-    setRestorable(null);
+    drafts.clear();
   };
 
   const copyPath = async (path: string) => {
@@ -502,21 +516,30 @@ export function RunestonePage() {
   const exportDocument = () =>
     saveText(text, exportFilename(title, format), FORMAT_FILE[format].mimeType);
 
-  const restoreDraft = () => {
-    if (!restorable) return;
-    setTitle(restorable.title || title);
-    setText(restorable.text);
-    setFormat(restorable.format);
-    setRestorable(null);
+  // Another tab's draft, or the pre-update one, taken into this tab (once).
+  // On a saved document it is a working copy like this tab's own: checked
+  // against the server copy it was edited from.
+  const restoreDraft = async () => {
+    const restored = await drafts.restore();
+    if (!restored) return;
+    setTitle((current) => restored.title || current);
+    setText(restored.text);
+    setFormat(asJsonFormat(restored.format));
     setView('code');
   };
 
-  const dismissDraft = () => {
-    clearDraft();
-    setRestorable(null);
+  // The server copy changed after this tab's edits: keep the edits (they now
+  // count as changes to the current server copy), or take the server's.
+  const takeServerVersion = () => {
+    const server = drafts.takeServer();
+    if (!server) return;
+    setTitle(server.name);
+    setText(server.content);
+    setFormat(asJsonFormat(server.format));
   };
 
   const carveFromSlug = () => {
+    drafts.reset();
     setPhase('new');
     setDocId(null);
     setSnapshot(null);
@@ -535,6 +558,11 @@ export function RunestonePage() {
   const startNew = () => {
     if (dirty && !window.confirm('Start a new runestone? Unsaved changes to this one are lost.'))
       return;
+    // New discards this workspace's unsaved buffer, so its draft goes with it:
+    // only this tab's, and only this workspace's. Leaving a saved document
+    // for the scratch editor brings back this tab's scratch draft, if any.
+    drafts.clear();
+    drafts.reset();
     setPhase('new');
     setDocId(null);
     setSnapshot(null);
@@ -542,16 +570,12 @@ export function RunestonePage() {
     setFormat('json');
     setTitle(relicTitle());
     setNotice(null);
-    // The cached draft backs up the buffer being left behind, so keeping it
-    // would have the restore prompt offer back exactly what New discarded.
-    clearDraft();
-    setRestorable(null);
     if (slug) navigate('/runestone');
   };
 
   const canTransform = valid && !overCap;
 
-  if (phase === 'loading') {
+  if (phase === 'loading' || !ready) {
     return <div className="page-loading caption">Reading the stone…</div>;
   }
 
@@ -572,7 +596,10 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
+              <Button
+                variant="ghost"
+                onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}
+              >
                 Back to the Pensieve
               </Button>
             </div>
@@ -620,19 +647,18 @@ export function RunestonePage() {
         className="stack rune-workspace panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
-        {showsRestore(restorable, blank) && (
-          <Toast kind="info">
-            <span className="rune-restore">
-              Restore the draft from your last visit?
-              <Button size="sm" onClick={restoreDraft}>
-                Restore
-              </Button>
-              <Button size="sm" variant="ghost" onClick={dismissDraft}>
-                Dismiss
-              </Button>
-            </span>
-          </Toast>
-        )}
+        <DraftNotices
+          offer={drafts.offer}
+          blank={drafts.showOffer}
+          busy={drafts.offerBusy}
+          onRestore={() => void restoreDraft()}
+          onDismiss={drafts.dismissOffer}
+          offerError={drafts.offerError}
+          conflict={drafts.conflict}
+          onKeepLocal={drafts.keepLocal}
+          onUseServer={takeServerVersion}
+          writeError={drafts.writeError}
+        />
 
         {overCap && maxBytes !== null && (
           <Toast kind="danger">
@@ -765,7 +791,12 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={empty} onClick={exportDocument}>
                 Export
               </Button>
-              <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                onClick={() => void copyDocument()}
+              >
                 Copy
               </Button>
               <Button
@@ -903,9 +934,7 @@ export function RunestonePage() {
                   </li>
                 );
               })}
-              {issues.length > 20 && (
-                <li className="caption">…and {issues.length - 20} more</li>
-              )}
+              {issues.length > 20 && <li className="caption">…and {issues.length - 20} more</li>}
             </ul>
           )}
         </Card>

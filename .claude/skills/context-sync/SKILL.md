@@ -5,7 +5,7 @@ description: Audit and update Bifrost's .agents/ knowledge files against the act
 
 # Context Sync — keep `.agents/` truthful
 
-Goal: `.agents/context/*.md` and `.agents/rules/*.md` must describe the code as it exists, not as it was planned. Claude Code treats these as ground truth at session start; drift causes contradictions and re-derived decisions.
+Goal: `.agents/context/*.md` and `.agents/rules/*.md` must describe the code as it exists, not as it was planned. Agents read them at session start; drift causes contradictions and re-derived decisions. The code is the source of truth; these files only describe it.
 
 ## Procedure
 
@@ -20,7 +20,7 @@ Goal: `.agents/context/*.md` and `.agents/rules/*.md` must describe the code as 
    - scripts table in README vs `package.json`
 3. Also check the public mirrors: `docs/ARCHITECTURE.md`, `docs/THEME-SPEC.md` (vs the shipped ajv schema), root `README.md` feature list.
 4. Update files to match reality. **Direction of truth: code wins**, unless the divergence violates a logged decision — in that case report it as a regression instead of documenting it.
-5. Anything that was a real decision drift (not just stale prose) gets a new dated row in `.agents/memory/decisions.md`. Never edit or delete existing rows.
-6. Do NOT touch plan files (they are historical specs), and never rewrite session notes — moving them in step 7 is not rewriting.
-7. Archive `progress.md`: move every Recent-activity entry dated before the latest existing release tag (`git tag --sort=-creatordate | head -1`) into `.agents/memory/history.md`, merged in by date, newest first, text unchanged. `progress.md` then holds only the sessions since that tag.
+5. A real decision drift (not just stale prose) gets a dated line in `.agents/memory/decisions.md`, in its area, and the line it supersedes is removed (git keeps it).
+6. Do NOT touch open plan files.
+7. Prune, so the files stay short: `progress.md` holds where the project stands (plan table, open owner checks, a short journey), not session notes; owner checks the owner has confirmed come out; `decisions.md` lines no longer in force come out; a plan file whose PR has merged is deleted.
 8. Output a divergence table in the PR body: file · claim · reality · action taken.

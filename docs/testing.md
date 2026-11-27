@@ -8,9 +8,9 @@ Every kind of test this repo runs, how to run and replay each one, and which of 
 
 | Kind                         | Where                                                                 | Command                                 | Needs a build? | In CI              |
 | ---------------------------- | --------------------------------------------------------------------- | --------------------------------------- | -------------- | ------------------ |
-| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, `checks` job  |
+| Unit + integration           | `server/`, `client/`, `cli/` (`*.test.ts`), plus the e2e support code | `npm test`                              | no             | yes, `unit` jobs   |
 | API description is current   | `server/openapi.json` (checked by `openapi.test.ts` in `npm test`)    | `npm run api:spec` regenerates it       | no             | yes, in `npm test` |
-| End-to-end: browser          | `e2e/browser/`, `e2e/standalone/` (Playwright)                        | `npm run test:e2e:ui -w e2e`            | yes, both      | yes, 4 shards      |
+| End-to-end: browser          | `e2e/browser/`, `e2e/standalone/` (Playwright)                        | `npm run test:e2e:ui -w e2e`            | yes, both      | Chromium, 4 shards; WebKit by hand |
 | End-to-end: installed CLI    | `e2e/cli/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:cli -w e2e`           | yes            | yes, own job       |
 | Black-box API (PLAN-33)      | `e2e/api/` (Vitest, `*.e2e.ts`)                                       | `npm run test:e2e:api -w e2e`           | yes            | yes, own job       |
 | All three of the above       |                                                                       | `npm run test:e2e`                      | yes            | yes                |
@@ -47,7 +47,8 @@ An eslint rule bans any import of `server/src`, `client/src` or `cli/src` from `
 ```bash
 npm run build                                  # the e2e suites run against dist/
 cd e2e && npx playwright install chromium webkit && cd ..   # once per Playwright version
-npm run test:e2e                               # CLI suite, API suite, then the browser suite
+npm run test:e2e                               # CLI suite, API suite, then the browser suite (Chromium)
+./bifrost test e2e webkit                      # the browser suite on WebKit, by hand before a release
 ```
 
 Narrower runs, from `e2e/`:
@@ -61,7 +62,7 @@ npx playwright show-trace test-results/<test>/trace.zip   # replay a failure ste
 
 A failing Playwright test keeps its trace, a screenshot, and the output of the server it ran against (`server-output` in the report). In CI the report and `test-results/` are uploaded as a `playwright-report-<shard>` artifact, one per failing shard.
 
-**How CI runs all this** (`.github/workflows/ci.yml`): every job in parallel, so the wall clock is the slowest job, not the sum. `checks` runs audit, lint, typecheck, `npm test` and the backup smoke; `e2e-cli-api` builds and runs the installed-CLI and black-box API suites; `e2e-ui` builds and runs the browser journeys in four shards (Chromium desktop + standalone, Chromium mobile, WebKit 1/2 and 2/2, since WebKit takes twice Chromium's time per test); `docker` builds the images. The four browser shards run inside Microsoft's Playwright image (`mcr.microsoft.com/playwright:v<version>-noble`), which already holds every browser and its system libraries, so no shard installs anything from Ubuntu's apt mirror: `playwright install-deps` used to, and a slow mirror held a WebKit shard for 17–32 minutes before any test ran. The image tag must equal e2e's `@playwright/test` version; `scripts/ci.test.ts` fails when a bump changes one without the other. A shard still running after 15 minutes is stuck, and fails. CI also runs on every push to `develop`, so the npm and Playwright caches are saved where every PR can restore them, but not on pushes to `main`, which only ever receives a PR that already ran it. A newer push to a PR cancels its older run. To reproduce one shard locally: `./bifrost test e2e ui -- --project=webkit-mobile --shard=1/2`.
+**How CI runs all this** (`.github/workflows/ci.yml`): first a small `changes` job reads the PR's (or push's) list of changed files from the API. When every file is documentation (Markdown, except under `client/src/` and `cli/man/` and `CHANGELOG.md`, which the code reads; anything under `docs/`; `LICENSE`), every other job is skipped; `scripts/ci-changes.sh` decides. A renamed file counts under its old path too, and everything runs when the list cannot be had or the `changes` job fails: only its explicit docs-only verdict skips a job, since a skipped job reads as passed. Otherwise every job runs in parallel, so the wall clock is the slowest job, about 2–3 minutes: `checks` runs audit, lint, typecheck and the backup smoke; `unit` runs `npm test` on two machines (the server's suite, then every other workspace and `scripts/`); `e2e-cli-api` builds and runs the installed-CLI and black-box API suites; `e2e-ui` builds and runs the browser journeys in four shards (Chromium desktop + standalone 1/2 and 2/2, Chromium mobile 1/2 and 2/2); `docker` builds the three images in three parallel jobs (the standalone one also validates the compose files and smoke-tests its image). **WebKit is not run in CI** (owner, 2026-11-27): in the CI container, with no GPU, it failed journeys for reasons a real iPhone does not have. Run `./bifrost test e2e webkit` before a release, beside a look on a real iPhone or iPad. The browser shards run inside Microsoft's Playwright image (`mcr.microsoft.com/playwright:v<version>-noble`), which already holds every browser and its system libraries, so no shard installs anything from Ubuntu's apt mirror: `playwright install-deps` used to, and a slow mirror held a shard for 17–32 minutes before any test ran. The image tag must equal e2e's `@playwright/test` version; `scripts/ci.test.ts` fails when a bump changes one without the other, and also holds the `changes` gate, the unit split and the absence of WebKit in place. A shard still running after 10 minutes is stuck, and fails. CI also runs on every push to `develop`, so the npm and Playwright caches are saved where every PR can restore them, but not on pushes to `main`, which only ever receives a PR that already ran it. A newer push to a PR cancels its older run. To reproduce one shard locally: `./bifrost test e2e ui -- --project=chromium-mobile --shard=1/2`.
 
 Where Playwright's own browser download is unavailable but a Chromium is installed, `E2E_CHROMIUM_EXECUTABLE=/path/to/chrome` points the Chromium projects at it. WebKit has no such fallback.
 
@@ -70,8 +71,8 @@ Where Playwright's own browser download is unavailable but a Chromium is install
 | Project            | What                                             | Why                                                                                    |
 | ------------------ | ------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | `chromium-desktop` | 1280×900                                         | the Mac on the desk                                                                    |
-| `chromium-mobile`  | Pixel 7, 390×844, touch                          | phones, and the layouts below 640/768px                                                |
-| `webkit-mobile`    | iPhone 14                                        | the household's iPads and iPhones are WebKit, and Safari-only bugs have shipped before |
+| `chromium-mobile`  | Pixel 7 at an iPhone 14's 390×664, touch         | phones, and the layouts below 640/768px, at the size Safari leaves an iPhone's page    |
+| `webkit-mobile`    | iPhone 14; by hand only (`E2E_WEBKIT=1`)         | the household's iPads and iPhones are WebKit, and Safari-only bugs have shipped before |
 | `standalone`       | Chromium, 1280×900, against `dist-standalone/`   | the standalone site (PLAN-35): no server at all, served with the container's rules     |
 
 ### The standalone project (PLAN-35)
@@ -86,7 +87,7 @@ The old `cloud` project is gone: the client's nav comes from its build now, not 
 
 ### Isolation
 
-Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port), with:
+Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port; a port taken by another process before the server bound it, `EADDRINUSE`, means up to two fresh starts on new ports), with:
 
 - a fresh `mkdtemp` storage root;
 - every key in `.env.example` and in your own `.env` blanked to its built-in default. The server's dotenv never overrides a set key, so without this a developer's real `.env` would leak into the suite;
@@ -115,7 +116,7 @@ The exceptions are an explicit allowlist, each with its reason:
 - the SSE stream cancelled by a navigation;
 - a request the page aborted itself;
 - the browser's own console line for a 4xx answer;
-- connection-refused noise, but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose;
+- connection-refused noise, and a lazy chunk from this server that failed to load (the boundary around it catches that), but only after a test calls `guard.allowConnectionLoss()` because it stopped the server on purpose, or a test's own server (`ownServer()`) is stopped at teardown while its pages are still open;
 - the web host's `502` (`503` for `/go`) and the browser's lines for them, but only after a test calls `guard.allowApiOutage()` because it stopped the API on purpose (PLAN-36). A 5xx from anything else still fails.
 - WebKit's report of a same-origin request cut off by a navigation (`Fetch API cannot load … due to access control checks`, the live events stream's `EventSource cannot load … due to access control checks`, `Importing a module script failed`), but only when that page starts a navigation or closes within 3 seconds of it. Chromium drops such a request silently. The same words with no navigation nearby still fail the test.
 
@@ -125,7 +126,7 @@ The exceptions are an explicit allowlist, each with its reason:
 
 Every browser context a hub journey touches is a device with the installed season's **switchable** decorations switched off (winter's snowfall: `bifrost.decor.off`, as Heimdall → Sky Relics stores it), unless the journey opts in with `test.use({ seasonDecorations: true })`. The season's own journey (`season-winter.spec.ts`) and the shell's "every animation runs on the compositor" check opt in; nothing else does. The ids are listed in `e2e/support/season.ts`, since e2e never imports product source; a new season adds its switchable ids there (`client/src/seasons/README.md`).
 
-Why: the snow moves dozens of layers for as long as a tab is open, and CI's WebKit, in a container with no GPU, composites them in software. With four workers on the runner it delivered animation frames slowly enough that Playwright's taps, which wait for their target to hold still across frames, timed out (Runestone's and Groot's Code toggle above all), on most runs from the Yule merge on. Chromium composites on its own thread and never showed it. Real iPhones and iPads composite on the GPU.
+Why: the snow moves dozens of layers for as long as a tab is open, and WebKit in a container with no GPU (as CI ran it until 2026-11-27, and as a by-hand run in a container still does) composites them in software. With four workers on the runner it delivered animation frames slowly enough that Playwright's taps, which wait for their target to hold still across frames, timed out (Runestone's and Groot's Code toggle above all), on most runs from the Yule merge on. Chromium composites on its own thread and never showed it. Real iPhones and iPads composite on the GPU.
 
 ### A server that will not start
 
@@ -144,7 +145,21 @@ A bug the net finds that is out of the current PR's scope is never skipped:
 
 When the fix lands, the pin or workaround comes out in the same PR. The test then exercises the fixed path and catches a regression.
 
-All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
+All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed. None are pinned today.
+
+### Multi-tab draft recovery (PLAN-43)
+
+Per-tab drafts have no browser journeys: the multi-tab journeys written for PLAN-43 were removed at the owner's decision (2026-11-27) after they kept failing in CI's WebKit. Coverage is the unit tests: `client/src/core/drafts/protocol.test.ts` (known-closed, transfer once, racing accepts, quota and blocked storage, failed and interrupted commits, newest-wins pruning, the legacy journal), `identity.test.ts` (duplicate tabs, reloads), `session.test.ts`, `core/draftCache.test.tsx`, the Runestone page tests and Variant's. The editors' existing journeys still run through every editor page.
+
+**Browser lifecycle limitations** (measured in the PLAN-43 spike, Chromium 1243 headless; WebKit was not measured, and runs by hand only: `./bifrost test e2e webkit`):
+
+- A close, a reload and a navigation to another site all fire the same `pagehide` with `persisted === false`; nothing tells them apart at that moment. A tab is therefore known closed only after it left a departure marker, the IndexedDB registry still names the same page lifetime (a reload, a Back navigation or a reopened tab registers a new one as it starts) and the grace has passed. **A tab that leaves the app and returns later than the grace may find its draft moved to another tab (after 10 s) or pruned (after 10 minutes)**; the owner accepted this on 2026-11-26.
+- A tab that is frozen, discarded, killed with the browser or kept in the back/forward cache writes no marker, so its drafts are never offered or pruned; they come back only if that tab does (a restored session, "reopen closed tab").
+- Headless Chromium uses no back/forward cache even without Playwright's `--disable-back-forward-cache`, and `Page.setWebLifecycleState` fires no `freeze`/`resume` events there: those paths are covered by reasoning and unit tests, not journeys.
+- `navigator.locks` exists only in a secure context: present at `http://127.0.0.1`, missing at `http://<LAN address>`, which is how the hub is reached. IndexedDB and `BroadcastChannel` exist on both, so the lock is an IndexedDB transaction.
+- Under that lock a tab can still read another tab's `localStorage` write a moment stale (0–2 lost updates per 1,000 in the spike), so everything that must agree across tabs lives in IndexedDB.
+
+**By hand, on the real devices** (not automatable here): duplicate a tab with the browser's own "Duplicate tab" in Chrome and Safari and check each tab keeps its own draft; close a tab and reopen it with ⌘⇧T within ten minutes; on an iPhone or iPad, let Safari unload a background tab, come back, and check the draft is restored without an offer.
 
 ## The black-box API suite (PLAN-33)
 

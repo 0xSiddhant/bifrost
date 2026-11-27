@@ -17,11 +17,11 @@ const DECOR_OFF_KEY = 'bifrost.decor.off';
  * switchable decorations off, unless the page has stored a choice of its own.
  *
  * The journeys run with the snow off because it is the one decoration that
- * moves dozens of layers for as long as a tab is open, and WebKit in CI's
- * GPU-less containers composites them in software: with four workers on the
- * runner it delivered animation frames slowly enough that taps waiting for an
- * element to hold still timed out (Runestone's and Groot's Code toggle above
- * all). Real iPhones and iPads composite on the GPU. A journey about the
+ * moves dozens of layers for as long as a tab is open, and WebKit without a
+ * GPU (CI's containers, until WebKit left CI on 2026-11-27) composites them in
+ * software: with four workers it delivered animation frames slowly enough
+ * that taps waiting for an element to hold still timed out (Runestone's and
+ * Groot's Code toggle above all). Real iPhones and iPads composite on the GPU. A journey about the
  * season opts back in with `test.use({ seasonDecorations: true })`.
  */
 export async function switchOffSeasonDecorations(context: BrowserContext): Promise<void> {

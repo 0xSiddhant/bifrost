@@ -58,6 +58,22 @@ function readInsetPx(name: string): number {
   return Number.parseFloat(raw) || 0;
 }
 
+function observeOnAnimationFrame(element: Element, callback: () => void): () => void {
+  let frame: number | null = null;
+  const observer = new ResizeObserver(() => {
+    if (frame !== null) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      callback();
+    });
+  });
+  observer.observe(element);
+  return () => {
+    observer.disconnect();
+    if (frame !== null) cancelAnimationFrame(frame);
+  };
+}
+
 /**
  * ExpandingGrid — a grid of cards where one card can open a **full-width panel
  * at the end of its own row** (PLAN-18). Cards keep their column; nothing jumps
@@ -93,34 +109,19 @@ export function ExpandingGrid({
   }, []);
 
   /**
-   * The live column count. `auto-fit` means the authored value says nothing —
-   * only the *used* track list does. Measuring in a layout effect means the
-   * first paint already has the panel in the right row: no visible jump.
+   * Measure the live column count and caret together. `auto-fit` means the
+   * authored value says nothing — only the used track list does. Measuring in
+   * a layout effect puts the panel in the right row on its first paint.
    */
   useLayoutEffect(() => {
     const grid = gridRef.current;
     if (!grid) return;
-    const measure = () => setCols(columnCount(getComputedStyle(grid).gridTemplateColumns));
-    measure();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(grid);
-    return () => observer.disconnect();
-  }, []);
-
-  /**
-   * Caret position: the source card's horizontal centre relative to the grid.
-   * Recomputed whenever the layout could have moved it. If it cannot be
-   * measured the caret is hidden — a caret pointing at the wrong card is worse
-   * than no caret.
-   */
-  useLayoutEffect(() => {
-    const grid = gridRef.current;
-    if (!grid || !openId) {
-      setCaretX(null);
-      return;
-    }
-    const measureCaret = () => {
+    const measure = () => {
+      setCols(columnCount(getComputedStyle(grid).gridTemplateColumns));
+      if (!openId) {
+        setCaretX(null);
+        return;
+      }
       const card = cardRefs.current.get(openId);
       if (!card) {
         setCaretX(null);
@@ -130,11 +131,9 @@ export function ExpandingGrid({
       const gridRect = grid.getBoundingClientRect();
       setCaretX(cardRect.left + cardRect.width / 2 - gridRect.left);
     };
-    measureCaret();
+    measure();
     if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(measureCaret);
-    observer.observe(grid);
-    return () => observer.disconnect();
+    return observeOnAnimationFrame(grid, measure);
   }, [openId, cols]);
 
   /**
@@ -155,6 +154,7 @@ export function ExpandingGrid({
   useLayoutEffect(() => {
     if (!openId) return;
     let observer: ResizeObserver | null = null;
+    let planFrame: number | null = null;
     let lastHeight = -1;
 
     const plan = () => {
@@ -188,13 +188,17 @@ export function ExpandingGrid({
         if (Math.abs(panel.getBoundingClientRect().height - lastHeight) < 1) return;
         observer?.disconnect();
         observer = null;
-        plan();
+        planFrame = requestAnimationFrame(() => {
+          planFrame = null;
+          plan();
+        });
       });
       observer.observe(panel);
     });
 
     return () => {
       cancelAnimationFrame(frame);
+      if (planFrame !== null) cancelAnimationFrame(planFrame);
       observer?.disconnect();
     };
   }, [openId]);

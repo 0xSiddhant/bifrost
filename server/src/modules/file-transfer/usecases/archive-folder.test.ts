@@ -73,6 +73,21 @@ describe('ArchiveFolderUseCase', () => {
     expect(archiver.stream).toHaveBeenCalledWith('/safe/Trip photos', ['B.jpg', 'a.jpg', 'c.jpg']);
   });
 
+  it('orders names by code point, not by UTF-16 code unit', async () => {
+    const list = [
+      FOLDER,
+      entry({ id: 'e', name: '\u{1F600}.txt', parent: 'Trip photos' }),
+      entry({ id: 't', name: '\uFF5E.txt', parent: 'Trip photos' }),
+    ];
+    const { usecase, archiver } = build({ list });
+    await usecase.execute('folder-1');
+    // U+FF5E sorts before U+1F600; by code unit the emoji's surrogate came first.
+    expect(archiver.stream).toHaveBeenCalledWith('/safe/Trip photos', [
+      '\uFF5E.txt',
+      '\u{1F600}.txt',
+    ]);
+  });
+
   it('404s an unknown id', async () => {
     const { usecase } = build();
     await expect(usecase.execute('nope')).rejects.toMatchObject({ statusCode: 404 });
