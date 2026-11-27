@@ -200,7 +200,7 @@ describe('DeleteDownloadUseCase', () => {
   });
 
   it('maps a folder that becomes non-empty during removal to 409', async () => {
-    const { usecase, reader } = subject();
+    const { usecase, reader, registry } = subject();
     vi.mocked(reader.remove).mockRejectedValueOnce(
       Object.assign(new Error('directory not empty'), { code: 'ENOTEMPTY' }),
     );
@@ -209,6 +209,7 @@ describe('DeleteDownloadUseCase', () => {
       statusCode: 409,
       code: 'DOWNLOAD_CHANGED',
     });
+    expect(registry.removeEntry).not.toHaveBeenCalled();
   });
 
   it('reports filesystem permission failures as a declared delete error', async () => {

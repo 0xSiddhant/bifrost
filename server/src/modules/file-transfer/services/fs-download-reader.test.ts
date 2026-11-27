@@ -187,6 +187,30 @@ describe('FsDownloadReader.confineFolder', () => {
     }
   });
 
+  it('leaves unconfirmed files in place when they arrive during folder deletion', async () => {
+    const folder = path.join(downloads, 'Trip photos');
+    fs.mkdirSync(folder);
+    fs.writeFileSync(path.join(folder, 'a.jpg'), 'confirmed');
+    const snapshot = folderSnapshot(downloads, 'Trip photos', ['a.jpg']);
+    const unconfirmedChild = path.join(folder, 'new.jpg');
+    const realRmdir = fsp.rmdir.bind(fsp);
+    const rmdir = vi.spyOn(fsp, 'rmdir').mockImplementation(async (folderPath) => {
+      fs.writeFileSync(unconfirmedChild, 'not confirmed');
+      return realRmdir(folderPath);
+    });
+
+    try {
+      await expect(reader.remove('Trip photos', 'folder', snapshot)).rejects.toMatchObject({
+        code: 'ENOTEMPTY',
+      });
+      expect(fs.existsSync(folder)).toBe(true);
+      expect(fs.existsSync(path.join(folder, 'a.jpg'))).toBe(false);
+      expect(fs.readFileSync(unconfirmedChild, 'utf8')).toBe('not confirmed');
+    } finally {
+      rmdir.mockRestore();
+    }
+  });
+
   it('refuses to delete a symlink or an entry whose type changed', async () => {
     fs.writeFileSync(path.join(downloads, 'notes.txt'), 'notes');
     fs.mkdirSync(path.join(downloads, 'folder'));

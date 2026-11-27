@@ -85,15 +85,31 @@ export class FsDownloadReader implements DownloadReader {
     if (currentRealpath !== resolved) {
       throw new DownloadUnsafeEntryError('download path changed during deletion');
     }
-    if (type === 'folder') await this.assertFolderContents(target, snapshot);
+    const validatedChildren =
+      type === 'folder' ? await this.assertFolderContents(target, snapshot) : [];
 
     const current = await fsp.lstat(target);
     this.assertSameEntry(initial, current);
     this.assertEntryType(current, type);
     this.assertEntrySnapshot(current, type, snapshot);
 
-    if (type === 'folder') await fsp.rm(target, { recursive: true });
-    else await fsp.unlink(target);
+    if (type === 'folder') {
+      for (const child of validatedChildren) {
+        try {
+          await fsp.unlink(path.join(target, child.name));
+        } catch (error) {
+          if (isCode(error, 'ENOENT')) {
+            throw new DownloadChangedError(
+              'folder contents changed after listing; refresh the listing',
+            );
+          }
+          throw error;
+        }
+      }
+      await fsp.rmdir(target);
+    } else {
+      await fsp.unlink(target);
+    }
   }
 
   private async confine(name: string): Promise<string> {
@@ -141,7 +157,7 @@ export class FsDownloadReader implements DownloadReader {
   private async assertFolderContents(
     folderPath: string,
     snapshot: DownloadDeleteSnapshot,
-  ): Promise<void> {
+  ): Promise<DownloadDeleteSnapshot['children']> {
     const children = await fsp.readdir(folderPath, { withFileTypes: true });
     if (
       children.some((child) => !child.isFile() || child.name.startsWith('.')) ||
@@ -158,12 +174,7 @@ export class FsDownloadReader implements DownloadReader {
       try {
         stat = await fsp.lstat(path.join(folderPath, child.name));
       } catch (error) {
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          'code' in error &&
-          error.code === 'ENOENT'
-        ) {
+        if (isCode(error, 'ENOENT')) {
           throw new DownloadChangedError(
             'folder contents changed after listing; refresh the listing',
           );
@@ -195,5 +206,15 @@ export class FsDownloadReader implements DownloadReader {
         'folder contents changed after listing; refresh the listing',
       );
     }
+    return actualSorted;
   }
+}
+
+function isCode(error: unknown, code: string): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === code
+  );
 }
