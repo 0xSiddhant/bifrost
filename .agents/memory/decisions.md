@@ -99,7 +99,7 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-11-24** — Journeys run with the season's snowfall off; the season journey opts back in. *Why:* CI's GPU-less WebKit starved for animation frames.
 - **2026-11-27** — The e2e harness retries a server start on new ports after `EADDRINUSE`. *Why:* four workers race for free ports.
 - **2026-11-27** — WebKit journeys are not run in CI; `./bifrost test e2e webkit` runs them by hand before a release, beside a real iPhone or iPad (owner). Chromium mobile uses an iPhone 14's 390×664. *Why:* CI's GPU-less WebKit failed journeys for reasons a real iPhone does not have; the iPhone size keeps phone layout on every PR.
-- **2026-11-27** — CI skips every build and test job when a change is documentation only (`scripts/ci-changes.sh`; an unreadable file list runs everything), and splits unit tests over two machines and the Chromium journeys over four shards (owner). *Why:* no CI minutes for Markdown; the slowest job drops from about 4 minutes to 2–3.
+- **2026-11-27** — CI skips every build and test job when a change is documentation only, and splits unit tests over two machines and the Chromium journeys over four shards (owner). `scripts/ci-changes.sh` decides: Markdown is docs except under `client/src/`, `cli/man/` and `CHANGELOG.md` (all used by the build or the server); a rename counts its old path; only an explicit `code=false` skips a job, so a failed or empty check runs everything. *Why:* no CI minutes for Markdown, never a green run that tested nothing; the slowest job drops from about 4 minutes to 2–3.
 
 ## Operations and process
 
