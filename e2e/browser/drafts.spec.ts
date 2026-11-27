@@ -51,7 +51,14 @@ async function openTab(context: BrowserContext, path: string): Promise<Page> {
   return page;
 }
 
+/**
+ * Bring a tab's code editor on screen, switching to the tab first as a person
+ * would: WebKit gives a tab that is not in front no animation frames, and
+ * Playwright waits for frames before it taps (a `window.open` copy's Code
+ * toggle never became "stable" on webkit-mobile).
+ */
 async function bringEditor(page: Page): Promise<void> {
+  await page.bringToFront();
   if (page.url().includes('/edda') || page.url().includes('/variant')) {
     await expect(editorText(page)).toBeVisible();
     return;
@@ -61,6 +68,7 @@ async function bringEditor(page: Page): Promise<void> {
 
 /** Type, then wait for the 500 ms mirror to have stored it. */
 async function typeAndKeep(page: Page, feature: string, text: string): Promise<void> {
+  await page.bringToFront();
   await typeIntoEditor(page, text);
   await expect.poll(() => ownScratch(page, feature)).toBe(text);
 }
