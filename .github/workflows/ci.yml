@@ -31,7 +31,7 @@ permissions:
   pull-requests: read
 
 jobs:
-  # A change to documentation only (Markdown, docs/, .agents/, .claude/) builds
+  # A change to documentation only (Markdown, docs/, LICENSE) builds
   # and tests nothing (owner, 2026-11-27): every other job waits for this one
   # and is skipped when it says `code=false`. scripts/ci-changes.sh decides,
   # and runs everything whenever the list cannot be had. Only that explicit

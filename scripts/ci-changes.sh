@@ -7,8 +7,10 @@
 # error, a brand-new branch, a change too large to list), so everything runs.
 #
 # Markdown is documentation except where the code uses it: the Guide panel's
-# pages are bundled from client/src/, and the CLI's man page is built from
-# cli/man/.
+# pages are bundled from client/src/, the CLI's man page is built from
+# cli/man/, and the server serves CHANGELOG.md (Heimdall's About). Anything
+# else under .agents/ or .claude/ (a skill's script, say) is code: `eslint .`
+# lints those folders too.
 
 listed=false
 docs_only=true
@@ -17,8 +19,8 @@ while IFS= read -r file || [ -n "$file" ]; do
   [ -z "$file" ] && continue
   listed=true
   case "$file" in
-    client/src/* | cli/man/*) docs_only=false ;;
-    .agents/* | .claude/* | docs/* | LICENSE | *.md) ;;
+    client/src/* | cli/man/* | CHANGELOG.md) docs_only=false ;;
+    docs/* | LICENSE | *.md) ;;
     *) docs_only=false ;;
   esac
 done

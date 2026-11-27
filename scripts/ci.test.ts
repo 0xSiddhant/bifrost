@@ -127,14 +127,19 @@ describe('ci-changes.sh', () => {
       '.github/workflows/ci.yml',
       'package-lock.json',
       '.env.example',
+      // `eslint .` lints .agents/ and .claude/ too: only their Markdown is docs.
+      '.claude/skills/verify/check.ts',
+      '.agents/skills',
     ]) {
       expect(classify(['README.md', file]), file).toBe('code=true');
     }
   });
 
-  it('runs for Markdown the code uses: the Guide pages and the man page', () => {
+  it('runs for Markdown the code uses: the Guide pages, the man page, the changelog', () => {
     expect(classify(['client/src/assets/guides/json.md'])).toBe('code=true');
     expect(classify(['cli/man/bifrost.1.md'])).toBe('code=true');
+    // Served by the API (Heimdall's About) and rendered in a browser journey.
+    expect(classify(['CHANGELOG.md'])).toBe('code=true');
   });
 
   it('runs everything when the list of files could not be had', () => {
