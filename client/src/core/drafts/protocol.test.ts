@@ -295,6 +295,68 @@ describe('draft protocol (PLAN-43)', () => {
         expect(await offeredAgain()).toBe(key());
         expect(textOf(B)).toBe('closed work');
       });
+
+      /** The completing transaction's callback runs, its commit fails, then `then` runs. */
+      const completingCommitFails = (then: () => void) => {
+        const run = backend.run;
+        let calls = 0;
+        backend.run = async (work) => {
+          calls += 1;
+          if (calls !== 2) return run(work);
+          backend.failNext = 1;
+          try {
+            return await run(work);
+          } finally {
+            then();
+          }
+        };
+        return () => {
+          backend.run = run;
+        };
+      };
+
+      it('keeps the source when the completing commit fails after its callback ran (Codex on #122)', async () => {
+        let edited = false;
+        const restore = completingCommitFails(() => {
+          edited = true;
+        });
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec, () => !edited);
+        restore();
+        expect(result).toEqual({ status: 'own' });
+        // The source is removed only after a commit, so it is still there.
+        expect(textOf(B)).toBe('closed work');
+        expect(read(A)).toBeNull();
+        clock += CLAIM_LEASE_MS + 1;
+        expect(await offeredAgain()).toBe(key());
+      });
+
+      it('keeps its copy, and completes, when the source vanished while it held the claim', async () => {
+        let edited = false;
+        beforeRun(2, () => {
+          local.remove(key());
+          edited = true;
+        });
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec, () => !edited);
+        expect(result).toMatchObject({ status: 'ok', payload: { text: 'closed work' } });
+        expect(textOf(A)).toBe('closed work');
+      });
+
+      it('removes the source only after the commit, and not a returning tab’s newer work', async () => {
+        const run = backend.run;
+        let calls = 0;
+        backend.run = async (work) => {
+          const result = await run(work);
+          calls += 1;
+          // Committed, not yet removed: the closed tab is back and has typed.
+          if (calls === 2) put(B, 'came back with more');
+          return result;
+        };
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec);
+        backend.run = run;
+        expect(result).toMatchObject({ status: 'ok', payload: { text: 'closed work' } });
+        expect(textOf(A)).toBe('closed work');
+        expect(textOf(B)).toBe('came back with more');
+      });
     });
 
     it('counts a transfer another tab completed for it during a stall as done, keeping the copy', async () => {
@@ -569,6 +631,28 @@ describe('draft protocol (PLAN-43)', () => {
       expect(textOf(A)).toBe('typed while restoring');
       expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
       expect(backend.entries.has('legacy:runestone')).toBe(false);
+    });
+
+    it('keeps the old key when the completing commit fails after its callback ran', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      let edited = false;
+      const run = backend.run;
+      let calls = 0;
+      backend.run = async (work) => {
+        calls += 1;
+        if (calls !== 2) return run(work);
+        backend.failNext = 1;
+        try {
+          return await run(work);
+        } finally {
+          edited = true;
+        }
+      };
+      const result = await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY, () => !edited);
+      backend.run = run;
+      expect(result).toEqual({ status: 'own' });
+      expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+      expect(read(A)).toBeNull();
     });
 
     it('withdraws its copy when the buffer changed on screen before the transfer completed', async () => {

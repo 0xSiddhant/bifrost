@@ -45,7 +45,8 @@ import { memoryStorage, type DraftStorage } from './storage';
  *    replaces it there.
  * 6. Work the claimant does while its restore runs (its mirror writes, or the
  *    buffer on screen changes before the mirror has) is never replaced: the
- *    restore stands down, and its record keeps what was written.
+ *    restore stands down, and its record keeps what was written. That holds
+ *    even when the completing commit fails after its callback ran.
  *
  * A failure names the seed and the steps so far: replay with `SEEDS=<seed>`.
  */
@@ -244,9 +245,14 @@ async function simulate(seed: number): Promise<void> {
       const key = found.offer.key;
       start = (unchanged) => acceptOffer(ctx, me(tab), key, textDraftCodec, unchanged);
     }
-    // After the claim commits, or just before the completing transaction;
-    // written by the mirror, or only changed on screen.
-    const late = random.chance(0.5);
+    // After the claim commits, just before the completing transaction, or
+    // after its callback ran but before its commit fails; written by the
+    // mirror, or only changed on screen.
+    const when = random.pick([
+      'after the claim',
+      'before it completes',
+      'as its commit fails',
+    ] as const);
     const mirrored = random.chance(0.5);
     let edited = false;
     let typed: string | null = null;
@@ -259,10 +265,19 @@ async function simulate(seed: number): Promise<void> {
     const run = backend.run;
     let calls = 0;
     backend.run = async (job) => {
-      if (calls === 1 && late) work();
+      if (calls === 1 && when === 'before it completes') work();
+      if (calls === 1 && when === 'as its commit fails') {
+        backend.failNext = 1;
+        calls += 1;
+        try {
+          return await run(job);
+        } finally {
+          work();
+        }
+      }
       const result = await run(job);
       calls += 1;
-      if (calls === 1 && !late) work();
+      if (calls === 1 && when === 'after the claim') work();
       return result;
     };
     let result: AcceptResult<TextDraft>;
@@ -271,7 +286,7 @@ async function simulate(seed: number): Promise<void> {
     } finally {
       backend.run = run;
     }
-    const did = `${mirrored ? 'writes' : 'types'} ${late ? 'before it completes' : 'after the claim'}: ${result.status}`;
+    const did = `${mirrored ? 'writes' : 'types'} ${when}: ${result.status}`;
     if (typed !== null || edited) {
       if (result.status === 'ok') fail(`a restore by ${tab.tab} replaced work done while it ran`);
       if (typed !== null && ownText(tab, workspace) !== typed)

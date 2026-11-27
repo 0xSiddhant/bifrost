@@ -367,21 +367,33 @@ interface Transfer<P, E> {
   claim: (tx: CoordTx) => 'done' | 'lost' | { held: E };
   /** Drop this lifetime's claim, if it still holds it. */
   release: (tx: CoordTx) => void;
-  /** Mark the claim done and remove the source: 'kept-source' when it could not be removed. */
-  complete: (tx: CoordTx, held: E) => 'ok' | 'kept-source';
+  /**
+   * Mark the claim done. Returns what removes the source once that has
+   * committed (true when removed or no longer there), or null when the
+   * source must stay.
+   */
+  complete: (tx: CoordTx, held: E) => (() => boolean) | null;
+  /** The claimed draft is still where it was offered from. */
+  sourceKept: () => boolean;
   keptSourceWarning: string;
 }
 
 /**
  * Write this tab's copy of a claimed draft, verify it, and complete the
- * claim. This tab's own newer work always wins over the restore, up to the
- * moment the transfer completes: a record of its own at the destination (the
- * mirror can write while a claim is awaited), or a buffer that changed on
- * screen since the restore began (`unchanged` false; the mirror is debounced
- * and may not have written yet). Then the restore stands down: the claim is
- * released, the source stays where it was, and only the copy this restore
- * wrote is ever removed. A change that lands after the transfer completed
- * gives way to the draft the person asked for.
+ * claim. This tab's own newer work wins over the restore, up to the moment
+ * the transfer completes: a record of its own at the destination (the mirror
+ * can write while a claim is awaited), or a buffer that changed on screen
+ * since the restore began (`unchanged` false; the mirror is debounced and may
+ * not have written yet). Then the restore stands down: the claim is
+ * released, the source stays where it was, and the copy this restore wrote is
+ * removed.
+ *
+ * No step leaves the draft nowhere. The source is removed only after the
+ * transaction that marks the transfer done has committed (localStorage does
+ * not roll back with IndexedDB), and this tab's copy is removed only while the
+ * source is still there. A restore that cannot stand down without losing the
+ * draft completes instead, and a change that lands after the transfer
+ * completed gives way to the draft the person asked for.
  */
 async function finishTransfer<P, E>(
   ctx: ProtocolContext,
@@ -411,40 +423,42 @@ async function finishTransfer<P, E>(
   const dropCopy = () => {
     if (ours()) tryRemove(ctx.local, t.dest);
   };
+  /** Newer work here, and the restore can step aside without losing the draft. */
+  const standDown = () => (!unchanged() || (!ours() && own())) && t.sourceKept();
+  /** This tab's copy, put back if something removed it, but never over a draft of its own. */
+  const restoreCopy = () => (ours() || own() ? null : writeVerified(ctx.local, t.dest, raw));
 
-  let outcome: 'ok' | 'kept-source' | 'lost' | 'own' | { failed: string };
+  let outcome: 'lost' | 'own' | { failed: string } | { done: (() => boolean) | null };
   try {
     outcome = await ctx.backend.run((tx) => {
       const claim = t.claim(tx);
       // Stalled past the lease, another tab's reconciliation found this tab's
       // copy verified and completed the transfer for it: that is success.
-      if (claim === 'done') return 'ok';
+      if (claim === 'done') return { done: null };
       if (claim === 'lost') return 'lost';
-      if (!unchanged() || (!ours() && own())) {
+      if (standDown()) {
         dropCopy();
         t.release(tx);
         return 'own';
       }
       // Removed meanwhile (a mirror tick armed before the restore, with
       // nothing worth keeping on screen): put it back before completing.
-      if (!ours()) {
-        const failure = writeVerified(ctx.local, t.dest, raw);
-        if (failure) {
-          t.release(tx);
-          return { failed: failure };
-        }
+      const failure = restoreCopy();
+      if (failure) {
+        t.release(tx);
+        return { failed: failure };
       }
-      return t.complete(tx, claim.held);
+      return { done: t.complete(tx, claim.held) };
     });
   } catch (error) {
-    // The transfer could not be marked complete, and the claim still names
-    // this tab: reconciliation completes it while the copy is there, or
-    // releases it once it is not.
-    if (!unchanged()) {
+    // Nothing of the completing transaction committed, and the source was
+    // not touched. The claim still names this tab: reconciliation completes
+    // it while this tab's copy is there, or releases it once it is not.
+    if (standDown()) {
       dropCopy();
       return { status: 'own' };
     }
-    if (!ours()) writeVerified(ctx.local, t.dest, raw);
+    restoreCopy();
     return {
       status: 'ok',
       payload: t.claimed.payload,
@@ -458,12 +472,13 @@ async function finishTransfer<P, E>(
     return own() ? { status: 'own' } : { status: 'gone' };
   }
   if (outcome === 'own') return { status: 'own' };
-  if (typeof outcome === 'object') return { status: 'failed', reason: outcome.failed };
+  if ('failed' in outcome) return { status: 'failed', reason: outcome.failed };
+  const removed = outcome.done ? outcome.done() : true;
   return {
     status: 'ok',
     payload: t.claimed.payload,
     savedAt: t.claimed.savedAt,
-    ...(outcome === 'kept-source' ? { warning: t.keptSourceWarning } : {}),
+    ...(removed ? {} : { warning: t.keptSourceWarning }),
   };
 }
 
@@ -538,9 +553,16 @@ export async function acceptOffer<P>(
       },
       complete: (tx, gone) => {
         tx.put(tombstone, { ...gone, phase: 'done', at: ctx.now() } satisfies GoneEntry);
-        if (!notReclaimed(tx, source.tab, gone.srcInstance)) return 'ok';
-        return tryRemove(ctx.local, sourceKey) ? 'ok' : 'kept-source';
+        if (!notReclaimed(tx, source.tab, gone.srcInstance)) return null;
+        // After the commit: only the draft that was claimed, not newer work
+        // of a tab that came back meanwhile.
+        return () => {
+          const left = parseEnvelope(ctx.local.get(sourceKey), anyPayload, source);
+          if (!left || payloadHash(left.payload) !== gone.hash) return true;
+          return tryRemove(ctx.local, sourceKey);
+        };
       },
+      sourceKept: () => ctx.local.get(sourceKey) !== null,
       keptSourceWarning: 'the other tab’s copy could not be removed; it will not be offered again',
     },
     unchanged,
@@ -767,7 +789,7 @@ export async function acceptLegacy<P>(
   const dest = recordKey(feature, me.tab, workspace);
   const journalKey = legacyJournalKey(feature);
 
-  let claimed: { payload: P; savedAt: number } | 'own' | null;
+  let claimed: { payload: P; savedAt: number; hash: string } | 'own' | null;
   try {
     claimed = await ctx.backend.run((tx) => {
       const now = ctx.now();
@@ -790,13 +812,19 @@ export async function acceptLegacy<P>(
         payloadHash: payloadHash(parsed.payload),
         at: now,
       } satisfies LegacyJournal);
-      return parsed;
+      return { ...parsed, hash };
     });
   } catch (error) {
     return { status: 'failed', reason: `draft coordination failed (${storageErrorReason(error)})` };
   }
   if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
+  const claimedHash = claimed.hash;
+  /** The old key still holds the value that was claimed (an older build may write a new one). */
+  const stillThere = () => {
+    const current = ctx.local.get(legacyKey);
+    return current !== null && hashText(current) === claimedHash;
+  };
 
   return finishTransfer(
     ctx,
@@ -821,11 +849,14 @@ export async function acceptLegacy<P>(
         if (journal?.phase === 'claimed' && journal.instance === me.instance) tx.del(journalKey);
       },
       complete: (tx, journal) => {
-        tx.put(journalKey, { ...journal, phase: 'consumed', at: ctx.now() } satisfies LegacyJournal);
-        const current = ctx.local.get(legacyKey);
-        if (current === null || hashText(current) !== journal.hash) return 'ok';
-        return tryRemove(ctx.local, legacyKey) ? 'ok' : 'kept-source';
+        tx.put(journalKey, {
+          ...journal,
+          phase: 'consumed',
+          at: ctx.now(),
+        } satisfies LegacyJournal);
+        return () => !stillThere() || tryRemove(ctx.local, legacyKey);
       },
+      sourceKept: stillThere,
       keptSourceWarning: 'the old copy could not be removed; it will not be offered again',
     },
     unchanged,

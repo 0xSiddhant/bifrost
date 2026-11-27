@@ -451,14 +451,7 @@ export function useDraftOffer<P>({
         offer.kind === 'tab' && offer.key
           ? await acceptOffer(ctx, me, offer.key, spec.current.codec, unchanged)
           : spec.current.legacy
-            ? await acceptLegacy(
-                ctx,
-                me,
-                feature,
-                offer.workspace,
-                spec.current.legacy,
-                unchanged,
-              )
+            ? await acceptLegacy(ctx, me, feature, offer.workspace, spec.current.legacy, unchanged)
             : ({ status: 'gone' } as const);
       if (result.status === 'ok') {
         if (result.warning)
