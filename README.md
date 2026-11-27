@@ -263,7 +263,7 @@ Unit tests live next to the code they test. End-to-end tests live in `e2e/` and 
 
 ## Project docs
 
-Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`.agents/plans/README.md`](.agents/plans/README.md).
+Architecture, rules, plans and progress live in [`.agents/`](.agents/). Start with [`CLAUDE.md`](CLAUDE.md).
 
 Operating & deploying:
 
