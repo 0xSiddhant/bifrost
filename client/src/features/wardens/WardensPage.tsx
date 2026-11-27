@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getDeviceId } from '../../core/deviceId';
 import { formatTimeAgo } from '../../core/format';
 import { Button } from '../../core/ui/Button';
@@ -19,8 +19,12 @@ function DeviceRow({
   onRename: (deviceId: string, name: string) => void;
 }) {
   const [draft, setDraft] = useState(device.name ?? '');
+  // Typed since the last save: a name arriving from the server then leaves
+  // the box alone. Each device hears its own rename back over the live
+  // stream, and that echo can land after the person has typed again.
+  const typing = useRef(false);
   useEffect(() => {
-    setDraft(device.name ?? '');
+    if (!typing.current) setDraft(device.name ?? '');
   }, [device.name]);
 
   return (
@@ -43,6 +47,7 @@ function DeviceRow({
           className="device-row__rename"
           onSubmit={(event) => {
             event.preventDefault();
+            typing.current = false;
             onRename(device.deviceId, draft);
           }}
         >
@@ -52,7 +57,10 @@ function DeviceRow({
             placeholder="Name this device"
             maxLength={40}
             aria-label="Device name"
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              typing.current = true;
+              setDraft(event.target.value);
+            }}
           />
           <Button type="submit" size="sm" variant="ghost">
             Save
