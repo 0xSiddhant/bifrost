@@ -28,9 +28,10 @@ export default defineConfig<object, WorkerOptions>({
   forbidOnly: Boolean(process.env.CI),
   // A failure is a client break caught before merge, not a flake to retry.
   retries: 0,
-  // Two keeps the production app and browser responsive while each worker
-  // boots its own server; four workers exhausted the route-chunk timeout.
-  workers: 2,
+  // CI keeps four, the count its shards are sized and measured at. Locally,
+  // four on a busy machine pushed Edda/Groot journeys past the app's 8 s
+  // route-chunk timeout, so a developer run stays at two.
+  workers: process.env.CI ? 4 : 2,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list']],
