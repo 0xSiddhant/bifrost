@@ -9,7 +9,7 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-07-12** — Vertical-slice modules; modules talk only through the core event bus; a `DEPLOY_PROFILE` manifest (`local`/`cloud`) decides what loads. *Why:* features stay removable and the cloud profile can drop LAN-only modules.
 - **2026-07-12** — SQLite (better-sqlite3 + Drizzle, WAL) behind repository interfaces. *Why:* embedded and restart-safe now; a Postgres swap for cloud stays mechanical.
 - **2026-07-12** — SSE, not WebSockets, for live updates. *Why:* one-way notifications, browser auto-reconnect, far less lifecycle code.
-- **2026-07-12** — Docker is not the run mode on macOS; PM2/launchd run it natively. *Why:* mDNS, FSEvents and Finder break inside Docker's VM.
+- **2026-07-12** — Docker is not the run mode on macOS; PM2/launchd run it natively. Only the web host may run in Docker on a Mac, with a native mDNS advertiser (PLAN-39, owner). *Why:* mDNS, FSEvents and Finder break inside Docker's VM.
 - **2026-07-15** — Auth is a core service (`app.requireAdmin`), not part of the heimdall module. *Why:* other modules' admin routes need the same guard.
 - **2026-08-04** — The Pensieve is a client-side `Promise.allSettled` fan-out over each kind's own list API, never a server aggregate. *Why:* no cross-module server code; one failed kind does not blank the page.
 - **2026-10-04** — Two client builds from one source: the hub, and a standalone site that cannot reach a server by construction (`__HUB__` branches, `hubOnly` stubs, `check-standalone`). *Why:* the public site must never depend on a hub.
@@ -21,7 +21,9 @@ Add a line only for a decision a future change could plausibly undo without know
 
 ## API
 
-- **2026-07-14** — Download ids are `sha256(filename)` base64url (16 chars), derived independently by file-transfer and previews. *Why:* two modules agree on an id without talking.
+- **2026-07-14** — Download ids are the `sha256` of the path under `downloads/`, base64url (16 chars), derived independently by file-transfer and previews. *Why:* two modules agree on an id without talking.
+- **2026-07-19** — Raw document endpoints (`/<kind>/api/v1/:slug`) serve the stored text with CORS `*` (owner). *Why:* a saved document is a stable data URL any tool can fetch.
+- **2026-07-26** — A taken Portkey slug is a plain `409`; the client suggests a free variant, the server never renames one (owner). *Why:* a memorable slug is the point.
 - **2026-07-26** — `server/src/core/reserved-roots.ts` is the one list of top-level path roots; every new root is added there. *Why:* a Portkey slug must never shadow a real page.
 - **2026-09-30** — List endpoints gain an opt-in `paged=true` envelope; the legacy bare arrays stay byte-identical. *Why:* the installed CLI and old clients keep working.
 - **2026-10-04** — Every route ships response schemas proven by a byte-identical contract guard, and `server/openapi.json` is committed. *Why:* a schema rewrites bytes; documentation must never lie about them.
@@ -34,7 +36,11 @@ Add a line only for a decision a future change could plausibly undo without know
 
 - **2026-07-12** — Uploads stream to tmp and are published by atomic link/rename; filenames sanitized; an extension blocklist. *Why:* no half-written file is ever visible; nothing executable is served.
 - **2026-07-14** — `.html`, `.js` and `.svg` are served as `text/plain` from uploads and downloads. *Why:* never execute user content same-origin.
+- **2026-07-15** — The Heimdall login throttle is in memory, per IP (5 failures per 15 minutes, a growing delay), not `@fastify/rate-limit`. *Why:* the PIN is the gate; this is DoS insurance, and a restart clearing it is fine.
 - **2026-07-21** — Heimdall asks for the PIN on every opening of the modal; the entry gesture is not a security boundary. *Why:* shared household devices.
+- **2026-07-22** — Portkey is local-only for good, its targets are http(s) only, and its redirects are always `302`. *Why:* a public go-links service is an open redirect; a cached `301` would pin a moved target.
+- **2026-07-24** — Loki runs code in a fresh module Web Worker per run, killed with `terminate()` by the watchdog or Stop; execution and the runner's `fetch` are Heimdall switches. *Why:* no DOM, storage or cookies, and a `while(true)` stays killable.
+- **2026-07-25** — Accio stores any scheme as a link except those that execute or embed in the page (`javascript:`, `data:`, `vbscript:`, `blob:`, `filesystem:`). *Why:* a stored row renders as an href, and an href must never be a script.
 - **2026-07-30** — Staged uploads are readable (preview, rename, publish): `UPLOAD_EXT_BLOCKLIST` is load-bearing (PLAN-17b). *Why:* the sender previews before publishing.
 - **2026-09-24** — `DEPLOY_PROFILE`, `STORAGE_ROOT`, `PORT` and `HEIMDALL_PIN` are required, no defaults. *Why:* a silent default once pointed storage at the wrong place.
 - **2026-09-24** — Restore validates every archive entry (no symlinks, absolute paths or `..`) before extracting anything. *Why:* a crafted backup must not write outside `storage/`.
@@ -42,15 +48,20 @@ Add a line only for a decision a future change could plausibly undo without know
 ## Client
 
 - **2026-07-13** — Self-hosted fonts (Space Grotesk, Inter, JetBrains Mono); no font CDNs. *Why:* LAN-only, offline, private.
+- **2026-07-16** — Lore names (Hermes, Wardens, Pensieve, Nótt, Sigil) are frontend-only: server module ids, API paths, events and tables keep plain names, and old routes redirect. New toolbox tools get plain titles (owner). *Why:* the plumbing stays readable, and a tool is found by what it does.
+- **2026-07-21** — Navigation is three category hubs (Midgard, Ollivanders, Diagon Alley); a tool is a card on its hub, not a tab (owner). *Why:* seven flat tabs were truncated on a phone's bottom bar.
 - **2026-07-24** — Card colours follow position via the 10-slot palette (`cardToneClass(index + 1)`), never hand-picked. Exceptions by design: Accio's tile colour comes from a hostname hash (a site keeps its colour), and the Pensieve badge from the document kind. *Why:* reordering recolours consistently.
 - **2026-07-20** — Diffing runs only on the Compare button, in both Variant modes; JSON and text are separate workspaces. *Why:* owner's model: an edit drops the results.
+- **2026-07-25** — Nótt (the screensaver) is dismissed only by a click or a keystroke; moving the mouse keeps it up (owner). *Why:* it is a sky you part with the cursor, not an overlay in the way.
 - **2026-08-02** — The toolbox's tools expand in place on Diagon Alley; open state lives in the URL. *Why:* Back closes the panel and a tool is linkable.
 - **2026-08-04** — `renderMarkdown` is pure and synchronous; Mermaid is a separate async pass, treated as untrusted (`securityLevel: 'strict'`, extended `secure` keys). *Why:* one renderer for every surface, and DOMPurify keeps `<style>` in SVG.
 - **2026-08-10** — Cross-tool hand-offs travel as one-shot `sessionStorage` seeds (`core/*Seed.ts`). *Why:* an unsaved document has no URL to carry it.
-- **2026-08-26** — Offline mode warms chunks in an open tab; no Service Worker. *Why:* Service Workers need a secure context; the hub is plain http.
+- **2026-08-26** — Offline mode warms chunks in an open tab; no Service Worker. Its switch starts off on every load, warms only on a click, and shows on Ollivanders and Diagon Alley only (owner). *Why:* Service Workers need a secure context; the hub is plain http.
 - **2026-08-27** — A cold route with no bridge gets `core/ui/RouteBoundary`, not the app-wide crash card; every route loader has an 8 s `withChunkTimeout`. *Why:* a vanished host hangs a fetch instead of refusing it.
 - **2026-10-04** — Standalone Heimdall: device-local settings through `SettingsStore`, no PIN. *Why:* nothing to protect without a hub.
+- **2026-10-25** — Only the standalone site is search-engine optimised (`client/seoBuild.ts`, standalone build only); the hub is not (owner). *Why:* the public site is meant to be found; the hub is a private LAN app.
 - **2026-10-26** — Accent-coloured text uses a derived `--accent-text` that reaches 4.5:1 on every backdrop; `--accent` is for fills. *Why:* contrast without changing a theme's look.
+- **2026-10-27** — Every client-side file save goes through `core/saveBlob.ts` (`saveBlob` for bytes, `saveText` for text) (owner). *Why:* one implementation, not seven copies.
 - **2026-10-29** — Page styles load with their page; the shell stylesheet is inlined; a first-load JS and CSS budget fails the build. *Why:* first paint is a download problem (PLAN-40/41).
 - **2026-11-21** — Yule is the built-in default theme for every first visit. *Why:* owner.
 - **2026-11-21** — Short looping decorations are Web Animations with literal keyframes; long-running motion uses `transform` only, never a CSS `filter`. *Why:* measured: CSS iterations woke React's listener (0.9 s of every 3 s); software compositors re-apply filters every frame.
@@ -99,6 +110,8 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-10-09** — Every repo task runs through `./bifrost`; root npm scripts are kept minimal. *Why:* one discoverable entry point.
 - **2026-10-24** — Node floor 22 (`>=22.23.4`). *Why:* CVE-2026-111497 (brotli decoder).
 - **2026-07-12** — ESLint stays on 9 and TypeScript on 5.9. *Why:* typescript-eslint 8 targets them.
+- **2026-10-28** — No `Co-authored-by` in ordinary commits; merge messages credit multiple authors and reviewers (`Reviewed-by`). *Why:* owner.
+- **2026-11-27** — The `.agents/` files are guidance, not a record: progress is one line per plan, decisions are the ones in force, plans are deleted once merged. *Why:* owner; they cost tokens every session and the code is the source of truth.
 
 ## Dependency overrides
 
@@ -110,5 +123,3 @@ Each root `overrides` entry in `package.json` and why. Drop a line when its over
 - **2026-10-08** — `micromatch` is the in-repo shim `tools/micromatch-shim/`, wired as a root devDependency plus `"micromatch": "$micromatch"`. *Why:* eslint-plugin-boundaries pins micromatch 4.0.8, and the shim is its three functions copied on picomatch, never reaching `braces`; a `file:` path directly in `overrides` does not resolve.
 - **2026-10-09** — `handlebars ^4.7.10`: three critical JavaScript-injection advisories in ≤ 4.7.9.
 - **2026-11-02** — `glob ^14.0.3` and `minimatch ^11.0.4`: advisories with no backport, reaching us through eslint 9, typescript-eslint, archiver, @fastify/static and gaxios; every consumer's calls still work on the patched majors.
-- **2026-10-28** — No `Co-authored-by` in ordinary commits; merge messages credit multiple authors and reviewers (`Reviewed-by`). *Why:* owner.
-- **2026-11-27** — The `.agents/` files are guidance, not a record: progress is one line per plan, decisions are the ones in force, plans are deleted once merged. *Why:* owner; they cost tokens every session and the code is the source of truth.

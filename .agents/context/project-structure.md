@@ -7,7 +7,7 @@ bifrost/
 ├── CLAUDE.md · AGENTS.md      # agent entry points → .agents/
 ├── bifrost                    # `./bifrost`: the repo task runner (scripts/bifrost/); NOT the LAN client (cli/)
 ├── .agents/                   # context/, rules/, memory/, plans/; skills → .claude/skills/
-├── .github/workflows/         # ci.yml, release.yml, audit.yml
+├── .github/workflows/         # ci.yml, release.yml, audit.yml, sync-develop.yml
 ├── package.json               # npm workspaces: server, client, web, cli, e2e; root `overrides`
 ├── ecosystem.config.cjs       # PM2 apps (API, web host, mDNS), chosen by the launcher's flags
 ├── docker/ · compose/         # one Dockerfile per image; one compose file per piece
@@ -23,7 +23,7 @@ bifrost/
 │       ├── otel.ts            # tracing, loaded with `node --import` before the app
 │       ├── testing/app.ts     # createTestApp: the one way a server test builds an app
 │       ├── core/              # shared kernel; never imports modules/
-│       └── modules/<feature>/ # module.ts, routes/, usecases/, services/, schema.ts
+│       └── modules/<feature>/ # module.ts, ports.ts, routes/, usecases/, services/
 ├── web/src/                   # the web host: host.ts (static + proxy), mdns, run modes, standalone rules
 ├── client/
 │   ├── *.ts                   # Vite plugins: seoBuild, precompress, bundleBudget, fontPreload, inlineCss
@@ -47,7 +47,7 @@ bifrost/
 - **Code shared by two features** moves to `core/` at its second consumer, not before.
 - **A page across features** (the Pensieve, the category hubs) lives in `client/src/app/pages/`; its logic in `core/`.
 - **Only the composition roots reach across features:** `server/src/app.ts` and `client/src/app/`.
-- **A Drizzle table** belongs to the module that owns it (`modules/<feature>/schema.ts`).
+- **A Drizzle table** goes in `server/src/core/db/schema.ts` (drizzle-kit reads only that file), with a comment naming the module that owns it; see the `db-migration` skill.
 - **Tests sit beside the code** (`*.test.ts`, `*.int.test.ts`); end-to-end tests go in `e2e/`.
 
 ## Naming

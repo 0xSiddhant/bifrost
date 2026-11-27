@@ -6,7 +6,7 @@ Two Node/Fastify processes, one address (PLAN-36). The **web host** (`web/`) lis
 
 ## The three modularization rules (non-negotiable)
 
-1. **Vertical slices.** `server/src/modules/<feature>/` holds that feature's routes, usecases, services and DB schema; shared infrastructure lives in `src/core/` only. The client mirrors it: `client/src/features/<feature>/` over `client/src/core/`.
+1. **Vertical slices.** `server/src/modules/<feature>/` holds that feature's routes, usecases, services and repository interfaces (`ports.ts`); shared infrastructure lives in `src/core/` only. The one exception: every Drizzle table is in `core/db/schema.ts` (drizzle-kit reads only that file), commented with the module that owns it. The client mirrors it: `client/src/features/<feature>/` over `client/src/core/`.
 2. **Modules never import each other, only `core`.** Cross-feature communication goes through the core event bus (`bus.emit('file.uploaded', meta)`). `eslint-plugin-boundaries` makes a violating import a build failure.
 3. **A deployment manifest decides what loads.** `DEPLOY_PROFILE=local|cloud` picks the modules `server/src/app.ts`'s `MANIFEST` registers: `local` is everything, `cloud` the internet-safe ones.
 
