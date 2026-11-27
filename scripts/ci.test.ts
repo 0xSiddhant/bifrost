@@ -65,13 +65,17 @@ describe('CI', () => {
     expect(workflow()).not.toMatch(/webkit/i);
   });
 
-  it('skips every job but `changes` when a change is documentation only', () => {
+  it('skips every job but `changes` only on its explicit documentation-only verdict', () => {
+    // A skipped job reads as passed, so anything short of `code=false` (no
+    // output at all, or `changes` failing) must run the job, not skip it.
     const all = jobs();
     expect(all.has('changes')).toBe(true);
     for (const [id, block] of all) {
       if (id === 'changes') continue;
       expect(block, id).toMatch(/\n {4}needs: changes\n/);
-      expect(block, id).toMatch(/\n {4}if: needs\.changes\.outputs\.code == 'true'\n/);
+      expect(block, id).toMatch(
+        /\n {4}if: \$\{\{ !cancelled\(\) && needs\.changes\.outputs\.code != 'false' \}\}\n/,
+      );
     }
   });
 

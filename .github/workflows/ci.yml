@@ -34,7 +34,10 @@ jobs:
   # A change to documentation only (Markdown, docs/, .agents/, .claude/) builds
   # and tests nothing (owner, 2026-11-27): every other job waits for this one
   # and is skipped when it says `code=false`. scripts/ci-changes.sh decides,
-  # and runs everything whenever the list cannot be had.
+  # and runs everything whenever the list cannot be had. Only that explicit
+  # `false` skips: an empty output (the script missing, say, which the step's
+  # pipe through `tee` would not fail on) or a failed `changes` job runs every
+  # job, since a skipped job reads as passed.
   changes:
     name: changes
     runs-on: ubuntu-latest
@@ -72,7 +75,7 @@ jobs:
   checks:
     name: checks (audit, lint, typecheck, backup)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -104,7 +107,7 @@ jobs:
   unit:
     name: unit (${{ matrix.name }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -143,7 +146,7 @@ jobs:
   e2e-cli-api:
     name: e2e (installed CLI + black-box API)
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -168,7 +171,7 @@ jobs:
   e2e-ui:
     name: e2e (${{ matrix.name }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     # Microsoft's Playwright image already holds every browser and its system
     # libraries. Installing them on the runner meant `playwright install-deps`,
@@ -223,7 +226,7 @@ jobs:
 
   docker:
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
