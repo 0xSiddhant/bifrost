@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ANSI, useCliSuite } from './harness.js';
+import { useCliSuite } from './harness.js';
 
 const cli = useCliSuite();
 
@@ -93,23 +93,4 @@ describe('push and pull', () => {
     expect(JSON.parse(run.stderr)).toHaveProperty('error');
   });
 
-  it('on a terminal: colour and a progress bar; piped: neither', async () => {
-    const dir = workdir();
-    fs.writeFileSync(path.join(dir, 'tty.txt'), 'x'.repeat(4096));
-    const tty = await cli.bifrost(['push', 'tty.txt'], { cwd: dir, tty: true });
-    expect(tty.code).toBe(0);
-    expect(tty.stdout).toMatch(ANSI);
-    expect(tty.stdout).toContain('▕');
-
-    fs.writeFileSync(path.join(dir, 'pipe.txt'), 'x'.repeat(4096));
-    const piped = await cli.bifrost(['push', 'pipe.txt'], { cwd: dir });
-    expect(piped.code).toBe(0);
-    expect(piped.stdout + piped.stderr).not.toMatch(ANSI);
-    expect(piped.stdout + piped.stderr).not.toContain('▕');
-
-    const listTty = await cli.bifrost(['pull', '--list'], { tty: true });
-    expect(listTty.stdout).toMatch(ANSI);
-    const listPiped = await cli.bifrost(['pull', '--list']);
-    expect(listPiped.stdout).not.toMatch(ANSI);
-  });
 });

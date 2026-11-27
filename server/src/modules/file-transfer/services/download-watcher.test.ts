@@ -191,13 +191,4 @@ describe('DownloadWatcherService new-folder rescan', () => {
     expect(await watcher.rescanFolder(path.join(downloads, 'Nope'))).toBe(0);
   });
 
-  it('schedules a rescan when a new folder appears', async () => {
-    await watcher.stop();
-    const bus = new EventBus();
-    watcher = new DownloadWatcherService(downloads, bus, log, { folderRescanMs: 20 });
-    const rescan = vi.spyOn(watcher, 'rescanFolder');
-    await watcher.start();
-    fs.mkdirSync(path.join(downloads, 'Brand new'));
-    await vi.waitFor(() => expect(rescan).toHaveBeenCalledWith(path.join(downloads, 'Brand new')), { timeout: 5_000 });
-  });
 });

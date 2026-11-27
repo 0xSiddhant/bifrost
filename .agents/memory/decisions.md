@@ -31,6 +31,7 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-10-04** — v1 only grows; a breaking change is `/api/v2/<module>/…` for that module alone. *Why:* clients on the LAN update at different times.
 - **2026-10-04** — API docs (Swagger UI) live on the API server's loopback port only, invisible to the client by construction, with no configuration. *Why:* nothing to secure or forget on the LAN.
 - **2026-10-09** — The CLI probes `/api/v1/health` once per run and falls back to unversioned paths on a 404. *Why:* an installed CLI can be newer than its hub.
+- **2026-11-27** — A folder zip stats its files one at a time (`statConcurrency: 1`). *Why:* the API promises code-point entry order, and archiver's concurrent stats queued entries in completion order.
 
 ## Security and storage
 
@@ -66,6 +67,7 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-11-21** — Yule is the built-in default theme for every first visit. *Why:* owner.
 - **2026-11-21** — Short looping decorations are Web Animations with literal keyframes; long-running motion uses `transform` only, never a CSS `filter`. *Why:* measured: CSS iterations woke React's listener (0.9 s of every 3 s); software compositors re-apply filters every frame.
 - **2026-11-22** — Relic collections are stored as the ones switched off (`bifrost.relics.off`). *Why:* a new collection shows on devices that saved a choice.
+- **2026-11-27** — Heimdall's Uploads section previews a staged file by opening the existing `/upload/:name/preview` route in a new tab; Move and Delete call the files API. *Why:* the sniffed preview surface is reused without Heimdall importing another feature.
 
 ## Editors and documents
 
@@ -98,6 +100,8 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-10-27** — CI's browser shards run in Microsoft's Playwright image; nothing installs from apt. *Why:* a slow mirror held shards for 17–32 minutes.
 - **2026-11-24** — Journeys run with the season's snowfall off; the season journey opts back in. *Why:* CI's GPU-less WebKit starved for animation frames.
 - **2026-11-27** — The e2e harness retries a server start on new ports after `EADDRINUSE`. *Why:* four workers race for free ports.
+- **2026-11-27** — Playwright runs four workers in CI and two locally. *Why:* CI's shards are sized at four; four on a busy developer machine pushed Edda/Groot journeys past the 8 s route-chunk timeout.
+- **2026-11-27** — Three failing tests removed at the owner's call, their coverage dropped: the downloads watcher's new-folder rescan case, the CLI's Portkey/Go lifecycle case and its push/pull terminal-vs-pipe case. *Why:* owner chose removal over investigation.
 - **2026-11-27** — WebKit journeys are not run in CI; `./bifrost test e2e webkit` runs them by hand before a release, beside a real iPhone or iPad (owner). Chromium mobile uses an iPhone 14's 390×664. *Why:* CI's GPU-less WebKit failed journeys for reasons a real iPhone does not have; the iPhone size keeps phone layout on every PR.
 - **2026-11-27** — CI skips every build and test job when a change is documentation only, and splits unit tests over two machines and the Chromium journeys over four shards (owner). `scripts/ci-changes.sh` decides: Markdown is docs except under `client/src/`, `cli/man/` and `CHANGELOG.md` (all used by the build or the server); a rename counts its old path; only an explicit `code=false` skips a job, so a failed or empty check runs everything. *Why:* no CI minutes for Markdown, never a green run that tested nothing; the slowest job drops from about 4 minutes to 2–3.
 
