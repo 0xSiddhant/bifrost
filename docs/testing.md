@@ -148,26 +148,7 @@ All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings
 
 ### Multi-tab draft recovery (PLAN-43)
 
-`browser/drafts.spec.ts` drives the editors' per-tab drafts with several **pages of one browser context**: pages of a context share `localStorage` and each keeps its own `sessionStorage`, which is what tabs of one browser do. What it covers, on every project:
-
-- two tabs of each editor keep separate drafts, and a reload brings back only the reloading tab's own, silently;
-- a closed tab's draft is offered to a blank tab after the 10-second grace, survives a Dismiss, and goes to exactly one of two tabs that press Restore together;
-- a tab opened with `window.open` (which copies `sessionStorage`, as "Duplicate tab" does) gets an id of its own and none of its original's draft;
-- the single-slot draft saved before PLAN-43 is offered until taken, then consumed once;
-- a saved document's unsaved edits come back after a reload as unsaved edits, and a server change made meanwhile asks Keep local / Use server first;
-- Variant restores both workspaces, without compare results;
-- closing all tabs but one prunes the closed tabs' drafts once the open one has its own, and two tabs closing together leave the newest draft;
-- IndexedDB read/write transactions exclude each other across tabs in this engine, the guarantee the drafts' lock rests on.
-
-How the journeys do it:
-
-- **Close a tab by sending it the `pagehide` a close sends, checking it recorded leaving, then `page.close()`** (`closeTab`). A browser's own close fires `pagehide` (the spike saw it in Chromium, with or without `runBeforeUnload`), but Playwright's WebKit never completes a `runBeforeUnload` close (CI on #122) and may skip unload handlers on a plain one, so the journeys send the event themselves.
-- **Offers wait out the grace in real time** (up to 25 s); a reload must not look like a close, so there is no shortcut.
-- **Pruning takes 10 minutes, so those journeys fast-forward `page.clock`.** The clock is the context's: every tab's time jumps together. Wait for the sky's lazy chunks first (`waitForSkyAndSlots`), or the jump fires their 8 s chunk timeout at once. A minute of idleness also brings Nótt, whose chunk loads only then (desktops): `jumpMinutes` jumps past that minute, waits for its overlay, then jumps the rest.
-- **A reload keeps the tab's id**, and the reload journey asserts it: the page being replaced stops answering for its id at `pagehide`, because WebKit can still deliver the new document's question to it.
-- **Read state from storage, not only the screen.** A tab's records are `bifrost.drafts.v1.r.<editor>.<tab>.<workspace>` in `localStorage`; its id is `bifrost.tab.id` in its `sessionStorage`.
-
-The protocol's races and failures (quota and blocked storage, a claim that cannot commit, a tab killed mid-transfer, a legacy value rewritten by an older tab) are unit tests in `client/src/core/drafts/protocol.test.ts`, which interleave two simulated tabs over one in-memory coordinator.
+Per-tab drafts have no browser journeys: the multi-tab journeys written for PLAN-43 were removed at the owner's decision (2026-11-27) after they kept failing in CI's WebKit. Coverage is the unit tests: `client/src/core/drafts/protocol.test.ts` (known-closed, transfer once, racing accepts, quota and blocked storage, failed and interrupted commits, newest-wins pruning, the legacy journal), `identity.test.ts` (duplicate tabs, reloads), `session.test.ts`, `core/draftCache.test.tsx`, the Runestone page tests and Variant's. The editors' existing journeys still run through every editor page.
 
 **Browser lifecycle limitations** (measured in the PLAN-43 spike, Chromium 1243 headless; WebKit runs in CI only):
 
