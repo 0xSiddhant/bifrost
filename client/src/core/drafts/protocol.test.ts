@@ -191,6 +191,112 @@ describe('draft protocol (PLAN-43)', () => {
       expect(backend.entries.has(`gone:${key}`)).toBe(false);
     });
 
+    describe('this tab’s newer work, during the restore (Codex on #122)', () => {
+      const key = () => recordKey('runestone', B.tab, SCRATCH);
+      /** Run `then` right after the `n`th transaction commits, before the restore goes on. */
+      const afterCommit = (n: number, then: () => void) => {
+        const run = backend.run;
+        let calls = 0;
+        backend.run = async (work) => {
+          const result = await run(work);
+          calls += 1;
+          if (calls === n) then();
+          return result;
+        };
+        return () => {
+          backend.run = run;
+        };
+      };
+      /** Run `then` just before the `n`th transaction starts. */
+      const beforeRun = (n: number, then: () => void) => {
+        let calls = 0;
+        backend.delay = async () => {
+          calls += 1;
+          if (calls === n) then();
+        };
+      };
+      const offeredAgain = async () => (await offerFor(C)).offer?.key;
+
+      it('never overwrites a draft the mirror wrote while the claim was committing', async () => {
+        const restore = afterCommit(1, () => put(A, 'typed while restoring'));
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec);
+        restore();
+        expect(result).toEqual({ status: 'own' });
+        expect(textOf(A)).toBe('typed while restoring');
+        expect(textOf(B)).toBe('closed work');
+        expect(backend.entries.has(`gone:${key()}`)).toBe(false);
+        expect(await offeredAgain()).toBe(key());
+      });
+
+      it('stands down when the buffer changed on screen before the copy went in', async () => {
+        let edited = false;
+        const restore = afterCommit(1, () => {
+          edited = true;
+        });
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec, () => !edited);
+        restore();
+        expect(result).toEqual({ status: 'own' });
+        expect(read(A)).toBeNull();
+        expect(textOf(B)).toBe('closed work');
+        expect(await offeredAgain()).toBe(key());
+      });
+
+      it('withdraws its copy when the buffer changed on screen before the transfer completed', async () => {
+        let edited = false;
+        beforeRun(2, () => {
+          edited = true;
+        });
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec, () => !edited);
+        expect(result).toEqual({ status: 'own' });
+        expect(read(A)).toBeNull();
+        expect(textOf(B)).toBe('closed work');
+        expect(await offeredAgain()).toBe(key());
+      });
+
+      it('keeps a draft the mirror wrote over the copy before the transfer completed', async () => {
+        beforeRun(2, () => put(A, 'typed after the copy'));
+        expect(await acceptOffer(ctx, A, key(), textDraftCodec)).toEqual({ status: 'own' });
+        expect(textOf(A)).toBe('typed after the copy');
+        expect(textOf(B)).toBe('closed work');
+        expect(await offeredAgain()).toBe(key());
+      });
+
+      it('keeps a newer draft here when its claim was lost meanwhile', async () => {
+        beforeRun(2, () => {
+          backend.entries.delete(`gone:${key()}`);
+          put(A, 'typed after the copy');
+        });
+        expect(await acceptOffer(ctx, A, key(), textDraftCodec)).toEqual({ status: 'own' });
+        expect(textOf(A)).toBe('typed after the copy');
+        expect(textOf(B)).toBe('closed work');
+      });
+
+      it('puts its copy back when an earlier mirror tick removed it, then completes', async () => {
+        beforeRun(2, () => local.remove(recordKey('runestone', A.tab, SCRATCH)));
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec);
+        expect(result).toMatchObject({ status: 'ok', payload: { text: 'closed work' } });
+        expect(textOf(A)).toBe('closed work');
+        expect(read(B)).toBeNull();
+      });
+
+      it('stands down when the buffer changed and the completing commit failed', async () => {
+        let edited = false;
+        beforeRun(2, () => {
+          edited = true;
+          backend.failNext = 1;
+        });
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec, () => !edited);
+        backend.delay = () => Promise.resolve();
+        expect(result).toEqual({ status: 'own' });
+        expect(read(A)).toBeNull();
+        // The claim outlives the failed commit; past its lease, nothing here
+        // matches it, so it is released and the draft is offered again.
+        clock += CLAIM_LEASE_MS + 1;
+        expect(await offeredAgain()).toBe(key());
+        expect(textOf(B)).toBe('closed work');
+      });
+    });
+
     it('counts a transfer another tab completed for it during a stall as done, keeping the copy', async () => {
       const key = recordKey('runestone', B.tab, SCRATCH);
       const runestone = { runestone: { codec: textDraftCodec as (raw: unknown) => unknown } };
@@ -445,6 +551,40 @@ describe('draft protocol (PLAN-43)', () => {
       expect(await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY)).toEqual({ status: 'own' });
       expect(textOf(A)).toBe('typed here meanwhile');
       expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+    });
+
+    it('never overwrites a draft the mirror wrote while the claim was committing', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      const run = backend.run;
+      let calls = 0;
+      backend.run = async (work) => {
+        const result = await run(work);
+        calls += 1;
+        if (calls === 1) put(A, 'typed while restoring');
+        return result;
+      };
+      const result = await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY);
+      backend.run = run;
+      expect(result).toEqual({ status: 'own' });
+      expect(textOf(A)).toBe('typed while restoring');
+      expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+      expect(backend.entries.has('legacy:runestone')).toBe(false);
+    });
+
+    it('withdraws its copy when the buffer changed on screen before the transfer completed', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      let edited = false;
+      let calls = 0;
+      backend.delay = async () => {
+        calls += 1;
+        if (calls === 2) edited = true;
+      };
+      const result = await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY, () => !edited);
+      backend.delay = () => Promise.resolve();
+      expect(result).toEqual({ status: 'own' });
+      expect(read(A)).toBeNull();
+      expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
+      expect((await findLegacy(ctx, 'runestone', LEGACY))?.payload.text).toBe('{"kept":1}');
     });
 
     it('counts a transfer another tab completed for it during a stall as done', async () => {

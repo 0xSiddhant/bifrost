@@ -123,6 +123,7 @@ export function useDocumentDrafts({
     codec: textDraftCodec,
     worth,
     legacy,
+    buffer: { title, text, format },
   });
 
   const conflictFor = (restored: TextDraft, doc: ServerDoc): DocBaseline | null =>

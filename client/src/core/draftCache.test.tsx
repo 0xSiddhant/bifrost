@@ -211,9 +211,12 @@ describe('useDraftOffer (PLAN-43)', () => {
   function Offering({
     eligible = true,
     workspace = SCRATCH,
+    text = '',
   }: {
     eligible?: boolean;
     workspace?: string;
+    /** What is on screen. */
+    text?: string;
   }) {
     offers = useDraftOffer<TextDraft>({
       feature: 'runestone',
@@ -222,6 +225,8 @@ describe('useDraftOffer (PLAN-43)', () => {
       codec: textDraftCodec,
       worth: (draft) => draft.text.trim() !== '',
       legacy: LEGACY,
+      // Rebuilt every render, as a page may: only a change of content counts.
+      buffer: { title: '', text },
     });
     return null;
   }
@@ -331,6 +336,59 @@ describe('useDraftOffer (PLAN-43)', () => {
     expect(localStorage.getItem(recordKey('runestone', tab, SCRATCH))).toContain(
       'for the scratch editor',
     );
+  });
+
+  it('never replaces what was typed while the restore ran, and keeps the offered draft', async () => {
+    const source = await closedTab('left in a closed tab');
+    await render();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    backend.delay = () => held;
+    let pending: Promise<TextDraft | null> = Promise.resolve(null);
+    await act(async () => {
+      pending = offers.accept();
+    });
+    // Typed while the claim waits; the mirror has not written it yet.
+    await act(async () => {
+      root.render(<Offering text="typed while restoring" />);
+    });
+    backend.delay = () => Promise.resolve();
+    release();
+    let restored: TextDraft | null | undefined;
+    await act(async () => {
+      restored = await pending;
+    });
+    expect(restored).toBeNull();
+    expect(offers.error).toBeNull();
+    expect(localStorage.getItem(source)).toContain('left in a closed tab');
+    const tab = draftSession().me()?.tab ?? '';
+    expect(localStorage.getItem(recordKey('runestone', tab, SCRATCH))).toBeNull();
+  });
+
+  it('restores over a re-render that changed nothing on screen', async () => {
+    await closedTab('left in a closed tab');
+    await render();
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    backend.delay = () => held;
+    let pending: Promise<TextDraft | null> = Promise.resolve(null);
+    await act(async () => {
+      pending = offers.accept();
+    });
+    await act(async () => {
+      root.render(<Offering text="" />);
+    });
+    backend.delay = () => Promise.resolve();
+    release();
+    let restored: TextDraft | null | undefined;
+    await act(async () => {
+      restored = await pending;
+    });
+    expect(restored).toMatchObject({ text: 'left in a closed tab' });
   });
 
   it('leaves the draft where it is when dismissed', async () => {

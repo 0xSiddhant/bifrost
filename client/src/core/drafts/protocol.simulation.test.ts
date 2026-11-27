@@ -6,6 +6,7 @@ import {
   OFFER_GRACE_MS,
   PRUNE_GRACE_MS,
   LEGACY_KEYS,
+  type AcceptResult,
   acceptLegacy,
   acceptOffer,
   dismissLegacy,
@@ -42,6 +43,9 @@ import { memoryStorage, type DraftStorage } from './storage';
  *    offered: it ends up here, or stays where it was. The same holds for the
  *    draft an older build left in its single slot, until a newer value
  *    replaces it there.
+ * 6. Work the claimant does while its restore runs (its mirror writes, or the
+ *    buffer on screen changes before the mirror has) is never replaced: the
+ *    restore stands down, and its record keeps what was written.
  *
  * A failure names the seed and the steps so far: replay with `SEEDS=<seed>`.
  */
@@ -224,11 +228,65 @@ async function simulate(seed: number): Promise<void> {
     }
   };
 
+  /** Invariant 6: the claimant works while its restore runs. Returns what happened. */
+  const restoreWhileWorking = async (tab: Tab, workspace: string, legacy: boolean) => {
+    let offered: string;
+    let start: (unchanged: () => boolean) => Promise<AcceptResult<TextDraft>>;
+    if (legacy) {
+      const found = await findLegacy(ctx, FEATURE, LEGACY);
+      if (!found) return 'nothing offered';
+      offered = found.payload.text;
+      start = (unchanged) => acceptLegacy(ctx, me(tab), FEATURE, workspace, LEGACY, unchanged);
+    } else {
+      const found = await findOffer(ctx, me(tab), FEATURE, workspace, textDraftCodec, worth);
+      if (!found.offer) return 'nothing offered';
+      offered = found.offer.envelope.payload.text;
+      const key = found.offer.key;
+      start = (unchanged) => acceptOffer(ctx, me(tab), key, textDraftCodec, unchanged);
+    }
+    // After the claim commits, or just before the completing transaction;
+    // written by the mirror, or only changed on screen.
+    const late = random.chance(0.5);
+    const mirrored = random.chance(0.5);
+    let edited = false;
+    let typed: string | null = null;
+    const work = () => {
+      if (mirrored) {
+        write(tab, workspace);
+        typed = ownText(tab, workspace);
+      } else edited = true;
+    };
+    const run = backend.run;
+    let calls = 0;
+    backend.run = async (job) => {
+      if (calls === 1 && late) work();
+      const result = await run(job);
+      calls += 1;
+      if (calls === 1 && !late) work();
+      return result;
+    };
+    let result: AcceptResult<TextDraft>;
+    try {
+      result = await start(() => !edited);
+    } finally {
+      backend.run = run;
+    }
+    const did = `${mirrored ? 'writes' : 'types'} ${late ? 'before it completes' : 'after the claim'}: ${result.status}`;
+    if (typed !== null || edited) {
+      if (result.status === 'ok') fail(`a restore by ${tab.tab} replaced work done while it ran`);
+      if (typed !== null && ownText(tab, workspace) !== typed)
+        fail(`a restore by ${tab.tab} lost "${typed}", written while it ran`);
+    }
+    const kept = [...records().values()].includes(offered) || (legacy && legacyText() === offered);
+    if (!kept) fail(`a ${result.status} restore by ${tab.tab} destroyed the offered "${offered}"`);
+    return did;
+  };
+
   for (let step = 0; step < STEPS; step += 1) {
     const actor = random.pick(tabs);
     const workspace = random.pick(WORKSPACES);
     const before = records();
-    const choice = random.int(13);
+    const choice = random.int(14);
     let label = '';
 
     try {
@@ -340,6 +398,11 @@ async function simulate(seed: number): Promise<void> {
           label = `${actor.tab} restores the legacy draft${what === 1 ? `, stalling while ${other?.tab ?? 'nobody'} looks` : ''}`;
           await restoreLegacy(actor, what === 1 ? other : null);
         }
+      } else if (choice === 13 && actor.open) {
+        const legacy = random.chance(0.3);
+        const where = legacy ? SCRATCH : workspace;
+        label = `${actor.tab} restores ${legacy ? 'the legacy draft' : where} and works meanwhile`;
+        label += ` (${await restoreWhileWorking(actor, where, legacy)})`;
       } else {
         label = `${actor.tab} idles`;
       }

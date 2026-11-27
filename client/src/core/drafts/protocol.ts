@@ -355,21 +355,138 @@ function writeVerified(local: DraftStorage, key: string, raw: string): string | 
 }
 
 /**
+ * What a restore holds once it has claimed a draft: where the copy goes, and
+ * how to read, release and complete the claim (a closed tab's `gone:` entry,
+ * or the pre-update draft's journal).
+ */
+interface Transfer<P, E> {
+  dest: string;
+  destParts: RecordKeyParts;
+  claimed: { payload: P; savedAt: number };
+  /** 'done' when another tab's reconciliation completed it for this one; 'lost' when the claim is no longer this one's. */
+  claim: (tx: CoordTx) => 'done' | 'lost' | { held: E };
+  /** Drop this lifetime's claim, if it still holds it. */
+  release: (tx: CoordTx) => void;
+  /** Mark the claim done and remove the source: 'kept-source' when it could not be removed. */
+  complete: (tx: CoordTx, held: E) => 'ok' | 'kept-source';
+  keptSourceWarning: string;
+}
+
+/**
+ * Write this tab's copy of a claimed draft, verify it, and complete the
+ * claim. This tab's own newer work always wins over the restore, up to the
+ * moment the transfer completes: a record of its own at the destination (the
+ * mirror can write while a claim is awaited), or a buffer that changed on
+ * screen since the restore began (`unchanged` false; the mirror is debounced
+ * and may not have written yet). Then the restore stands down: the claim is
+ * released, the source stays where it was, and only the copy this restore
+ * wrote is ever removed. A change that lands after the transfer completed
+ * gives way to the draft the person asked for.
+ */
+async function finishTransfer<P, E>(
+  ctx: ProtocolContext,
+  t: Transfer<P, E>,
+  unchanged: () => boolean,
+): Promise<AcceptResult<P>> {
+  const own = () => holdsOwn(ctx.local, t.dest, t.destParts);
+  const release = () =>
+    ctx.backend.run(t.release).catch(() => {
+      // The lease runs out and reconciliation releases it: this tab's copy of
+      // the claimed draft is not there, so the source stays.
+    });
+
+  // Asked again with nothing awaited between this and the write: the claim's
+  // transaction gave the mirror, and the person, time to act.
+  if (!unchanged() || own()) {
+    await release();
+    return { status: 'own' };
+  }
+  const raw = JSON.stringify(makeEnvelope(t.destParts, t.claimed.payload, t.claimed.savedAt));
+  const writeFailure = writeVerified(ctx.local, t.dest, raw);
+  if (writeFailure) {
+    await release();
+    return { status: 'failed', reason: writeFailure };
+  }
+  const ours = () => ctx.local.get(t.dest) === raw;
+  const dropCopy = () => {
+    if (ours()) tryRemove(ctx.local, t.dest);
+  };
+
+  let outcome: 'ok' | 'kept-source' | 'lost' | 'own' | { failed: string };
+  try {
+    outcome = await ctx.backend.run((tx) => {
+      const claim = t.claim(tx);
+      // Stalled past the lease, another tab's reconciliation found this tab's
+      // copy verified and completed the transfer for it: that is success.
+      if (claim === 'done') return 'ok';
+      if (claim === 'lost') return 'lost';
+      if (!unchanged() || (!ours() && own())) {
+        dropCopy();
+        t.release(tx);
+        return 'own';
+      }
+      // Removed meanwhile (a mirror tick armed before the restore, with
+      // nothing worth keeping on screen): put it back before completing.
+      if (!ours()) {
+        const failure = writeVerified(ctx.local, t.dest, raw);
+        if (failure) {
+          t.release(tx);
+          return { failed: failure };
+        }
+      }
+      return t.complete(tx, claim.held);
+    });
+  } catch (error) {
+    // The transfer could not be marked complete, and the claim still names
+    // this tab: reconciliation completes it while the copy is there, or
+    // releases it once it is not.
+    if (!unchanged()) {
+      dropCopy();
+      return { status: 'own' };
+    }
+    if (!ours()) writeVerified(ctx.local, t.dest, raw);
+    return {
+      status: 'ok',
+      payload: t.claimed.payload,
+      savedAt: t.claimed.savedAt,
+      warning: `the transfer could not be marked complete (${storageErrorReason(error)})`,
+    };
+  }
+  if (outcome === 'lost') {
+    // Another tab completed or released the claim meanwhile.
+    dropCopy();
+    return own() ? { status: 'own' } : { status: 'gone' };
+  }
+  if (outcome === 'own') return { status: 'own' };
+  if (typeof outcome === 'object') return { status: 'failed', reason: outcome.failed };
+  return {
+    status: 'ok',
+    payload: t.claimed.payload,
+    savedAt: t.claimed.savedAt,
+    ...(outcome === 'kept-source' ? { warning: t.keptSourceWarning } : {}),
+  };
+}
+
+/**
  * Take a closed tab's draft into this tab, once: claim it, write and verify
  * this tab's copy, then mark the claim done and remove the source. A failed
  * write releases the claim and keeps the source; a lost claim removes the
- * copy, so two tabs never both restore it.
+ * copy, so two tabs never both restore it. `unchanged` says whether the
+ * buffer on screen is still what it was when the person chose to restore:
+ * see `finishTransfer`.
  */
 export async function acceptOffer<P>(
   ctx: ProtocolContext,
   me: Me,
   sourceKey: string,
   codec: DraftCodec<P>,
+  unchanged: () => boolean = () => true,
 ): Promise<AcceptResult<P>> {
   const source = parseRecordKey(sourceKey);
   if (!source) return { status: 'gone' };
   const destParts: RecordKeyParts = { ...source, tab: me.tab };
   const dest = recordKey(source.feature, me.tab, source.workspace);
+  const tombstone = goneKey(sourceKey);
 
   let claimed: DraftEnvelope<P> | 'own' | null;
   try {
@@ -378,13 +495,13 @@ export async function acceptOffer<P>(
       reconcileClaims(tx, ctx.local, now);
       // This tab's own draft for the workspace is never overwritten: it was
       // typed after the offer appeared, and is newer work than the offer.
-      if (holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
+      if (!unchanged() || holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
       const departure = confirmedDepartures(tx, ctx.local).get(source.tab);
       if (!departure || now - departure.at < OFFER_GRACE_MS) return null;
-      if (tx.get(goneKey(sourceKey)) !== undefined) return null;
+      if (tx.get(tombstone) !== undefined) return null;
       const envelope = parseEnvelope(ctx.local.get(sourceKey), codec, source);
       if (!envelope) return null;
-      tx.put(goneKey(sourceKey), {
+      tx.put(tombstone, {
         phase: 'claimed',
         reason: 'transferred',
         srcInstance: departure.instance,
@@ -402,56 +519,32 @@ export async function acceptOffer<P>(
   if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
 
-  const raw = JSON.stringify(makeEnvelope(destParts, claimed.payload, claimed.savedAt));
-  const writeFailure = writeVerified(ctx.local, dest, raw);
-  if (writeFailure) {
-    await ctx.backend
-      .run((tx) => {
-        const gone = asGone(tx.get(goneKey(sourceKey)));
-        if (gone?.phase === 'claimed' && gone.instance === me.instance) tx.del(goneKey(sourceKey));
-      })
-      .catch(() => {
-        // The claim's lease runs out and reconciliation releases it: the
-        // destination never verified, so the source stays.
-      });
-    return { status: 'failed', reason: writeFailure };
-  }
-
-  let outcome: 'ok' | 'lost' | 'kept-source';
-  try {
-    outcome = await ctx.backend.run((tx) => {
-      const gone = asGone(tx.get(goneKey(sourceKey)));
-      // Stalled past the lease, another tab's reconciliation found this tab's
-      // copy verified and completed the transfer for it: that is success.
-      if (gone?.phase === 'done' && gone.instance === me.instance && gone.dest === dest)
-        return 'ok';
-      if (!gone || gone.phase !== 'claimed' || gone.instance !== me.instance) return 'lost';
-      tx.put(goneKey(sourceKey), { ...gone, phase: 'done', at: ctx.now() } satisfies GoneEntry);
-      if (!notReclaimed(tx, source.tab, gone.srcInstance)) return 'ok';
-      return tryRemove(ctx.local, sourceKey) ? 'ok' : 'kept-source';
-    });
-  } catch (error) {
-    // The copy is written and verified and the claim still names this tab:
-    // reconciliation completes it, so the draft can be shown now.
-    return {
-      status: 'ok',
-      payload: claimed.payload,
-      savedAt: claimed.savedAt,
-      warning: `the transfer could not be marked complete (${storageErrorReason(error)})`,
-    };
-  }
-  if (outcome === 'lost') {
-    tryRemove(ctx.local, dest);
-    return { status: 'gone' };
-  }
-  return {
-    status: 'ok',
-    payload: claimed.payload,
-    savedAt: claimed.savedAt,
-    ...(outcome === 'kept-source'
-      ? { warning: 'the other tab’s copy could not be removed; it will not be offered again' }
-      : {}),
-  };
+  return finishTransfer(
+    ctx,
+    {
+      dest,
+      destParts,
+      claimed,
+      claim: (tx) => {
+        const gone = asGone(tx.get(tombstone));
+        if (gone?.phase === 'done' && gone.instance === me.instance && gone.dest === dest)
+          return 'done';
+        if (!gone || gone.phase !== 'claimed' || gone.instance !== me.instance) return 'lost';
+        return { held: gone };
+      },
+      release: (tx) => {
+        const gone = asGone(tx.get(tombstone));
+        if (gone?.phase === 'claimed' && gone.instance === me.instance) tx.del(tombstone);
+      },
+      complete: (tx, gone) => {
+        tx.put(tombstone, { ...gone, phase: 'done', at: ctx.now() } satisfies GoneEntry);
+        if (!notReclaimed(tx, source.tab, gone.srcInstance)) return 'ok';
+        return tryRemove(ctx.local, sourceKey) ? 'ok' : 'kept-source';
+      },
+      keptSourceWarning: 'the other tab’s copy could not be removed; it will not be offered again',
+    },
+    unchanged,
+  );
 }
 
 export interface SweepFeature {
@@ -658,6 +751,7 @@ export async function dismissLegacy(
  * the claim and its destination, write and verify the copy, then mark the
  * journal consumed and remove the old key. The old value is never removed
  * before this tab's copy has read back, and never if it changed meanwhile.
+ * `unchanged`: as for `acceptOffer`.
  */
 export async function acceptLegacy<P>(
   ctx: ProtocolContext,
@@ -665,27 +759,29 @@ export async function acceptLegacy<P>(
   feature: DraftFeature,
   workspace: string,
   legacy: LegacyParse<P>,
+  unchanged: () => boolean = () => true,
 ): Promise<AcceptResult<P>> {
   const legacyKey = LEGACY_KEYS[feature];
   if (!legacyKey) return { status: 'gone' };
   const destParts: RecordKeyParts = { feature, tab: me.tab, workspace };
   const dest = recordKey(feature, me.tab, workspace);
+  const journalKey = legacyJournalKey(feature);
 
   let claimed: { payload: P; savedAt: number } | 'own' | null;
   try {
     claimed = await ctx.backend.run((tx) => {
       const now = ctx.now();
       reconcileLegacy(tx, ctx.local, feature, legacyKey, now);
-      if (holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
+      if (!unchanged() || holdsOwn(ctx.local, dest, destParts)) return 'own' as const;
       const raw = ctx.local.get(legacyKey);
       if (raw === null) return null;
       const parsed = legacy.parse(raw);
       if (!parsed) return null;
       const hash = hashText(raw);
-      const journal = asJournal(tx.get(legacyJournalKey(feature)));
+      const journal = asJournal(tx.get(journalKey));
       if (journal?.phase === 'claimed') return null;
       if (journal?.phase === 'consumed' && journal.hash === hash) return null;
-      tx.put(legacyJournalKey(feature), {
+      tx.put(journalKey, {
         phase: 'claimed',
         by: me.tab,
         instance: me.instance,
@@ -702,63 +798,36 @@ export async function acceptLegacy<P>(
   if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
 
-  const raw = JSON.stringify(makeEnvelope(destParts, claimed.payload, claimed.savedAt));
-  const writeFailure = writeVerified(ctx.local, dest, raw);
-  if (writeFailure) {
-    await ctx.backend
-      .run((tx) => {
-        const journal = asJournal(tx.get(legacyJournalKey(feature)));
-        if (journal?.phase === 'claimed' && journal.instance === me.instance)
-          tx.del(legacyJournalKey(feature));
-      })
-      .catch(() => {
-        // The lease runs out and reconciliation releases it: the copy never
-        // verified, so the old key stays.
-      });
-    return { status: 'failed', reason: writeFailure };
-  }
-
-  let outcome: 'ok' | 'lost' | 'kept-source';
-  try {
-    outcome = await ctx.backend.run((tx) => {
-      const journal = asJournal(tx.get(legacyJournalKey(feature)));
-      // Stalled past the lease, another tab's reconciliation completed this
-      // tab's verified copy: that is success.
-      if (
-        journal?.phase === 'consumed' &&
-        journal.instance === me.instance &&
-        journal.dest === dest
-      )
-        return 'ok';
-      if (!journal || journal.phase !== 'claimed' || journal.instance !== me.instance)
-        return 'lost';
-      tx.put(legacyJournalKey(feature), {
-        ...journal,
-        phase: 'consumed',
-        at: ctx.now(),
-      } satisfies LegacyJournal);
-      const current = ctx.local.get(legacyKey);
-      if (current === null || hashText(current) !== journal.hash) return 'ok';
-      return tryRemove(ctx.local, legacyKey) ? 'ok' : 'kept-source';
-    });
-  } catch (error) {
-    return {
-      status: 'ok',
-      payload: claimed.payload,
-      savedAt: claimed.savedAt,
-      warning: `the transfer could not be marked complete (${storageErrorReason(error)})`,
-    };
-  }
-  if (outcome === 'lost') {
-    tryRemove(ctx.local, dest);
-    return { status: 'gone' };
-  }
-  return {
-    status: 'ok',
-    payload: claimed.payload,
-    savedAt: claimed.savedAt,
-    ...(outcome === 'kept-source'
-      ? { warning: 'the old copy could not be removed; it will not be offered again' }
-      : {}),
-  };
+  return finishTransfer(
+    ctx,
+    {
+      dest,
+      destParts,
+      claimed,
+      claim: (tx) => {
+        const journal = asJournal(tx.get(journalKey));
+        if (
+          journal?.phase === 'consumed' &&
+          journal.instance === me.instance &&
+          journal.dest === dest
+        )
+          return 'done';
+        if (!journal || journal.phase !== 'claimed' || journal.instance !== me.instance)
+          return 'lost';
+        return { held: journal };
+      },
+      release: (tx) => {
+        const journal = asJournal(tx.get(journalKey));
+        if (journal?.phase === 'claimed' && journal.instance === me.instance) tx.del(journalKey);
+      },
+      complete: (tx, journal) => {
+        tx.put(journalKey, { ...journal, phase: 'consumed', at: ctx.now() } satisfies LegacyJournal);
+        const current = ctx.local.get(legacyKey);
+        if (current === null || hashText(current) !== journal.hash) return 'ok';
+        return tryRemove(ctx.local, legacyKey) ? 'ok' : 'kept-source';
+      },
+      keptSourceWarning: 'the old copy could not be removed; it will not be offered again',
+    },
+    unchanged,
+  );
 }

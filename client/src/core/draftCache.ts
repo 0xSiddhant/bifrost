@@ -302,6 +302,11 @@ interface OfferOptions<P> {
   worth: (payload: P) => boolean;
   /** The pre-PLAN-43 single-slot draft, scratch only. */
   legacy?: LegacyParse<P>;
+  /**
+   * What the person can change on screen. A restore stands down if it changes
+   * while the restore runs: that is newer work, and is never replaced.
+   */
+  buffer: unknown;
 }
 
 export interface OfferState<P> {
@@ -310,8 +315,9 @@ export interface OfferState<P> {
   error: string | null;
   /**
    * Transfer the offered draft into this tab; resolves to it, or null when it
-   * could not be taken, or when the page has moved to another workspace
-   * meanwhile (the draft then waits there, as this tab's own).
+   * could not be taken, when the buffer changed meanwhile (that work stays),
+   * or when the page has moved to another workspace meanwhile (the draft then
+   * waits there, as this tab's own).
    */
   accept: () => Promise<P | null>;
   /** Not this one: not offered again, here or in another tab. The draft itself stays where it is. */
@@ -339,6 +345,7 @@ export function useDraftOffer<P>({
   codec,
   worth,
   legacy,
+  buffer,
 }: OfferOptions<P>): OfferState<P> {
   const session = draftSession();
   const ready = useDraftsReady();
@@ -353,6 +360,8 @@ export function useDraftOffer<P>({
   // The workspace on screen now, read after an accept's awaits.
   const shown = useRef(workspace);
   shown.current = workspace;
+  const onScreen = useRef(buffer);
+  onScreen.current = buffer;
 
   useEffect(() => {
     setHeld(null);
@@ -427,6 +436,10 @@ export function useDraftOffer<P>({
     busyRef.current = true;
     setBusy(true);
     setError(null);
+    // Compared by content, so a re-render that rebuilds an equal buffer is
+    // not mistaken for an edit.
+    const before = JSON.stringify(onScreen.current);
+    const unchanged = () => JSON.stringify(onScreen.current) === before;
     try {
       const ctx = await session.coordinated();
       const me = session.me();
@@ -436,9 +449,16 @@ export function useDraftOffer<P>({
       }
       const result =
         offer.kind === 'tab' && offer.key
-          ? await acceptOffer(ctx, me, offer.key, spec.current.codec)
+          ? await acceptOffer(ctx, me, offer.key, spec.current.codec, unchanged)
           : spec.current.legacy
-            ? await acceptLegacy(ctx, me, feature, offer.workspace, spec.current.legacy)
+            ? await acceptLegacy(
+                ctx,
+                me,
+                feature,
+                offer.workspace,
+                spec.current.legacy,
+                unchanged,
+              )
             : ({ status: 'gone' } as const);
       if (result.status === 'ok') {
         if (result.warning)
@@ -451,8 +471,8 @@ export function useDraftOffer<P>({
         return shown.current === offer.workspace ? result.payload : null;
       }
       if (result.status === 'own') {
-        // Typed here after the offer appeared: that newer work stays, and so
-        // does the other draft, where it was.
+        // Typed here after the offer appeared, or while it was being taken:
+        // that newer work stays, and so does the other draft, where it was.
         setHeld(null);
         dismissedFor.current = offer.workspace;
         return null;

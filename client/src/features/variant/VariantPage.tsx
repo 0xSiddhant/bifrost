@@ -178,6 +178,7 @@ function VariantWorkbench() {
     eligible: offerEligible,
     codec: variantDraftCodec,
     worth: variantHasContent,
+    buffer: draftPayload,
   });
   const [results, setResults] = useState<CompareResults | null>(null);
   const [textResult, setTextResult] = useState<TextCompareResult | null>(null);
