@@ -82,7 +82,7 @@ Unsaved work in Runestone, Edda, Groot, Atlas and Variant stays in this browser,
 - **Identity:** a tab id in `sessionStorage`; a duplicated tab is detected over a `BroadcastChannel` and takes a new id.
 - **Own draft:** restored silently. A saved document's draft carries a hash of the server copy; a mismatch asks Keep local / Use server.
 - **Another tab's draft:** offered once, only from a tab known closed (departure marker + registry + 10 s grace), taken once.
-- **Cleanup:** newest wins after 10 minutes.
+- **Cleanup:** newest wins after 10 minutes, decided per workspace. A dismissed offer is not shown again; a restore never overwrites this tab's own draft.
 - **The lock** is an IndexedDB transaction (`navigator.locks` needs a secure context; the hub is plain http).
 
 ## Two processes (PLAN-36)

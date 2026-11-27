@@ -84,10 +84,11 @@ Add a line only for a decision a future change could plausibly undo without know
 
 - **2026-11-26** — Drafts are kept per tab, editor and workspace in `localStorage`; a tab restores its own silently, another tab's is only offered and taken once. *Why:* two tabs on one editor overwrote each other.
 - **2026-11-26** — "Known closed" = departure marker at `pagehide` + IndexedDB-registered lifetime not reclaimed + a grace (10 s offer, 10 min prune); owner accepted the gap that a tab returning after the grace may find its draft moved or pruned. *Why:* the spike found no signal that tells a close from a reload.
-- **2026-11-26** — Pruning: newest draft wins (owner). *Why:* the next visit should offer what was last left in the editor.
+- **2026-11-26** — Pruning and offers: newest draft wins (owner), decided per editor and workspace (scratch, each saved document, Variant's workbench). *Why:* the next visit should offer what was last left there; a scratch draft must never cost a document's unsaved edits.
 - **2026-11-26** — The cross-tab lock is an IndexedDB read/write transaction; everything that must agree across tabs lives in IndexedDB. *Why:* `navigator.locks` needs a secure context, and `localStorage` reads can be stale under a lock.
 - **2026-11-26** — A duplicated tab yields its copied id (`BroadcastChannel` handshake); a leaving page stops answering at `pagehide`. *Why:* a copy must not share drafts; a reload must keep its own.
-- **2026-11-26** — A saved document's draft carries a hash of the server copy; a mismatch asks Keep local / Use server. *Why:* never overwrite either version silently.
+- **2026-11-26** — A saved document's draft carries a hash of the server copy; a mismatch asks Keep local / Use server, and Save is off until one is picked. *Why:* never overwrite either version silently.
+- **2026-11-27** — A restore never overwrites this tab's own draft, and one that lands after the page moved to another workspace waits in its own; a dismissed offer is not offered again (any tab) while its source stays closed, and the draft stays put. *Why:* code review of #122; "dismiss keeps" without an offer on every load.
 - **2026-11-27** — No multi-tab browser journeys for drafts (owner); unit tests are the coverage. *Why:* they failed in CI's WebKit one engine quirk at a time.
 
 ## Testing and CI
@@ -99,7 +100,7 @@ Add a line only for a decision a future change could plausibly undo without know
 - **2026-10-07** — The editor helper types with the input each engine proved reliable (`fill()` on WebKit, keyboard on Chromium). *Why:* measured flakiness per engine.
 - **2026-10-27** — CI's browser shards run in Microsoft's Playwright image; nothing installs from apt. *Why:* a slow mirror held shards for 17–32 minutes.
 - **2026-11-24** — Journeys run with the season's snowfall off; the season journey opts back in. *Why:* WebKit without a GPU (CI's, until 2026-11-27; a by-hand run in a container) starved for animation frames.
-- **2026-11-27** — The e2e harness retries a server start on new ports after `EADDRINUSE`. *Why:* four workers race for free ports.
+- **2026-11-27** — The e2e harness retries a server start on new ports after `EADDRINUSE` (API or web host), and counts a start as up only once its own processes log listening on its ports. *Why:* four workers race for free ports, and a stranger's health answer is not this start's server.
 - **2026-11-27** — Playwright runs four workers in CI and two locally. *Why:* CI's shards are sized at four; four on a busy developer machine pushed Edda/Groot journeys past the 8 s route-chunk timeout.
 - **2026-11-27** — Three failing tests removed at the owner's call, their coverage dropped: the downloads watcher's new-folder rescan case, the CLI's Portkey/Go lifecycle case and its push/pull terminal-vs-pipe case. *Why:* owner chose removal over investigation.
 - **2026-11-27** — WebKit journeys are not run in CI; `./bifrost test e2e webkit` runs them by hand before a release, beside a real iPhone or iPad (owner). Chromium mobile uses an iPhone 14's 390×664. *Why:* CI's GPU-less WebKit failed journeys for reasons a real iPhone does not have; the iPhone size keeps phone layout on every PR.
