@@ -100,7 +100,9 @@ describe('CI', () => {
           ?.test,
     );
     expect([...listed].sort()).toEqual([...tested].sort());
-    expect(unit).toMatch(/vitest run --dir scripts/);
+    // The scripts/ step runs only on an entry that sets `scripts: true`.
+    expect(unit).toMatch(/\n {8}if: matrix\.scripts\n {8}run: npx vitest run --dir scripts\n/);
+    expect(unit).toMatch(/\n {12}scripts: true\n/);
   });
 });
 
