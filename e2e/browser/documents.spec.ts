@@ -206,7 +206,7 @@ for (const kind of KINDS) {
         // Over Fastify's default 1 MiB body limit and under the 2048 KB cap:
         // refused with a 413 until PLAN-33 sized the route's limit from the cap.
         // The server answers in milliseconds; the time goes on the page laying
-        // out 1.5 MB, which CI's software-rendered WebKit does far slower.
+        // out 1.5 MB, which WebKit without a GPU does far slower.
         test.slow();
         await page.goto(`/${kind.kind}`);
         await page

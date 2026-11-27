@@ -59,7 +59,7 @@ Where Bifrost stands. The code is the source of truth; this file is a map. Updat
 | 44 | Runestone JSONL | not started | |
 | 99 | Future backlog | reference | |
 
-Outside any plan: the Halloween world (#110) and the Yule world (#118), which is the default theme now.
+Outside any plan: the Halloween world (#110) and the Yule world (#118), which is the default theme now; Heimdall's staged-upload actions (#123); CI without WebKit, skipping docs-only changes (#125).
 
 ## Open owner checks
 
@@ -77,4 +77,4 @@ Things only the owner can check, from merged work. Remove a line once it is chec
 - **July 2026: the hub.** Foundation and design system, then file transfer, previews, themes, Heimdall, clipboard sync and presence (`v1.0.0`, 07-16). Then the editors and LAN tools: Runestone, Variant, Edda, Loki, Accio, Nimbus and Portkey, plus ops and observability (`v1.1.0`–`v1.3.0`).
 - **August–September: Ollivanders and the CLI.** The toolbox, the Pensieve, Groot, Atlas, Brotli, Mermaid and PDF export, offline mode, download folders, diff export, the `bifrost` CLI, Saga and the Guide panel (`v1.4.0`, 09-12). Then pagination.
 - **October: an API you can trust, and two builds.** Response schemas and contract tests behind browser journeys, black-box API tests, load testing, a standalone public site with no server, a separate web host and API server, `/api/v1`, API docs and per-process Docker images (`v2.0.0`, 10-25). Then load performance and first-load CSS (Lighthouse 60 → 95), and the Halloween world (`v2.1.0`, `v2.1.1`).
-- **November: documents and drafts.** The Yule world became the default (`v2.2.0`, 11-21); Runestone gained JSONC; editor drafts became per tab. The `.agents/` files were cut from about 2 MB to what a session needs (owner, 11-27).
+- **November: documents and drafts.** The Yule world became the default (`v2.2.0`, 11-21); Runestone gained JSONC; editor drafts became per tab; Heimdall can preview, move and delete staged uploads. CI dropped WebKit (run by hand before a release) and skips documentation-only changes. The `.agents/` files were cut from about 2 MB to what a session needs (owner, 11-27).
