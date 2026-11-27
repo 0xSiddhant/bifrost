@@ -9,16 +9,20 @@ import { eventToShortcut, prettyShortcut } from '../../core/shortcut';
 import { Button } from '../../core/ui/Button';
 import { Card } from '../../core/ui/Card';
 import { Select } from '../../core/ui/Field';
+import { FileRow } from '../../core/ui/FileRow';
 import { QrCard } from '../../core/ui/QrCard';
 import {
   ClipboardIcon,
   CodeIcon,
+  DownloadIcon,
+  EyeIcon,
   FolderIcon,
   MonitorIcon,
   ShieldIcon,
   UploadIcon,
   WifiOffIcon,
 } from '../../core/ui/icons';
+import { notify } from '../../core/notify';
 import type { LokiConfig, LokiSettingsPatch } from '../../core/loki';
 import type { ScreensaverConfig, ScreensaverSettingsPatch } from '../../core/screensaver';
 import {
@@ -49,6 +53,8 @@ import {
   fetchSettings,
   fetchStats,
   fetchUploads,
+  publishUpload,
+  deleteUpload,
   prunePresence,
   revokeSessions,
   updateSettings,
@@ -963,34 +969,173 @@ function StorageSection() {
 
 function UploadsSection() {
   const [uploads, setUploads] = useState<UploadFileEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [busyName, setBusyName] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadError(false);
     fetchUploads()
       .then((res) => {
-        if (!cancelled) setUploads(res.items);
+        if (cancelled) return;
+        setUploads(res.items);
+        notify.dismissKey('heimdall-uploads');
       })
-      .catch(() => {});
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(true);
+        log.reportError('Heimdall: could not load staged uploads', error, { module: 'heimdall' });
+        notify.error('Could not load staged uploads. Try again.', {
+          title: 'Heimdall',
+          dedupeKey: 'heimdall-uploads',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshKey]);
+
+  const moveUpload = async (upload: UploadFileEntry) => {
+    setBusyName(upload.name);
+    try {
+      const result = await publishUpload(upload.name);
+      setUploads((current) => current.filter((entry) => entry.name !== upload.name));
+      setConfirmingDelete(null);
+      notify.dismissKey(`heimdall-upload-move:${upload.name}`);
+      notify.ok(
+        result.renamed
+          ? `Moved ${upload.name} to Downloads as ${result.finalName}`
+          : `Moved ${upload.name} to Downloads`,
+        { title: 'Heimdall' },
+      );
+    } catch (error: unknown) {
+      log.reportError(`Heimdall: could not move staged upload ${upload.name}`, error, {
+        module: 'heimdall',
+      });
+      if (error instanceof ApiError && error.status === 404) {
+        setUploads((current) => current.filter((entry) => entry.name !== upload.name));
+        setConfirmingDelete(null);
+      }
+      notify.error(
+        error instanceof ApiError && error.status === 404
+          ? `${upload.name} is no longer staged and was removed from the list.`
+          : `Could not move ${upload.name} to Downloads.`,
+        { title: 'Heimdall', dedupeKey: `heimdall-upload-move:${upload.name}` },
+      );
+    } finally {
+      setBusyName(null);
+    }
+  };
+
+  const removeUpload = async (upload: UploadFileEntry) => {
+    setBusyName(upload.name);
+    try {
+      await deleteUpload(upload.name);
+      setUploads((current) => current.filter((entry) => entry.name !== upload.name));
+      setConfirmingDelete(null);
+      notify.dismissKey(`heimdall-upload-delete:${upload.name}`);
+      notify.ok(`Deleted ${upload.name}`, { title: 'Heimdall' });
+    } catch (error: unknown) {
+      log.reportError(`Heimdall: could not delete staged upload ${upload.name}`, error, {
+        module: 'heimdall',
+      });
+      if (error instanceof ApiError && error.status === 404) {
+        setUploads((current) => current.filter((entry) => entry.name !== upload.name));
+        setConfirmingDelete(null);
+      }
+      notify.error(
+        error instanceof ApiError && error.status === 404
+          ? `${upload.name} is no longer staged and was removed from the list.`
+          : `Could not delete ${upload.name}.`,
+        { title: 'Heimdall', dedupeKey: `heimdall-upload-delete:${upload.name}` },
+      );
+    } finally {
+      setBusyName(null);
+    }
+  };
 
   return (
     <Card>
       <div id={ctlId('uploads-list')}>
-        {uploads.length === 0 ? (
+        {loading ? (
+          <p className="caption">Loading staged uploads…</p>
+        ) : loadError ? (
+          <div className="row" role="alert">
+            <p className="caption">Could not load staged uploads.</p>
+            <Button size="sm" variant="ghost" onClick={() => setRefreshKey((key) => key + 1)}>
+              Retry
+            </Button>
+          </div>
+        ) : uploads.length === 0 ? (
           <p className="caption">Nothing is staged on the host right now.</p>
         ) : (
           uploads.slice(0, 30).map((upload) => (
-            <div className="file-row" key={upload.name}>
-              <div className="file-row__body">
-                <div className="file-row__name">{upload.name}</div>
-                <div className="file-row__meta">
-                  <span>{formatBytes(upload.size)}</span>
-                  <span>{formatTimeAgo(upload.mtime)}</span>
-                </div>
-              </div>
-            </div>
+            <FileRow
+              key={upload.name}
+              name={upload.name}
+              size={formatBytes(upload.size)}
+              time={formatTimeAgo(upload.mtime)}
+              aside={
+                confirmingDelete === upload.name ? (
+                  <span className="row">
+                    <span className="caption">Delete this staged file?</span>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busyName !== null}
+                      onClick={() => void removeUpload(upload)}
+                    >
+                      Delete
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyName !== null}
+                      onClick={() => setConfirmingDelete(null)}
+                    >
+                      Keep
+                    </Button>
+                  </span>
+                ) : (
+                  <span className="row">
+                    <a
+                      className="btn btn--ghost btn--icon tip"
+                      href={`/upload/${encodeURIComponent(upload.name)}/preview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Preview ${upload.name}`}
+                      data-tip={`Preview ${upload.name}`}
+                    >
+                      <EyeIcon size={18} />
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busyName !== null}
+                      aria-label={`Move ${upload.name} to Downloads`}
+                      onClick={() => void moveUpload(upload)}
+                    >
+                      <DownloadIcon size={14} /> Move
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={busyName !== null}
+                      aria-label={`Delete ${upload.name}`}
+                      onClick={() => setConfirmingDelete(upload.name)}
+                    >
+                      Delete
+                    </Button>
+                  </span>
+                )
+              }
+            />
           ))
         )}
       </div>
@@ -1338,7 +1483,7 @@ const ALL_SECTIONS: (HeimdallSection & { hubOnly?: true })[] = [
     label: 'Uploads',
     group: 'Vault',
     icon: <UploadIcon size={16} />,
-    blurb: 'What is sitting in storage/uploads right now.',
+    blurb: 'Preview, move or delete files waiting in storage/uploads.',
     Component: UploadsSection,
     manifest: [
       { controlId: 'uploads-list', label: 'Staged files', keywords: ['files', 'sent', 'uploads'] },
