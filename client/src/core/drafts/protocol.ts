@@ -363,8 +363,12 @@ interface Transfer<P, E> {
   dest: string;
   destParts: RecordKeyParts;
   claimed: { payload: P; savedAt: number };
-  /** 'done' when another tab's reconciliation completed it for this one; 'lost' when the claim is no longer this one's. */
-  claim: (tx: CoordTx) => 'done' | 'lost' | { held: E };
+  /**
+   * The claim now: 'done' when another tab's reconciliation completed it for
+   * this one; 'taken' when another tab's claim on the same draft replaced
+   * it; 'lost' when it is gone and nothing records where the draft went.
+   */
+  claim: (tx: CoordTx) => 'done' | 'taken' | 'lost' | { held: E };
   /** Drop this lifetime's claim, if it still holds it. */
   release: (tx: CoordTx) => void;
   /**
@@ -390,10 +394,12 @@ interface Transfer<P, E> {
  *
  * No step leaves the draft nowhere. The source is removed only after the
  * transaction that marks the transfer done has committed (localStorage does
- * not roll back with IndexedDB), and this tab's copy is removed only while the
- * source is still there. A restore that cannot stand down without losing the
- * draft completes instead, and a change that lands after the transfer
- * completed gives way to the draft the person asked for.
+ * not roll back with IndexedDB), and this tab's copy is removed only while
+ * another copy is known to exist: the source, or another tab's claim on the
+ * same draft. A restore that cannot stand down without losing the draft
+ * completes instead, and a change that lands after the transfer completed
+ * gives way to the draft the person asked for. Where it cannot tell, it keeps
+ * a second copy rather than none.
  */
 async function finishTransfer<P, E>(
   ctx: ProtocolContext,
@@ -428,14 +434,14 @@ async function finishTransfer<P, E>(
   /** This tab's copy, put back if something removed it, but never over a draft of its own. */
   const restoreCopy = () => (ours() || own() ? null : writeVerified(ctx.local, t.dest, raw));
 
-  let outcome: 'lost' | 'own' | { failed: string } | { done: (() => boolean) | null };
+  let outcome: 'taken' | 'lost' | 'own' | { failed: string } | { done: (() => boolean) | null };
   try {
     outcome = await ctx.backend.run((tx) => {
       const claim = t.claim(tx);
       // Stalled past the lease, another tab's reconciliation found this tab's
       // copy verified and completed the transfer for it: that is success.
       if (claim === 'done') return { done: null };
-      if (claim === 'lost') return 'lost';
+      if (claim === 'taken' || claim === 'lost') return claim;
       if (standDown()) {
         dropCopy();
         t.release(tx);
@@ -466,10 +472,19 @@ async function finishTransfer<P, E>(
       warning: `the transfer could not be marked complete (${storageErrorReason(error)})`,
     };
   }
-  if (outcome === 'lost') {
-    // Another tab completed or released the claim meanwhile.
+  if (outcome === 'taken' || (outcome === 'lost' && t.sourceKept())) {
+    // Another tab holds the draft, or its source still does: this tab's
+    // copy would be a second one.
     dropCopy();
     return own() ? { status: 'own' } : { status: 'gone' };
+  }
+  if (outcome === 'lost') {
+    // The claim is gone and so is the source, with nothing to say where the
+    // draft went: a tab whose transfer another tab completed, then the closed
+    // tab came back and its new lifetime cleared that record. This tab's copy
+    // may be the only one left: it stays, and is shown.
+    restoreCopy();
+    return { status: 'ok', payload: t.claimed.payload, savedAt: t.claimed.savedAt };
   }
   if (outcome === 'own') return { status: 'own' };
   if ('failed' in outcome) return { status: 'failed', reason: outcome.failed };
@@ -533,6 +548,7 @@ export async function acceptOffer<P>(
   }
   if (claimed === 'own') return { status: 'own' };
   if (!claimed) return { status: 'gone' };
+  const claimedHash = payloadHash(claimed.payload);
 
   return finishTransfer(
     ctx,
@@ -542,10 +558,15 @@ export async function acceptOffer<P>(
       claimed,
       claim: (tx) => {
         const gone = asGone(tx.get(tombstone));
-        if (gone?.phase === 'done' && gone.instance === me.instance && gone.dest === dest)
-          return 'done';
-        if (!gone || gone.phase !== 'claimed' || gone.instance !== me.instance) return 'lost';
-        return { held: gone };
+        if (gone?.instance === me.instance && gone.dest === dest) {
+          if (gone.phase === 'done') return 'done';
+          if (gone.phase === 'claimed') return { held: gone };
+        }
+        // Another tab's claim on this same draft; anything else (a prune, a
+        // later lifetime's draft) says nothing about where this one went.
+        if (gone?.instance && gone.instance !== me.instance && gone.hash === claimedHash)
+          return 'taken';
+        return 'lost';
       },
       release: (tx) => {
         const gone = asGone(tx.get(tombstone));
@@ -834,15 +855,15 @@ export async function acceptLegacy<P>(
       claimed,
       claim: (tx) => {
         const journal = asJournal(tx.get(journalKey));
-        if (
-          journal?.phase === 'consumed' &&
-          journal.instance === me.instance &&
-          journal.dest === dest
-        )
-          return 'done';
-        if (!journal || journal.phase !== 'claimed' || journal.instance !== me.instance)
-          return 'lost';
-        return { held: journal };
+        if (journal?.instance === me.instance && journal.dest === dest) {
+          if (journal.phase === 'consumed') return 'done';
+          return { held: journal };
+        }
+        // A consumed journal is cleared once the old key is empty, so its
+        // absence does not mean another tab has the value.
+        if (journal && journal.instance !== me.instance && journal.hash === claimedHash)
+          return 'taken';
+        return 'lost';
       },
       release: (tx) => {
         const journal = asJournal(tx.get(journalKey));

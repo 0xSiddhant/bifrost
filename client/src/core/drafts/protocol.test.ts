@@ -341,6 +341,43 @@ describe('draft protocol (PLAN-43)', () => {
         expect(textOf(A)).toBe('closed work');
       });
 
+      it('keeps its copy when the transfer was completed for it and the closed tab came back (Codex on #122)', async () => {
+        const runestone = { runestone: { codec: textDraftCodec as (raw: unknown) => unknown } };
+        let calls = 0;
+        backend.delay = async () => {
+          calls += 1;
+          if (calls !== 2) return;
+          backend.delay = () => Promise.resolve();
+          // Stalled past the lease: another tab's sweep completes the transfer
+          // from this tab's copy and removes the source; then the closed tab
+          // comes back, and its new lifetime clears that record.
+          clock += CLAIM_LEASE_MS + 1;
+          await sweep(ctx, C, runestone);
+          await registerLifetime(ctx, { tab: B.tab, instance: 'b2' });
+        };
+        const result = await acceptOffer(ctx, A, key(), textDraftCodec);
+        expect(result).toMatchObject({ status: 'ok', payload: { text: 'closed work' } });
+        expect(textOf(A)).toBe('closed work');
+      });
+
+      it('withdraws its copy when another tab’s claim on the same draft replaced its own', async () => {
+        beforeRun(2, () => {
+          const mine = backend.entries.get(`gone:${key()}`) as Record<string, unknown>;
+          backend.entries.set(`gone:${key()}`, {
+            ...mine,
+            phase: 'done',
+            by: C.tab,
+            instance: C.instance,
+            dest: recordKey('runestone', C.tab, SCRATCH),
+          });
+          local.remove(key());
+          put(C, 'closed work');
+        });
+        expect(await acceptOffer(ctx, A, key(), textDraftCodec)).toEqual({ status: 'gone' });
+        expect(read(A)).toBeNull();
+        expect(textOf(C)).toBe('closed work');
+      });
+
       it('removes the source only after the commit, and not a returning tab’s newer work', async () => {
         const run = backend.run;
         let calls = 0;
@@ -631,6 +668,25 @@ describe('draft protocol (PLAN-43)', () => {
       expect(textOf(A)).toBe('typed while restoring');
       expect(local.get(LEGACY_KEY)).toBe(old('{"kept":1}'));
       expect(backend.entries.has('legacy:runestone')).toBe(false);
+    });
+
+    it('keeps its copy when another tab completed it for this one and then cleared the journal', async () => {
+      local.set(LEGACY_KEY, old('{"kept":1}'));
+      let calls = 0;
+      backend.delay = async () => {
+        calls += 1;
+        if (calls !== 2) return;
+        backend.delay = () => Promise.resolve();
+        clock += CLAIM_LEASE_MS + 1;
+        // Completed for this tab from its copy (the old key goes), then
+        // forgotten: consumed with the old key empty clears the journal.
+        await findLegacy(ctx, 'runestone', LEGACY);
+        await findLegacy(ctx, 'runestone', LEGACY);
+      };
+      const result = await acceptLegacy(ctx, A, 'runestone', SCRATCH, LEGACY);
+      expect(result).toMatchObject({ status: 'ok', payload: { text: '{"kept":1}' } });
+      expect(textOf(A)).toBe('{"kept":1}');
+      expect(local.get(LEGACY_KEY)).toBeNull();
     });
 
     it('keeps the old key when the completing commit fails after its callback ran', async () => {

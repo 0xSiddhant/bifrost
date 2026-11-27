@@ -95,6 +95,9 @@ function faultyStorage(): DraftStorage & { failKey: string | null } {
   return area;
 }
 
+/** A broken invariant: never swallowed as an injected fault. */
+class InvariantBroken extends Error {}
+
 interface Tab {
   tab: string;
   instance: string;
@@ -116,7 +119,7 @@ async function simulate(seed: number): Promise<void> {
 
   const me = (tab: Tab): Me => ({ tab: tab.tab, instance: tab.instance });
   const fail = (message: string): never => {
-    throw new Error(`seed ${seed}: ${message}\nsteps:\n  ${steps.join('\n  ')}`);
+    throw new InvariantBroken(`seed ${seed}: ${message}\nsteps:\n  ${steps.join('\n  ')}`);
   };
 
   /** Every record's text, by key. */
@@ -167,13 +170,13 @@ async function simulate(seed: number): Promise<void> {
   const restore = async (
     tab: Tab,
     workspace: string,
-    accept: () => Promise<void> = async () => undefined,
+    accept: (key: string) => Promise<void> = async () => undefined,
   ) => {
     const found = await findOffer(ctx, me(tab), FEATURE, workspace, textDraftCodec, worth);
     if (!found.offer) return;
     const ownBefore = ownText(tab, workspace);
     const offered = found.offer.envelope.payload.text;
-    await accept();
+    await accept(found.offer.key);
     const result = await acceptOffer(ctx, me(tab), found.offer.key, textDraftCodec);
     const ownAfter = ownText(tab, workspace);
     if (![...records().values()].includes(offered))
@@ -197,7 +200,7 @@ async function simulate(seed: number): Promise<void> {
   /** Old-build drafts that must still be somewhere: the slot or a record. */
   const legacyRequired = new Set<string>();
 
-  const restoreLegacy = async (tab: Tab, stallWith: Tab | null) => {
+  const restoreLegacy = async (tab: Tab, stallWith: Tab | null, looksTwice = false) => {
     const found = await findLegacy(ctx, FEATURE, LEGACY);
     if (!found) return;
     const ownBefore = ownText(tab, SCRATCH);
@@ -209,6 +212,8 @@ async function simulate(seed: number): Promise<void> {
           backend.delay = () => Promise.resolve();
           clock += CLAIM_LEASE_MS + 1;
           await findLegacy(ctx, FEATURE, LEGACY);
+          // A second look clears a journal that was consumed and emptied.
+          if (looksTwice) await findLegacy(ctx, FEATURE, LEGACY);
         }
       };
     }
@@ -297,11 +302,60 @@ async function simulate(seed: number): Promise<void> {
     return did;
   };
 
+  /** Closed tabs that came back during this step: their records changed while closed. */
+  const cameBack = new Set<Tab>();
+  /** A closed tab comes back: a new page lifetime. */
+  const comeBack = async (tab: Tab) => {
+    tab.instance = `${tab.tab}-${(lifetimes += 1)}`;
+    tab.open = true;
+    cameBack.add(tab);
+    await registerLifetime(ctx, me(tab));
+  };
+
+  /**
+   * A claimant stalls past its lease mid-transfer (after its claim, before or
+   * after writing its copy), and another tab sweeps or looks for an offer
+   * meanwhile, which reconciles the stalled claim. Then, sometimes, the closed
+   * tab comes back, which clears every record of what was decided about its
+   * drafts.
+   */
+  const stalledRestore = async (actor: Tab, workspace: string) => {
+    const other = tabs.find((tab) => tab !== actor && tab.open);
+    const sweeps = random.chance(0.5);
+    const returns = random.chance(0.4);
+    let label = `${actor.tab} restores ${workspace}, stalling while ${other?.tab ?? 'nobody'} ${sweeps ? 'sweeps' : 'looks for an offer'}${returns ? ', and the closed tab comes back' : ''}`;
+    try {
+      await restore(actor, workspace, async (key) => {
+        // Armed once the offer is found: the claim is this tab's first
+        // transaction from here, the completion its second.
+        let calls = 0;
+        backend.delay = async () => {
+          calls += 1;
+          if (calls === 2 && other) {
+            backend.delay = () => Promise.resolve();
+            clock += CLAIM_LEASE_MS + 1;
+            if (sweeps) await sweep(ctx, me(other), features);
+            else await findOffer(ctx, me(other), FEATURE, workspace, textDraftCodec, worth);
+            const source = tabs.find((tab) => tab.tab === parseRecordKey(key)?.tab);
+            if (returns && source && !source.open) await comeBack(source);
+          }
+        };
+      });
+    } catch (error) {
+      if (error instanceof InvariantBroken) throw error;
+      label += ` (threw: ${error instanceof Error ? error.message : String(error)})`;
+    } finally {
+      backend.delay = () => Promise.resolve();
+    }
+    return label;
+  };
+
   for (let step = 0; step < STEPS; step += 1) {
+    cameBack.clear();
     const actor = random.pick(tabs);
     const workspace = random.pick(WORKSPACES);
     const before = records();
-    const choice = random.int(14);
+    const choice = random.int(15);
     let label = '';
 
     try {
@@ -319,9 +373,8 @@ async function simulate(seed: number): Promise<void> {
         actor.open = false;
       } else if (choice === 5 && !actor.open) {
         label = `${actor.tab} comes back`;
-        actor.instance = `${actor.tab}-${(lifetimes += 1)}`;
-        actor.open = true;
-        await registerLifetime(ctx, me(actor));
+        await comeBack(actor);
+        cameBack.delete(actor);
       } else if (choice === 6) {
         const pick = random.pick([1_000, OFFER_GRACE_MS, CLAIM_LEASE_MS + 1, PRUNE_GRACE_MS + 1]);
         label = `time passes ${pick} ms`;
@@ -361,30 +414,7 @@ async function simulate(seed: number): Promise<void> {
           }
         }
       } else if (choice === 9 && actor.open) {
-        // A claimant stalls past its lease mid-transfer (after its claim,
-        // before or after writing its copy), and another tab sweeps or looks
-        // for an offer meanwhile, which reconciles the stalled claim.
-        const other = tabs.find((tab) => tab !== actor && tab.open);
-        const sweeps = random.chance(0.5);
-        label = `${actor.tab} restores ${workspace}, stalling while ${other?.tab ?? 'nobody'} ${sweeps ? 'sweeps' : 'looks for an offer'}`;
-        try {
-          await restore(actor, workspace, async () => {
-            // Armed once the offer is found: the claim is this tab's first
-            // transaction from here, the completion its second.
-            let calls = 0;
-            backend.delay = async () => {
-              calls += 1;
-              if (calls === 2 && other) {
-                backend.delay = () => Promise.resolve();
-                clock += CLAIM_LEASE_MS + 1;
-                if (sweeps) await sweep(ctx, me(other), features);
-                else await findOffer(ctx, me(other), FEATURE, workspace, textDraftCodec, worth);
-              }
-            };
-          });
-        } finally {
-          backend.delay = () => Promise.resolve();
-        }
+        label = await stalledRestore(actor, workspace);
       } else if (choice === 10 && actor.open) {
         if (random.chance(0.5)) {
           label = `${actor.tab} dismisses the ${workspace} offer`;
@@ -410,20 +440,43 @@ async function simulate(seed: number): Promise<void> {
           const found = await findLegacy(ctx, FEATURE, LEGACY);
           if (found) await dismissLegacy(ctx, FEATURE, found.hash);
         } else {
-          label = `${actor.tab} restores the legacy draft${what === 1 ? `, stalling while ${other?.tab ?? 'nobody'} looks` : ''}`;
-          await restoreLegacy(actor, what === 1 ? other : null);
+          const twice = random.chance(0.5);
+          label = `${actor.tab} restores the legacy draft${what === 1 ? `, stalling while ${other?.tab ?? 'nobody'} looks${twice ? ' twice' : ''}` : ''}`;
+          await restoreLegacy(actor, what === 1 ? other : null, twice);
         }
       } else if (choice === 13 && actor.open) {
         const legacy = random.chance(0.3);
         const where = legacy ? SCRATCH : workspace;
         label = `${actor.tab} restores ${legacy ? 'the legacy draft' : where} and works meanwhile`;
         label += ` (${await restoreWhileWorking(actor, where, legacy)})`;
+      } else if (choice === 14 && actor.open) {
+        // The hand-off a stalled restore needs, set up on purpose (by chance
+        // it is rare): the other two tabs open, one writes and closes and is
+        // gone past the grace; then the stall, with the third one sweeping.
+        const [source, helper] = random.chance(0.5)
+          ? tabs.filter((tab) => tab !== actor)
+          : tabs.filter((tab) => tab !== actor).reverse();
+        if (source && helper) {
+          for (const tab of [source, helper]) {
+            if (tab.open) continue;
+            await comeBack(tab);
+            // Coming back changes none of its records.
+            cameBack.delete(tab);
+          }
+          write(source, workspace);
+          writeDeparture(local, me(source), clock);
+          source.open = false;
+          clock += OFFER_GRACE_MS;
+          label = `${source.tab} writes ${workspace} and closes; ${await stalledRestore(actor, workspace)}`;
+        }
       } else {
         label = `${actor.tab} idles`;
       }
     } catch (error) {
       // Injected faults may surface as a rejected coordination call; the
-      // invariants below must hold all the same.
+      // invariants below must hold all the same. A check that failed inside
+      // the step is not one of them.
+      if (error instanceof InvariantBroken) throw error;
       label += ` (threw: ${error instanceof Error ? error.message : String(error)})`;
     }
     steps.push(label);
@@ -431,7 +484,7 @@ async function simulate(seed: number): Promise<void> {
     const after = records();
     // Invariant 4: nobody else changed an open tab's records.
     for (const tab of tabs) {
-      if (tab === actor || !tab.open) continue;
+      if (tab === actor || !tab.open || cameBack.has(tab)) continue;
       for (const [key, text] of before) {
         if (parseRecordKey(key)?.tab !== tab.tab) continue;
         if (after.get(key) !== text) fail(`${label} changed open ${tab.tab}'s ${key} ("${text}")`);
