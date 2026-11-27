@@ -36,4 +36,4 @@ Read `.agents/context/architecture.md` first. The three rules are law: feature-f
 13. **Log the failure paths as you write them** (`rules/coding.md` → Errors & logging): every new failure path gets a `warn`/`error`/`fatal` line where it is handled, with `{ err, ...identifiers }`; every deliberately silent `catch` gets a comment saying why silence is correct. A module is not done until this is true — retrofitting it later means re-deriving what each swallow was hiding. Client-side code in the matching feature slice logs through `core/log.ts`, never `console.*`.
 14. Unit tests for every usecase (mock the interfaces) + at least one `fastify.inject` route test.
 15. Run the `verify` skill. Confirm the boundaries lint passes — an accidental cross-module import must fail the build.
-16. Update `.agents/context/architecture.md` module registry + `project-structure.md`, and add a session note to `progress.md`.
+16. Add the module to `.agents/context/architecture.md`'s module registry, and to `project-structure.md` only if it adds a new kind of place.

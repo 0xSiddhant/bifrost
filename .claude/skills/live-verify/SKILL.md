@@ -5,7 +5,7 @@ description: Prove a change works in the real app — build, run the built serve
 
 # Live Verify — built server + headless Chromium
 
-Tests passing is not "live-verified". This is the procedure behind the "live-verified" claim in every session note. It supplements owner testing, never replaces it — test-before-commit still applies.
+Tests passing is not "live-verified". This is the procedure behind the "live-verified" claim in every PR description. It supplements owner testing, never replaces it — test-before-commit still applies.
 
 ## Server
 
@@ -45,4 +45,4 @@ check three things a unit test cannot:
 ## Finish
 
 6. SIGINT `scripts/start.ts` (the kill test exists for a reason — a clean shutdown of both processes, the web host first, is part of the verification), close Chromium, and **Read every screenshot** to confirm it actually shows the expected state before claiming success.
-7. Report to the owner: what was verified live (with concrete observations, not "looks fine"), and what remains manual (real-device gestures, iOS quirks, etc.). Record the live-verified line in the `progress.md` session note.
+7. Report to the owner: what was verified live (with concrete observations, not "looks fine"), and what remains manual (real-device gestures, iOS quirks, etc.). Put the live-verified lines in the PR description.

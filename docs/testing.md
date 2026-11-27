@@ -144,7 +144,7 @@ A bug the net finds that is out of the current PR's scope is never skipped:
 
 When the fix lands, the pin or workaround comes out in the same PR. The test then exercises the fixed path and catches a regression.
 
-All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
+All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed. None are pinned today.
 
 ### Multi-tab draft recovery (PLAN-43)
 
