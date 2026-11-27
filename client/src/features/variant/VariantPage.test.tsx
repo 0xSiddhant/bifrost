@@ -83,7 +83,14 @@ describe('VariantPage — per-tab drafts', () => {
   const keep = (draft: VariantDraft) =>
     localStorage.setItem(
       key(),
-      JSON.stringify({ v: 1, tab, feature: 'variant', workspace: VARIANT_WORKSPACE, savedAt: 1, payload: draft }),
+      JSON.stringify({
+        v: 1,
+        tab,
+        feature: 'variant',
+        workspace: VARIANT_WORKSPACE,
+        savedAt: 1,
+        payload: draft,
+      }),
     );
 
   it('brings back both workspaces and the mode after a reload, without compare results', async () => {
@@ -92,10 +99,14 @@ describe('VariantPage — per-tab drafts', () => {
     // Text mode, as it was left.
     expect(editors()).toEqual(['before', 'after']);
     expect(container.textContent).not.toContain('Restore draft');
-    await act(async () => button('JSON')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await act(async () =>
+      button('JSON')?.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    );
     expect(editors()).toEqual(['{"a":1}', '{"a":2}']);
     // No stale results: nothing compared until Compare is pressed again.
-    expect(container.querySelector('.variant-drawer')?.textContent ?? '').not.toMatch(/\d+ changes?/);
+    expect(container.querySelector('.variant-drawer')?.textContent ?? '').not.toMatch(
+      /\d+ changes?/,
+    );
     await settle();
     expect(stored()).toMatchObject({ mode: 'json', text: KEPT.text, json: KEPT.json });
   });
@@ -110,15 +121,50 @@ describe('VariantPage — per-tab drafts', () => {
     expect(stored()?.text.left.text).toBe('seed left');
   });
 
+  it('keeps a restored pane’s unsaved work over the runestone its address names', async () => {
+    keep({ ...KEPT, mode: 'json' });
+    search.params = new URLSearchParams({ left: 'shared-rune-abc123' });
+    wire.fetchRunestone.mockResolvedValue({
+      id: 'r1',
+      name: 'Shared',
+      slug: 'shared-rune-abc123',
+      content: '{"from":"link"}',
+    });
+    await render();
+    await settle();
+    expect(editors()).toEqual(['{"a":1}', '{"a":2}']);
+    expect(container.textContent).toContain('Kept this tab’s unsaved work here instead of loading');
+    expect(stored()?.json.left.text).toBe('{"a":1}');
+  });
+
+  it('loads the address’s runestone into a pane that came back empty', async () => {
+    keep({ ...KEPT, mode: 'json', json: { ...KEPT.json, left: pane('', 'Original') } });
+    search.params = new URLSearchParams({ left: 'shared-rune-abc123' });
+    wire.fetchRunestone.mockResolvedValue({
+      id: 'r1',
+      name: 'Shared',
+      slug: 'shared-rune-abc123',
+      content: '{"from":"link"}',
+    });
+    await render();
+    await settle();
+    expect(editors()[0]).toBe('{"from":"link"}');
+  });
+
   it('drops its record when every pane is emptied', async () => {
     keep({
       ...KEPT,
       mode: 'json',
       text: { left: pane('', 'Original'), right: pane('', 'Modified') },
     });
-    vi.stubGlobal('confirm', vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true),
+    );
     await render();
-    await act(async () => button('Clear')?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await act(async () =>
+      button('Clear')?.dispatchEvent(new MouseEvent('click', { bubbles: true })),
+    );
     await settle();
     expect(stored()).toBeNull();
     vi.unstubAllGlobals();

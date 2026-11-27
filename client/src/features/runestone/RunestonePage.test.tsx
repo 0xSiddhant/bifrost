@@ -186,6 +186,23 @@ describe('RunestonePage — New and saved-document drafts', () => {
     expect(container.textContent).not.toContain('Restore draft');
   });
 
+  it('starts the scratch editor blank when a saved document is left by a link, keeping its edits', async () => {
+    await render();
+    await rename('Edited, then left');
+    await settle();
+    // The Runestone nav link: the route loses its slug, nothing else happens.
+    delete params.slug;
+    await render();
+    await settle();
+
+    expect(titleInput().value).not.toBe('Edited, then left');
+    expect(titleInput().value).not.toBe(DOC.name);
+    expect(button('Save to Pensieve')).toBeTruthy();
+    // The document's text is not scratch work; its edits stay its own.
+    expect(ownDraft(SCRATCH)).toBeNull();
+    expect(ownDraft(docWorkspace(DOC.id))?.title).toBe('Edited, then left');
+  });
+
   it('brings a saved document’s unsaved edits back after a reload, unsaved', async () => {
     await render();
     await rename('Edited, then reloaded');
@@ -211,12 +228,18 @@ describe('RunestonePage — New and saved-document drafts', () => {
 
     expect(container.textContent).toContain('This document changed on the server');
     expect(titleInput().value).toBe('Local edits');
-    // Nothing overwritten while the person decides: the server copy is on the server.
+    // Nothing overwritten while the person decides: the server copy is on the
+    // server, and Save cannot put the local edits over it.
     expect(ownDraft(docWorkspace(DOC.id))?.text).toBe('{"a":"local"}');
+    await settle(400);
+    expect(button('Save').disabled).toBe(true);
+    await click(button('Save'));
+    expect(wire.updateRunestone).not.toHaveBeenCalled();
 
     await click(button('Keep local draft'));
     await settle();
     expect(container.textContent).not.toContain('changed on the server');
+    expect(button('Save').disabled).toBe(false);
     expect(ownDraft(docWorkspace(DOC.id))?.baseline).toEqual(baselineOf(DOC));
 
     await reload();

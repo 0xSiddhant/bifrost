@@ -39,12 +39,7 @@ import { TreeView } from '../../core/ui/TreeView';
 import { Toast } from '../../core/ui/Toast';
 import { DraftNotices } from '../../core/ui/DraftNotices';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
-import {
-  fetchGroot,
-  GROOT_CONFIG,
-  saveGroot,
-  updateGroot,
-} from '../../core/groot';
+import { fetchGroot, GROOT_CONFIG, saveGroot, updateGroot } from '../../core/groot';
 import './groot.css';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .yaml file — one trunk, many branches…';
@@ -149,6 +144,13 @@ export function GrootPage() {
   // draft identity is settled, so its own working copy can come back with it.
   useEffect(() => {
     if (!slug) {
+      // Leaving a saved document for the scratch editor (a nav link, Back):
+      // its text is not scratch work. Start blank; this tab's own scratch
+      // draft, a hand-off or an offer fills it next.
+      if (docId !== null || phase !== 'new') {
+        setTitle(relicTitle());
+        setText('');
+      }
       setPhase('new');
       setDocId(null);
       setSnapshot(null);
@@ -238,7 +240,9 @@ export function GrootPage() {
   const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
-  const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
+  // While local edits and a newer server copy disagree, nothing is saved
+  // until the person picks one: Save would overwrite the server's.
+  const canSave = valid && !overCap && !saving && (snapshot === null || dirty) && !drafts.conflict;
   const canTransform = valid && !overCap;
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
@@ -331,7 +335,6 @@ export function GrootPage() {
     void navigate('/variant');
   };
 
-
   // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
   // mount and compresses it straight away, so no feature imports another. The
   // live buffer is sent, never the debounced copy the toolbar's disabled state
@@ -419,7 +422,7 @@ export function GrootPage() {
   const restoreDraft = async () => {
     const restored = await drafts.restore();
     if (!restored) return;
-    setTitle(restored.title || title);
+    setTitle((current) => restored.title || current);
     setText(restored.text);
     setView('code');
   };
@@ -661,7 +664,12 @@ export function GrootPage() {
               <Button size="sm" variant="ghost" disabled={empty} onClick={exportDocument}>
                 Export
               </Button>
-              <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                onClick={() => void copyDocument()}
+              >
                 Copy
               </Button>
               <Button

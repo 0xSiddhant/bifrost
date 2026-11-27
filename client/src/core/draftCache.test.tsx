@@ -15,6 +15,7 @@ import { OFFER_GRACE_MS, registerLifetime, writeDeparture } from './drafts/proto
 import { SCRATCH, makeEnvelope, recordKey } from './drafts/records';
 import { browserLocalStorage } from './drafts/storage';
 import { installTestSession, uninstallTestSession } from './drafts/testing';
+import { draftSession } from './drafts/session';
 import { log } from './log';
 
 declare global {
@@ -55,7 +56,15 @@ describe('useWorkspaceDraft (PLAN-43)', () => {
 
   const render = async (props: Props, strict = false) => {
     await act(async () => {
-      root.render(strict ? <StrictMode><Editor {...props} /></StrictMode> : <Editor {...props} />);
+      root.render(
+        strict ? (
+          <StrictMode>
+            <Editor {...props} />
+          </StrictMode>
+        ) : (
+          <Editor {...props} />
+        ),
+      );
     });
   };
   const settle = async (ms = 500) => {
@@ -71,7 +80,11 @@ describe('useWorkspaceDraft (PLAN-43)', () => {
     localStorage.setItem(
       recordKey('runestone', owner, workspace),
       JSON.stringify(
-        makeEnvelope({ feature: 'runestone', tab: owner, workspace }, { title: 'O', text, baseline: null }, 1),
+        makeEnvelope(
+          { feature: 'runestone', tab: owner, workspace },
+          { title: 'O', text, baseline: null },
+          1,
+        ),
       ),
     );
 
@@ -195,10 +208,16 @@ describe('useDraftOffer (PLAN-43)', () => {
   const backend = memoryBackend();
   const LEGACY = legacyTextParse((text) => text.trim() === '');
 
-  function Offering({ eligible = true }: { eligible?: boolean }) {
+  function Offering({
+    eligible = true,
+    workspace = SCRATCH,
+  }: {
+    eligible?: boolean;
+    workspace?: string;
+  }) {
     offers = useDraftOffer<TextDraft>({
       feature: 'runestone',
-      workspace: SCRATCH,
+      workspace,
       eligible,
       codec: textDraftCodec,
       worth: (draft) => draft.text.trim() !== '',
@@ -222,7 +241,11 @@ describe('useDraftOffer (PLAN-43)', () => {
     localStorage.setItem(
       recordKey('runestone', other.tab, SCRATCH),
       JSON.stringify(
-        makeEnvelope({ feature: 'runestone', tab: other.tab, workspace: SCRATCH }, { title: 'C', text, baseline: null }, 7),
+        makeEnvelope(
+          { feature: 'runestone', tab: other.tab, workspace: SCRATCH },
+          { title: 'C', text, baseline: null },
+          7,
+        ),
       ),
     );
     writeDeparture(ctx.local, other, Date.now() - OFFER_GRACE_MS);
@@ -258,6 +281,58 @@ describe('useDraftOffer (PLAN-43)', () => {
     expect(offers.offer).toBeNull();
   });
 
+  it('does not offer a dismissed draft again after a reload, and leaves it where it is', async () => {
+    const source = await closedTab('not wanted');
+    await render();
+    await act(async () => offers.dismiss());
+    for (let i = 0; i < 5; i += 1) await act(async () => Promise.resolve());
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    await render();
+    expect(offers.offer).toBeNull();
+    expect(localStorage.getItem(source)).not.toBeNull();
+  });
+
+  it('restores once for a double click, without a false "no longer available"', async () => {
+    await closedTab('clicked twice');
+    await render();
+    let results: (TextDraft | null)[] = [];
+    await act(async () => {
+      results = await Promise.all([offers.accept(), offers.accept()]);
+    });
+    expect(results.filter((result) => result !== null)).toHaveLength(1);
+    expect(offers.error).toBeNull();
+  });
+
+  it('keeps a restore that lands after the page moved on in its own workspace, not on screen', async () => {
+    await closedTab('for the scratch editor');
+    await render();
+    const tab = draftSession().me()?.tab ?? '';
+    // Hold the transfer until the person has opened a saved document.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    backend.delay = () => held;
+    let pending: Promise<TextDraft | null> = Promise.resolve(null);
+    await act(async () => {
+      pending = offers.accept();
+    });
+    await act(async () => {
+      root.render(<Offering workspace="doc:1" />);
+    });
+    backend.delay = () => Promise.resolve();
+    release();
+    let restored: TextDraft | null | undefined;
+    await act(async () => {
+      restored = await pending;
+    });
+    expect(restored).toBeNull();
+    expect(localStorage.getItem(recordKey('runestone', tab, SCRATCH))).toContain(
+      'for the scratch editor',
+    );
+  });
+
   it('leaves the draft where it is when dismissed', async () => {
     const source = await closedTab('not now');
     await render();
@@ -273,7 +348,10 @@ describe('useDraftOffer (PLAN-43)', () => {
   });
 
   it('falls back to the draft saved before the update, only when no tab has one', async () => {
-    localStorage.setItem('bifrost.runestone.draft', JSON.stringify({ title: 'Old', text: '{"o":1}', savedAt: 3 }));
+    localStorage.setItem(
+      'bifrost.runestone.draft',
+      JSON.stringify({ title: 'Old', text: '{"o":1}', savedAt: 3 }),
+    );
     await render();
     expect(offers.offer).toMatchObject({ kind: 'legacy', payload: { text: '{"o":1}' } });
     await act(async () => root.unmount());

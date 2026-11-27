@@ -163,6 +163,14 @@ export function RunestonePage() {
   // draft identity is settled, so its own working copy can come back with it.
   useEffect(() => {
     if (!slug) {
+      // Leaving a saved document for the scratch editor (a nav link, Back):
+      // its text is not scratch work. Start blank; this tab's own scratch
+      // draft, a hand-off or an offer fills it next.
+      if (docId !== null || phase !== 'new') {
+        setTitle(relicTitle());
+        setText('');
+        setFormat('json');
+      }
       setPhase('new');
       setDocId(null);
       setSnapshot(null);
@@ -278,8 +286,14 @@ export function RunestonePage() {
   // a cap lowered since it was saved: the update then carries no content, and
   // the server checks the stored text in the new format, not its size.
   const textChanged = snapshot === null || snapshot.text !== text;
+  // While local edits and a newer server copy disagree, nothing is saved
+  // until the person picks one: Save would overwrite the server's.
   const canSave =
-    valid && (!overCap || !textChanged) && !saving && (snapshot === null || dirty);
+    valid &&
+    (!overCap || !textChanged) &&
+    !saving &&
+    (snapshot === null || dirty) &&
+    !drafts.conflict;
 
   const ok = (message: string) => setNotice({ kind: 'ok', message });
   const fail = (message: string) => setNotice({ kind: 'danger', message });
@@ -413,7 +427,6 @@ export function RunestonePage() {
     setFormat(next);
   };
 
-
   // Hand-off, not an import (PLAN-25): the Brotli page reads this seed once on
   // mount and compresses it straight away, so no feature imports another. The
   // live buffer is sent, never the debounced copy the toolbar's disabled state
@@ -509,7 +522,7 @@ export function RunestonePage() {
   const restoreDraft = async () => {
     const restored = await drafts.restore();
     if (!restored) return;
-    setTitle(restored.title || title);
+    setTitle((current) => restored.title || current);
     setText(restored.text);
     setFormat(asJsonFormat(restored.format));
     setView('code');
@@ -583,7 +596,10 @@ export function RunestonePage() {
             </p>
             <div className="row">
               <Button onClick={carveFromSlug}>Carve it now</Button>
-              <Button variant="ghost" onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}>
+              <Button
+                variant="ghost"
+                onClick={() => hubNavigate(navigate, '/pensieve?type=runestone')}
+              >
                 Back to the Pensieve
               </Button>
             </div>
@@ -775,7 +791,12 @@ export function RunestonePage() {
               <Button size="sm" variant="ghost" disabled={empty} onClick={exportDocument}>
                 Export
               </Button>
-              <Button size="sm" variant="ghost" disabled={empty} onClick={() => void copyDocument()}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={empty}
+                onClick={() => void copyDocument()}
+              >
                 Copy
               </Button>
               <Button
@@ -913,9 +934,7 @@ export function RunestonePage() {
                   </li>
                 );
               })}
-              {issues.length > 20 && (
-                <li className="caption">…and {issues.length - 20} more</li>
-              )}
+              {issues.length > 20 && <li className="caption">…and {issues.length - 20} more</li>}
             </ul>
           )}
         </Card>

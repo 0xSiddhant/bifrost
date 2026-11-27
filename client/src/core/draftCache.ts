@@ -3,6 +3,8 @@ import { log } from './log';
 import {
   acceptLegacy,
   acceptOffer,
+  dismissLegacy,
+  dismissOffer,
   findLegacy,
   findOffer,
   type LegacyParse,
@@ -141,7 +143,9 @@ export function useWorkspaceDraft<P>({
     (action: string, error: unknown) => {
       const reason = storageErrorReason(error);
       if (writeErrorRef.current !== reason) {
-        log.warn(`drafts: ${feature} could not ${action} a draft (${reason})`, { module: 'drafts' });
+        log.warn(`drafts: ${feature} could not ${action} a draft (${reason})`, {
+          module: 'drafts',
+        });
       }
       writeErrorRef.current = reason;
       // `hydrate` can run during a render (Variant reads its draft in a state
@@ -151,9 +155,9 @@ export function useWorkspaceDraft<P>({
     [feature],
   );
 
-  const persist = useRef<(workspace: string, payload: P, keep: boolean, mayRemove: boolean) => void>(
-    () => undefined,
-  );
+  const persist = useRef<
+    (workspace: string, payload: P, keep: boolean, mayRemove: boolean) => void
+  >(() => undefined);
   persist.current = (target, value, worthKeeping, mayRemove) => {
     const me = session.me();
     if (!me) return;
@@ -304,15 +308,23 @@ export interface OfferState<P> {
   offer: DraftOffer<P> | null;
   busy: boolean;
   error: string | null;
-  /** Transfer the offered draft into this tab; resolves to it, or null when it could not be taken. */
+  /**
+   * Transfer the offered draft into this tab; resolves to it, or null when it
+   * could not be taken, or when the page has moved to another workspace
+   * meanwhile (the draft then waits there, as this tab's own).
+   */
   accept: () => Promise<P | null>;
-  /** Hide it for this visit; the draft itself stays where it is. */
+  /** Not this one: not offered again, here or in another tab. The draft itself stays where it is. */
   dismiss: () => void;
 }
 
 interface HeldOffer<P> extends DraftOffer<P> {
   key: string | null;
   workspace: string;
+  /** The closed tab's page lifetime (a tab offer), to dismiss it. */
+  srcInstance: string | null;
+  /** The old value's hash (a legacy offer), to dismiss it. */
+  hash: string | null;
 }
 
 /**
@@ -332,10 +344,15 @@ export function useDraftOffer<P>({
   const ready = useDraftsReady();
   const [held, setHeld] = useState<HeldOffer<P> | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set before the first await, so a second click finds it at once.
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const spec = useRef({ codec, worth, legacy });
   spec.current = { codec, worth, legacy };
   const dismissedFor = useRef<string | null>(null);
+  // The workspace on screen now, read after an accept's awaits.
+  const shown = useRef(workspace);
+  shown.current = workspace;
 
   useEffect(() => {
     setHeld(null);
@@ -361,19 +378,32 @@ export function useDraftOffer<P>({
             workspace,
             payload: found.offer.envelope.payload,
             savedAt: found.offer.envelope.savedAt,
+            srcInstance: found.offer.srcInstance,
+            hash: null,
           });
           return;
         }
         if (found.recheckAt !== null) {
           // A tab left moments ago: offer its draft once it has been gone long
           // enough not to be a reload, and offer nothing older meanwhile.
-          timer = window.setTimeout(() => void search(), Math.max(50, found.recheckAt - ctx.now() + 50));
+          timer = window.setTimeout(
+            () => void search(),
+            Math.max(50, found.recheckAt - ctx.now() + 50),
+          );
           return;
         }
         if (legacyParse && workspace === SCRATCH) {
           const old = await findLegacy(ctx, feature, legacyParse);
           if (old && !cancelled && worthOffering(old.payload)) {
-            setHeld({ kind: 'legacy', key: null, workspace, payload: old.payload, savedAt: old.savedAt });
+            setHeld({
+              kind: 'legacy',
+              key: null,
+              workspace,
+              payload: old.payload,
+              savedAt: old.savedAt,
+              srcInstance: null,
+              hash: old.hash,
+            });
           }
         }
       } catch (failure) {
@@ -393,16 +423,17 @@ export function useDraftOffer<P>({
 
   const accept = useCallback(async (): Promise<P | null> => {
     const offer = held;
-    if (!offer || busy) return null;
-    const ctx = await session.coordinated();
-    const me = session.me();
-    if (!ctx || !me) {
-      setError('This browser cannot hand drafts between tabs right now.');
-      return null;
-    }
+    if (!offer || busyRef.current) return null;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
+      const ctx = await session.coordinated();
+      const me = session.me();
+      if (!ctx || !me) {
+        setError('This browser cannot hand drafts between tabs right now.');
+        return null;
+      }
       const result =
         offer.kind === 'tab' && offer.key
           ? await acceptOffer(ctx, me, offer.key, spec.current.codec)
@@ -410,29 +441,62 @@ export function useDraftOffer<P>({
             ? await acceptLegacy(ctx, me, feature, offer.workspace, spec.current.legacy)
             : ({ status: 'gone' } as const);
       if (result.status === 'ok') {
-        if (result.warning) log.warn(`drafts: ${feature} restore: ${result.warning}`, { module: 'drafts' });
+        if (result.warning)
+          log.warn(`drafts: ${feature} restore: ${result.warning}`, { module: 'drafts' });
         setHeld(null);
         dismissedFor.current = offer.workspace;
-        return result.payload;
+        // Taken into this tab's record for the offer's workspace. If the page
+        // moved on meanwhile, it waits there and comes back with that
+        // workspace, rather than landing in whatever is on screen now.
+        return shown.current === offer.workspace ? result.payload : null;
+      }
+      if (result.status === 'own') {
+        // Typed here after the offer appeared: that newer work stays, and so
+        // does the other draft, where it was.
+        setHeld(null);
+        dismissedFor.current = offer.workspace;
+        return null;
       }
       if (result.status === 'gone') {
         setHeld(null);
         setError('That draft is no longer available — another tab may have restored it.');
         return null;
       }
-      log.warn(`drafts: ${feature} could not restore a draft (${result.reason})`, { module: 'drafts' });
+      log.warn(`drafts: ${feature} could not restore a draft (${result.reason})`, {
+        module: 'drafts',
+      });
       setError(`The draft could not be restored: ${result.reason}. It is still kept.`);
       return null;
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
-  }, [session, feature, held, busy]);
+  }, [session, feature, held]);
 
   const dismiss = useCallback(() => {
-    if (held) dismissedFor.current = held.workspace;
+    if (!held) return;
+    dismissedFor.current = held.workspace;
     setHeld(null);
     setError(null);
-  }, [held]);
+    // Remembered beyond this visit, so the same draft is not offered on every
+    // load. Best effort: if it cannot be recorded, it is offered again later.
+    const offer = held;
+    void (async () => {
+      try {
+        const ctx = await session.coordinated();
+        if (!ctx) return;
+        if (offer.kind === 'tab' && offer.key && offer.srcInstance)
+          await dismissOffer(ctx, offer.key, offer.srcInstance);
+        else if (offer.kind === 'legacy' && offer.hash)
+          await dismissLegacy(ctx, feature, offer.hash);
+      } catch (failure) {
+        session.warnOnce(
+          `dismiss:${feature}`,
+          `drafts: ${feature} could not remember a dismissed draft (${storageErrorReason(failure)})`,
+        );
+      }
+    })();
+  }, [session, feature, held]);
 
   const offer =
     held && held.workspace === workspace

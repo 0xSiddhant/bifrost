@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ChangeEvent,
-  type CSSProperties,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { hasFeature } from '../../core/features';
 import { copyText } from '../../core/copy';
@@ -194,7 +187,10 @@ function VariantWorkbench() {
   const [pickerSide, setPickerSide] = useState<Side | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
   const [changeCursor, setChangeCursor] = useState(-1);
-  const [pendingJump, setPendingJump] = useState<{ left: number | null; right: number | null } | null>(null);
+  const [pendingJump, setPendingJump] = useState<{
+    left: number | null;
+    right: number | null;
+  } | null>(null);
 
   const leftEditorRef = useRef<JsonEditorHandle>(null);
   const rightEditorRef = useRef<JsonEditorHandle>(null);
@@ -262,11 +258,34 @@ function VariantWorkbench() {
   const rightParam = searchParams.get('right');
   const leftLoadedSlug = panes.json.left.source?.slug ?? null;
   const rightLoadedSlug = panes.json.right.source?.slug ?? null;
+  // The address this workbench was restored under, and which JSON panes came
+  // back with unsaved work in them (PLAN-43): those are kept rather than
+  // replaced by the address's runestones. A slug chosen later loads as usual.
+  const arrivedWith = useRef({
+    left: leftParam,
+    right: rightParam,
+    work: {
+      left: (restored?.json.left.text.trim() ?? '') !== '',
+      right: (restored?.json.right.text.trim() ?? '') !== '',
+    },
+  });
 
   useEffect(() => {
     let cancelled = false;
     const load = async (side: Side, slug: string | null, loaded: string | null) => {
       if (!slug || slug === loaded) return null;
+      const arrival = arrivedWith.current;
+      if (arrival.work[side] && arrival[side] === slug) {
+        setPane(
+          side,
+          (pane) => ({
+            ...pane,
+            slugError: `Kept this tab’s unsaved work here instead of loading “${slug}”.`,
+          }),
+          'json',
+        );
+        return null;
+      }
       try {
         const doc = await fetchRunestone(slug);
         if (cancelled) return null;
@@ -494,16 +513,14 @@ function VariantWorkbench() {
   const stepChange = (direction: 1 | -1) => {
     if (mode === 'text') {
       if (!textResult || textResult.rows.length === 0) return;
-      const next =
-        (changeCursor + direction + textResult.rows.length) % textResult.rows.length;
+      const next = (changeCursor + direction + textResult.rows.length) % textResult.rows.length;
       setChangeCursor(next);
       const row = textResult.rows[next];
       if (row) jumpToChunk(row);
       return;
     }
     if (!results || results.records.length === 0) return;
-    const next =
-      (changeCursor + direction + results.records.length) % results.records.length;
+    const next = (changeCursor + direction + results.records.length) % results.records.length;
     setChangeCursor(next);
     const record = results.records[next];
     if (record) jumpToRecord(record);
@@ -763,9 +780,7 @@ function VariantWorkbench() {
             />
           </div>
         ) : (
-          <p className="variant-pane__treeempty caption">
-            The tree appears once this side parses.
-          </p>
+          <p className="variant-pane__treeempty caption">The tree appears once this side parses.</p>
         )}
         {paneStatus(issues, pane.text, strict)}
       </section>
@@ -791,10 +806,7 @@ function VariantWorkbench() {
         </button>
       </div>
 
-      <Button
-        onClick={() => (mode === 'json' ? runCompare() : runTextCompare())}
-        disabled={empty}
-      >
+      <Button onClick={() => (mode === 'json' ? runCompare() : runTextCompare())} disabled={empty}>
         Compare
       </Button>
 
@@ -906,8 +918,8 @@ function VariantWorkbench() {
           <span className="eyebrow eyebrow--violet">the variant · two stones, one truth</span>
           <h2>Variant</h2>
           <p>
-            Compare JSON or JSONC structurally — key order, formatting and comments are noise —
-            or fall back to raw text for anything else.
+            Compare JSON or JSONC structurally — key order, formatting and comments are noise — or
+            fall back to raw text for anything else.
           </p>
         </div>
         <PanelFontControl font={font} />
@@ -943,9 +955,7 @@ function VariantWorkbench() {
               <div>{paneHeader('right', right)}</div>
             </div>
             {(left.slugError || right.slugError) && (
-              <p className="variant-pane__error caption">
-                {left.slugError ?? right.slugError}
-              </p>
+              <p className="variant-pane__error caption">{left.slugError ?? right.slugError}</p>
             )}
             {/* Always-editable panes; Compare paints decorations onto them,
                 and the first real edit removes them again (owner's model). */}
