@@ -22,8 +22,8 @@ import {
   type YamlIssue,
 } from '../../core/yaml';
 import { relicTitle } from '../../core/relicNames';
-import { useDraftCache, showsRestore } from '../../core/draftCache';
-import { takeLeftOpen } from '../../core/draftReturn';
+import { useDocumentDrafts } from '../../core/documentDrafts';
+import { legacyTextParse, type TextDraft } from '../../core/drafts/documents';
 import { putBrotliSeed } from '../../core/brotliSeed';
 import { takeGrootSeed } from '../../core/grootSeed';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
@@ -37,6 +37,7 @@ import { PanelFontControl, UndoRedoControl } from '../../core/ui/PanelControls';
 import { JsonEditor, type JsonEditorHandle } from '../../core/ui/JsonEditor';
 import { TreeView } from '../../core/ui/TreeView';
 import { Toast } from '../../core/ui/Toast';
+import { DraftNotices } from '../../core/ui/DraftNotices';
 import { AlertIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon } from '../../core/ui/icons';
 import {
   fetchGroot,
@@ -44,13 +45,13 @@ import {
   saveGroot,
   updateGroot,
 } from '../../core/groot';
-import { clearDraft, loadDraft, saveDraft, type GrootDraft } from './draft';
 import './groot.css';
 
 const EDITOR_PLACEHOLDER = 'Paste, type, or drop a .yaml file — one trunk, many branches…';
 
-/** Identifies this editor's buffer to `core/draftReturn`. */
-const DRAFT_ID = 'groot';
+/** The pre-PLAN-43 single-slot draft, offered once if it holds anything. */
+const LEGACY_DRAFT = legacyTextParse((text) => text.trim() === '');
+const worthOffering = (draft: TextDraft) => draft.text.trim() !== '';
 
 /** Debounce heavy derived work (parse/advise on up-to-2MB docs) off the keystroke path. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -120,19 +121,41 @@ export function GrootPage() {
   // Baked in at build time (PLAN-35): known before the first render.
   const config = GROOT_CONFIG;
   const [notice, setNotice] = useState<{ kind: 'ok' | 'danger'; message: string } | null>(null);
-  const [restorable, setRestorable] = useState<GrootDraft | null>(null);
   const [cursor, setCursor] = useState(0);
   const editorRef = useRef<JsonEditorHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load (or fail to find) the document a slug URL names.
+  const isScratch = phase === 'new' && docId === null;
+  const blank = text.trim() === '';
+  const dirty =
+    snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
+  // Unsaved work kept per tab and workspace (PLAN-43): the scratch editor
+  // while it holds anything, a saved document while it has unsaved changes.
+  const drafts = useDocumentDrafts({
+    feature: 'groot',
+    isScratch,
+    phase,
+    docId,
+    title,
+    text,
+    blank,
+    dirty,
+    worth: worthOffering,
+    legacy: LEGACY_DRAFT,
+  });
+  const ready = drafts.ready;
+
+  // Load (or fail to find) the document a slug URL names, once this tab's
+  // draft identity is settled, so its own working copy can come back with it.
   useEffect(() => {
     if (!slug) {
       setPhase('new');
       setDocId(null);
       setSnapshot(null);
+      drafts.reset();
       return;
     }
+    if (!ready) return;
     let cancelled = false;
     setPhase('loading');
     fetchGroot(slug)
@@ -142,9 +165,11 @@ export function GrootPage() {
           setPhase('notfound');
           return;
         }
+        // This tab's unsaved edits to it come back as unsaved edits, never saved.
+        const own = drafts.loaded(doc);
         setDocId(doc.id);
-        setTitle(doc.name);
-        setText(doc.content);
+        setTitle(own ? own.title : doc.name);
+        setText(own ? own.text : doc.content);
         setSnapshot({ title: doc.name, text: doc.content });
         setPhase('saved');
         // The API 301s stale slugs; fix the address bar to the canonical one.
@@ -159,54 +184,34 @@ export function GrootPage() {
     return () => {
       cancelled = true;
     };
-    // navigate identity churns; slug is the real dependency
-  }, [slug]);
+    // navigate identity churns; slug (and the drafts being ready) are the real dependencies
+  }, [slug, ready]);
 
-  const isScratch = phase === 'new' && docId === null;
-
-  // On arriving at the scratch editor: a buffer left open by a navigation
-  // inside this page's lifetime comes straight back, because jumping to
-  // Runestone to see the same document as JSON and returning is one task, not
-  // two visits. A draft from an *earlier* page load is still only offered —
-  // opening the tool fresh must not silently refill it with something old.
+  // On arriving at the scratch editor: a hand-off first (the user just chose
+  // this document, PLAN-25; read once, so a refresh does not re-apply it),
+  // then this tab's own draft — jumping to Runestone to see the same document
+  // as JSON and coming back, or a reload, is one task, so it simply comes
+  // back — and otherwise another tab's draft may only be offered.
   useEffect(() => {
-    if (!isScratch) return;
-    // A hand-off wins over a draft: the user just chose this document (PLAN-25),
-    // so it opens rather than being offered. Read once and cleared, so a
-    // refresh does not re-apply it.
+    if (!isScratch || !ready) return;
+    const arrival = drafts.enterScratch();
+    if (!arrival.first) return;
     const seed = takeGrootSeed();
     if (seed) {
       setText(seed.text);
       if (seed.title) setTitle(seed.title);
-      setRestorable(null);
+      drafts.offerScratch(false);
       return;
     }
-    const draft = loadDraft();
-    if (!draft || draft.text.trim() === '') return;
-    if (takeLeftOpen(DRAFT_ID)) {
-      setTitle((current) => draft.title || current);
-      setText(draft.text);
-    } else {
-      setRestorable(draft);
+    const own = arrival.own;
+    if (own && own.text.trim() !== '') {
+      setTitle((current) => own.title || current);
+      setText(own.text);
+      drafts.offerScratch(false);
+      return;
     }
-  }, [isScratch]);
-
-  // The cache mirrors the scratch buffer, so a refresh mid-edit loses nothing,
-  // and leaving flushes it and marks it left open for the silent return above:
-  // clicking "Runestone" within half a second of typing must not lose the last
-  // keystrokes. Saving clears the draft deliberately and flips `isScratch`
-  // before leaving, so a saved document cannot resurrect it.
-  const blank = text.trim() === '';
-  useDraftCache({
-    isScratch,
-    title,
-    text,
-    blank,
-    offered: restorable,
-    save: saveDraft,
-    clear: clearDraft,
-    returnId: DRAFT_ID,
-  });
+    drafts.offerScratch(true);
+  }, [isScratch, ready]);
 
   useEffect(() => {
     if (!notice) return;
@@ -233,8 +238,6 @@ export function GrootPage() {
   const maxBytes = config.maxDocKb * 1024;
   const overCap = maxBytes !== null && stats.bytes > maxBytes;
 
-  const dirty =
-    snapshot === null ? text.trim() !== '' : snapshot.title !== title || snapshot.text !== text;
   const canSave = valid && !overCap && !saving && (snapshot === null || dirty);
   const canTransform = valid && !overCap;
 
@@ -247,16 +250,17 @@ export function GrootPage() {
     try {
       if (docId === null) {
         const doc = await saveGroot({ name: title, content: text });
+        // Saved: this tab's scratch draft has done its job.
+        drafts.saved(doc, 'scratch');
         setDocId(doc.id);
         setTitle(doc.name);
         setSnapshot({ title: doc.name, text: doc.content });
         setPhase('saved');
-        clearDraft();
-        setRestorable(null);
         navigate(`/groot/${doc.slug}`, { replace: true });
         ok('Grown into the Pensieve');
       } else {
         const doc = await updateGroot(docId, { name: title, content: text });
+        drafts.saved(doc, 'doc');
         setTitle(doc.name);
         setSnapshot({ title: doc.name, text: doc.content });
         if (slug && doc.slug !== slug) navigate(`/groot/${doc.slug}`, { replace: true });
@@ -340,8 +344,7 @@ export function GrootPage() {
   const clearDocument = () => {
     if (!window.confirm('Clear the document? The cached draft is removed too.')) return;
     setText('');
-    clearDraft();
-    setRestorable(null);
+    drafts.clear();
   };
 
   const copyPath = async (path: string) => {
@@ -412,20 +415,25 @@ export function GrootPage() {
 
   const exportDocument = () => saveText(text, exportFilename(title), 'application/yaml');
 
-  const restoreDraft = () => {
-    if (!restorable) return;
-    setTitle(restorable.title || title);
-    setText(restorable.text);
-    setRestorable(null);
+  // Another tab's draft, or the pre-update one, taken into this tab (once).
+  const restoreDraft = async () => {
+    const restored = await drafts.restore();
+    if (!restored) return;
+    setTitle(restored.title || title);
+    setText(restored.text);
     setView('code');
   };
 
-  const dismissDraft = () => {
-    clearDraft();
-    setRestorable(null);
+  // The server copy changed after this tab's edits and the person took it.
+  const takeServerVersion = () => {
+    const server = drafts.takeServer();
+    if (!server) return;
+    setTitle(server.name);
+    setText(server.content);
   };
 
   const growFromSlug = () => {
+    drafts.reset();
     setPhase('new');
     setDocId(null);
     setSnapshot(null);
@@ -443,6 +451,11 @@ export function GrootPage() {
   const startNew = () => {
     if (dirty && !window.confirm('Start a new document? Unsaved changes to this one are lost.'))
       return;
+    // New discards this workspace's unsaved buffer, so its draft goes with it:
+    // only this tab's, and only this workspace's. Leaving a saved document
+    // for the scratch editor brings back this tab's scratch draft, if any.
+    drafts.clear();
+    drafts.reset();
     setPhase('new');
     setDocId(null);
     setSnapshot(null);
@@ -452,14 +465,10 @@ export function GrootPage() {
     // The stream tab is clamped on read, not reset — but a new document starts
     // at its first document, not on whichever tab the last one ended on.
     setDocIndex(0);
-    // The cached draft backs up the buffer being left behind, so keeping it
-    // would have the restore prompt offer back exactly what New discarded.
-    clearDraft();
-    setRestorable(null);
     if (slug) navigate('/groot');
   };
 
-  if (phase === 'loading') {
+  if (phase === 'loading' || !ready) {
     return <div className="page-loading caption">Reading the rings…</div>;
   }
 
@@ -523,19 +532,18 @@ export function GrootPage() {
         className="stack rune-workspace panel-scope"
         style={{ '--panel-font': `${font.px}px` } as CSSProperties}
       >
-        {showsRestore(restorable, blank) && (
-          <Toast kind="info">
-            <span className="rune-restore">
-              Restore the draft from your last visit?
-              <Button size="sm" onClick={restoreDraft}>
-                Restore
-              </Button>
-              <Button size="sm" variant="ghost" onClick={dismissDraft}>
-                Dismiss
-              </Button>
-            </span>
-          </Toast>
-        )}
+        <DraftNotices
+          offer={drafts.offer}
+          blank={drafts.showOffer}
+          busy={drafts.offerBusy}
+          onRestore={() => void restoreDraft()}
+          onDismiss={drafts.dismissOffer}
+          offerError={drafts.offerError}
+          conflict={drafts.conflict}
+          onKeepLocal={drafts.keepLocal}
+          onUseServer={takeServerVersion}
+          writeError={drafts.writeError}
+        />
 
         {overCap && maxBytes !== null && (
           <Toast kind="danger">

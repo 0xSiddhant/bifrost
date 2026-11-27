@@ -16,7 +16,7 @@
 4. Run the `verify` skill (`.claude/skills/verify/SKILL.md`) locally — must pass.
 5. Push and raise a **PR into `develop`**. Title: `feat(plan-XX): <summary>`. Body: what the plan delivered, any deviations + why, test evidence.
 6. CI must be green. User reviews and merges. Never self-merge.
-7. Update `.agents/memory/progress.md` in the same PR.
+7. In the same PR: mark the plan `done` in `.agents/memory/progress.md`'s plan table, remove its row from `plans/README.md`, and delete the plan file (git keeps it; the merged code is the spec of record). Add a `decisions.md` line for each deviation or owner call a later change could undo.
 
 ## Commits — Conventional Commits, enforced by commitlint + husky
 

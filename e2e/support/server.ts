@@ -231,7 +231,30 @@ async function bootFailure(
   );
 }
 
+/**
+ * How many times a server whose ports this harness picked itself is started
+ * afresh when one of them was taken. `freePort()` can only say a port was free
+ * a moment ago: another worker's server (four start at once in CI) can bind it
+ * before this one does, and the API then dies with EADDRINUSE (CI run
+ * 45961921150, webkit 2/2). New ports make that a non-event.
+ */
+const PORT_RACE_ATTEMPTS = 3;
+
+const addressInUse = (error: unknown): boolean =>
+  (error instanceof Error ? error.message : String(error)).includes('EADDRINUSE');
+
 export async function startServer(options: StartServerOptions = {}): Promise<E2EServer> {
+  const ownPorts = options.port === undefined && options.apiPort === undefined;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await startServerOnce(options);
+    } catch (error) {
+      if (!ownPorts || attempt >= PORT_RACE_ATTEMPTS || !addressInUse(error)) throw error;
+    }
+  }
+}
+
+async function startServerOnce(options: StartServerOptions): Promise<E2EServer> {
   const buildRoot = options.buildRoot ?? REPO_ROOT;
   const entry = path.join(buildRoot, 'server', 'dist', 'bootstrap.js');
   const otel = path.join(buildRoot, 'server', 'dist', 'otel.js');
@@ -251,7 +274,10 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
 
   const profile = options.profile ?? 'local';
   const port = options.port ?? (await freePort());
-  const apiPort = hasWebHost ? (options.apiPort ?? (await freePort())) : port;
+  let apiPort = hasWebHost ? (options.apiPort ?? (await freePort())) : port;
+  // Two probes can be handed the same ephemeral port in turn; the web host and
+  // the API would then race for it.
+  while (hasWebHost && options.apiPort === undefined && apiPort === port) apiPort = await freePort();
   let jail: string | null = null;
   let canary: Canary | null = null;
   let storageRoot: string;
@@ -321,7 +347,11 @@ export async function startServer(options: StartServerOptions = {}): Promise<E2E
     if (web) await waitForHealth(baseUrl, bothAlive, 30_000, '/healthz');
   } catch (error) {
     await haltBoth();
-    throw await bootFailure(error, { api, web }, () => output, logFile);
+    const failure = await bootFailure(error, { api, web }, () => output, logFile);
+    // Read the log first; then a scratch storage this harness made is its to remove.
+    if (!options.keepStorage && !options.storageRoot)
+      fs.rmSync(jail ?? storageRoot, { recursive: true, force: true });
+    throw failure;
   }
 
   return {

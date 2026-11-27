@@ -37,9 +37,9 @@ const clipboard = vi.hoisted(() => ({ copyText: vi.fn(() => Promise.resolve(true
 vi.mock('../../core/copy', () => clipboard);
 
 import { RunestonePage } from './RunestonePage';
-import { clearDraft, loadDraft, saveDraft } from './draft';
 import { putRunestoneSeed } from '../../core/runestoneSeed';
-import { takeLeftOpen } from '../../core/draftReturn';
+import { SCRATCH, recordKey } from '../../core/drafts/records';
+import { installTestSession, uninstallTestSession } from '../../core/drafts/testing';
 
 const COMMENTED = '{\n  // the port\n  "port": 4646,\n  "big": 9007199254740993,\n}';
 
@@ -58,6 +58,13 @@ const SAVED = {
 describe('RunestonePage — JSON and JSONC', () => {
   let container: HTMLDivElement;
   let root: Root;
+  let tab: string;
+
+  /** This tab's scratch draft, as stored. */
+  const ownDraft = () => {
+    const raw = localStorage.getItem(recordKey('runestone', tab, SCRATCH));
+    return raw === null ? null : (JSON.parse(raw) as { payload: Record<string, unknown> }).payload;
+  };
 
   const render = async () => {
     await act(async () => {
@@ -126,9 +133,8 @@ describe('RunestonePage — JSON and JSONC', () => {
     Range.prototype.getBoundingClientRect = () => new DOMRect();
     localStorage.clear();
     sessionStorage.clear();
-    clearDraft();
-    // The previous test's unmount marks the buffer left open (module scope).
-    takeLeftOpen('runestone');
+    // A tab of its own per test, with drafts coordinated in memory (PLAN-43).
+    tab = installTestSession().me()?.tab ?? '';
     vi.clearAllMocks();
     vi.stubGlobal(
       'confirm',
@@ -143,6 +149,7 @@ describe('RunestonePage — JSON and JSONC', () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    uninstallTestSession();
     vi.unstubAllGlobals();
   });
 
@@ -263,9 +270,9 @@ describe('RunestonePage — JSON and JSONC', () => {
     putRunestoneSeed({ title: 'Drafted', text: COMMENTED, format: 'jsonc' });
     await render();
     await settle(600);
-    expect(loadDraft()).toMatchObject({ title: 'Drafted', text: COMMENTED, format: 'jsonc' });
+    expect(ownDraft()).toMatchObject({ title: 'Drafted', text: COMMENTED, format: 'jsonc' });
 
-    // Leaving and coming back inside the page's lifetime restores it silently.
+    // Leaving and coming back (or reloading) in this tab restores it silently.
     await act(async () => root.unmount());
     root = createRoot(container);
     await render();
@@ -274,25 +281,35 @@ describe('RunestonePage — JSON and JSONC', () => {
     expect((await exported()).text).toBe(COMMENTED);
   });
 
-  it("restores an earlier visit's JSONC draft in JSONC", async () => {
-    saveDraft({ title: 'Earlier', text: COMMENTED, format: 'jsonc', savedAt: 1 });
+  it('restores a JSONC draft saved before the per-tab update in JSONC', async () => {
+    localStorage.setItem(
+      'bifrost.runestone.draft',
+      JSON.stringify({ title: 'Earlier', text: COMMENTED, format: 'jsonc', savedAt: 1 }),
+    );
     await render();
+    await settle(50);
     // Offered, not applied: the editor opens blank in strict JSON.
+    expect(container.textContent).toContain('Restore draft saved before this update?');
     expect(radio('json').checked).toBe(true);
     await click(button('Restore'));
+    await settle(50);
     expect(radio('jsonc').checked).toBe(true);
+    expect(localStorage.getItem('bifrost.runestone.draft')).toBeNull();
     await settle();
     expect((await exported()).text).toBe(COMMENTED);
   });
 
-  it('reads a draft cached before PLAN-42 as strict JSON', () => {
+  it('reads a draft cached before PLAN-42 (no format) as strict JSON', async () => {
     localStorage.setItem(
       'bifrost.runestone.draft',
       JSON.stringify({ title: 'Old', text: '{"a":1}', savedAt: 1 }),
     );
-    expect(loadDraft()).toEqual({ title: 'Old', text: '{"a":1}', format: 'json', savedAt: 1 });
-    saveDraft({ title: 'New', text: '{}', format: 'jsonc', savedAt: 2 });
-    expect(loadDraft()?.format).toBe('jsonc');
+    await render();
+    await settle(50);
+    await click(button('Restore'));
+    await settle(50);
+    expect(radio('json').checked).toBe(true);
+    expect(container.querySelector<HTMLInputElement>('input.rune-title')?.value).toBe('Old');
   });
 
   it('imports .jsonc as JSONC (strict contents included) and .json as JSON', async () => {

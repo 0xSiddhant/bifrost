@@ -9,9 +9,9 @@ Two plans drafted the same day both needed a second pass to catch real defects �
 
 ## 1. Read before drafting
 
-Same order CLAUDE.md already mandates, applied specifically to plan-authoring: `.agents/context/architecture.md`, `.agents/rules/coding.md`, `.agents/rules/git.md`, the recent tail of `.agents/memory/progress.md` and `.agents/memory/decisions.md`. Then **read 2–3 actual recent plan files** (the three highest-numbered files in `.agents/plans/completed/` are a good default set) as live templates — not from memory of "the format." The format has drifted over the project's history (see §2); working from a stale mental model is exactly how a plan ends up citing a section nobody else uses.
+Same order CLAUDE.md already mandates, applied specifically to plan-authoring: `.agents/context/architecture.md`, `.agents/rules/coding.md`, `.agents/rules/git.md`, `.agents/memory/progress.md` and `.agents/memory/decisions.md`. Then **read 2–3 actual recent plan files** as live templates: the open ones in `.agents/plans/`, and recent merged ones from git (merged plan files are deleted; `git log --diff-filter=D --name-only -- .agents/plans/` finds them, `git show <commit>^:<path>` prints one) — not from memory of "the format." The format has drifted over the project's history (see §2); working from a stale mental model is exactly how a plan ends up citing a section nobody else uses.
 
-**The plan number is mechanical, not a guess**: it's one more than the highest `PLAN-N` row already in `.agents/plans/README.md`'s gate table (check the table itself, not just the newest file in `completed/` — a plan can be drafted, gated, and sitting un-implemented). The gate is "PLAN-(N-1) merged" worded the way the existing rows word it, even when that prior plan hasn't actually merged yet at drafting time — every plan in this project's history was gated on paper before the thing it depended on was necessarily done.
+**The plan number is mechanical, not a guess**: it's one more than the highest plan in `.agents/memory/progress.md`'s plan table, which lists every plan, drafted or done (PLAN-99 aside). The gate is "PLAN-(N-1) merged" worded the way the existing rows word it, even when that prior plan hasn't actually merged yet at drafting time — every plan in this project's history was gated on paper before the thing it depended on was necessarily done.
 
 ## 2. The section order
 
@@ -27,10 +27,10 @@ The order current plans use:
 6. `## Scope` (**In:**/**Out:**) — a dedicated section in every current plan; it matters most when there is real scope ambiguity (several related backlog items, a feature easily confused with a bigger one), where a section a reader can find by its own heading beats a sentence buried in Goal. Fold scope into Goal only when one sentence genuinely covers the boundary.
 7. `## Decisions & reasoning` — always present, the plan's real content. Early, small plans (00–11ish) use a flat bullet list; from roughly PLAN-12 onward, plans use `###` subheadings per named decision, each a short essay with real reasoning, not just a conclusion. Match the `###` style — it's what makes a decision individually citable later (see how often this project's own plans and progress notes reference "PLAN-19's Tabs decision" or "PLAN-23's parsererror finding" by name). A `⚠️` prefix on a paragraph is this project's convention for "read this one carefully, it's a trap" (PLAN-17 uses it six times over a handful of hazards it found; most plans use it zero or once) — use it the same way, for a real trap worth flagging, not as routine emphasis.
 8. `## API contracts` — a table (`| Method & path | Purpose | Notes |`, the Notes column optional for simple contracts) whenever the plan adds or changes routes. For a genuinely pure-client plan with zero server surface, PLAN-18 states it explicitly ("None. The `toolbox` module registers no routes; every tool is pure client compute.") rather than omitting the section — that's the stronger pattern, and the one to follow: an explicit "none" reads as a checked box, silent omission reads as an oversight (PLAN-20 omits the section outright, which is the weaker of the two legitimate options for the same situation).
-9. `## Task checklist` (`## Tasks` for a short, simple plan — the two headings pair with `## Test checklist`/`## Tests` respectively; pick the pair that matches the plan's size, don't mix `Tasks` with `Test checklist`). Every checkbox starts unchecked (`[ ]`); they generally **stay** unchecked even after the plan is archived to `completed/` — most archived plans do, a couple (16, 18) got flipped to `[x]` during implementation. Don't pre-check anything while drafting.
+9. `## Task checklist` (`## Tasks` for a short, simple plan — the two headings pair with `## Test checklist`/`## Tests` respectively; pick the pair that matches the plan's size, don't mix `Tasks` with `Test checklist`). Every checkbox starts unchecked (`[ ]`). Don't pre-check anything while drafting.
 10. `## Acceptance criteria` — numbered, sequentially, from 1. If a mid-draft edit needs to insert a criterion, **renumber the whole list** rather than inserting `9a`/`9b` — ad-hoc suffixes are a drafting artifact, not a style, and step 4 below exists partly to catch them before they ship.
 11. `## Test checklist` (or `## Tests`) — grouped by kind where the plan is big enough to warrant it (Unit / Integration / Component / Live-verify / Manual is the common grouping), a flat list where it isn't.
-12. **Optional: `## On completion`** — only for a plan promoted from `PLAN-99-future-backlog.md`. States that the backlog row is already gone (rows get deleted from PLAN-99 when a plan is *scheduled*, not when it *finishes* — see PLAN-18/20/21/22/23's identical notes on this) and that archiving this file to `completed/` happens in this plan's own implementation PR.
+12. **Optional: `## On completion`** — only for a plan promoted from `PLAN-99-future-backlog.md`. States that the backlog row is already gone (rows get deleted from PLAN-99 when a plan is *scheduled*, not when it *finishes* — see PLAN-18/20/21/22/23's identical notes on this) and that deleting this file happens in this plan's own implementation PR.
 
 ## 3. Before writing "Decisions & reasoning," read the real code
 
@@ -62,11 +62,11 @@ Read the whole draft start to finish and check each of these explicitly. Every o
 
 A plan is not "just a file" the moment it's written. In the same session, before considering the plan done:
 
-- Add a gate-table row to `.agents/plans/README.md`, matching the existing rows' phrasing (`PLAN-N merged. Single PR.` or the multi-part shape).
-- Log the real design calls in `.agents/memory/decisions.md` — dated, with the actual reasoning (not "decided X," but *why*), one row per distinct call, matching the density and specificity every existing row already has.
-- Add a session note to `.agents/memory/progress.md`'s "Recent activity" section (newest first), ending with something like "Nothing implemented — plan only" when that's true. This is the project's own established pattern for every plan-only session (PLAN-18 through 25's planning sessions all do this).
+- Add a row to the "Open plans" table in `.agents/plans/README.md`, with its gate.
+- Add a `not started` row to the plan table in `.agents/memory/progress.md`.
+- Add to `.agents/memory/decisions.md` one line (date, decision, why) for each owner call or design rule a later change could undo without knowing it. The plan file holds the full reasoning; it is deleted once implemented, so whatever must outlive it goes in `decisions.md`.
 
-The plan file itself lives at `.agents/plans/PLAN-XX-<slug>.md` — directly under `plans/`, **not** under `completed/`. It only moves to `completed/` as part of its own implementation PR, once real work has landed.
+The plan file itself lives at `.agents/plans/PLAN-XX-<slug>.md`. Its own implementation PR deletes it, removes its README row and marks it done in `progress.md`.
 
 ## Boundaries
 

@@ -47,6 +47,9 @@ destroy the conventional-commit history the workflow reads).
    attached (`bifrost-vX.Y.Z.tar.gz` and `bifrost-cli-X.Y.Z.tgz`); `CHANGELOG.md` updated; `develop` fast-forwarded to `main` (carries
    the `chore(release):` commit). Report the tag URL, release URL, and
    develop==main confirmation.
+5. **Record it**: a one-line docs PR into `develop` sets the *Latest release*
+   line in `.agents/memory/progress.md` to the new tag and date, and adds it to
+   the journey if the release marks a step worth remembering.
 
 ## When it doesn't fire / needs a hand
 

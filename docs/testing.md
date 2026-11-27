@@ -87,7 +87,7 @@ The old `cloud` project is gone: the client's nav comes from its build now, not 
 
 ### Isolation
 
-Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port), with:
+Each Playwright worker and each Vitest e2e file starts **its own hub** (the API and the web host, each on a free port; a port taken by another process before the server bound it, `EADDRINUSE`, means up to two fresh starts on new ports), with:
 
 - a fresh `mkdtemp` storage root;
 - every key in `.env.example` and in your own `.env` blanked to its built-in default. The server's dotenv never overrides a set key, so without this a developer's real `.env` would leak into the suite;
@@ -145,7 +145,21 @@ A bug the net finds that is out of the current PR's scope is never skipped:
 
 When the fix lands, the pin or workaround comes out in the same PR. The test then exercises the fixed path and catches a regression.
 
-All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed (see `progress.md`). None are pinned today.
+All seven bugs PLAN-32a found were fixed in the follow-up `fix/plan-32a-findings` PR, and their pins and workarounds were removed. None are pinned today.
+
+### Multi-tab draft recovery (PLAN-43)
+
+Per-tab drafts have no browser journeys: the multi-tab journeys written for PLAN-43 were removed at the owner's decision (2026-11-27) after they kept failing in CI's WebKit. Coverage is the unit tests: `client/src/core/drafts/protocol.test.ts` (known-closed, transfer once, racing accepts, quota and blocked storage, failed and interrupted commits, newest-wins pruning, the legacy journal), `identity.test.ts` (duplicate tabs, reloads), `session.test.ts`, `core/draftCache.test.tsx`, the Runestone page tests and Variant's. The editors' existing journeys still run through every editor page.
+
+**Browser lifecycle limitations** (measured in the PLAN-43 spike, Chromium 1243 headless; WebKit runs in CI only):
+
+- A close, a reload and a navigation to another site all fire the same `pagehide` with `persisted === false`; nothing tells them apart at that moment. A tab is therefore known closed only after it left a departure marker, the IndexedDB registry still names the same page lifetime (a reload, a Back navigation or a reopened tab registers a new one as it starts) and the grace has passed. **A tab that leaves the app and returns later than the grace may find its draft moved to another tab (after 10 s) or pruned (after 10 minutes)**; the owner accepted this on 2026-11-26.
+- A tab that is frozen, discarded, killed with the browser or kept in the back/forward cache writes no marker, so its drafts are never offered or pruned; they come back only if that tab does (a restored session, "reopen closed tab").
+- Headless Chromium uses no back/forward cache even without Playwright's `--disable-back-forward-cache`, and `Page.setWebLifecycleState` fires no `freeze`/`resume` events there: those paths are covered by reasoning and unit tests, not journeys.
+- `navigator.locks` exists only in a secure context: present at `http://127.0.0.1`, missing at `http://<LAN address>`, which is how the hub is reached. IndexedDB and `BroadcastChannel` exist on both, so the lock is an IndexedDB transaction.
+- Under that lock a tab can still read another tab's `localStorage` write a moment stale (0–2 lost updates per 1,000 in the spike), so everything that must agree across tabs lives in IndexedDB.
+
+**By hand, on the real devices** (not automatable here): duplicate a tab with the browser's own "Duplicate tab" in Chrome and Safari and check each tab keeps its own draft; close a tab and reopen it with ⌘⇧T within ten minutes; on an iPhone or iPad, let Safari unload a background tab, come back, and check the draft is restored without an offer.
 
 ## The black-box API suite (PLAN-33)
 
