@@ -108,6 +108,64 @@ describe('DraftSession (PLAN-43)', () => {
     }
   });
 
+  it('never drops or brings forward a requested sweep, over random request schedules', async () => {
+    // Manual time: every timer the session arms is ours to fire in order.
+    for (let seed = 1; seed <= 200; seed += 1) {
+      let state = seed;
+      const random = () => {
+        state = (Math.imul(state ^ (state >>> 15), 2246822507) + 0x9e3779b9) >>> 0;
+        return state / 4294967296;
+      };
+      let clock = 0;
+      let nextId = 0;
+      const timers = new Map<number, { at: number; fn: () => void }>();
+      const session = start({
+        now: () => clock,
+        target: null,
+        doc: null,
+        setTimer: (fn, ms) => {
+          nextId += 1;
+          timers.set(nextId, { at: clock + ms, fn });
+          return nextId;
+        },
+        clearTimer: (handle) => timers.delete(handle as number),
+      });
+      const sweeps: number[] = [];
+      vi.spyOn(session, 'sweepNow').mockImplementation(async () => {
+        sweeps.push(clock);
+        return 0;
+      });
+      const advance = (to: number) => {
+        for (;;) {
+          const due = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+          if (!due || due[1].at > to) break;
+          timers.delete(due[0]);
+          clock = due[1].at;
+          due[1].fn();
+        }
+        clock = to;
+      };
+      const requests: { at: number; delay: number }[] = [];
+      for (let i = 0; i < 30; i += 1) {
+        advance(clock + Math.floor(random() * 5_000));
+        const delay = random() < 0.5 ? 2_000 : PRUNE_GRACE_MS + 1_000;
+        requests.push({ at: clock, delay });
+        session.requestSweep(delay);
+      }
+      advance(clock + PRUNE_GRACE_MS * 3);
+      for (const request of requests) {
+        const due = request.at + request.delay;
+        // A sweep runs once the request is due (a departed tab's draft is
+        // prunable only then): one that ran only before would leave it.
+        if (!sweeps.some((at) => at >= due))
+          throw new Error(
+            `seed ${seed}: no sweep for a request at ${request.at} (+${request.delay})`,
+          );
+      }
+      session.stop();
+    }
+  });
+
   it('asks again whether a twin holds its id when it wakes or becomes visible', () => {
     const sent: unknown[] = [];
     const channel = {

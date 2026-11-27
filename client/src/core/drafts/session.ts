@@ -205,9 +205,11 @@ export class DraftSession {
       return;
     }
     const due = this.deps.now() + delayMs;
-    // Departures moments apart share one sweep.
-    if (!this.pruneDue.some((at) => Math.abs(at - due) < SWEEP_DEBOUNCE_MS))
-      this.pruneDue.push(due);
+    // Departures moments apart share one sweep, at the later of their times:
+    // run at the earlier one, the later departure would not be prunable yet.
+    const near = this.pruneDue.findIndex((at) => Math.abs(at - due) < SWEEP_DEBOUNCE_MS);
+    if (near === -1) this.pruneDue.push(due);
+    else this.pruneDue[near] = Math.max(this.pruneDue[near] ?? due, due);
     this.armPrune();
   }
 
